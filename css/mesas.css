@@ -1,0 +1,155 @@
+/* ================================================================
+   PubPOS — CSS MODULAR
+   Archivo: css/mesas.css
+   Propósito: Grilla de mesas y tarjetas de mesa
+              Incluye estilos para mesa virtual y checkboxes de fusión.
+   ================================================================ */
+
+/* ── GRID DE MESAS ─────────────────────────────────────────── */
+.mesas-grid {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 16px;
+  align-content: start;
+}
+
+/* ── TARJETA DE MESA ───────────────────────────────────────── */
+.mesa-card {
+  background: var(--color-card);
+  border: 2px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 20px 16px;
+  cursor: pointer;
+  transition: var(--t);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  user-select: none;
+  position: relative;
+  text-align: center;
+}
+.mesa-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow);
+}
+
+/* ── COLORES POR ESTADO ────────────────────────────────────── */
+.mesa-card.libre    { border-color: var(--color-border); }
+.mesa-card.libre:hover { border-color: var(--color-success); }
+.mesa-card.ocupada  { border-color: var(--color-danger); }
+.mesa-card.esperando{ border-color: var(--color-warning); }
+.mesa-card.cuenta   { border-color: var(--color-info); }
+
+/* ── MESA VIRTUAL (FUSIONADA) ──────────────────────────────── */
+.mesa-card.mesa-virtual {
+  border-style: dashed;
+  border-width: 3px;
+  border-color: var(--color-accent);
+  background: rgba(245, 158, 11, 0.05);
+}
+.mesa-virtual-badge {
+  font-size: 10px;
+  background: var(--color-accent);
+  color: #000;
+  padding: 2px 8px;
+  border-radius: 99px;
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+}
+
+/* ── CHECKBOX DE SELECCIÓN (MODO FUSIÓN) ───────────────────── */
+.mesa-checkbox {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 20px;
+  height: 20px;
+  accent-color: var(--color-accent);
+  cursor: pointer;
+  z-index: 2;
+}
+
+/* ── CONTENIDO ─────────────────────────────────────────────── */
+.mesa-icon { font-size: 26px; margin-bottom: 2px; }
+
+.mesa-card.libre    > .mesa-icon { color: var(--color-text-muted); }
+.mesa-card.ocupada  > .mesa-icon { color: var(--color-danger); }
+.mesa-card.esperando> .mesa-icon { color: var(--color-warning); }
+.mesa-card.cuenta   > .mesa-icon { color: var(--color-info); }
+.mesa-card.mesa-virtual > .mesa-icon { color: var(--color-accent); }
+
+.mesa-numero {
+  font-size: 30px;
+  font-weight: 800;
+  line-height: 1;
+}
+.mesa-card.libre    .mesa-numero { color: var(--color-text-sec); }
+.mesa-card.ocupada  > .mesa-numero { color: var(--color-danger); }
+.mesa-card.esperando > .mesa-numero { color: var(--color-warning); }
+.mesa-card.cuenta    > .mesa-numero { color: var(--color-info); }
+.mesa-card.mesa-virtual > .mesa-numero { color: var(--color-accent); }
+
+.mesa-estado-label {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  font-weight: 600;
+}
+.mesa-mozo {
+  font-size: 11px;
+  color: var(--color-accent);
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.mesa-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--color-text-sec);
+}
+.mesa-tiempo  { font-size: 10px; color: var(--color-text-muted); }
+.mesa-total   { font-size: 14px; font-weight: 700; color: var(--color-success); }
+
+/* Badge de esquina (cuenta / listo) */
+.mesa-corner-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9px;
+  font-weight: 800;
+  border: 2px solid var(--color-bg);
+}
+.mesa-corner-badge.cuenta   { background: var(--color-info);    color: #fff; }
+.mesa-corner-badge.esperando{ background: var(--color-warning);  color: #000; }
+
+/* ── RESPONSIVE ────────────────────────────────────────────── */
+@media (max-width: 600px) {
+  .mesas-grid {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 12px;
+    padding: 16px;
+  }
+  .mesa-card {
+    padding: 14px 8px;
+  }
+  .mesa-numero {
+    font-size: 24px;
+  }
+}

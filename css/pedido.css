@@ -1,0 +1,647 @@
+/* ================================================================
+   PubPOS — CSS MODULAR
+   Archivo: css/pedido.css
+   Propósito: Modal de pedido, carta de productos y comanda
+   Versión: Pantalla completa en móviles, footer siempre visible
+   ================================================================ */
+
+/* ── MODAL BASE ────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.72);
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  backdrop-filter: blur(4px);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-panel);
+  flex-shrink: 0;
+  gap: 12px;
+}
+.modal-header h3 {
+  font-size: 15px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.modal-header h3 i { color: var(--color-accent); }
+
+.modal-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 18px;
+  font-weight: 800;
+}
+.modal-title i { color: var(--color-accent); }
+
+.modal-close {
+  background: var(--color-hover);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-sec);
+  width: 34px;
+  height: 34px;
+  cursor: pointer;
+  transition: var(--t);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.modal-close:hover { background: var(--color-danger); color: #fff; border-color: var(--color-danger); }
+
+.estado-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 99px;
+  background: var(--color-hover);
+  color: var(--color-text-sec);
+}
+.estado-badge.ocupada  { background: rgba(239,68,68,.15);  color: var(--color-danger); }
+.estado-badge.libre    { background: rgba(34,197,94,.15);  color: var(--color-success); }
+.estado-badge.cuenta   { background: rgba(59,130,246,.15); color: var(--color-info); }
+.estado-badge.esperando{ background: rgba(245,158,11,.15); color: var(--color-warning); }
+
+/* ── MODAL PEDIDO (ventana flotante) ───────────────────────── */
+.modal-pedido {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  width: 100%;
+  max-width: 1100px;
+  height: 100%;
+  max-height: calc(100vh - 24px);
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+@media (max-width: 480px) {
+  .modal-overlay { padding: 8px; }
+  .modal-pedido { max-height: calc(100vh - 16px); }
+}
+
+.modal-pedido .modal-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ── PANEL CARTA (izquierda) ───────────────────────────────── */
+.carta-panel {
+  width: 60%;
+  border-right: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.carta-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-panel);
+  flex-shrink: 0;
+}
+.carta-search i { color: var(--color-text-muted); }
+.carta-search input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--color-text);
+  font-size: 14px;
+}
+.carta-search input::placeholder { color: var(--color-text-muted); }
+
+.categorias-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--color-border);
+  overflow-x: auto;
+  flex-shrink: 0;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.categorias-tabs::-webkit-scrollbar { display: none; }
+
+.cat-tab {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 99px;
+  color: var(--color-text-sec);
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--t);
+}
+.cat-tab:hover  { border-color: var(--color-accent); color: var(--color-accent); }
+.cat-tab.active { background: var(--color-accent); color: #000; border-color: var(--color-accent); font-weight: 700; }
+
+.carta-productos {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  align-content: start;
+  -webkit-overflow-scrolling: touch;
+}
+
+.prod-card {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  cursor: pointer;
+  transition: var(--t);
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.prod-card:hover {
+  border-color: var(--color-accent);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(245,158,11,.2);
+}
+.prod-card:active { transform: scale(.97); }
+
+.prod-nombre {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+  line-height: 1.3;
+}
+.prod-desc {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  line-height: 1.3;
+}
+.prod-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+.prod-precio {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--color-accent);
+}
+.prod-destino-tag {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 99px;
+  text-transform: uppercase;
+}
+.prod-destino-tag.barra  { background: rgba(139,92,246,.15); color: var(--color-barra); }
+.prod-destino-tag.cocina { background: rgba(249,115,22,.15);  color: var(--color-cocina); }
+.prod-destino-tag.ambos  { background: rgba(245,158,11,.15);  color: var(--color-accent); }
+
+/* ── PANEL COMANDA (derecha) ───────────────────────────────── */
+.comanda-panel {
+  width: 40%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.comanda-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-panel);
+  flex-shrink: 0;
+}
+.comanda-meta {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.comanda-meta span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-text-sec);
+}
+.comanda-meta select,
+.comanda-meta input[type="number"] {
+  background: var(--color-hover);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  padding: 6px 10px;
+  font-size: 13px;
+  outline: none;
+}
+.comanda-meta input[type="number"] { width: 60px; }
+.comanda-meta select option { background: var(--color-panel); }
+
+.comanda-items {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+.comanda-items::-webkit-scrollbar { width: 3px; }
+.comanda-items::-webkit-scrollbar-thumb { background: var(--color-border); border-radius: 4px; }
+
+.comanda-vacia {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--color-text-muted);
+  text-align: center;
+  padding: 24px;
+}
+.comanda-vacia i { font-size: 40px; opacity: .3; }
+.comanda-vacia p { font-size: 13px; }
+
+.comanda-item {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 9px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  transition: var(--t);
+}
+.comanda-item:hover { border-color: var(--color-accent); }
+.comanda-item.enviado {
+  opacity: .75;
+  border-left: 3px solid var(--color-success);
+}
+.comanda-item.enviado .item-nombre::after {
+  content: ' ✓';
+  font-size: 10px;
+  color: var(--color-success);
+  font-weight: 700;
+}
+
+.item-qty-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.qty-btn {
+  background: var(--color-hover);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xs);
+  color: var(--color-text);
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+  font-size: 18px;
+  transition: var(--t);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.qty-btn:hover  { background: var(--color-accent); color: #000; border-color: var(--color-accent); }
+.qty-btn:disabled { opacity: .35; cursor: not-allowed; }
+.qty-btn:disabled:hover { background: var(--color-hover); color: var(--color-text); border-color: var(--color-border); }
+
+.item-qty {
+  font-size: 15px;
+  font-weight: 800;
+  min-width: 24px;
+  text-align: center;
+}
+.item-info   { flex: 1; min-width: 0; }
+.item-nombre {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.item-obs-input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  outline: none;
+  padding: 2px 0;
+  margin-top: 2px;
+  transition: var(--t);
+}
+.item-obs-input::placeholder { color: var(--color-text-muted); }
+.item-obs-input:focus { border-color: var(--color-accent); }
+.item-precio {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-accent);
+  flex-shrink: 0;
+}
+.item-remove {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px;
+  transition: var(--t);
+  flex-shrink: 0;
+}
+.item-remove:hover { color: var(--color-danger); }
+
+.comanda-obs {
+  padding: 10px 12px;
+  border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+.comanda-obs input {
+  width: 100%;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  padding: 10px 12px;
+  font-size: 13px;
+  outline: none;
+  transition: var(--t);
+}
+.comanda-obs input:focus { border-color: var(--color-accent); }
+
+.comanda-footer {
+  padding: 12px;
+  border-top: 2px solid var(--color-border);
+  background: var(--color-panel);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.comanda-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 16px;
+  font-weight: 700;
+}
+.comanda-total .total-monto {
+  color: var(--color-accent);
+  font-size: 22px;
+}
+
+.comanda-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+.btn-comanda {
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 12px 6px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--t);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  letter-spacing: .2px;
+}
+.btn-barra  { background: rgba(139,92,246,.2); color: var(--color-barra);  border-color: rgba(139,92,246,.3); }
+.btn-barra:hover  { background: var(--color-barra);  color: #fff; }
+.btn-cocina { background: rgba(249,115,22,.2);  color: var(--color-cocina); border-color: rgba(249,115,22,.3); }
+.btn-cocina:hover { background: var(--color-cocina); color: #fff; }
+.btn-todo   { background: rgba(245,158,11,.2);  color: var(--color-accent); border-color: rgba(245,158,11,.3); }
+.btn-todo:hover   { background: var(--color-accent); color: #000; }
+
+.comanda-actions-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.btn-cuenta {
+  background: rgba(59,130,246,.15);
+  border: 1px solid rgba(59,130,246,.3);
+  color: var(--color-info);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--t);
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+}
+.btn-cuenta:hover { background: var(--color-info); color: #fff; }
+
+.btn-cerrar-mesa {
+  background: rgba(34,197,94,.15);
+  border: 1px solid rgba(34,197,94,.3);
+  color: var(--color-success);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--t);
+  display: flex; align-items: center; justify-content: center; gap: 5px;
+}
+.btn-cerrar-mesa:hover { background: var(--color-success); color: #fff; }
+
+button, .btn-comanda, .btn-cuenta, .btn-cerrar-mesa, .cat-tab, .prod-card {
+  touch-action: manipulation;
+}
+
+/* ================================================================
+   MÓVIL: PANTALLA COMPLETA, FOOTER SIEMPRE VISIBLE
+   ================================================================ */
+@media (max-width: 767px) {
+  /* Overlay sin padding, modal pegado abajo */
+  .modal-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+
+  /* Modal ocupa toda la pantalla */
+  .modal-pedido {
+    height: 100vh;
+    max-height: 100vh;
+    width: 100%;
+    border-radius: 0;
+    margin: 0;
+    box-shadow: none;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .modal-pedido .modal-header {
+    flex-shrink: 0;
+    padding: 10px 16px;
+  }
+
+  /* Cuerpo con Grid: dos filas explícitas */
+  .modal-pedido .modal-body {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-rows: minmax(25vh, 35vh) 1fr; /* Carta: 25-35% altura, Comanda: resto */
+    grid-template-columns: 100%;
+    overflow: hidden;
+    gap: 0;
+  }
+
+  /* Panel Carta (fila 1) */
+  .carta-panel {
+    grid-row: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-bottom: 2px solid var(--color-border);
+    width: 100%;
+    border-right: none;
+  }
+
+  .carta-search,
+  .categorias-tabs {
+    flex-shrink: 0;
+  }
+
+  .carta-productos {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 8px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
+    align-content: start;
+  }
+
+  /* Panel Comanda (fila 2) */
+  .comanda-panel {
+    grid-row: 2;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow: hidden;
+    width: 100%;
+  }
+
+  .comanda-header {
+    flex-shrink: 0;
+    padding: 8px 12px;
+  }
+
+  .comanda-items {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .comanda-obs {
+    flex-shrink: 0;
+    padding: 8px 12px;
+  }
+
+  /* FOOTER SIEMPRE VISIBLE */
+  .comanda-footer {
+    flex-shrink: 0;
+    padding: 10px 12px;
+    border-top: 2px solid var(--color-border);
+    background: var(--color-panel);
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.15);
+  }
+
+  /* Ajustes táctiles */
+  .btn-comanda,
+  .btn-cuenta,
+  .btn-cerrar-mesa {
+    padding: 14px 6px;
+    font-size: 13px;
+  }
+
+  .cat-tab {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+
+  .comanda-meta select,
+  .comanda-meta input {
+    font-size: 16px;
+  }
+
+  /* Ocultar scrollbars para estética */
+  .carta-productos::-webkit-scrollbar,
+  .comanda-items::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .comanda-vacia {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .item-persona-badge {
+  font-size: 10px;
+  background: var(--color-primary);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 99px;
+  margin-left: 6px;
+}
+.cierre-persona-group {
+  margin-bottom: 12px;
+  border-bottom: 1px dashed var(--color-border);
+}
+.cierre-persona-header {
+  font-weight: bold;
+  display: flex;
+  justify-content: space-between;
+}
+.pago-persona-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+}
+}

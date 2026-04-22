@@ -1,0 +1,349 @@
+/* ================================================================
+   PubPOS — CSS MODULAR
+   Archivo: css/despensa.css
+   Propósito: Estilos específicos para la vista de Despensa
+              (tabla de ingredientes, sidebar, modales de ajuste).
+   ================================================================ */
+
+/* ── LAYOUT PRINCIPAL (Grid de 2 columnas) ─────────────────── */
+.despensa-grid {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 20px;
+  padding: 20px;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Panel izquierdo: tabla de ingredientes (permite scroll horizontal) */
+.despensa-main {
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  padding-right: 4px;
+  position: relative;
+}
+
+/* Sombra indicadora de contenido desplazable (se activa con JS) */
+.despensa-main::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 24px;
+  height: 100%;
+  background: linear-gradient(to right, transparent, rgba(0,0,0,0.15));
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: 2;
+}
+
+.despensa-main.scrollable::after {
+  opacity: 1;
+}
+
+/* Panel derecho: movimientos y alertas */
+.despensa-sidebar {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+}
+
+/* ── TABLA DE INGREDIENTES ─────────────────────────────────── */
+.ingredientes-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  background: var(--color-card);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.ingredientes-table th {
+  text-align: left;
+  padding: 12px 10px;
+  background: var(--color-panel);
+  color: var(--color-text-muted);
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--color-border);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.ingredientes-table td {
+  padding: 10px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+  vertical-align: middle;
+}
+
+.ingredientes-table tbody tr:hover td {
+  background: var(--color-hover);
+}
+
+/* Fila con stock bajo */
+.ingredientes-table tr.stock-bajo {
+  background: rgba(239, 68, 68, 0.08);
+  border-left: 3px solid var(--color-danger);
+}
+
+/* Botones de acción en la tabla */
+.btn-ajuste {
+  background: var(--color-hover);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xs);
+  color: var(--color-text-sec);
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--t);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 6px;
+  white-space: nowrap;
+}
+
+.btn-ajuste:hover {
+  background: var(--color-accent);
+  color: #000;
+  border-color: var(--color-accent);
+}
+
+.btn-ajuste i {
+  font-size: 11px;
+}
+
+/* ── SIDEBAR: MOVIMIENTOS ─────────────────────────────────── */
+#movimientosList {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 280px;
+  padding-right: 4px;
+}
+
+.movimiento-item {
+  font-size: 12px;
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--color-border);
+}
+
+.movimiento-item:last-child {
+  border-bottom: none;
+}
+
+/* ── SIDEBAR: ALERTAS ─────────────────────────────────────── */
+#alertasStockList {
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+/* Títulos del sidebar */
+.despensa-sidebar h4 {
+  margin: 0 0 8px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-sec);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.despensa-sidebar h4 i {
+  color: var(--color-accent);
+  font-size: 14px;
+}
+
+/* Botón de Ajuste Rápido en sidebar */
+.despensa-sidebar .btn-secondary {
+  width: 100%;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+/* ── RESPONSIVE: TABLETS ──────────────────────────────────── */
+@media (max-width: 900px) {
+  .despensa-grid {
+    grid-template-columns: 1fr 280px;
+    gap: 16px;
+    padding: 16px;
+  }
+
+  .ingredientes-table {
+    min-width: 650px; /* Asegura scroll horizontal si es necesario */
+  }
+
+  .btn-ajuste {
+    padding: 4px 8px;
+  }
+}
+
+/* ── RESPONSIVE: MÓVILES (APILADO Y TABLA ABAJO) ───────────── */
+/* ── RESPONSIVE: MÓVILES (APILADO VERTICAL FORZADO) ────────── */
+@media (max-width: 600px) {
+  /* Anular completamente el grid y usar bloque flexible */
+  .despensa-grid {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 16px;
+    padding: 12px;
+    height: auto !important;
+    overflow-y: auto;
+  }
+
+  /* Sidebar arriba */
+  .despensa-sidebar {
+    order: 1;
+    width: 100% !important;
+    max-height: none;
+    padding: 14px;
+    margin: 0;
+  }
+
+  /* Panel de ingredientes abajo */
+  .despensa-main {
+    order: 2;
+    width: 100% !important;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-right: 0;
+    padding-right: 0;
+  }
+
+  /* La tabla mantiene un ancho mínimo para scroll horizontal */
+  .ingredientes-table {
+    min-width: 600px;
+    font-size: 12px;
+    display: table; /* Asegura comportamiento de tabla */
+  }
+
+  /* Ocultar columnas secundarias para mejor legibilidad */
+  .ingredientes-table th:nth-child(2), /* Categoría */
+  .ingredientes-table td:nth-child(2) {
+    display: none;
+  }
+
+  .ingredientes-table th:nth-child(5), /* Stock Mín. */
+  .ingredientes-table td:nth-child(5) {
+    display: none;
+  }
+
+  /* Botones más compactos */
+  .btn-ajuste {
+    padding: 6px 8px;
+    font-size: 10px;
+  }
+
+  /* Ajustes en la barra de herramientas */
+  .view-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .view-toolbar .toolbar-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .view-toolbar .toolbar-actions .btn-primary,
+  .view-toolbar .toolbar-actions .btn-secondary {
+    flex: 1 0 auto;
+  }
+}
+  /* El panel de ingredientes ahora va DEBAJO del sidebar */
+  .despensa-main {
+    order: 2;
+    width: 100%;
+    margin-right: 0;
+  }
+
+  .despensa-sidebar {
+    order: 1;
+    width: 100%;
+    max-height: none;
+    padding: 14px;
+  }
+
+  /* La tabla se mantiene con scroll horizontal amplio */
+  .ingredientes-table {
+    min-width: 550px;  /* Ancho mínimo para que todas las columnas se vean bien */
+    font-size: 12px;
+  }
+
+  /* Ocultamos columnas menos importantes si el espacio es crítico */
+  .ingredientes-table th:nth-child(2), /* Categoría */
+  .ingredientes-table td:nth-child(2) {
+    display: none;
+  }
+
+  .ingredientes-table th:nth-child(5), /* Stock Mín. */
+  .ingredientes-table td:nth-child(5) {
+    display: none;
+  }
+
+  .btn-ajuste {
+    padding: 6px 8px;
+    font-size: 10px;
+  }
+
+  #movimientosList {
+    max-height: 180px;
+  }
+
+  /* Toolbar de la vista: botones en fila adaptativa */
+  .view-toolbar .toolbar-actions {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .view-toolbar .toolbar-actions .btn-primary,
+  .view-toolbar .toolbar-actions .btn-secondary {
+    flex: 1 0 auto;
+  }
+}
+
+/* ── MODALES ───────────────────────────────────────────────── */
+#modalIngrediente .modal-small-body,
+#modalReceta .modal-small-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#modalIngrediente input,
+#modalIngrediente select,
+#modalReceta input,
+#modalReceta select {
+  width: 100%;
+  padding: 9px 12px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+#modalIngrediente label,
+#modalReceta label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: -4px;
+}

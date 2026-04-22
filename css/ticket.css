@@ -1,0 +1,102 @@
+/* ================================================================
+   PubPOS — CSS MODULAR
+   Archivo: css/ticket.css
+   Propósito: Estilos del ticket de 80mm (preview + impresión)
+   ----------------------------------------------------------------
+   El div .ticket-80mm simula el papel físico de 80mm (~302px a 96dpi)
+   Usar font-family monoespaciada para alineación correcta al imprimir.
+   ================================================================ */
+
+/* ── PREVIEW EN PANTALLA ───────────────────────────────────── */
+.ticket-80mm {
+  width: 302px;
+  background: #fff;
+  color: #000;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 12px 10px;
+  box-shadow: 0 4px 24px rgba(0,0,0,.5);
+}
+
+/* ── ELEMENTOS INTERNOS DEL TICKET ────────────────────────── */
+.t-center  { text-align: center; }
+.t-right   { text-align: right; }
+.t-bold    { font-weight: bold; }
+.t-small   { font-size: 10px; }
+.t-large   { font-size: 15px; }
+.t-xl      { font-size: 22px; font-weight: bold; text-align: center; }
+
+/* Título y subtítulo del local */
+.t-title {
+  font-size: 16px;
+  font-weight: bold;
+  text-align: center;
+  line-height: 1.2;
+}
+.t-subtitle { font-size: 11px; text-align: center; }
+
+/* Header de destino (fondo negro, texto blanco) */
+.t-dest-header {
+  background: #000;
+  color: #fff;
+  text-align: center;
+  font-weight: bold;
+  font-size: 14px;
+  padding: 4px 0;
+  letter-spacing: 2px;
+  margin-bottom: 2px;
+}
+
+/* Separadores */
+.t-hr-dash  { border: none; border-top: 1px dashed #000; margin: 5px 0; }
+.t-hr-solid { border: none; border-top: 2px solid  #000; margin: 5px 0; }
+
+/* Fila flex (izquierda / derecha) */
+.t-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+}
+/* Fila de ítem: cant | nombre | precio */
+.t-item-row {
+  display: grid;
+  grid-template-columns: 3ch 1fr auto;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+/* Aclaración debajo del ítem */
+.t-item-obs {
+  font-style: italic;
+  font-size: 10px;
+  padding-left: 28px;
+  margin-bottom: 3px;
+}
+
+/* Fila de total */
+.t-total-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+/* Pie del ticket */
+.t-footer {
+  text-align: center;
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+/* Espaciado interno */
+.t-mb1 { margin-bottom: 2px; }
+.t-mb2 { margin-bottom: 5px; }
+.t-mt1 { margin-top:    2px; }
+.t-mt2 { margin-top:    5px; }
+.t-spacer { height: 16px; }
+
+/* ── REGLAS DE IMPRESIÓN ───────────────────────────────────── */
+/*
+  La impresión se genera en una nueva ventana con estas reglas:
+  ver js/tickets.js → función imprimirTicket()
+*/

@@ -1,0 +1,73 @@
+/* ================================================================
+   PubPOS — MÓDULO: caja.js (Versión con EventBus)
+   ================================================================ */
+const Caja = (() => {
+  async function render() {
+    const statsEl = $id('cajaStats');
+    const bodyEl = $id('cajaBody');
+    if (!statsEl || !bodyEl) return;
+
+    try {
+      const todos = await DB.fetchTodosPedidos();
+      const cerrados = todos.filter(p => p.estado === 'cerrada');
+      const abiertos = todos.filter(p => p.estado !== 'cerrada' && p.estado !== 'cancelada');
+
+      const totalVentas = cerrados.reduce((s, p) => s + (p.total || 0), 0);
+      const promedio = cerrados.length ? totalVentas / cerrados.length : 0;
+
+      statsEl.innerHTML = _htmlStats(totalVentas, cerrados.length, promedio, abiertos.length);
+      bodyEl.innerHTML = todos.length
+        ? todos.map(_htmlFila).join('')
+        : `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--color-text-muted)">No hay registros en este turno</td></tr>`;
+
+    } catch (e) {
+      statsEl.innerHTML = `<div style="grid-column:1/-1;color:var(--color-text-muted);padding:20px"><i class="fas fa-exclamation-circle"></i> Error cargando datos de caja</div>`;
+      console.warn('[Caja] Error:', e);
+    }
+  }
+
+  function _htmlStats(totalVentas, cerradas, promedio, abiertas) {
+    const tarjetas = [
+      { icon: 'fa-dollar-sign', label: 'Total Ventas', value: fmtMoney(totalVentas), color: 'var(--color-success)' },
+      { icon: 'fa-chair', label: 'Mesas Cerradas', value: cerradas, color: 'var(--color-accent)' },
+      { icon: 'fa-chart-line', label: 'Ticket Promedio', value: fmtMoney(promedio), color: 'var(--color-primary)' },
+      { icon: 'fa-door-open', label: 'Mesas Abiertas', value: abiertas, color: 'var(--color-danger)' }
+    ];
+    return tarjetas.map(t => `
+      <div class="caja-stat-card">
+        <div class="caja-stat-icon ${t.cls || ''}"><i class="fas ${t.icon}"></i></div>
+        <div><div class="caja-stat-label">${t.label}</div><div class="caja-stat-value" style="color:${t.color}">${t.value}</div></div>
+      </div>`).join('');
+  }
+
+  function _htmlFila(p) {
+    let items = [];
+    try { items = JSON.parse(p.items || '[]'); } catch {}
+    const cant = items.reduce((s, it) => s + it.qty, 0);
+    const apertura = fmtHoraCorta(p.created_at);
+    const cierre = p.estado === 'cerrada' ? fmtHoraCorta(p.updated_at) : '—';
+    return `
+      <tr>
+        <td><strong>Mesa ${p.mesa}</strong></td>
+        <td>${apertura}</td>
+        <td>${cierre}</td>
+        <td>${p.mozo || '—'}</td>
+        <td>${p.comensales || 1}</td>
+        <td>${cant}</td>
+        <td><strong style="color:var(--color-success)">${fmtMoney(p.total)}</strong></td>
+        <td><span class="status-pill ${p.estado}">${p.estado}</span></td>
+      </tr>`;
+  }
+
+  function exportar() {
+    showToast('info', '<i class="fas fa-info-circle"></i> Exportación CSV próximamente disponible');
+  }
+
+  // Suscripción a eventos
+  EventBus.on('pedidos:guardados', render);
+  EventBus.on('pedido:cerrado', render);
+  EventBus.on('db:inicializada', render);
+
+  return { render, exportar };
+})();
+window.Caja = Caja;
