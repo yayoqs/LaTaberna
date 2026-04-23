@@ -1,10 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: auth.js
-   Propósito: Gestión de usuarios, roles y permisos.
-   Cambios (2026-04-23):
-     • Añadida función getDefaultView() para redirigir según rol.
-     • Modificado login() para usar vista por defecto en lugar de fijar 'mesas'.
-     • Modificado logout() para limpiar elementos UI basados en rol.
+   PubPOS — MÓDULO: auth.js (Corregido)
    ================================================================ */
 
 const Auth = (() => {
@@ -35,12 +30,6 @@ const Auth = (() => {
     }
   }
 
-  /**
-   * Determina la vista inicial según el rol del usuario.
-   * - Cocina y Barra → ven el monitor KDS.
-   * - Caja → ven el módulo de caja.
-   * - Resto (master, admin, mesero) → mesas.
-   */
   function getDefaultView() {
     if (!_usuarioActual) return 'mesas';
     const rol = _usuarioActual.rol;
@@ -60,7 +49,6 @@ const Auth = (() => {
     aplicarRestriccionesUI();
     cerrarModalLogin();
     showToast('success', `Bienvenido ${user.nombre} (${user.rol})`);
-    // CAMBIO: usar la vista por defecto según rol
     const vistaInicial = getDefaultView();
     if (window.App) App.showView(vistaInicial);
     return true;
@@ -69,12 +57,66 @@ const Auth = (() => {
   function logout() {
     _usuarioActual = null;
     sessionStorage.removeItem('usuarioActual');
-    // Limpiar elementos que dependen de rol para que no queden visibles
     document.querySelectorAll('[data-rol]').forEach(el => el.style.display = 'none');
     mostrarLogin();
   }
 
-  // ... (el resto de funciones de permisos se mantienen igual)
+  // --------------------------------------------------------------
+  // MODAL DE LOGIN (creación dinámica)
+  // --------------------------------------------------------------
+  function mostrarLogin() {
+    let modal = document.getElementById('modalLogin');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'modalLogin';
+      modal.className = 'modal-overlay';
+      modal.style.display = 'flex';
+      modal.innerHTML = `
+        <div class="modal-small" style="max-width:360px;">
+          <div class="modal-header">
+            <h3><i class="fas fa-beer"></i> La Taberna</h3>
+            <button class="modal-close" onclick="Auth.cerrarModalLogin()"><i class="fas fa-times"></i></button>
+          </div>
+          <div class="modal-small-body">
+            <label>Usuario</label>
+            <input type="text" id="loginUsuario" placeholder="Ej: admin, master, cocina, barra, caja, Carlos, Ana, Luis, María">
+            <label>Contraseña</label>
+            <input type="password" id="loginPassword" placeholder="Contraseña">
+            <div class="modal-small-footer">
+              <button class="btn-primary" onclick="Auth._loginFromModal()" style="width:100%;">
+                <i class="fas fa-sign-in-alt"></i> Ingresar
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    } else {
+      modal.style.display = 'flex';
+    }
+    // Ocultar todas las vistas mientras se muestra el login
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  }
+
+  function cerrarModalLogin() {
+    const modal = document.getElementById('modalLogin');
+    if (modal) modal.style.display = 'none';
+  }
+
+  function _loginFromModal() {
+    const usuario = document.getElementById('loginUsuario')?.value.trim() || '';
+    const password = document.getElementById('loginPassword')?.value.trim() || '';
+    login(usuario, password);
+    // Limpiar campos
+    const userInput = document.getElementById('loginUsuario');
+    const passInput = document.getElementById('loginPassword');
+    if (userInput) userInput.value = '';
+    if (passInput) passInput.value = '';
+  }
+
+  // --------------------------------------------------------------
+  // Permisos y restricciones UI (sin cambios relevantes)
+  // --------------------------------------------------------------
   function tienePermiso(permiso) {
     if (!_usuarioActual) return false;
     return Roles.getPermisos(_usuarioActual.rol)[permiso] === true;
@@ -99,49 +141,39 @@ const Auth = (() => {
   function puedeEditarPrecios() { return tienePermiso('editarPrecios'); }
 
   function aplicarRestriccionesUI() {
-    const userEl = $id('usuarioActualDisplay');
+    const userEl = document.getElementById('usuarioActualDisplay');
     if (userEl) userEl.textContent = _usuarioActual ? `${_usuarioActual.nombre} (${_usuarioActual.rol})` : '';
 
     document.querySelectorAll('[data-rol]').forEach(el => {
       const roles = el.dataset.rol.split(',').map(r => r.trim());
-      const mostrar = roles.includes(_usuarioActual?.rol) || (esAdmin() && roles.includes('admin')) || (esMaster() && roles.includes('master'));
+      const mostrar = roles.includes(_usuarioActual?.rol) ||
+                     (esAdmin() && roles.includes('admin')) ||
+                     (esMaster() && roles.includes('master'));
       el.style.display = mostrar ? '' : 'none';
     });
 
-    // ... (resto del código del mozo selector sin cambios)
     const mozoContainer = document.querySelector('.mozo-selector');
     if (!mozoContainer || !_usuarioActual) return;
     if (!esMaster()) {
-      mozoContainer.innerHTML = `<i class="fas fa-user-tie"></i><span style="padding: 6px 0; color: var(--color-text); font-weight: 500;">${_usuarioActual.nombre}</span>`;
+      mozoContainer.innerHTML = `<i class="fas fa-user-tie"></i><span style="padding:6px 0;color:var(--color-text);font-weight:500;">${_usuarioActual.nombre}</span>`;
     } else {
       let mozosNombres = [];
       if (typeof DB !== 'undefined' && Array.isArray(DB.mozos) && DB.mozos.length) {
         mozosNombres = DB.mozos.filter(m => m.activo !== false).map(m => m.nombre);
       } else {
-        mozosNombres = USUARIOS.filter(u => ['mesero', 'admin', 'master'].includes(u.rol)).map(u => u.nombre);
+        mozosNombres = USUARIOS.filter(u => ['mesero','admin','master'].includes(u.rol)).map(u => u.nombre);
       }
       const options = mozosNombres.map(nombre => `<option value="${nombre}" ${nombre === _usuarioActual.nombre ? 'selected' : ''}>${nombre}</option>`).join('');
       mozoContainer.innerHTML = `<i class="fas fa-user-tie"></i><select id="mozoActivo" onchange="Comanda?.setMozo?.(this.value)">${options}</select>`;
     }
   }
 
-  function mostrarLogin() {
-    // ... (sin cambios, igual que antes)
-    let modal = $id('modalLogin');
-    if (!modal) { /* crear modal */ }
-    else { modal.style.display = 'flex'; }
-    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  }
-
-  function cerrarModalLogin() { $id('modalLogin').style.display = 'none'; }
-  function _loginFromModal() { /* ... */ }
-
   return {
     init, login, logout, getRol, getNombre, tienePermiso, puede,
     esMaster, esAdmin, esCocina, esBarra, esCaja, esMesero,
     puedeEliminarItemEnviado, puedeCerrarMesa, puedeAccederCaja, puedeAccederCocina,
     puedeCambiarEstadoComanda, puedeEditarProductos, puedeEditarPrecios,
-    getDefaultView,   // EXPUESTO para que App lo use
+    getDefaultView,
     mostrarLogin, cerrarModalLogin, _loginFromModal
   };
 })();
