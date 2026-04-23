@@ -115,7 +115,8 @@
       <button id="btnFusionar" class="btn-secondary" onclick="Mesas.toggleModoFusion()" data-rol="mesero,admin,master">
         <i class="fas fa-object-group"></i> Fusionar Mesas
       </button>
-      <button id="btnConfirmarFusion" class="btn-primary" onclick="Mesas.fusionarMesasSeleccionadas()" style="display:none;" data-rol="mesero,admin,master">
+      <!-- Sin data-rol para que solo lo controle mesas.js -->
+      <button id="btnConfirmarFusion" class="btn-primary" onclick="Mesas.fusionarMesasSeleccionadas()" style="display:none;">
         <i class="fas fa-check"></i> Confirmar Fusión
       </button>
     </div>
@@ -258,13 +259,13 @@
         <span id="modalMesaTitulo">Mesa 1</span>
         <span class="estado-badge" id="modalEstadoBadge">Libre</span>
       </div>
-      <!-- Botón de cerrar a la derecha -->
-      <button class="modal-close" onclick="Pedido.cerrar()" aria-label="Cerrar" style="margin-left: auto;">
-        <i class="fas fa-times"></i>
-      </button>
-      <!-- Botón de cambiar mesa -->
+      <!-- Botón de cambiar mesa pegado al título -->
       <button class="btn-icon" onclick="Pedido.mostrarSelectorTransferencia()" title="Cambiar Mesa" style="background:transparent; border:1px solid var(--color-border); border-radius:var(--radius-sm); padding:6px 12px; color:var(--color-text-sec); margin-right:8px;" data-rol="admin,master">
         <i class="fas fa-exchange-alt"></i> Cambiar Mesa
+      </button>
+      <!-- Botón de cerrar al final, con margen automático -->
+      <button class="modal-close" onclick="Pedido.cerrar()" aria-label="Cerrar" style="margin-left: auto;">
+        <i class="fas fa-times"></i>
       </button>
     </div>
     <div class="modal-body">

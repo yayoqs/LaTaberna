@@ -1,17 +1,7 @@
 /* ================================================================
    PubPOS — MÓDULO: mesas.js
    Propósito: Gestión de la grilla de mesas, fusión y creación.
-   Dependencias: DB, EventBus, Auth, utils.js
-   ----------------------------------------------------------------
-   NOTA SOBRE ROLES:
-   • Los botones "Nueva Mesa" y "Fusionar Mesas" tienen atributos
-     data-rol en el HTML (admin,master para nueva mesa; mesero,admin,master para fusión).
-     Auth.aplicarRestriccionesUI() se encarga de ocultarlos según el rol.
-   • La lógica interna no necesita más verificaciones porque el acceso
-     a estas funciones ya está restringido por la UI y porque los eventos
-     solo se disparan desde botones visibles.
    ================================================================ */
-
 const Mesas = (() => {
 
   const ICONOS = {
@@ -56,7 +46,6 @@ const Mesas = (() => {
         card.className = `mesa-card ${mesa.estado}`;
       }
 
-      // Modo selección: checkbox en mesas libres, ocupadas o esperando
       const puedeSeleccionar = _modoSeleccion && 
                                (mesa.estado === 'libre' || mesa.estado === 'ocupada' || mesa.estado === 'esperando') && 
                                !mesa.esVirtual;
@@ -81,7 +70,6 @@ const Mesas = (() => {
           }
         };
       } else {
-        // Comportamiento normal: clic abre mesa
         card.onclick = () => EventBus.emit('mesa:seleccionada', mesa.numero);
         
         let numeroMostrado = mesa.numero;
@@ -101,6 +89,12 @@ const Mesas = (() => {
       }
       grid.appendChild(card);
     });
+
+    // Asegurar que el botón de confirmar fusión solo se muestre en modo selección
+    const confirmBtn = document.getElementById('btnConfirmarFusion');
+    if (confirmBtn) {
+      confirmBtn.style.display = _modoSeleccion ? 'inline-flex' : 'none';
+    }
   }
 
   /* ── MODO SELECCIÓN PARA FUSIÓN ───────────────────────────── */
@@ -111,10 +105,6 @@ const Mesas = (() => {
     const btn = document.getElementById('btnFusionar');
     if (btn) {
       btn.innerHTML = _modoSeleccion ? '<i class="fas fa-times"></i> Cancelar' : '<i class="fas fa-object-group"></i> Fusionar Mesas';
-    }
-    const confirmBtn = document.getElementById('btnConfirmarFusion');
-    if (confirmBtn) {
-      confirmBtn.style.display = _modoSeleccion ? 'inline-flex' : 'none';
     }
   }
 
@@ -139,7 +129,6 @@ const Mesas = (() => {
     if (mesaVirtual) {
       showToast('success', `Mesas ${numeros.join(', ')} fusionadas.`);
       toggleModoFusion();
-      // Opcional: abrir la mesa virtual automáticamente
       EventBus.emit('mesa:seleccionada', mesaVirtual.numero);
     } else {
       showToast('error', 'No se pudo fusionar. Verificá que las mesas estén en un estado válido.');
@@ -165,10 +154,7 @@ const Mesas = (() => {
 
   /* ── SUSCRIPCIÓN A EVENTOS ───────────────────────────────── */
   function _initEventListeners() {
-    // Asegurar que el botón de confirmar fusión esté oculto al inicio
-    const confirmBtn = document.getElementById('btnConfirmarFusion');
-    if (confirmBtn) confirmBtn.style.display = 'none';
-    
+    // No ocultamos el botón aquí, se controla en render()
     EventBus.on('mesas:guardadas', render);
     EventBus.on('db:inicializada', render);
     EventBus.on('config:guardada', render);
