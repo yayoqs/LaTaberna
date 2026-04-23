@@ -27,6 +27,7 @@
   background: var(--color-panel);
   flex-shrink: 0;
   gap: 12px;
+  flex-wrap: nowrap; /* Evitar que los botones bajen a otra línea */
 }
 .modal-header h3 {
   font-size: 15px;
@@ -621,27 +622,4 @@ button, .btn-comanda, .btn-cuenta, .btn-cerrar-mesa, .cat-tab, .prod-card {
     align-items: center;
     justify-content: center;
   }
-  .item-persona-badge {
-  font-size: 10px;
-  background: var(--color-primary);
-  color: white;
-  padding: 2px 6px;
-  border-radius: 99px;
-  margin-left: 6px;
-}
-.cierre-persona-group {
-  margin-bottom: 12px;
-  border-bottom: 1px dashed var(--color-border);
-}
-.cierre-persona-header {
-  font-weight: bold;
-  display: flex;
-  justify-content: space-between;
-}
-.pago-persona-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 6px 0;
-}
 }

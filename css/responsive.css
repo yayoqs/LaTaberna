@@ -37,10 +37,6 @@
     justify-content: space-between;
   }
 
-  .logo span {
-    display: none; /* Opcional: mostrar solo ícono */
-  }
-
   .header-info {
     display: none; /* Ocultar fecha/hora en móviles para ganar espacio */
   }
@@ -131,6 +127,4 @@
   .btn-test {
     align-self: flex-start;
   }
-
-  /* Modal de pedido ya tiene media query en pedido.css, se mantiene */
 }

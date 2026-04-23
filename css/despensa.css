@@ -185,7 +185,7 @@
   }
 
   .ingredientes-table {
-    min-width: 650px; /* Asegura scroll horizontal si es necesario */
+    min-width: 650px;
   }
 
   .btn-ajuste {
@@ -193,10 +193,8 @@
   }
 }
 
-/* ── RESPONSIVE: MÓVILES (APILADO Y TABLA ABAJO) ───────────── */
 /* ── RESPONSIVE: MÓVILES (APILADO VERTICAL FORZADO) ────────── */
 @media (max-width: 600px) {
-  /* Anular completamente el grid y usar bloque flexible */
   .despensa-grid {
     display: flex !important;
     flex-direction: column !important;
@@ -206,7 +204,6 @@
     overflow-y: auto;
   }
 
-  /* Sidebar arriba */
   .despensa-sidebar {
     order: 1;
     width: 100% !important;
@@ -215,7 +212,6 @@
     margin: 0;
   }
 
-  /* Panel de ingredientes abajo */
   .despensa-main {
     order: 2;
     width: 100% !important;
@@ -225,31 +221,27 @@
     padding-right: 0;
   }
 
-  /* La tabla mantiene un ancho mínimo para scroll horizontal */
   .ingredientes-table {
     min-width: 600px;
     font-size: 12px;
-    display: table; /* Asegura comportamiento de tabla */
+    display: table;
   }
 
-  /* Ocultar columnas secundarias para mejor legibilidad */
-  .ingredientes-table th:nth-child(2), /* Categoría */
+  .ingredientes-table th:nth-child(2),
   .ingredientes-table td:nth-child(2) {
     display: none;
   }
 
-  .ingredientes-table th:nth-child(5), /* Stock Mín. */
+  .ingredientes-table th:nth-child(5),
   .ingredientes-table td:nth-child(5) {
     display: none;
   }
 
-  /* Botones más compactos */
   .btn-ajuste {
     padding: 6px 8px;
     font-size: 10px;
   }
 
-  /* Ajustes en la barra de herramientas */
   .view-toolbar {
     flex-wrap: wrap;
   }
@@ -258,57 +250,6 @@
     flex-wrap: wrap;
     gap: 8px;
     width: 100%;
-  }
-
-  .view-toolbar .toolbar-actions .btn-primary,
-  .view-toolbar .toolbar-actions .btn-secondary {
-    flex: 1 0 auto;
-  }
-}
-  /* El panel de ingredientes ahora va DEBAJO del sidebar */
-  .despensa-main {
-    order: 2;
-    width: 100%;
-    margin-right: 0;
-  }
-
-  .despensa-sidebar {
-    order: 1;
-    width: 100%;
-    max-height: none;
-    padding: 14px;
-  }
-
-  /* La tabla se mantiene con scroll horizontal amplio */
-  .ingredientes-table {
-    min-width: 550px;  /* Ancho mínimo para que todas las columnas se vean bien */
-    font-size: 12px;
-  }
-
-  /* Ocultamos columnas menos importantes si el espacio es crítico */
-  .ingredientes-table th:nth-child(2), /* Categoría */
-  .ingredientes-table td:nth-child(2) {
-    display: none;
-  }
-
-  .ingredientes-table th:nth-child(5), /* Stock Mín. */
-  .ingredientes-table td:nth-child(5) {
-    display: none;
-  }
-
-  .btn-ajuste {
-    padding: 6px 8px;
-    font-size: 10px;
-  }
-
-  #movimientosList {
-    max-height: 180px;
-  }
-
-  /* Toolbar de la vista: botones en fila adaptativa */
-  .view-toolbar .toolbar-actions {
-    flex-wrap: wrap;
-    gap: 8px;
   }
 
   .view-toolbar .toolbar-actions .btn-primary,

@@ -258,11 +258,13 @@
         <span id="modalMesaTitulo">Mesa 1</span>
         <span class="estado-badge" id="modalEstadoBadge">Libre</span>
       </div>
-      <button class="btn-icon" onclick="Pedido.mostrarSelectorTransferencia()" title="Cambiar Mesa" style="margin-left:auto; background:transparent; border:1px solid var(--color-border); border-radius:var(--radius-sm); padding:6px 12px; color:var(--color-text-sec); margin-right:8px;" data-rol="admin,master">
-        <i class="fas fa-exchange-alt"></i> Cambiar Mesa
-      </button>
-      <button class="modal-close" onclick="Pedido.cerrar()" aria-label="Cerrar">
+      <!-- Botón de cerrar a la derecha -->
+      <button class="modal-close" onclick="Pedido.cerrar()" aria-label="Cerrar" style="margin-left: auto;">
         <i class="fas fa-times"></i>
+      </button>
+      <!-- Botón de cambiar mesa -->
+      <button class="btn-icon" onclick="Pedido.mostrarSelectorTransferencia()" title="Cambiar Mesa" style="background:transparent; border:1px solid var(--color-border); border-radius:var(--radius-sm); padding:6px 12px; color:var(--color-text-sec); margin-right:8px;" data-rol="admin,master">
+        <i class="fas fa-exchange-alt"></i> Cambiar Mesa
       </button>
     </div>
     <div class="modal-body">
@@ -289,7 +291,6 @@
             <button class="btn-comanda btn-todo" onclick="Pedido.enviarComanda('todos')"><i class="fas fa-paper-plane"></i> Enviar Todo</button>
           </div>
           <div class="comanda-actions-2">
-            <!-- CAMBIO: Añadido data-rol para que solo personal autorizado pueda pedir cuenta -->
             <button class="btn-cuenta" onclick="Cuenta.pedirCuenta()" data-rol="mesero,admin,master,caja"><i class="fas fa-file-invoice-dollar"></i> Pedir Cuenta</button>
             <button class="btn-cerrar-mesa" onclick="Cobro.abrirModalCierre()" data-rol="caja,admin,master"><i class="fas fa-check-circle"></i> Cerrar Mesa</button>
           </div>
