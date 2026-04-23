@@ -153,7 +153,6 @@ const DBCore = (function() {
     };
     this.pedidos.push(nuevo);
     this.savePedidos();
-    // La parte de encolar se hará desde el orquestador
     return nuevo;
   };
 

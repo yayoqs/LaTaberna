@@ -1,17 +1,16 @@
 /* ================================================================
    PubPOS — MÓDULO: db.js (Orquestador)
-   Propósito: Reunir los submódulos (core, sync, inventario, fusion)
-              y exponer el objeto DB completo.
+   Propósito: Reúne todos los submódulos y coordina la inicialización.
    ================================================================ */
 
 var DB = (function() {
-  // Combinar todos los submódulos en un solo objeto
+  // Combinar todos los submódulos
   const core = DBCore;
   const sync = DBSync;
   const inventario = DBInventario;
   const fusion = DBFusion;
 
-  // Mezclar propiedades (cuidado con sobrescribir métodos)
+  // Mezclar propiedades (cuidado con sobrescribir métodos, pero están separados)
   const combined = {
     ...core,
     ...sync,
@@ -19,13 +18,14 @@ var DB = (function() {
     ...fusion
   };
 
-  // Ajustar referencias cruzadas (algunos métodos llaman a otros módulos)
-  // Como todos están en el mismo objeto, las llamadas internas funcionarán.
+  // URL de Google Sheets (se toma de db-sync, pero la exponemos por si otros módulos la necesitan)
+  combined.urlSheets = sync.urlSheets;
 
-  // Inicialización principal
+  // ── INICIALIZACIÓN PRINCIPAL ─────────────────────────────────
   combined.init = async function() {
     try {
-      console.log("[DB] Iniciando carga...");
+      console.log("[DB] Iniciando carga de datos...");
+      // Cargar desde localStorage
       this._cargarConfigLocal();
       this._inicializarMesas();
       this._cargarComandasLocal();
@@ -36,12 +36,14 @@ var DB = (function() {
       this._cargarMovimientosLocal();
       this._cargarSyncQueueLocal();
 
+      // Sincronizar con Google Sheets (si hay conexión)
       await this._fetchProductos();
-      this._fetchMozos().catch(e => console.warn("[DB] Mozos remotos no disponibles"));
-      this._fetchIngredientes().catch(e => console.warn("[DB] Ingredientes remotos no disponibles"));
-      this._fetchRecetas().catch(e => console.warn("[DB] Recetas remotas no disponibles"));
+      this._fetchMozos().catch(e => console.warn("[DB] Mozos remotos no disponibles", e));
+      this._fetchIngredientes().catch(e => console.warn("[DB] Ingredientes remotos no disponibles", e));
+      this._fetchRecetas().catch(e => console.warn("[DB] Recetas remotas no disponibles", e));
 
-      this._procesarSyncQueue();
+      // Procesar operaciones pendientes de la cola offline
+      await this._procesarSyncQueue();
 
       console.log("[DB] Inicialización completada.");
       EventBus.emit('db:inicializada');
@@ -57,20 +59,22 @@ var DB = (function() {
     EventBus.emit('app:error', 'No se pudieron cargar los datos iniciales.');
   };
 
-  // Ajustar cerrarPedido para usar inventario y sync
+  // ── CIERRE DE PEDIDO (descuenta stock y sincroniza venta) ─────
   combined.cerrarPedido = async function(id, formaPago, total, descuento) {
     const pedido = this.pedidos.find(p => p.id === id);
     if (!pedido) return null;
 
+    // 1. Descontar stock localmente (si tiene recetas)
     try {
       const items = JSON.parse(pedido.items || '[]');
       for (const item of items) {
         await this.consumirIngredientesDeProducto(item.prodId, item.qty, `Venta Mesa ${pedido.mesa}`);
       }
     } catch (e) {
-      console.warn("[DB] Error descontando stock:", e);
+      console.warn("[DB] Error descontando stock local:", e);
     }
 
+    // 2. Notificar a Google Sheets para que también descuente (o encolar)
     try {
       const items = JSON.parse(pedido.items || '[]');
       await fetch(this.urlSheets, {
@@ -89,6 +93,7 @@ var DB = (function() {
       });
     }
 
+    // 3. Actualizar estado del pedido a cerrado
     return this.actualizarPedido(id, {
       estado: 'cerrada',
       total,

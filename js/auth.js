@@ -61,9 +61,7 @@ const Auth = (() => {
     mostrarLogin();
   }
 
-  // --------------------------------------------------------------
-  // MODAL DE LOGIN (creación dinámica)
-  // --------------------------------------------------------------
+  // --- MODAL DE LOGIN (se crea dinámicamente si no existe) ---
   function mostrarLogin() {
     let modal = document.getElementById('modalLogin');
     if (!modal) {
@@ -114,9 +112,7 @@ const Auth = (() => {
     if (passInput) passInput.value = '';
   }
 
-  // --------------------------------------------------------------
-  // Permisos y restricciones UI (sin cambios relevantes)
-  // --------------------------------------------------------------
+  // --- Permisos y restricciones UI ---
   function tienePermiso(permiso) {
     if (!_usuarioActual) return false;
     return Roles.getPermisos(_usuarioActual.rol)[permiso] === true;
