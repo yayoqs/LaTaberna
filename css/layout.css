@@ -152,12 +152,8 @@ body { display: flex; flex-direction: column; }
 .badge.esperando::before{ background: var(--color-warning); }
 .badge.cuenta   { color: var(--color-info); }
 .badge.cuenta::before   { background: var(--color-info); }
-/* ================================================================
-   PubPOS — CSS MODULAR
-   Archivo: css/layout.css (Adiciones para móvil)
-   ================================================================ */
 
-/* Ajustes responsive para el header y vistas */
+/* ── RESPONSIVE ────────────────────────────────────────────── */
 @media (max-width: 600px) {
   .app-header {
     padding: 8px 12px;
