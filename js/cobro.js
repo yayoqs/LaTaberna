@@ -1,15 +1,24 @@
 /* ================================================================
    PubPOS — MÓDULO: cobro.js
-   Propósito: Gestionar el cierre de mesa y cobro, con soporte para
-              división de cuenta por persona (split bill).
+   Propósito: Cierre de mesa y cobro, split bill.
+   Cambios (2026-04-23):
+     • En abrirModalCierre() se verifica que el usuario tenga permiso
+       para cerrar mesas (permiso 'cerrarMesa' definido en roles.js).
+     • Esto evita que meseros o personal no autorizado ejecuten cobros.
    ================================================================ */
 
 const Cobro = (() => {
   let _mesaACerrar = null;
   let _formaPago = 'Efectivo';
-  let _pagosParciales = []; // [{ persona, monto, formaPago }]
+  let _pagosParciales = [];
 
   function abrirModalCierre() {
+    // 🔒 VERIFICACIÓN DE PERMISO
+    if (!Auth.puedeCerrarMesa()) {
+      showToast('error', 'No tienes permiso para cerrar mesas');
+      return;
+    }
+
     _mesaACerrar = Comanda.getMesaActiva();
     if (!_mesaACerrar) {
       showToast('warning', 'No hay ninguna mesa abierta.');
@@ -33,8 +42,6 @@ const Cobro = (() => {
   function _renderResumen() {
     const resumenEl = document.getElementById('cierreResumen');
     if (!resumenEl || !_mesaACerrar) return;
-
-    // Agrupar por persona
     const porPersona = {};
     _mesaACerrar.items.forEach(it => {
       const p = it.persona || 'General';
@@ -42,11 +49,9 @@ const Cobro = (() => {
       porPersona[p].items.push(it);
       porPersona[p].subtotal += it.precio * it.qty;
     });
-
     let html = `<div><strong>Mesa ${_mesaACerrar.numero}</strong> - ${_mesaACerrar.mozo}</div>`;
     for (const [persona, data] of Object.entries(porPersona)) {
-      html += `<div class="cierre-persona-group">
-        <div class="cierre-persona-header">${persona} <span>${fmtMoney(data.subtotal)}</span></div>`;
+      html += `<div class="cierre-persona-group"><div class="cierre-persona-header">${persona} <span>${fmtMoney(data.subtotal)}</span></div>`;
       data.items.forEach(it => {
         html += `<div class="cierre-resumen-row"><span>${it.qty}x ${it.nombre}</span><span>${fmtMoney(it.precio * it.qty)}</span></div>`;
       });
@@ -54,8 +59,6 @@ const Cobro = (() => {
     }
     html += `<div class="cierre-resumen-row total-row"><span>Total</span><span>${fmtMoney(_mesaACerrar.total)}</span></div>`;
     resumenEl.innerHTML = html;
-
-    // Renderizar opciones de pago por persona
     _renderPagosParciales(porPersona);
   }
 
@@ -96,20 +99,16 @@ const Cobro = (() => {
     const pago = _pagosParciales.find(p => p.persona === persona);
     if (pago) pago.formaPago = forma;
   }
-
   function actualizarMontoPersona(persona, montoStr) {
     const monto = parseFloat(montoStr);
     if (isNaN(monto)) return;
     const pago = _pagosParciales.find(p => p.persona === persona);
     if (pago) pago.monto = monto;
   }
-
   function cobrarTodoJunto() {
-    // Usar el método tradicional de un solo pago
     _formaPago = 'Efectivo';
     document.getElementById('cierreDescuento').value = 0;
     _actualizarTotalFinal();
-    // Ocultar pagos parciales
     const container = document.getElementById('pagosParcialesContainer');
     if (container) container.style.display = 'none';
   }
@@ -118,40 +117,31 @@ const Cobro = (() => {
     _formaPago = btn.dataset.pago;
     _actualizarUIFormaPago();
   }
-
   function _actualizarUIFormaPago() {
     document.querySelectorAll('.pago-btn').forEach(b => {
       b.classList.toggle('active', b.dataset.pago === _formaPago);
     });
   }
-
   function actualizarTotalCierre() {
     if (!_mesaACerrar) return;
     _actualizarTotalFinal();
   }
-
   function _actualizarTotalFinal() {
     const subtotal = calcularTotal(_mesaACerrar.items);
     const descuentoInput = document.getElementById('cierreDescuento');
     const descuento = parseFloat(descuentoInput?.value) || 0;
     const total = subtotal * (1 - descuento / 100);
     const totalEl = document.getElementById('cierreTotalFinal');
-    if (totalEl) {
-      totalEl.textContent = `TOTAL A COBRAR: ${fmtMoney(total)}`;
-    }
+    if (totalEl) totalEl.textContent = `TOTAL A COBRAR: ${fmtMoney(total)}`;
   }
 
   async function confirmarCierre() {
     if (!_mesaACerrar) return;
-
     const usarSplit = document.getElementById('pagosParcialesContainer')?.style.display !== 'none';
     let pagos = [];
     if (usarSplit) {
       pagos = _pagosParciales.filter(p => p.monto > 0);
-      if (pagos.length === 0) {
-        showToast('error', 'No hay pagos registrados.');
-        return;
-      }
+      if (pagos.length === 0) { showToast('error', 'No hay pagos registrados.'); return; }
     } else {
       const subtotal = calcularTotal(_mesaACerrar.items);
       const descuentoInput = document.getElementById('cierreDescuento');
@@ -160,18 +150,14 @@ const Cobro = (() => {
       pagos = [{ persona: 'Total', monto: totalFinal, formaPago: _formaPago }];
     }
 
-    // Procesar pagos
     for (const pago of pagos) {
       try {
         if (_mesaACerrar.pedidoId) {
           await DB.cerrarPedido(_mesaACerrar.pedidoId, pago.formaPago, pago.monto, 0);
         }
-      } catch (e) {
-        console.warn('[Cobro] Error al cerrar pedido:', e);
-      }
+      } catch (e) { console.warn('[Cobro] Error al cerrar pedido:', e); }
     }
 
-    // Generar ticket(s)
     if (usarSplit) {
       for (const pago of pagos) {
         const ticketHTML = Tickets.generarCierreParcial(_mesaACerrar, pago);
@@ -182,7 +168,6 @@ const Cobro = (() => {
       Tickets.mostrar(ticketHTML, `Comprobante — Mesa ${_mesaACerrar.numero}`);
     }
 
-    // Liberar mesa
     if (_mesaACerrar.esVirtual) {
       DB.liberarMesasFusionadas(_mesaACerrar);
     } else {
@@ -204,14 +189,9 @@ const Cobro = (() => {
   EventBus.on('cobro:solicitado', abrirModalCierre);
 
   return {
-    abrirModalCierre,
-    cerrarModalCierre,
-    selectPago,
-    actualizarTotalCierre,
-    confirmarCierre,
-    actualizarFormaPagoPersona,
-    actualizarMontoPersona,
-    cobrarTodoJunto
+    abrirModalCierre, cerrarModalCierre, selectPago,
+    actualizarTotalCierre, confirmarCierre,
+    actualizarFormaPagoPersona, actualizarMontoPersona, cobrarTodoJunto
   };
 })();
 

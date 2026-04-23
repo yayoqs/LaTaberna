@@ -1,5 +1,12 @@
 /* ================================================================
-   PubPOS — MÓDULO: kds.js (Versión con EventBus)
+   PubPOS — MÓDULO: kds.js (Kitchen Display System)
+   Propósito: Monitor de cocina y barra.
+   Cambios (2026-04-23):
+     • En refresh() se filtran las comandas según el rol del usuario:
+       - cocina → solo ve comandas con destino 'cocina' o 'ambos'
+       - barra  → solo ve comandas con destino 'barra' o 'ambos'
+       - admin/master → ven todas
+     • Esto evita que un cocinero vea pedidos de barra y viceversa.
    ================================================================ */
 const KDS = (() => {
   const MINUTOS_URGENTE = 15;
@@ -10,22 +17,38 @@ const KDS = (() => {
     if (!cont) return;
 
     const ahora = Date.now();
-    const visibles = DB.comandas.filter(c => {
+    const rol = Auth.getRol();  // Obtener rol actual
+
+    // 1. Filtrar comandas visibles (ocultar las "lista" muy viejas)
+    let comandasFiltradas = DB.comandas.filter(c => {
       if (c.estado === 'lista') {
         return (ahora - c.ts) < MINUTOS_OCULTAR_LISTA * 60 * 1000;
       }
       return true;
     });
 
-    if (!visibles.length) {
+    // 2. Aplicar filtro por rol para que cada quien vea solo lo suyo
+    if (rol === 'cocina') {
+      comandasFiltradas = comandasFiltradas.filter(c => 
+        c.destino === 'cocina' || c.destino === 'ambos'
+      );
+    } else if (rol === 'barra') {
+      comandasFiltradas = comandasFiltradas.filter(c => 
+        c.destino === 'barra' || c.destino === 'ambos'
+      );
+    }
+    // admin y master ven todos (sin filtro adicional)
+
+    if (!comandasFiltradas.length) {
       cont.innerHTML = `<div class="kds-empty"><i class="fas fa-check-circle"></i><p class="kds-empty-title">Todo en orden</p><p>No hay comandas pendientes</p></div>`;
       return;
     }
 
-    cont.innerHTML = visibles.map(_htmlKdsCard).join('');
+    cont.innerHTML = comandasFiltradas.map(_htmlKdsCard).join('');
   }
 
   function _htmlKdsCard(c) {
+    // Sin cambios en la generación HTML
     const minutos = Math.floor((Date.now() - c.ts) / 60000);
     const urgente = minutos > MINUTOS_URGENTE;
     const tiempoTxt = minutos === 0 ? 'Ahora' : `Hace ${minutos} min`;
@@ -81,7 +104,6 @@ const KDS = (() => {
     showToast('success', `<i class="fas fa-check"></i> Mesa ${c.mesa} → ${estado === 'lista' ? 'LISTA ✓' : 'En proceso'}`);
   }
 
-  /* ── SUSCRIPCIÓN A EVENTOS ───────────────────────────────── */
   function _initEventListeners() {
     EventBus.on('comandas:guardadas', refresh);
     EventBus.on('comanda:enviada', refresh);

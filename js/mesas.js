@@ -1,6 +1,17 @@
 /* ================================================================
-   PubPOS — MÓDULO: mesas.js (Versión con fusión mejorada)
+   PubPOS — MÓDULO: mesas.js
+   Propósito: Gestión de la grilla de mesas, fusión y creación.
+   Dependencias: DB, EventBus, Auth, utils.js
+   ----------------------------------------------------------------
+   NOTA SOBRE ROLES:
+   • Los botones "Nueva Mesa" y "Fusionar Mesas" tienen atributos
+     data-rol en el HTML (admin,master para nueva mesa; mesero,admin,master para fusión).
+     Auth.aplicarRestriccionesUI() se encarga de ocultarlos según el rol.
+   • La lógica interna no necesita más verificaciones porque el acceso
+     a estas funciones ya está restringido por la UI y porque los eventos
+     solo se disparan desde botones visibles.
    ================================================================ */
+
 const Mesas = (() => {
 
   const ICONOS = {

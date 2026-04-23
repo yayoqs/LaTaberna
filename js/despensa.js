@@ -1,31 +1,42 @@
 /* ================================================================
    PubPOS — MÓDULO: despensa.js
-   Propósito: Gestión de inventario (ingredientes), recetas simples,
-              movimientos de stock y alertas.
-   Dependencias: DB, EventBus, Auth, utils.js
+   Propósito: Gestión de inventario (ingredientes, recetas, movimientos).
+   Cambios (2026-04-23):
+     • En _renderTablaIngredientes() se filtran los ingredientes según el rol:
+       - cocina → solo ve ingredientes con categoría 'cocina'
+       - barra  → solo ve ingredientes con categoría 'barra'
+       - admin/master → ven todos
+     • Esto evita que un cocinero modifique stock de la barra y viceversa.
    ================================================================ */
 
 const Despensa = (() => {
 
-  /* ── RENDERIZADO PRINCIPAL ────────────────────────────────── */
   function render() {
     _renderTablaIngredientes();
     _renderMovimientos();
     _renderAlertasStock();
   }
 
-  /* ── TABLA DE INGREDIENTES ───────────────────────────────── */
   function _renderTablaIngredientes() {
     const tbody = document.getElementById('ingredientesBody');
     if (!tbody) return;
 
-    const ingredientes = DB.ingredientes || [];
+    let ingredientes = DB.ingredientes || [];
+    const rol = Auth.getRol();
+
+    // 🔒 FILTRO POR ROL
+    if (rol === 'cocina') {
+      ingredientes = ingredientes.filter(i => i.categoria === 'cocina');
+    } else if (rol === 'barra') {
+      ingredientes = ingredientes.filter(i => i.categoria === 'barra');
+    }
+    // admin/master ven todos
+
     if (!ingredientes.length) {
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:40px;">No hay ingredientes. Creá uno nuevo.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:40px;">No hay ingredientes visibles para tu rol.</td></tr>`;
       return;
     }
 
-    // Ordenar: primero los que están bajo stock mínimo
     const ordenados = [...ingredientes].sort((a, b) => {
       const critA = a.stock <= a.stock_minimo ? 1 : 0;
       const critB = b.stock <= b.stock_minimo ? 1 : 0;
@@ -55,7 +66,6 @@ const Despensa = (() => {
     const cont = document.getElementById('movimientosList');
     if (!cont) return;
     const movs = DB.movimientos || [];
-    // Últimos 10 movimientos
     const recientes = [...movs].reverse().slice(0, 10);
     if (!recientes.length) {
       cont.innerHTML = `<p style="color:var(--color-text-muted);">Sin movimientos</p>`;
@@ -95,11 +105,9 @@ const Despensa = (() => {
     `).join('');
   }
 
-  /* ── MODALES Y FORMULARIOS ───────────────────────────────── */
   function mostrarModalIngrediente(ingrediente = null) {
     const esEdicion = !!ingrediente;
     const titulo = esEdicion ? 'Editar Ingrediente' : 'Nuevo Ingrediente';
-    
     let modal = document.getElementById('modalIngrediente');
     if (!modal) {
       modal = document.createElement('div');
@@ -121,17 +129,14 @@ const Despensa = (() => {
         </div>`;
       document.body.appendChild(modal);
     }
-    
     const modalTitulo = modal.querySelector('.modal-header h3');
     if (modalTitulo) modalTitulo.textContent = titulo;
-    
     document.getElementById('ingId').value = ingrediente?.id || '';
     document.getElementById('ingNombre').value = ingrediente?.nombre || '';
     document.getElementById('ingCategoria').value = ingrediente?.categoria || 'general';
     document.getElementById('ingStock').value = ingrediente?.stock || 0;
     document.getElementById('ingUnidad').value = ingrediente?.unidad || 'kg';
     document.getElementById('ingStockMin').value = ingrediente?.stock_minimo || 5;
-    
     modal.style.display = 'flex';
   }
 
@@ -143,11 +148,7 @@ const Despensa = (() => {
   function guardarIngrediente() {
     const id = document.getElementById('ingId').value;
     const nombre = document.getElementById('ingNombre').value.trim();
-    if (!nombre) {
-      showToast('error', 'Nombre obligatorio');
-      return;
-    }
-    
+    if (!nombre) { showToast('error', 'Nombre obligatorio'); return; }
     const ingrediente = {
       id: id || `ins_${Date.now()}_${Math.random().toString(36).substr(2,6)}`,
       nombre,
@@ -156,13 +157,9 @@ const Despensa = (() => {
       unidad: document.getElementById('ingUnidad').value.trim() || 'u',
       stock_minimo: parseFloat(document.getElementById('ingStockMin').value) || 0
     };
-    
     const idx = DB.ingredientes.findIndex(i => i.id === ingrediente.id);
-    if (idx >= 0) {
-      DB.ingredientes[idx] = ingrediente;
-    } else {
-      DB.ingredientes.push(ingrediente);
-    }
+    if (idx >= 0) DB.ingredientes[idx] = ingrediente;
+    else DB.ingredientes.push(ingrediente);
     DB.saveIngredientes();
     cerrarModalIngrediente();
     render();
@@ -175,34 +172,25 @@ const Despensa = (() => {
   }
 
   function ajusteRapido(ingredienteId = null) {
-    // Si no se pasa ID, se abre un pequeño prompt para elegir ingrediente y cantidad
     if (!ingredienteId) {
       const nombre = prompt('Ingrediente a ajustar (nombre exacto):');
       if (!nombre) return;
       const ing = DB.ingredientes.find(i => i.nombre.toLowerCase() === nombre.toLowerCase());
-      if (!ing) {
-        showToast('error', 'Ingrediente no encontrado');
-        return;
-      }
+      if (!ing) { showToast('error', 'Ingrediente no encontrado'); return; }
       ingredienteId = ing.id;
     }
     const ing = DB.ingredientes.find(i => i.id === ingredienteId);
     if (!ing) return;
-    
     const delta = prompt(`Ajustar stock de ${ing.nombre} (actual: ${ing.stock} ${ing.unidad}). Ingresá cantidad (positiva para agregar, negativa para quitar):`);
     if (delta === null) return;
     const cantidad = parseFloat(delta);
-    if (isNaN(cantidad)) {
-      showToast('error', 'Cantidad inválida');
-      return;
-    }
+    if (isNaN(cantidad)) { showToast('error', 'Cantidad inválida'); return; }
     const motivo = prompt('Motivo (opcional):') || 'Ajuste manual';
     DB.ajustarStock(ingredienteId, cantidad, motivo);
     render();
     showToast('success', `Stock de ${ing.nombre} actualizado`);
   }
 
-  /* ── RECETAS SIMPLES ─────────────────────────────────────── */
   function mostrarModalReceta() {
     let modal = document.getElementById('modalReceta');
     if (!modal) {
@@ -222,13 +210,10 @@ const Despensa = (() => {
         </div>`;
       document.body.appendChild(modal);
     }
-    
-    // Poblar selects
     const selProd = document.getElementById('recProductoId');
     const selIng = document.getElementById('recIngredienteId');
     selProd.innerHTML = DB.productos.filter(p => p.activo !== false).map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
     selIng.innerHTML = DB.ingredientes.map(i => `<option value="${i.id}">${i.nombre} (${i.unidad})</option>`).join('');
-    
     modal.style.display = 'flex';
   }
 
@@ -244,26 +229,14 @@ const Despensa = (() => {
       showToast('error', 'Completá todos los campos correctamente');
       return;
     }
-    
-    // Buscar si ya existe receta para ese producto
     let receta = DB.recetas.find(r => r.productoId === productoId);
     if (!receta) {
-      receta = {
-        id: `rec_${Date.now()}_${Math.random().toString(36).substr(2,6)}`,
-        productoId,
-        ingredientes: []
-      };
+      receta = { id: `rec_${Date.now()}_${Math.random().toString(36).substr(2,6)}`, productoId, ingredientes: [] };
       DB.recetas.push(receta);
     }
-    
-    // Agregar o actualizar ingrediente
     const idxIng = receta.ingredientes.findIndex(ing => ing.ingredienteId === ingredienteId);
-    if (idxIng >= 0) {
-      receta.ingredientes[idxIng].cantidad = cantidad;
-    } else {
-      receta.ingredientes.push({ ingredienteId, cantidad });
-    }
-    
+    if (idxIng >= 0) receta.ingredientes[idxIng].cantidad = cantidad;
+    else receta.ingredientes.push({ ingredienteId, cantidad });
     DB.saveRecetas();
     cerrarModalReceta();
     showToast('success', 'Receta asignada correctamente');
@@ -285,7 +258,6 @@ const Despensa = (() => {
     URL.revokeObjectURL(url);
   }
 
-  /* ── SUSCRIPCIÓN A EVENTOS ───────────────────────────────── */
   function _initEventListeners() {
     EventBus.on('db:inicializada', render);
     EventBus.on('ingredientes:actualizados', render);
@@ -294,22 +266,13 @@ const Despensa = (() => {
       showToast('warning', `⚠️ Stock bajo: ${data.ingrediente} (${data.stock} ${data.unidad})`);
     });
   }
-
   _initEventListeners();
 
   return {
-    render,
-    mostrarModalIngrediente,
-    cerrarModalIngrediente,
-    guardarIngrediente,
-    editarIngrediente,
-    ajusteRapido,
-    mostrarModalReceta,
-    cerrarModalReceta,
-    guardarReceta,
-    exportarMovimientos
+    render, mostrarModalIngrediente, cerrarModalIngrediente, guardarIngrediente,
+    editarIngrediente, ajusteRapido, mostrarModalReceta, cerrarModalReceta,
+    guardarReceta, exportarMovimientos
   };
-
 })();
 
 window.Despensa = Despensa;
