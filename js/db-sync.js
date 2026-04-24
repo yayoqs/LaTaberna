@@ -1,23 +1,18 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-sync.js
-   Propósito: Sincronización bidireccional con Google Sheets.
-   Incluye cola offline, notificaciones y manejo robusto de errores.
+   PubPOS — MÓDULO: db-sync.js (CON PROXY CORS)
    ================================================================ */
 
 const DBSync = (function() {
   const module = {};
 
   // ──────────────────────────────────────────────────────────────
-  // 1. CONFIGURACIÓN DE LA URL (¡CAMBIA ESTA URL POR LA TUYA!)
+  // URL con proxy CORS para evitar problemas de CORS
   // ──────────────────────────────────────────────────────────────
-  module.urlSheets = "https://script.google.com/macros/s/AKfycby9K2VhK-7tkFwzGDJwy9jeSb4ElgygLaEVWsVRQDEY6d9QzTjAjM1r39siqi8Tao4CsQ/exec";
+  const URL_BASE = "https://script.google.com/macros/s/AKfycbwQKZZtyz0P6hDkCDtxth80aO4J_JWmax3WK3-qSy42ls3_LuGo1f_d4yVS6GexYxjvCw/exec";
+  module.urlSheets = "https://cors-anywhere.herokuapp.com/" + URL_BASE;
 
-  // Cola para operaciones cuando estamos offline
   module.syncQueue = [];
 
-  // ──────────────────────────────────────────────────────────────
-  // 2. PERSISTENCIA DE LA COLA (localStorage)
-  // ──────────────────────────────────────────────────────────────
   module._cargarSyncQueueLocal = function() {
     const raw = localStorage.getItem('pubpos_sync_queue');
     this.syncQueue = raw ? JSON.parse(raw) : [];
@@ -36,10 +31,9 @@ const DBSync = (function() {
       creado: new Date().toISOString()
     });
     this._saveSyncQueue();
-    console.log(`[DB Sync] Operación "${action}" encolada para cuando haya conexión.`);
+    console.log(`[DB Sync] Operación "${action}" encolada.`);
   };
 
-  // Intenta enviar todas las operaciones pendientes
   module._procesarSyncQueue = async function() {
     if (this.syncQueue.length === 0) return;
     console.log(`[DB Sync] Procesando cola (${this.syncQueue.length} operaciones)...`);
@@ -58,23 +52,20 @@ const DBSync = (function() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (data.error) throw new Error(data.error);
-        console.log(`[DB Sync] "${item.action}" sincronizado correctamente.`);
+        console.log(`[DB Sync] "${item.action}" sincronizado.`);
       } catch (e) {
         console.warn(`[DB Sync] Falló "${item.action}", re-encolando.`, e);
         item.intentos++;
         if (item.intentos < 5) {
           this.syncQueue.push(item);
         } else {
-          console.error(`[DB Sync] Descartando operación "${item.action}" después de 5 intentos.`);
+          console.error(`[DB Sync] Descartando "${item.action}" después de 5 intentos.`);
         }
       }
     }
     this._saveSyncQueue();
   };
 
-  // ──────────────────────────────────────────────────────────────
-  // 3. SINCRONIZACIÓN DE PRODUCTOS
-  // ──────────────────────────────────────────────────────────────
   module._fetchProductos = async function() {
     try {
       const res = await fetch(`${this.urlSheets}?action=getProductos`, { mode: 'cors' });
@@ -93,9 +84,6 @@ const DBSync = (function() {
     }
   };
 
-  // ──────────────────────────────────────────────────────────────
-  // 4. SINCRONIZACIÓN DE MOZOS
-  // ──────────────────────────────────────────────────────────────
   module._fetchMozos = async function() {
     try {
       const res = await fetch(`${this.urlSheets}?action=getMozos`, { mode: 'cors' });
@@ -112,9 +100,6 @@ const DBSync = (function() {
     }
   };
 
-  // ──────────────────────────────────────────────────────────────
-  // 5. SINCRONIZACIÓN DE INGREDIENTES (Insumos)
-  // ──────────────────────────────────────────────────────────────
   module._fetchIngredientes = async function() {
     try {
       const res = await fetch(`${this.urlSheets}?action=getInsumos`, { mode: 'cors' });
@@ -136,9 +121,6 @@ const DBSync = (function() {
     }
   };
 
-  // ──────────────────────────────────────────────────────────────
-  // 6. SINCRONIZACIÓN DE RECETAS (formato plano → anidado)
-  // ──────────────────────────────────────────────────────────────
   module._fetchRecetas = async function() {
     try {
       const res = await fetch(`${this.urlSheets}?action=getRecetas`, { mode: 'cors' });
@@ -165,18 +147,15 @@ const DBSync = (function() {
         });
         this.recetas = Array.from(mapa.values());
         this.saveRecetas();
-        console.log(`[DB Sync] ${this.recetas.length} recetas sincronizadas (${recetasPlanas.length} relaciones).`);
+        console.log(`[DB Sync] ${this.recetas.length} recetas sincronizadas.`);
       }
     } catch (e) {
       console.warn("[DB Sync] Error obteniendo recetas.", e.message);
     }
   };
 
-  // ──────────────────────────────────────────────────────────────
-  // 7. SINCRONIZACIÓN MASIVA (llamada desde DB.init)
-  // ──────────────────────────────────────────────────────────────
   module.sincronizarTodo = async function() {
-    showToast('info', '<i class="fas fa-sync-alt fa-spin"></i> Sincronizando con Google Sheets...');
+    showToast('info', '<i class="fas fa-sync-alt fa-spin"></i> Sincronizando...');
     try {
       await Promise.all([
         this._fetchProductos(),
@@ -185,19 +164,15 @@ const DBSync = (function() {
         this._fetchRecetas()
       ]);
       await this._procesarSyncQueue();
-      showToast('success', '<i class="fas fa-check-circle"></i> Datos sincronizados correctamente');
+      showToast('success', '<i class="fas fa-check-circle"></i> Datos sincronizados');
       EventBus.emit('sincronizacion:completada');
     } catch (e) {
-      console.error("[DB Sync] Error en sincronización general:", e);
-      showToast('error', '<i class="fas fa-exclamation-circle"></i> Error de conexión con Sheets');
+      console.error("[DB Sync] Error:", e);
+      showToast('error', '<i class="fas fa-exclamation-circle"></i> Error de conexión');
     }
   };
 
-  // ──────────────────────────────────────────────────────────────
-  // 8. OPERACIONES DE ESCRITURA (con cola offline y notificaciones)
-  // ──────────────────────────────────────────────────────────────
   module.syncGuardarProducto = async function(producto) {
-    // Actualiza caché local
     const idx = this.productos.findIndex(p => p.id === producto.id);
     if (idx >= 0) this.productos[idx] = producto;
     else this.productos.push(producto);
@@ -211,14 +186,14 @@ const DBSync = (function() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'guardarProducto', producto })
       });
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       showToast('success', '✅ Producto guardado en la nube');
       console.log('[DB Sync] Producto guardado en Sheets.');
     } catch (e) {
-      console.warn('[DB Sync] Error al guardar en Sheets, se encolará:', e);
-      showToast('warning', '⚠️ Sin conexión. Se guardará localmente y se sincronizará después.');
+      console.warn('[DB Sync] Error, se encolará:', e);
+      showToast('warning', '⚠️ Sin conexión. Se guardará localmente.');
       this._encolarOperacion('guardarProducto', { producto });
     }
   };
@@ -240,10 +215,9 @@ const DBSync = (function() {
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       showToast('success', '✅ Mozo guardado en la nube');
-      console.log('[DB Sync] Mozo guardado en Sheets.');
     } catch (e) {
       console.warn('[DB Sync] Offline, mozo encolado.');
-      showToast('warning', '⚠️ Sin conexión. Se guardará localmente y se sincronizará después.');
+      showToast('warning', '⚠️ Sin conexión. Se guardará localmente.');
       this._encolarOperacion('guardarMozo', { mozo });
     }
   };
