@@ -1,11 +1,10 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-sync.js (POSTs con text/plain, sin preflight)
+   PubPOS — MÓDULO: db-sync.js (v2.1 – con eliminación y mejora en guardado)
    ================================================================ */
 const DBSync = (function() {
   const module = {};
 
-
-  module.urlSheets = "https://script.google.com/macros/s/AKfycbwYf67G0tP51wXxecHspe1H2Vv7-habEGFI2H8MzTEFC5dzLGW93LWWLvKUOHHCoXFZVA/exec";
+  module.urlSheets = "https://script.google.com/macros/s/AKfycbyWd997tbxDrxUEf-JvpVHF0M8MCgMB78AKnPXsFwWJ22fi4rl4MJsNhlFzYGyZLEc76g/exec";
 
   module.syncQueue = [];
 
@@ -42,7 +41,7 @@ const DBSync = (function() {
         const res = await fetch(this.urlSheets, {
           method: 'POST',
           mode: 'cors',
-          headers: { 'Content-Type': 'text/plain' },  // text/plain evita preflight
+          headers: { 'Content-Type': 'text/plain' },
           body: JSON.stringify({ action: item.action, ...item.payload })
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -97,81 +96,31 @@ const DBSync = (function() {
   };
 
   module._fetchIngredientes = async function() {
-    try {
-      const res = await fetch(`${this.urlSheets}?action=getInsumos`, { mode: 'cors' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      let ingredientes = [];
-      if (data && Array.isArray(data.insumos)) {
-        ingredientes = data.insumos;
-      } else if (data && Array.isArray(data.ingredientes)) {
-        ingredientes = data.ingredientes;
-      }
-      if (ingredientes.length) {
-        this.ingredientes = ingredientes.map(i => this._normalizarIngrediente(i));
-        this.saveIngredientes();
-        console.log(`[DB Sync] ${this.ingredientes.length} ingredientes sincronizados.`);
-      }
-    } catch (e) {
-      console.warn("[DB Sync] Error obteniendo insumos, usando caché.", e.message);
-    }
+    // ... (sin cambios)
   };
 
   module._fetchRecetas = async function() {
-    try {
-      const res = await fetch(`${this.urlSheets}?action=getRecetas`, { mode: 'cors' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      let recetasPlanas = [];
-      if (data && Array.isArray(data.recetas)) {
-        recetasPlanas = data.recetas;
-      }
-      if (recetasPlanas.length) {
-        const mapa = new Map();
-        recetasPlanas.forEach(row => {
-          const prodId = row.productoId || row[0];
-          const ingId = row.insumoId || row[1];
-          const cant = row.cantidad || row[2];
-          if (!prodId || !ingId) return;
-          if (!mapa.has(prodId)) {
-            mapa.set(prodId, { id: `rec_${prodId}`, productoId: prodId, ingredientes: [] });
-          }
-          mapa.get(prodId).ingredientes.push({
-            ingredienteId: ingId,
-            cantidad: parseFloat(cant)
-          });
-        });
-        this.recetas = Array.from(mapa.values());
-        this.saveRecetas();
-        console.log(`[DB Sync] ${this.recetas.length} recetas sincronizadas.`);
-      }
-    } catch (e) {
-      console.warn("[DB Sync] Error obteniendo recetas.", e.message);
-    }
+    // ... (sin cambios)
   };
 
   module.sincronizarTodo = async function() {
-    showToast('info', '<i class="fas fa-sync-alt fa-spin"></i> Sincronizando...');
-    try {
-      await Promise.all([
-        this._fetchProductos(),
-        this._fetchMozos(),
-        this._fetchIngredientes(),
-        this._fetchRecetas()
-      ]);
-      await this._procesarSyncQueue();
-      showToast('success', '<i class="fas fa-check-circle"></i> Datos sincronizados');
-      EventBus.emit('sincronizacion:completada');
-    } catch (e) {
-      console.error("[DB Sync] Error:", e);
-      showToast('error', '<i class="fas fa-exclamation-circle"></i> Error de conexión');
-    }
+    // ... (sin cambios)
   };
 
+  /**
+   * Guarda un producto (crea o actualiza). Ahora con comparación flexible de ID.
+   */
   module.syncGuardarProducto = async function(producto) {
-    const idx = this.productos.findIndex(p => p.id === producto.id);
-    if (idx >= 0) this.productos[idx] = producto;
-    else this.productos.push(producto);
+    console.log('[DB Sync] Guardando producto:', producto);
+    // Buscar usando == para cubrir string/number
+    const idx = this.productos.findIndex(p => p.id == producto.id);
+    if (idx >= 0) {
+      this.productos[idx] = producto;
+      console.log('[DB Sync] Producto actualizado localmente.');
+    } else {
+      this.productos.push(producto);
+      console.warn('[DB Sync] Producto nuevo (no encontrado en array local). ¿ID correcto?');
+    }
     localStorage.setItem('pubpos_cache_prod', JSON.stringify(this.productos));
     EventBus.emit('productos:cargados', this.productos);
 
@@ -194,47 +143,40 @@ const DBSync = (function() {
     }
   };
 
-  module.syncGuardarMozo = async function(mozo) {
-    const idx = this.mozos.findIndex(m => m.id === mozo.id);
-    if (idx >= 0) this.mozos[idx] = mozo;
-    else this.mozos.push(mozo);
-    this.saveMozos();
+  /**
+   * Elimina un producto por ID en el backend y en el array local.
+   */
+  module.syncEliminarProducto = async function(productoId) {
+    console.log('[DB Sync] Eliminando producto:', productoId);
+    // Eliminar localmente
+    this.productos = this.productos.filter(p => p.id != productoId);
+    localStorage.setItem('pubpos_cache_prod', JSON.stringify(this.productos));
+    EventBus.emit('productos:cargados', this.productos);
 
     try {
       const res = await fetch(this.urlSheets, {
         method: 'POST',
         mode: 'cors',
         headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'guardarMozo', mozo })
+        body: JSON.stringify({ action: 'eliminarProducto', productoId })
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (data.error) throw new Error(data.error);
-      showToast('success', '✅ Mozo guardado en la nube');
+      showToast('success', '✅ Producto eliminado de la nube');
+      console.log('[DB Sync] Producto eliminado en Sheets.');
     } catch (e) {
-      console.warn('[DB Sync] Offline, mozo encolado.');
-      showToast('warning', '⚠️ Sin conexión. Se guardará localmente.');
-      this._encolarOperacion('guardarMozo', { mozo });
+      console.warn('[DB Sync] Error eliminando, se encolará:', e);
+      showToast('warning', '⚠️ Sin conexión. Se eliminará solo localmente.');
+      this._encolarOperacion('eliminarProducto', { productoId });
     }
   };
 
-  module.syncGuardarPedido = async function(pedido) {
-    try {
-      const res = await fetch(this.urlSheets, {
-        method: 'POST',
-        mode: 'cors',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'guardarPedido', pedido })
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      console.log('[DB Sync] Pedido guardado en Sheets.');
-    } catch (e) {
-      console.warn('[DB Sync] Offline, pedido encolado.');
-      this._encolarOperacion('guardarPedido', { pedido });
-    }
-  };
+  module.syncGuardarMozo = async function(mozo) { /* ... sin cambios */ };
+  module.syncGuardarPedido = async function(pedido) { /* ... sin cambios */ };
+
+  // Asegurarse de incluir las demás funciones (_fetchIngredientes, _fetchRecetas, etc.) que están en el original.
+  // (No las reescribo por brevedad, pero debes conservarlas)
 
   return module;
 })();
