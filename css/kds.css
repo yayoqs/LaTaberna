@@ -176,3 +176,20 @@
 }
 .kds-empty i { font-size: 48px; opacity: .2; }
 .kds-empty-title { font-size: 16px; font-weight: 700; color: var(--color-text-sec); }
+/* =============================================================== */
+
+/* ── ESTILO PARA RECETA DENTRO DE KDS ─────────────────────── */
+.kds-item details summary {
+  cursor: pointer;
+  color: var(--color-accent);
+  font-weight: 600;
+  font-size: 11px;
+  margin-top: 2px;
+}
+.kds-item details ul {
+  margin: 4px 0 0 16px;
+  padding: 0;
+  list-style-type: disc;
+  font-size: 11px;
+  color: var(--color-text-sec);
+}

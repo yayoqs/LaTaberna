@@ -1,6 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: mesas.js
-   Propósito: Gestión de la grilla de mesas, fusión y creación.
+   PubPOS — MÓDULO: mesas.js (v2 – con zonas)
    ================================================================ */
 const Mesas = (() => {
 
@@ -22,6 +21,7 @@ const Mesas = (() => {
 
   let _modoSeleccion = false;
   let _mesasSeleccionadas = new Set();
+  let _zonaActiva = 'todas';   // 'todas', 'salon', 'terraza'
 
   /* ── RENDERIZAR GRILLA ────────────────────────────────────── */
   function render() {
@@ -33,9 +33,18 @@ const Mesas = (() => {
       return;
     }
 
-    grid.innerHTML = '';
+    // Asegurar que todas las mesas tengan propiedad 'zona' (por defecto 'salon')
+    DB.mesas.forEach(m => {
+      if (!m.zona) m.zona = 'salon';
+    });
 
-    const mesasVisibles = DB.mesas.filter(m => m.estado !== 'fusionada');
+    // Filtrar por zona si no es 'todas'
+    let mesasVisibles = DB.mesas.filter(m => m.estado !== 'fusionada');
+    if (_zonaActiva !== 'todas') {
+      mesasVisibles = mesasVisibles.filter(m => m.zona === _zonaActiva);
+    }
+
+    grid.innerHTML = '';
 
     mesasVisibles.forEach(mesa => {
       const card = document.createElement('article');
@@ -52,13 +61,13 @@ const Mesas = (() => {
 
       if (puedeSeleccionar) {
         const checked = _mesasSeleccionadas.has(mesa.numero) ? 'checked' : '';
-        const extraClass = mesa.estado !== 'libre' ? 'ocupada-check' : '';
         card.innerHTML = `
-          <input type="checkbox" class="mesa-checkbox ${extraClass}" data-num="${mesa.numero}" ${checked} 
+          <input type="checkbox" class="mesa-checkbox" data-num="${mesa.numero}" ${checked} 
                  onclick="event.stopPropagation(); Mesas.toggleSeleccionMesa(${mesa.numero}, this.checked)">
           <i class="fas ${ICONOS[mesa.estado] || 'fa-chair'} mesa-icon"></i>
           <strong class="mesa-numero">${mesa.numero}</strong>
           <span class="mesa-estado-label">${LABELS[mesa.estado] || mesa.estado}</span>
+          <span class="mesa-zona-badge">${mesa.zona}</span>
         `;
         card.onclick = (e) => {
           if (e.target.type !== 'checkbox') {
@@ -85,16 +94,26 @@ const Mesas = (() => {
           <strong class="mesa-numero">${numeroMostrado}</strong>
           <span class="mesa-estado-label">${LABELS[mesa.estado] || mesa.estado}</span>
           ${mesa.esVirtual ? '<span class="mesa-virtual-badge"><i class="fas fa-link"></i> Unión</span>' : ''}
+          <span class="mesa-zona-badge">${mesa.zona}</span>
         `;
       }
       grid.appendChild(card);
     });
 
-    // Asegurar que el botón de confirmar fusión solo se muestre en modo selección
     const confirmBtn = document.getElementById('btnConfirmarFusion');
     if (confirmBtn) {
       confirmBtn.style.display = _modoSeleccion ? 'inline-flex' : 'none';
     }
+  }
+
+  /* ── CAMBIO DE ZONA ───────────────────────────────────────── */
+  function setZona(zona) {
+    _zonaActiva = zona;
+    render();
+    // Actualizar clases de los botones de zona
+    document.querySelectorAll('.zona-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.zona === zona);
+    });
   }
 
   /* ── MODO SELECCIÓN PARA FUSIÓN ───────────────────────────── */
@@ -121,10 +140,8 @@ const Mesas = (() => {
       showToast('warning', 'Seleccioná al menos dos mesas para fusionar.');
       return;
     }
-
     const numeros = Array.from(_mesasSeleccionadas).sort((a,b) => a-b);
     const mozo = $id('mozoActivo')?.value || 'Mozo';
-    
     const mesaVirtual = DB.fusionarMesas(numeros, mozo);
     if (mesaVirtual) {
       showToast('success', `Mesas ${numeros.join(', ')} fusionadas.`);
@@ -140,12 +157,13 @@ const Mesas = (() => {
     if (typeof DB === 'undefined') return;
     const mesasReales = DB.mesas.filter(m => !m.esVirtual);
     const nuevoNum = mesasReales.length + 1;
-    DB.mesas.push(mesaVacia(nuevoNum));
+    const zona = _zonaActiva !== 'todas' ? _zonaActiva : 'salon';  // hereda la zona activa
+    DB.mesas.push({ ...mesaVacia(nuevoNum), zona });
     DB.config.cantidadMesas = nuevoNum;
     DB.saveMesas();
     DB.saveConfig();
     render();
-    showToast('success', `Mesa ${nuevoNum} agregada`);
+    showToast('success', `Mesa ${nuevoNum} agregada (${zona})`);
   }
 
   function labelEstado(estado) {
@@ -154,7 +172,6 @@ const Mesas = (() => {
 
   /* ── SUSCRIPCIÓN A EVENTOS ───────────────────────────────── */
   function _initEventListeners() {
-    // No ocultamos el botón aquí, se controla en render()
     EventBus.on('mesas:guardadas', render);
     EventBus.on('db:inicializada', render);
     EventBus.on('config:guardada', render);
@@ -170,7 +187,8 @@ const Mesas = (() => {
     labelEstado,
     toggleModoFusion,
     toggleSeleccionMesa,
-    fusionarMesasSeleccionadas
+    fusionarMesasSeleccionadas,
+    setZona            // <--- nuevo método público
   };
 
 })();

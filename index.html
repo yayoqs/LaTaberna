@@ -96,7 +96,7 @@
 </header>
 
 <!-- ============================================================
-     VISTA: MESAS
+     VISTA: MESAS (con selector de zona)
      ============================================================ -->
 <main id="view-mesas" class="view active">
 
@@ -109,6 +109,18 @@
         <span class="badge esperando">Lista</span>
         <span class="badge cuenta">Cuenta</span>
       </span>
+
+      <!-- Botones de Zona -->
+      <button class="nav-btn zona-btn active" data-zona="todas" onclick="Mesas.setZona('todas')">
+        <i class="fas fa-globe"></i> Todas
+      </button>
+      <button class="nav-btn zona-btn" data-zona="salon" onclick="Mesas.setZona('salon')">
+        <i class="fas fa-warehouse"></i> Salón
+      </button>
+      <button class="nav-btn zona-btn" data-zona="terraza" onclick="Mesas.setZona('terraza')">
+        <i class="fas fa-sun"></i> Terraza
+      </button>
+
       <button class="btn-secondary" onclick="Mesas.agregarMesa()" data-rol="admin,master">
         <i class="fas fa-plus"></i> Nueva Mesa
       </button>
@@ -193,7 +205,7 @@
     <div class="despensa-main">
       <table class="ingredientes-table" id="ingredientesTable">
         <thead>
-          <tr><th>Ingrediente</th><th>Categoría</th><th>Stock</th><th>Unidad</th><th>Stock Mín.</th><th>Acciones</th></tr>
+          <tr><th>Ingrediente</th><th>Categoría</th><th>Stock</th><th>Unidad</th><th>Stock Mín.</th><th>Ubicación</th><th>Acciones</th></tr>
         </thead>
         <tbody id="ingredientesBody"></tbody>
       </table>
@@ -373,16 +385,4 @@
 <script src="js/auth.js"></script>
 <script src="js/mesas.js"></script>
 <script src="js/carta.js"></script>
-<script src="js/comanda.js"></script>
-<script src="js/cuenta.js"></script>
-<script src="js/cobro.js"></script>
-<script src="js/pedido.js"></script>
-<script src="js/kds.js"></script>
-<script src="js/caja.js"></script>
-<script src="js/tickets.js"></script>
-<script src="js/config.js"></script>
-<script src="js/despensa.js"></script>
-<script src="js/app.js"></script>
-
-</body>
-</html>
+<script src="js/comanda.js"></
