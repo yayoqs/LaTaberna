@@ -22,7 +22,6 @@ const DBInventario = (function() {
     };
   };
 
-  // Normaliza una receta que ya viene con el campo "ingredientes" como array
   module._normalizarReceta = function(r) {
     return {
       id: this._validarId(r.id, 'rec'),
@@ -46,7 +45,7 @@ const DBInventario = (function() {
     };
   };
 
-  // ── PERSISTENCIA LOCAL (caché) ───────────────────────────────
+  // ── PERSISTENCIA LOCAL ───────────────────────────────────────
   module._cargarIngredientesLocal = function() {
     const raw = localStorage.getItem('pubpos_ingredientes');
     if (raw) {
@@ -101,10 +100,10 @@ const DBInventario = (function() {
     }).filter(i => i !== undefined);
   };
 
-  // ── DESCONTAR STOCK AL VENDER ─────────────────────────────────
+  // ── DESCONTAR STOCK (local) ──────────────────────────────────
   module.consumirIngredientesDeProducto = async function(productoId, cantidad, motivo = 'Consumo') {
     const receta = this.recetas.find(r => r.productoId === productoId);
-    if (!receta) return false; // si no hay receta, no descontamos
+    if (!receta) return false;
 
     for (const ingReceta of receta.ingredientes) {
       const ingrediente = this.ingredientes.find(i => i.id === ingReceta.ingredienteId);
@@ -113,7 +112,6 @@ const DBInventario = (function() {
       const cantidadADescontar = ingReceta.cantidad * cantidad;
       ingrediente.stock = Math.max(0, ingrediente.stock - cantidadADescontar);
 
-      // Registrar movimiento
       this.movimientos.push(this._normalizarMovimiento({
         id: `mov_${Date.now()}_${Math.random().toString(36).substr(2,4)}`,
         ingredienteId: ingrediente.id,
@@ -124,7 +122,6 @@ const DBInventario = (function() {
         usuario: (typeof Auth !== 'undefined' && Auth.getNombre) ? Auth.getNombre() : 'sistema'
       }));
 
-      // Disparar alerta si stock bajo
       if (ingrediente.stock <= ingrediente.stock_minimo) {
         EventBus.emit('inventario:stock_bajo', {
           ingrediente: ingrediente.nombre,
@@ -140,7 +137,7 @@ const DBInventario = (function() {
     return true;
   };
 
-  // ── AJUSTE MANUAL DE STOCK ───────────────────────────────────
+  // ── AJUSTE MANUAL ────────────────────────────────────────────
   module.ajustarStock = function(ingredienteId, cantidadDelta, motivo = 'Ajuste manual') {
     const ingrediente = this.ingredientes.find(i => i.id === ingredienteId);
     if (!ingrediente) return false;
