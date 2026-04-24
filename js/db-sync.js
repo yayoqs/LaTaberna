@@ -8,8 +8,12 @@ const DBSync = (function() {
   // ──────────────────────────────────────────────────────────────
   // URL con proxy CORS para evitar problemas de CORS
   // ──────────────────────────────────────────────────────────────
+<<<<<<< HEAD
   const URL_BASE = "https://script.google.com/macros/s/AKfycbwQKZZtyz0P6hDkCDtxth80aO4J_JWmax3WK3-qSy42ls3_LuGo1f_d4yVS6GexYxjvCw/exec";
   module.urlSheets = "https://cors-anywhere.herokuapp.com/" + URL_BASE;
+=======
+  module.urlSheets = "https://script.google.com/macros/s/AKfycbwQKZZtyz0P6hDkCDtxth80aO4J_JWmax3WK3-qSy42ls3_LuGo1f_d4yVS6GexYxjvCw/exec";
+>>>>>>> 51ead134f28c96bab0c872f2460534b879483efb
 
   module.syncQueue = [];
 
