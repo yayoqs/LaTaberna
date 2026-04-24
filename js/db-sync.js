@@ -10,7 +10,7 @@ const DBSync = (function() {
   // ──────────────────────────────────────────────────────────────
   // 1. CONFIGURACIÓN DE LA URL (¡CAMBIA ESTA URL POR LA TUYA!)
   // ──────────────────────────────────────────────────────────────
-  module.urlSheets = "https://script.google.com/macros/s/AKfycby9K2VhK-7tkFwzGDJwy9jeSb4ElgygLaEVWsVRQDEY6d9QzTjAjM1r39siqi8Tao4CsQ/exec";
+  module.urlSheets = "https://script.google.com/macros/s/AKfycbwQKZZtyz0P6hDkCDtxth80aO4J_JWmax3WK3-qSy42ls3_LuGo1f_d4yVS6GexYxjvCw/exec";
 
   // Cola para operaciones cuando estamos offline
   module.syncQueue = [];
