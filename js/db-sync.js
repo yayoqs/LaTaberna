@@ -1,19 +1,21 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-sync.js (CON PROXY CORS)
+   PubPOS — MÓDULO: db-sync.js
+   Propósito: Sincronización con Google Sheets mediante App Script.
+   Cambios 2026-04-23:
+     • Eliminado el proxy CORS "cors-anywhere" porque ya no es necesario
+       si el backend incluye doOptions() para el preflight.
+     • Resuelto el conflicto de fusión que dejaba marcas <<<<<<< HEAD.
+     • Se mantiene la lógica de cola de operaciones offline.
+   Nota pedagógica: El fetch directo a https://script.google.com/macros/s/...
+   funciona si el web app está desplegado con acceso "Cualquiera" y 
+   el backend responde a OPTIONS. Sin ello, verás errores CORS.
    ================================================================ */
 
 const DBSync = (function() {
   const module = {};
 
-  // ──────────────────────────────────────────────────────────────
-  // URL con proxy CORS para evitar problemas de CORS
-  // ──────────────────────────────────────────────────────────────
-<<<<<<< HEAD
-  const URL_BASE = "https://script.google.com/macros/s/AKfycbwQKZZtyz0P6hDkCDtxth80aO4J_JWmax3WK3-qSy42ls3_LuGo1f_d4yVS6GexYxjvCw/exec";
-  module.urlSheets = "https://cors-anywhere.herokuapp.com/" + URL_BASE;
-=======
-  module.urlSheets = "https://script.google.com/macros/s/AKfycbwQKZZtyz0P6hDkCDtxth80aO4J_JWmax3WK3-qSy42ls3_LuGo1f_d4yVS6GexYxjvCw/exec";
->>>>>>> 51ead134f28c96bab0c872f2460534b879483efb
+  // ⚠️ Cambia esta URL por la de tu propio despliegue si es necesario
+  module.urlSheets = "https://script.google.com/macros/s/AKfycbxUweW17JsPyhdBB8o98qxG0MXePRDG49Yr3bhK_2r5wj8i2TfMMZuW2bdO_2d5-Hk5/exec";
 
   module.syncQueue = [];
 
