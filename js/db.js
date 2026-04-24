@@ -1,6 +1,8 @@
 /* ================================================================
    PubPOS — MÓDULO: db.js (Orquestador)
    Propósito: Reúne todos los submódulos y coordina la inicialización.
+   Cambio 2026-04-24: El POST para procesarVenta ahora usa
+   Content-Type: text/plain para evitar el preflight CORS.
    ================================================================ */
 
 var DB = (function() {
@@ -52,6 +54,10 @@ var DB = (function() {
     EventBus.emit('app:error', 'No se pudieron cargar los datos iniciales.');
   };
 
+  /**
+   * Cierra un pedido y descuenta el stock correspondiente.
+   * El POST a procesarVenta ahora usa 'text/plain' para evitar el preflight CORS.
+   */
   combined.cerrarPedido = async function(id, formaPago, total, descuento) {
     const pedido = this.pedidos.find(p => p.id === id);
     if (!pedido) return null;
@@ -67,10 +73,11 @@ var DB = (function() {
 
     try {
       const items = JSON.parse(pedido.items || '[]');
+      // ⚠️ Cambio importante: Content-Type: text/plain para evitar CORS preflight
       await fetch(this.urlSheets, {
         method: 'POST',
         mode: 'cors',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({
           action: 'procesarVenta',
           items: items.map(it => ({ productoId: it.prodId, cantidad: it.qty }))

@@ -1,20 +1,10 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-sync.js
-   Propósito: Sincronización con Google Sheets mediante App Script.
-   Cambios 2026-04-23:
-     • Eliminado el proxy CORS "cors-anywhere" porque ya no es necesario
-       si el backend incluye doOptions() para el preflight.
-     • Resuelto el conflicto de fusión que dejaba marcas <<<<<<< HEAD.
-     • Se mantiene la lógica de cola de operaciones offline.
-   Nota pedagógica: El fetch directo a https://script.google.com/macros/s/...
-   funciona si el web app está desplegado con acceso "Cualquiera" y 
-   el backend responde a OPTIONS. Sin ello, verás errores CORS.
+   PubPOS — MÓDULO: db-sync.js (POSTs con text/plain, sin preflight)
    ================================================================ */
-
 const DBSync = (function() {
   const module = {};
 
-  // ⚠️ Cambia esta URL por la de tu propio despliegue si es necesario
+
   module.urlSheets = "https://script.google.com/macros/s/AKfycbwYf67G0tP51wXxecHspe1H2Vv7-habEGFI2H8MzTEFC5dzLGW93LWWLvKUOHHCoXFZVA/exec";
 
   module.syncQueue = [];
@@ -52,7 +42,7 @@ const DBSync = (function() {
         const res = await fetch(this.urlSheets, {
           method: 'POST',
           mode: 'cors',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'text/plain' },  // text/plain evita preflight
           body: JSON.stringify({ action: item.action, ...item.payload })
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -189,7 +179,7 @@ const DBSync = (function() {
       const res = await fetch(this.urlSheets, {
         method: 'POST',
         mode: 'cors',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({ action: 'guardarProducto', producto })
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -214,7 +204,7 @@ const DBSync = (function() {
       const res = await fetch(this.urlSheets, {
         method: 'POST',
         mode: 'cors',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({ action: 'guardarMozo', mozo })
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -233,7 +223,7 @@ const DBSync = (function() {
       const res = await fetch(this.urlSheets, {
         method: 'POST',
         mode: 'cors',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({ action: 'guardarPedido', pedido })
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
