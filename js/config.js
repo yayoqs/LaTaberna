@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: config.js (v2.1 – eliminar y editar sincronizados)
+   PubPOS — MÓDULO: config.js (v2.2 – logs para depurar ID en edición)
    ================================================================ */
 const Config = (() => {
   const CATEGORIAS = ['Bebidas','Cervezas','Cocteles','Vinos','Entradas','Comidas','Postres'];
@@ -51,6 +51,7 @@ const Config = (() => {
   }
 
   function _htmlProdConfigItem(p) {
+    // Asegurarse de que el ID se pasa correctamente (entre comillas)
     return `
       <div class="prod-config-item${p.activo === false ? ' inactivo' : ''}">
         <span class="prod-config-nombre">${p.nombre}</span>
@@ -71,7 +72,7 @@ const Config = (() => {
     $id('prodDescripcion').value = prod?.descripcion || '';
     $id('prodActivo').checked = prod ? (prod.activo !== false) : true;
     $id('modalProducto').style.display = 'flex';
-    console.log('Editando producto con ID:', prod?.id);
+    console.log('📋 Editando producto con ID:', prod?.id, '| Producto completo:', prod);
   }
 
   function cerrarModalProducto() { $id('modalProducto').style.display = 'none'; }
@@ -82,10 +83,11 @@ const Config = (() => {
     if (!nombre) { showToast('error', 'Nombre obligatorio'); return; }
     if (!precio || precio <= 0) { showToast('error', 'Precio mayor a 0'); return; }
 
-    // ¡Importante! Usar el ID que ya viene del input (si existe)
-    const id = $val('prodId') || `prod_${Date.now()}_${Math.random().toString(36).substr(2,6)}`;
-    console.log('Guardando producto con ID:', id);
-    
+    // Tomar el ID del input; si está vacío, se genera uno nuevo
+    const idInput = $id('prodId');
+    const id = idInput && idInput.value.trim() ? idInput.value.trim() : `prod_${Date.now()}_${Math.random().toString(36).substr(2,6)}`;
+    console.log('💾 Guardando producto con ID:', id);
+
     const producto = {
       id,
       nombre,
@@ -110,16 +112,21 @@ const Config = (() => {
   }
 
   async function _editarProducto(id) {
-    const prod = DB.productos.find(p => p.id == id);  // usar == para flexibilidad
+    console.log('🔍 Buscando producto con ID:', id, 'Tipo:', typeof id);
+    // Usar comparación flexible (==) porque el ID puede venir como string
+    const prod = DB.productos.find(p => p.id == id);
     if (prod) {
+      console.log('✅ Producto encontrado:', prod);
       abrirModalProducto(prod);
     } else {
       showToast('error', 'Producto no encontrado');
+      console.warn('❌ Producto no encontrado en DB.productos. IDs disponibles:', DB.productos.map(p => p.id));
     }
   }
 
   async function _eliminarProducto(id) {
     if (!confirm('¿Eliminar este producto?')) return;
+    console.log('🗑️ Eliminando producto con ID:', id);
     try {
       await DB.syncEliminarProducto(id);
       renderProductos();
@@ -128,7 +135,7 @@ const Config = (() => {
     }
   }
 
-  function renderMozos() { /* ... igual que antes */ }
+  function renderMozos() { /* ... */ }
   function agregarMozo() { /* ... */ }
   function eliminarMozo(nombre) { /* ... */ }
 
