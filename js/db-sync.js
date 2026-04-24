@@ -15,7 +15,7 @@ const DBSync = (function() {
   const module = {};
 
   // ⚠️ Cambia esta URL por la de tu propio despliegue si es necesario
-  module.urlSheets = "https://script.google.com/macros/s/AKfycbxUweW17JsPyhdBB8o98qxG0MXePRDG49Yr3bhK_2r5wj8i2TfMMZuW2bdO_2d5-Hk5/exec";
+  module.urlSheets = "https://script.google.com/macros/s/AKfycbxq0q2id31wOpQWs3WazhTZSNIjpPAxcJ7mGZZyxlcgvhUTS2A6Kv0bjSvgcHYIWGn8OQ/exec";
 
   module.syncQueue = [];
 
