@@ -1,11 +1,13 @@
- /* ================================================================
+
+  /* ================================================================
    PubPOS — MÓDULO: db-sync.js (v2.3 – completo)
+   Propósito: Sincronización con Google Sheets mediante App Script.
    ================================================================ */
 const DBSync = (function() {
   const module = {};
 
   // ⚠️ Cambia esta URL si generas una nueva implementación
-   module.urlSheets = "https://script.google.com/macros/s/AKfycbxsOZ1KVokva9hq6tX2jKSfnHe-Q1e_5-DjdbxA-N2L4R2QDsJi7mIP96KwuP_TFkZ2gQ/exec";
+     module.urlSheets = "https://script.google.com/macros/s/AKfycbxsOZ1KVokva9hq6tX2jKSfnHe-Q1e_5-DjdbxA-N2L4R2QDsJi7mIP96KwuP_TFkZ2gQ/exec";
 
   module.syncQueue = [];
 
@@ -170,7 +172,6 @@ const DBSync = (function() {
 
   // ─── PRODUCTOS ──────────────────────────────────────────────
   module.syncGuardarProducto = async function(producto) {
-    console.log('[DB Sync] syncGuardarProducto llamado:', producto);
     const idx = this.productos.findIndex(p => p.id == producto.id);
     if (idx >= 0) this.productos[idx] = producto;
     else this.productos.push(producto);
@@ -197,7 +198,6 @@ const DBSync = (function() {
   };
 
   module.syncEliminarProducto = async function(productoId) {
-    console.log('[DB Sync] Eliminando producto:', productoId);
     this.productos = this.productos.filter(p => p.id != productoId);
     localStorage.setItem('pubpos_cache_prod', JSON.stringify(this.productos));
     EventBus.emit('productos:cargados', this.productos);
@@ -267,7 +267,6 @@ const DBSync = (function() {
 
   // ─── INGREDIENTES (DESPENSA) ───────────────────────────────
   module.syncGuardarIngrediente = async function(ingrediente) {
-    console.log('[DB Sync] syncGuardarIngrediente llamado:', ingrediente);
     const idx = this.ingredientes.findIndex(i => i.id == ingrediente.id);
     if (idx >= 0) this.ingredientes[idx] = ingrediente;
     else this.ingredientes.push(ingrediente);
@@ -293,7 +292,6 @@ const DBSync = (function() {
   };
 
   module.syncEliminarIngrediente = async function(ingredienteId) {
-    console.log('[DB Sync] Eliminando ingrediente:', ingredienteId);
     this.ingredientes = this.ingredientes.filter(i => i.id != ingredienteId);
     this.saveIngredientes();
 
@@ -318,7 +316,6 @@ const DBSync = (function() {
 
   // ─── RECETAS ───────────────────────────────────────────────
   module.syncGuardarReceta = async function(receta) {
-    console.log('[DB Sync] Guardando receta:', receta);
     // Actualizar estructura local (receta por productoId)
     let recetaLocal = this.recetas.find(r => r.productoId == receta.productoId);
     if (!recetaLocal) {

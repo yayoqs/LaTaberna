@@ -1,14 +1,7 @@
 /* ================================================================
-   PubPOS — MÓDULO: despensa.js
+   PubPOS — MÓDULO: despensa.js (v2.1 – ubicación, recetas visibles, sync)
    Propósito: Gestión de inventario (ingredientes, recetas, movimientos).
-   Cambios (2026-04-23):
-     • En _renderTablaIngredientes() se filtran los ingredientes según el rol:
-       - cocina → solo ve ingredientes con categoría 'cocina'
-       - barra  → solo ve ingredientes con categoría 'barra'
-       - admin/master → ven todos
-     • Esto evita que un cocinero modifique stock de la barra y viceversa.
    ================================================================ */
-
 const Despensa = (() => {
 
   function render() {
@@ -24,16 +17,14 @@ const Despensa = (() => {
     let ingredientes = DB.ingredientes || [];
     const rol = Auth.getRol();
 
-    // 🔒 FILTRO POR ROL
     if (rol === 'cocina') {
       ingredientes = ingredientes.filter(i => i.categoria === 'cocina');
     } else if (rol === 'barra') {
       ingredientes = ingredientes.filter(i => i.categoria === 'barra');
     }
-    // admin/master ven todos
 
     if (!ingredientes.length) {
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:40px;">No hay ingredientes visibles para tu rol.</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;">No hay ingredientes visibles para tu rol.</td></tr>`;
       return;
     }
 
@@ -53,6 +44,7 @@ const Despensa = (() => {
           <td>${ing.stock.toFixed(2)}</td>
           <td>${ing.unidad}</td>
           <td>${ing.stock_minimo}</td>
+          <td>${ing.ubicacion || '—'}</td>
           <td>
             <button class="btn-ajuste" onclick="Despensa.ajusteRapido('${ing.id}')"><i class="fas fa-pen"></i> Ajustar</button>
             <button class="btn-ajuste" onclick="Despensa.editarIngrediente('${ing.id}')"><i class="fas fa-edit"></i></button>
@@ -116,7 +108,7 @@ const Despensa = (() => {
       modal.style.display = 'none';
       modal.innerHTML = `
         <div class="modal-small">
-          <div class="modal-header"><h3>${titulo}</h3><button class="modal-close" onclick="Despensa.cerrarModalIngrediente()"><i class="fas fa-times"></i></button></div>
+          <div class="modal-header"><h3 id="ingTitulo">${titulo}</h3><button class="modal-close" onclick="Despensa.cerrarModalIngrediente()"><i class="fas fa-times"></i></button></div>
           <div class="modal-small-body">
             <input type="hidden" id="ingId">
             <label>Nombre</label><input type="text" id="ingNombre" placeholder="Ej: Harina 000">
@@ -124,28 +116,28 @@ const Despensa = (() => {
             <label>Stock inicial</label><input type="number" id="ingStock" step="0.01" value="0">
             <label>Unidad</label><input type="text" id="ingUnidad" placeholder="kg, g, L, u" value="kg">
             <label>Stock mínimo</label><input type="number" id="ingStockMin" step="0.01" value="5">
+            <label>Ubicación</label><input type="text" id="ingUbicacion" placeholder="Ej: Estante 3, refrigerador 1">
             <div class="modal-small-footer"><button class="btn-secondary" onclick="Despensa.cerrarModalIngrediente()">Cancelar</button><button class="btn-primary" onclick="Despensa.guardarIngrediente()">Guardar</button></div>
           </div>
         </div>`;
       document.body.appendChild(modal);
     }
-    const modalTitulo = modal.querySelector('.modal-header h3');
-    if (modalTitulo) modalTitulo.textContent = titulo;
     document.getElementById('ingId').value = ingrediente?.id || '';
     document.getElementById('ingNombre').value = ingrediente?.nombre || '';
     document.getElementById('ingCategoria').value = ingrediente?.categoria || 'general';
     document.getElementById('ingStock').value = ingrediente?.stock || 0;
     document.getElementById('ingUnidad').value = ingrediente?.unidad || 'kg';
     document.getElementById('ingStockMin').value = ingrediente?.stock_minimo || 5;
+    document.getElementById('ingUbicacion').value = ingrediente?.ubicacion || '';
+    document.getElementById('ingTitulo').textContent = titulo;
     modal.style.display = 'flex';
   }
 
   function cerrarModalIngrediente() {
-    const modal = document.getElementById('modalIngrediente');
-    if (modal) modal.style.display = 'none';
+    document.getElementById('modalIngrediente').style.display = 'none';
   }
 
-  function guardarIngrediente() {
+  async function guardarIngrediente() {
     const id = document.getElementById('ingId').value;
     const nombre = document.getElementById('ingNombre').value.trim();
     if (!nombre) { showToast('error', 'Nombre obligatorio'); return; }
@@ -155,23 +147,25 @@ const Despensa = (() => {
       categoria: document.getElementById('ingCategoria').value,
       stock: parseFloat(document.getElementById('ingStock').value) || 0,
       unidad: document.getElementById('ingUnidad').value.trim() || 'u',
-      stock_minimo: parseFloat(document.getElementById('ingStockMin').value) || 0
+      stock_minimo: parseFloat(document.getElementById('ingStockMin').value) || 0,
+      ubicacion: document.getElementById('ingUbicacion').value.trim() || ''
     };
-    const idx = DB.ingredientes.findIndex(i => i.id === ingrediente.id);
-    if (idx >= 0) DB.ingredientes[idx] = ingrediente;
-    else DB.ingredientes.push(ingrediente);
-    DB.saveIngredientes();
-    cerrarModalIngrediente();
-    render();
-    showToast('success', 'Ingrediente guardado');
+    try {
+      await DB.syncGuardarIngrediente(ingrediente);
+      cerrarModalIngrediente();
+      render();
+      showToast('success', 'Ingrediente guardado');
+    } catch (e) {
+      showToast('error', 'Error al guardar ingrediente');
+    }
   }
 
   function editarIngrediente(id) {
-    const ing = DB.ingredientes.find(i => i.id === id);
+    const ing = DB.ingredientes.find(i => i.id == id);
     if (ing) mostrarModalIngrediente(ing);
   }
 
-  function ajusteRapido(ingredienteId = null) {
+  async function ajusteRapido(ingredienteId = null) {
     if (!ingredienteId) {
       const nombre = prompt('Ingrediente a ajustar (nombre exacto):');
       if (!nombre) return;
@@ -199,21 +193,27 @@ const Despensa = (() => {
       modal.className = 'modal-overlay';
       modal.style.display = 'none';
       modal.innerHTML = `
-        <div class="modal-small">
-          <div class="modal-header"><h3>Asignar Receta Simple</h3><button class="modal-close" onclick="Despensa.cerrarModalReceta()"><i class="fas fa-times"></i></button></div>
+        <div class="modal-small" style="max-width: 500px;">
+          <div class="modal-header"><h3>Asignar Receta</h3><button class="modal-close" onclick="Despensa.cerrarModalReceta()"><i class="fas fa-times"></i></button></div>
           <div class="modal-small-body">
-            <label>Producto</label><select id="recProductoId"></select>
+            <label>Producto</label><select id="recProductoId" onchange="Despensa.mostrarRecetaActual()"></select>
+            <div id="recetaActual" style="margin-bottom: 10px;"></div>
             <label>Ingrediente</label><select id="recIngredienteId"></select>
             <label>Cantidad necesaria</label><input type="number" id="recCantidad" step="0.01" placeholder="Ej: 0.2">
-            <div class="modal-small-footer"><button class="btn-secondary" onclick="Despensa.cerrarModalReceta()">Cancelar</button><button class="btn-primary" onclick="Despensa.guardarReceta()">Asignar</button></div>
+            <div class="modal-small-footer">
+              <button class="btn-secondary" onclick="Despensa.cerrarModalReceta()">Cancelar</button>
+              <button class="btn-primary" onclick="Despensa.guardarReceta()">Asignar</button>
+            </div>
           </div>
         </div>`;
       document.body.appendChild(modal);
     }
+
     const selProd = document.getElementById('recProductoId');
-    const selIng = document.getElementById('recIngredienteId');
     selProd.innerHTML = DB.productos.filter(p => p.activo !== false).map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
+    const selIng = document.getElementById('recIngredienteId');
     selIng.innerHTML = DB.ingredientes.map(i => `<option value="${i.id}">${i.nombre} (${i.unidad})</option>`).join('');
+    mostrarRecetaActual();
     modal.style.display = 'flex';
   }
 
@@ -221,25 +221,57 @@ const Despensa = (() => {
     document.getElementById('modalReceta').style.display = 'none';
   }
 
-  function guardarReceta() {
+  function mostrarRecetaActual() {
     const productoId = document.getElementById('recProductoId').value;
-    const ingredienteId = document.getElementById('recIngredienteId').value;
+    const receta = DB.recetas.find(r => r.productoId == productoId);
+    const div = document.getElementById('recetaActual');
+    if (receta && receta.ingredientes.length) {
+      let html = '<strong>Ingredientes asignados:</strong><ul>';
+      receta.ingredientes.forEach(ing => {
+        const nombreIng = DB.ingredientes.find(i => i.id == ing.ingredienteId)?.nombre || ing.ingredienteId;
+        html += `<li>${nombreIng}: ${ing.cantidad} <button class="btn-icon-sm" onclick="Despensa.quitarIngredienteReceta('${receta.productoId}', '${ing.ingredienteId}')"><i class="fas fa-trash"></i></button></li>`;
+      });
+      html += '</ul>';
+      div.innerHTML = html;
+    } else {
+      div.innerHTML = '<p style="color:var(--color-text-muted);">Sin ingredientes asignados.</p>';
+    }
+  }
+
+  async function guardarReceta() {
+    const productoId = document.getElementById('recProductoId').value;
+    const insumoId = document.getElementById('recIngredienteId').value;
     const cantidad = parseFloat(document.getElementById('recCantidad').value);
-    if (!productoId || !ingredienteId || isNaN(cantidad) || cantidad <= 0) {
+    if (!productoId || !insumoId || isNaN(cantidad) || cantidad <= 0) {
       showToast('error', 'Completá todos los campos correctamente');
       return;
     }
-    let receta = DB.recetas.find(r => r.productoId === productoId);
-    if (!receta) {
-      receta = { id: `rec_${Date.now()}_${Math.random().toString(36).substr(2,6)}`, productoId, ingredientes: [] };
-      DB.recetas.push(receta);
+
+    const receta = {
+      id: `rec_${Date.now()}_${Math.random().toString(36).substr(2,4)}`,
+      productoId,
+      insumoId,
+      cantidad
+    };
+
+    try {
+      await DB.syncGuardarReceta(receta);
+      cerrarModalReceta();
+      mostrarModalReceta(); // refrescar
+      showToast('success', 'Receta asignada correctamente');
+    } catch (e) {
+      showToast('error', 'Error al asignar receta');
     }
-    const idxIng = receta.ingredientes.findIndex(ing => ing.ingredienteId === ingredienteId);
-    if (idxIng >= 0) receta.ingredientes[idxIng].cantidad = cantidad;
-    else receta.ingredientes.push({ ingredienteId, cantidad });
-    DB.saveRecetas();
-    cerrarModalReceta();
-    showToast('success', 'Receta asignada correctamente');
+  }
+
+  async function quitarIngredienteReceta(productoId, ingredienteId) {
+    const receta = DB.recetas.find(r => r.productoId == productoId);
+    if (receta) {
+      receta.ingredientes = receta.ingredientes.filter(ing => ing.ingredienteId != ingredienteId);
+      DB.saveRecetas();
+      mostrarRecetaActual();
+      showToast('warning', 'Eliminado solo localmente. Próximamente se sincronizará.');
+    }
   }
 
   function exportarMovimientos() {
@@ -271,7 +303,7 @@ const Despensa = (() => {
   return {
     render, mostrarModalIngrediente, cerrarModalIngrediente, guardarIngrediente,
     editarIngrediente, ajusteRapido, mostrarModalReceta, cerrarModalReceta,
-    guardarReceta, exportarMovimientos
+    guardarReceta, mostrarRecetaActual, quitarIngredienteReceta, exportarMovimientos
   };
 })();
 

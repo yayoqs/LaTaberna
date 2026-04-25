@@ -3,28 +3,21 @@
    Propósito: Gestión de la interfaz de carta de productos (búsqueda,
               filtros por categoría y renderizado de tarjetas).
    Dependencias: DB, EventBus, utils.js
-   ----------------------------------------------------------------
-   Este módulo se comunica principalmente emitiendo el evento
-   'producto:seleccionado' cuando el usuario hace clic en un producto.
    ================================================================ */
 
 const Carta = (() => {
-  // Estado interno privado
   let _categoriaActiva = 'Todos';
   let _terminoBusqueda = '';
 
-  /* ── RENDERIZADO PRINCIPAL ─────────────────────────────────── */
   function render() {
     _renderCategorias();
     _renderProductos();
   }
 
-  /* ── CATEGORÍAS (TABS) ────────────────────────────────────── */
   function _renderCategorias() {
     const container = $id('categoriasTabs');
     if (!container) return;
 
-    // Obtener categorías únicas de productos activos
     const categorias = ['Todos', ...new Set(
       DB.productos.filter(p => p.activo !== false).map(p => p.categoria)
     )].filter(Boolean);
@@ -36,27 +29,20 @@ const Carta = (() => {
       `).join('');
   }
 
-  /**
-   * Cambia la categoría activa y refresca la vista.
-   * @param {string} cat - Nombre de la categoría
-   */
   function setCategoria(cat) {
     _categoriaActiva = cat;
     render();
   }
 
-  /* ── BÚSQUEDA ─────────────────────────────────────────────── */
   function filtrar() {
     _terminoBusqueda = ($id('searchProducto')?.value || '').toLowerCase();
     _renderProductos();
   }
 
-  /* ── RENDERIZADO DE PRODUCTOS ─────────────────────────────── */
   function _renderProductos() {
     const cont = $id('cartaProductos');
     if (!cont) return;
 
-    // 1. Filtrar productos según categoría y término de búsqueda
     let productosFiltrados = DB.productos.filter(p => p.activo !== false);
 
     if (_categoriaActiva !== 'Todos') {
@@ -69,7 +55,6 @@ const Carta = (() => {
       );
     }
 
-    // 2. Generar HTML o mostrar vacío
     if (!productosFiltrados.length) {
       cont.innerHTML = `
         <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--color-text-muted)">
@@ -82,10 +67,6 @@ const Carta = (() => {
     cont.innerHTML = productosFiltrados.map(_htmlProducto).join('');
   }
 
-  /**
-   * Genera el HTML de una tarjeta de producto.
-   * Se aplica el patrón de "atributos data-" para pasar el ID al manejador de eventos.
-   */
   function _htmlProducto(p) {
     const destinoIcon = { barra: 'fa-wine-glass', cocina: 'fa-fire-burner', ambos: 'fa-arrows-split-up-and-left' }[p.destino] || 'fa-fire-burner';
     return `
@@ -101,10 +82,6 @@ const Carta = (() => {
       </article>`;
   }
 
-  /**
-   * Manejador de clic en producto. Emite un evento con el ID del producto.
-   * Este desacoplamiento permite que cualquier módulo (ej. Comanda) reaccione.
-   */
   function seleccionarProducto(prodId) {
     const producto = DB.productos.find(p => p.id === prodId);
     if (producto) {
@@ -112,10 +89,8 @@ const Carta = (() => {
     }
   }
 
-  // Escuchar cambios en productos para refrescar la carta automáticamente
   EventBus.on('productos:cargados', render);
 
-  // API pública
   return {
     render,
     setCategoria,

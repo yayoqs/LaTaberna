@@ -2,11 +2,6 @@
    PubPOS — MÓDULO: utils.js
    Propósito: Funciones de utilidad compartidas por todos los módulos.
               Sin dependencias externas.
-   ----------------------------------------------------------------
-   ETAPA DE EDICIÓN:
-   • Cambiar formato de moneda → función fmtMoney()
-   • Cambiar formato de fecha  → función fmtFecha() / fmtHora()
-   • Agregar helpers nuevos aquí antes de usarlos en otros módulos
    ================================================================ */
 
 /* ── FORMATO MONETARIO ───────────────────────────────────────── */

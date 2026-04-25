@@ -1,10 +1,6 @@
 /* ================================================================
    PubPOS — MÓDULO: pedido.js (Orquestador)
    Propósito: Coordinar apertura de mesa, envío de comandas, transferencia.
-   Cambios (2026-04-23):
-     • En transferirMesa() se verifica que el usuario sea admin o master.
-       La transferencia de pedidos entre mesas es una operación sensible,
-       solo para supervisores.
    ================================================================ */
 
 const Pedido = (() => {
@@ -152,7 +148,6 @@ const Pedido = (() => {
 
   /* ── TRANSFERIR MESA (Cambio de ubicación) ────────────────── */
   function transferirMesa(mesaOrigenNum, mesaDestinoNum) {
-    // 🔒 VERIFICACIÓN DE PERMISO: solo administradores y master pueden transferir
     if (!Auth.esAdmin()) {
       showToast('error', 'Solo administradores pueden transferir pedidos entre mesas');
       return false;

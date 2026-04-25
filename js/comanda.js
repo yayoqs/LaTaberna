@@ -36,7 +36,6 @@ const Comanda = (() => {
     if (inpComensales) inpComensales.value = _mesaActiva.comensales || 1;
     if (inpObs) inpObs.value = _mesaActiva.observaciones || '';
 
-    // Renderizar selector de persona activa
     _renderSelectorPersona();
   }
 
@@ -45,7 +44,6 @@ const Comanda = (() => {
     if (!container) return;
     const personas = _mesaActiva.personas || [];
     if (personas.length === 0) {
-      // Inicializar con "General"
       _mesaActiva.personas = ['General'];
     }
     const personaActual = _mesaActiva.personaActiva || 'General';
@@ -94,7 +92,7 @@ const Comanda = (() => {
         enviado:   false,
         enviadoA:  null,
         enviadoTs: null,
-        persona:   persona           // clave para split bill
+        persona:   persona
       });
     }
     _guardarYRenderizar();
@@ -178,7 +176,7 @@ const Comanda = (() => {
 
     contenedor.innerHTML = _mesaActiva.items.map((item, idx) => _htmlItem(item, idx)).join('');
     if (subtotalEl) subtotalEl.textContent = fmtMoney(_mesaActiva.total || 0);
-    _renderSelectorPersona(); // mantener actualizado
+    _renderSelectorPersona();
   }
 
   function _htmlItem(item, idx) {

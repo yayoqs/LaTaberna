@@ -6,10 +6,6 @@
      EventBus.emit('mesa:actualizada', { mesa: 3 });
      EventBus.off('mesa:actualizada', callback);
    ================================================================ */
-/* ================================================================
-   PubPOS — MÓDULO: eventBus.js
-   Propósito: Sistema de publicación/suscripción para desacoplar módulos.
-   ================================================================ */
 
 const EventBus = (() => {
   const eventos = {};

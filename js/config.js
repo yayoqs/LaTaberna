@@ -1,6 +1,8 @@
 /* ================================================================
-   PubPOS — MÓDULO: config.js (v2.2 – logs para depurar ID en edición)
+   PubPOS — MÓDULO: config.js
+   Propósito: Gestión de configuración del local y ABM de productos.
    ================================================================ */
+
 const Config = (() => {
   const CATEGORIAS = ['Bebidas','Cervezas','Cocteles','Vinos','Entradas','Comidas','Postres'];
 
@@ -51,7 +53,6 @@ const Config = (() => {
   }
 
   function _htmlProdConfigItem(p) {
-    // Asegurarse de que el ID se pasa correctamente (entre comillas)
     return `
       <div class="prod-config-item${p.activo === false ? ' inactivo' : ''}">
         <span class="prod-config-nombre">${p.nombre}</span>
@@ -64,7 +65,7 @@ const Config = (() => {
 
   function abrirModalProducto(prod = null) {
     $id('productoModalTitulo').textContent = prod ? 'Editar Producto' : 'Nuevo Producto';
-    $id('prodId').value = prod?.id || '';  // Cargar ID correctamente
+    $id('prodId').value = prod?.id || '';
     $id('prodNombre').value = prod?.nombre || '';
     $id('prodPrecio').value = prod?.precio || '';
     $id('prodCategoria').value = prod?.categoria || 'Comidas';
@@ -72,7 +73,6 @@ const Config = (() => {
     $id('prodDescripcion').value = prod?.descripcion || '';
     $id('prodActivo').checked = prod ? (prod.activo !== false) : true;
     $id('modalProducto').style.display = 'flex';
-    console.log('📋 Editando producto con ID:', prod?.id, '| Producto completo:', prod);
   }
 
   function cerrarModalProducto() { $id('modalProducto').style.display = 'none'; }
@@ -83,11 +83,8 @@ const Config = (() => {
     if (!nombre) { showToast('error', 'Nombre obligatorio'); return; }
     if (!precio || precio <= 0) { showToast('error', 'Precio mayor a 0'); return; }
 
-    // Tomar el ID del input; si está vacío, se genera uno nuevo
-    const idInput = $id('prodId');
-    const id = idInput && idInput.value.trim() ? idInput.value.trim() : `prod_${Date.now()}_${Math.random().toString(36).substr(2,6)}`;
-    console.log('💾 Guardando producto con ID:', id);
-
+    const id = $val('prodId') || `prod_${Date.now()}_${Math.random().toString(36).substr(2,6)}`;
+    
     const producto = {
       id,
       nombre,
@@ -112,32 +109,44 @@ const Config = (() => {
   }
 
   async function _editarProducto(id) {
-    console.log('🔍 Buscando producto con ID:', id, 'Tipo:', typeof id);
-    // Usar comparación flexible (==) porque el ID puede venir como string
-    const prod = DB.productos.find(p => p.id == id);
-    if (prod) {
-      console.log('✅ Producto encontrado:', prod);
-      abrirModalProducto(prod);
-    } else {
-      showToast('error', 'Producto no encontrado');
-      console.warn('❌ Producto no encontrado en DB.productos. IDs disponibles:', DB.productos.map(p => p.id));
-    }
+    const prod = DB.productos.find(p => p.id === id);
+    if (prod) abrirModalProducto(prod);
   }
 
   async function _eliminarProducto(id) {
     if (!confirm('¿Eliminar este producto?')) return;
-    console.log('🗑️ Eliminando producto con ID:', id);
-    try {
-      await DB.syncEliminarProducto(id);
-      renderProductos();
-    } catch (e) {
-      showToast('error', 'Error al eliminar');
-    }
+    DB.productos = DB.productos.filter(p => p.id !== id);
+    localStorage.setItem('pubpos_cache_prod', JSON.stringify(DB.productos));
+    renderProductos();
+    showToast('success', 'Producto eliminado');
   }
 
-  function renderMozos() { /* ... */ }
-  function agregarMozo() { /* ... */ }
-  function eliminarMozo(nombre) { /* ... */ }
+  // Gestión de Mozos (nuevo)
+  function renderMozos() {
+    const cont = $id('mozosLista');
+    if (!cont) return;
+    cont.innerHTML = DB.mozos.map(m => `
+      <div class="mozo-item">
+        <span>${m}</span>
+        <button onclick="Config.eliminarMozo('${m}')"><i class="fas fa-trash"></i></button>
+      </div>`).join('');
+  }
+
+  function agregarMozo() {
+    const nombre = prompt('Nombre del nuevo mozo:');
+    if (!nombre) return;
+    DB.mozos.push(nombre);
+    DB.saveMozos();
+    renderMozos();
+    const sel = $id('mozoActivo');
+    if (sel) sel.innerHTML = DB.mozos.map(m => `<option>${m}</option>`).join('');
+  }
+
+  function eliminarMozo(nombre) {
+    DB.mozos = DB.mozos.filter(m => m !== nombre);
+    DB.saveMozos();
+    renderMozos();
+  }
 
   return {
     cargar, guardar,

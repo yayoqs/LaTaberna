@@ -1,16 +1,12 @@
 /* ================================================================
    PubPOS — MÓDULO: cuenta.js
    Propósito: Pedir la cuenta (pre‑cuenta) y cambiar estado de mesa.
-   Cambios (2026-04-23):
-     • En pedirCuenta() se verifica que el rol sea mesero, admin, master o caja.
-       Un cajero también puede pedir la cuenta si la mesa está activa.
-       Cocina y barra no tienen esta acción.
    ================================================================ */
 
 const Cuenta = (() => {
 
   function pedirCuenta() {
-    // 🔒 VERIFICACIÓN DE ROL: solo personal autorizado
+    // Verificar que el rol sea mesero, admin, master o caja
     const rol = Auth.getRol();
     const rolesPermitidos = ['mesero', 'admin', 'master', 'caja'];
     if (!rolesPermitidos.includes(rol)) {

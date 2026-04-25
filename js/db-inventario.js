@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-inventario.js (v3 – completo)
+   PubPOS — MÓDULO: db-inventario.js
    Propósito: Gestión de ingredientes, recetas y movimientos de stock.
    ================================================================ */
 
@@ -18,8 +18,7 @@ const DBInventario = (function() {
       stock: this._validarNumero(i.stock, 0),
       unidad: this._validarString(i.unidad, 'u'),
       stock_minimo: this._validarNumero(i.stock_minimo, 0),
-      categoria: this._validarString(i.categoria, 'general'),
-      ubicacion: this._validarString(i.ubicacion, '')
+      categoria: this._validarString(i.categoria, 'general')
     };
   };
 
@@ -81,11 +80,9 @@ const DBInventario = (function() {
     localStorage.setItem('pubpos_ingredientes', JSON.stringify(this.ingredientes));
     EventBus.emit('ingredientes:actualizados', this.ingredientes);
   };
-
   module.saveRecetas = function() {
     localStorage.setItem('pubpos_recetas', JSON.stringify(this.recetas));
   };
-
   module.saveMovimientos = function() {
     localStorage.setItem('pubpos_movimientos', JSON.stringify(this.movimientos));
   };

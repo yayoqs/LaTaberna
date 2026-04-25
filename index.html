@@ -20,32 +20,6 @@
   <link rel="stylesheet" href="css/ticket.css">
   <link rel="stylesheet" href="css/despensa.css">
   <link rel="stylesheet" href="css/responsive.css">
-  <style>
-    /* Estilos adicionales para split bill y persona activa */
-    .item-persona-badge {
-      font-size: 10px;
-      background: var(--color-primary);
-      color: white;
-      padding: 2px 6px;
-      border-radius: 99px;
-      margin-left: 6px;
-    }
-    .cierre-persona-group {
-      margin-bottom: 12px;
-      border-bottom: 1px dashed var(--color-border);
-    }
-    .cierre-persona-header {
-      font-weight: bold;
-      display: flex;
-      justify-content: space-between;
-    }
-    .pago-persona-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin: 6px 0;
-    }
-  </style>
 </head>
 <body>
 
@@ -96,7 +70,7 @@
 </header>
 
 <!-- ============================================================
-     VISTA: MESAS (con selector de zona)
+     VISTA: MESAS
      ============================================================ -->
 <main id="view-mesas" class="view active">
 
@@ -109,25 +83,12 @@
         <span class="badge esperando">Lista</span>
         <span class="badge cuenta">Cuenta</span>
       </span>
-
-      <!-- Botones de Zona -->
-      <button class="nav-btn zona-btn active" data-zona="todas" onclick="Mesas.setZona('todas')">
-        <i class="fas fa-globe"></i> Todas
-      </button>
-      <button class="nav-btn zona-btn" data-zona="salon" onclick="Mesas.setZona('salon')">
-        <i class="fas fa-warehouse"></i> Salón
-      </button>
-      <button class="nav-btn zona-btn" data-zona="terraza" onclick="Mesas.setZona('terraza')">
-        <i class="fas fa-sun"></i> Terraza
-      </button>
-
       <button class="btn-secondary" onclick="Mesas.agregarMesa()" data-rol="admin,master">
         <i class="fas fa-plus"></i> Nueva Mesa
       </button>
       <button id="btnFusionar" class="btn-secondary" onclick="Mesas.toggleModoFusion()" data-rol="mesero,admin,master">
         <i class="fas fa-object-group"></i> Fusionar Mesas
       </button>
-      <!-- Sin data-rol para que solo lo controle mesas.js -->
       <button id="btnConfirmarFusion" class="btn-primary" onclick="Mesas.fusionarMesasSeleccionadas()" style="display:none;">
         <i class="fas fa-check"></i> Confirmar Fusión
       </button>
@@ -205,7 +166,7 @@
     <div class="despensa-main">
       <table class="ingredientes-table" id="ingredientesTable">
         <thead>
-          <tr><th>Ingrediente</th><th>Categoría</th><th>Stock</th><th>Unidad</th><th>Stock Mín.</th><th>Ubicación</th><th>Acciones</th></tr>
+          <tr><th>Ingrediente</th><th>Categoría</th><th>Stock</th><th>Unidad</th><th>Stock Mín.</th><th>Acciones</th></tr>
         </thead>
         <tbody id="ingredientesBody"></tbody>
       </table>
@@ -271,11 +232,9 @@
         <span id="modalMesaTitulo">Mesa 1</span>
         <span class="estado-badge" id="modalEstadoBadge">Libre</span>
       </div>
-      <!-- Botón de cambiar mesa pegado al título -->
       <button class="btn-icon" onclick="Pedido.mostrarSelectorTransferencia()" title="Cambiar Mesa" style="background:transparent; border:1px solid var(--color-border); border-radius:var(--radius-sm); padding:6px 12px; color:var(--color-text-sec); margin-right:8px;" data-rol="admin,master">
         <i class="fas fa-exchange-alt"></i> Cambiar Mesa
       </button>
-      <!-- Botón de cerrar al final, con margen automático -->
       <button class="modal-close" onclick="Pedido.cerrar()" aria-label="Cerrar" style="margin-left: auto;">
         <i class="fas fa-times"></i>
       </button>
@@ -375,7 +334,6 @@
 <!-- Scripts -->
 <script src="js/utils.js"></script>
 <script src="js/eventBus.js"></script>
-<!-- Módulos de base de datos (modularizados) -->
 <script src="js/db-core.js"></script>
 <script src="js/db-sync.js"></script>
 <script src="js/db-inventario.js"></script>
@@ -385,4 +343,16 @@
 <script src="js/auth.js"></script>
 <script src="js/mesas.js"></script>
 <script src="js/carta.js"></script>
-<script src="js/comanda.js"></
+<script src="js/comanda.js"></script>
+<script src="js/cuenta.js"></script>
+<script src="js/cobro.js"></script>
+<script src="js/pedido.js"></script>
+<script src="js/kds.js"></script>
+<script src="js/caja.js"></script>
+<script src="js/tickets.js"></script>
+<script src="js/config.js"></script>
+<script src="js/despensa.js"></script>
+<script src="js/app.js"></script>
+
+</body>
+</html>

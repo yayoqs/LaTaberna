@@ -2,15 +2,12 @@
    PubPOS — MÓDULO: db-core.js
    Propósito: Núcleo de base de datos: inicialización, mesas, pedidos,
               comandas, mozos, configuración y persistencia local.
-   Cambio (2026-04-25):
-     • _inicializarMesas asigna zona por defecto a mesas sin ella,
-       pero NO modifica el número de mesa.
-     • mesa.numero sigue siendo número entero.
    ================================================================ */
 
 const DBCore = (function() {
   const module = {};
 
+  // Propiedades internas (se expondrán al objeto DB final)
   module.productos = [];
   module.pedidos = [];
   module.mesas = [];
@@ -33,7 +30,7 @@ const DBCore = (function() {
 
   module._normalizarMesa = function(m) {
     return {
-      numero: this._validarNumero(m.numero, 0),   // siempre número
+      numero: this._validarNumero(m.numero, 0),
       estado: this._validarEstadoMesa(m.estado),
       pedidoId: m.pedidoId || null,
       items: Array.isArray(m.items) ? m.items : [],
@@ -91,25 +88,14 @@ const DBCore = (function() {
     };
   };
 
-  /**
-   * Inicializa mesas: asigna zona por defecto si no existe,
-   * pero NO modifica el número de mesa.
-   */
   module._inicializarMesas = function() {
     const raw = localStorage.getItem('pubpos_mesas');
     if (raw) {
       const mesasParseadas = JSON.parse(raw);
-      this.mesas = mesasParseadas.map(m => {
-        const mesa = this._normalizarMesa(m);
-        if (!mesa.zona) mesa.zona = 'salon';       // solo agrega zona
-        return mesa;
-      });
+      this.mesas = mesasParseadas.map(m => this._normalizarMesa(m));
     } else {
       const cant = this.config.cantidadMesas || 12;
-      this.mesas = Array.from({ length: cant }, (_, i) => ({
-        ...mesaVacia(i + 1),
-        zona: 'salon'                             // nuevas mesas en salón
-      }));
+      this.mesas = Array.from({ length: cant }, (_, i) => mesaVacia(i + 1));
       this.saveMesas();
     }
   };
@@ -190,9 +176,10 @@ const DBCore = (function() {
   return module;
 })();
 
+// Función auxiliar global
 function mesaVacia(num) {
   return {
-    numero: num,  // se guarda como número
+    numero: num,
     estado: 'libre',
     pedidoId: null,
     items: [],
