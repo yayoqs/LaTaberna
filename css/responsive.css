@@ -2,6 +2,7 @@
    PubPOS — CSS MODULAR
    Archivo: css/responsive.css
    Propósito: Ajustes responsive para móviles y tablets.
+   Incluye reglas para botones de zona (Salón / Terraza / Todas)
    ================================================================ */
 
 /* Tablets y pantallas medianas */
@@ -70,6 +71,13 @@
 
   .legend {
     flex-wrap: wrap;
+  }
+
+  /* Botones de zona: más compactos y con texto visible */
+  .zona-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+    white-space: nowrap;
   }
 
   /* Grilla de mesas más compacta */

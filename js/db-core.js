@@ -2,6 +2,9 @@
    PubPOS — MÓDULO: db-core.js
    Propósito: Núcleo de base de datos: inicialización, mesas, pedidos,
               comandas, mozos, configuración y persistencia local.
+   Cambio (2026-04-24):
+     • _inicializarMesas ahora asigna zona y prefijo a mesas antiguas
+       sin modificar repetidamente en cada render.
    ================================================================ */
 
 const DBCore = (function() {
@@ -88,17 +91,40 @@ const DBCore = (function() {
     };
   };
 
+  // ════════════════════════════════════════════════════════════
+  // 🟢 CAMBIO IMPORTANTE (2026-04-24):
+  // Esta función ahora asigna zona y prefijo a todas las mesas
+  // para que el filtro por zona funcione correctamente.
+  // ════════════════════════════════════════════════════════════
   module._inicializarMesas = function() {
     const raw = localStorage.getItem('pubpos_mesas');
     if (raw) {
       const mesasParseadas = JSON.parse(raw);
-      this.mesas = mesasParseadas.map(m => this._normalizarMesa(m));
+      this.mesas = mesasParseadas.map(m => {
+        // Normalizar la mesa (según la estructura definida)
+        const mesa = this._normalizarMesa(m);
+        // Si la mesa no tiene zona, asumimos que es del salón
+        if (!mesa.zona) mesa.zona = 'salon';
+        // Si el número es un entero (no tiene prefijo), le ponemos el prefijo según la zona
+        if (typeof mesa.numero === 'number' || /^\d+$/.test(mesa.numero)) {
+          const prefijo = mesa.zona === 'terraza' ? 'B' : 'A';
+          mesa.numero = mesa.numero.toString() + prefijo;
+        }
+        return mesa;
+      });
     } else {
       const cant = this.config.cantidadMesas || 12;
-      this.mesas = Array.from({ length: cant }, (_, i) => mesaVacia(i + 1));
+      // Crear mesas nuevas ya con zona 'salon' y prefijo A
+      this.mesas = Array.from({ length: cant }, (_, i) => {
+        const mesa = mesaVacia(i + 1);
+        mesa.numero = (i + 1).toString() + 'A';
+        mesa.zona = 'salon';
+        return mesa;
+      });
       this.saveMesas();
     }
   };
+  // ════════════════════════════════════════════════════════════
 
   module._cargarComandasLocal = function() {
     const raw = localStorage.getItem('pubpos_comandas');

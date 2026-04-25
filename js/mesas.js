@@ -1,5 +1,7 @@
 /* ================================================================
    PubPOS — MÓDULO: mesas.js (v3 – zonas con prefijo A/B)
+   Corregido: no modifica m.numero en render, solo muestra prefijo.
+   La asignación de zona y prefijo se hace una sola vez en db-core.
    ================================================================ */
 const Mesas = (() => {
 
@@ -33,17 +35,10 @@ const Mesas = (() => {
       return;
     }
 
-    // Asegurar que todas las mesas tengan zona y número con prefijo
-    DB.mesas.forEach(m => {
-      if (!m.zona) m.zona = 'salon';
-      // Normalizar número: si no tiene prefijo, agregar 'A' para salón, 'B' para terraza
-      if (typeof m.numero === 'number' || /^\d+$/.test(m.numero)) {
-        const prefijo = m.zona === 'terraza' ? 'B' : 'A';
-        m.numero = m.numero.toString() + prefijo;
-      }
-    });
+    // Ya NO modificamos DB.mesas aquí. Los números ya incluyen el prefijo
+    // (asignado en db-core.js al iniciar o al agregar mesa).
 
-    // Filtrar por zona si no es 'todas'
+    // Filtrar por zona
     let mesasVisibles = DB.mesas.filter(m => m.estado !== 'fusionada');
     if (_zonaActiva !== 'todas') {
       mesasVisibles = mesasVisibles.filter(m => m.zona === _zonaActiva);
@@ -115,6 +110,7 @@ const Mesas = (() => {
   function setZona(zona) {
     _zonaActiva = zona;
     render();
+    // Actualizar clases activas en botones de zona
     document.querySelectorAll('.zona-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.zona === zona);
     });
@@ -162,13 +158,12 @@ const Mesas = (() => {
     const zona = _zonaActiva !== 'todas' ? _zonaActiva : 'salon';
     const prefijo = zona === 'salon' ? 'A' : (zona === 'terraza' ? 'B' : 'X');
     
-    // Buscar el número más alto entre las mesas con el mismo prefijo
-    const mesasMismaZona = DB.mesas.filter(m => 
-      typeof m.numero === 'string' && m.numero.endsWith(prefijo)
-    );
+    // Buscar el número más alto entre las mesas con la misma zona (y mismo prefijo)
+    const mesasMismaZona = DB.mesas.filter(m => m.zona === zona);
     let maxNum = 0;
     mesasMismaZona.forEach(m => {
-      const numPart = parseInt(m.numero.slice(0, -1)); // quitar prefijo
+      // El número puede ser "1A", extraemos la parte numérica
+      const numPart = parseInt(m.numero);
       if (!isNaN(numPart) && numPart > maxNum) maxNum = numPart;
     });
     
