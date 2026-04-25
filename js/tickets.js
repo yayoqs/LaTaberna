@@ -1,13 +1,7 @@
 /* ================================================================
-   PubPOS — MÓDULO: tickets.js
+   PubPOS — MÓDULO: tickets.js (v2 – completo)
    Propósito: Generación y visualización/impresión de tickets 80mm.
-   Dependencias: db.js, utils.js
-   ----------------------------------------------------------------
-   ETAPA DE EDICIÓN:
-   • Cambiar encabezado del ticket → función _htmlEncabezado()
-   • Cambiar diseño de comanda → función generarComanda()
-   • Cambiar diseño de cuenta/cierre → generarCuenta() / generarCierre()
-   • Ticket de prueba → testImpresora()
+   Incluye ticket individual para split bill (generarCierreParcial).
    ================================================================ */
 
 const Tickets = (() => {
@@ -32,10 +26,6 @@ const Tickets = (() => {
 
 
   /* ── IMPRIMIR ──────────────────────────────────────────────── */
-  /**
-   * Abre una ventana emergente con el ticket formateado para 80mm
-   * y lanza el diálogo de impresión del sistema operativo.
-   */
   function imprimir() {
     const win = window.open('', '_blank', 'width=420,height=680');
     if (!win) {
@@ -232,6 +222,50 @@ const Tickets = (() => {
 
 
   /* ================================================================
+     NUEVO: TICKET INDIVIDUAL PARA SPLIT BILL
+     ================================================================ */
+  function generarCierreParcial(mesa, pago) {
+    const cfg      = DB.config;
+    const fecha    = fmtFechaCorta();
+    const hora     = fmtHoraCorta(Date.now());
+    const itemsPersona = mesa.items.filter(it => (it.persona || 'General') === pago.persona);
+    if (!itemsPersona.length) return '';
+
+    const grupos   = _agruparItems(itemsPersona);
+    const subtotal = calcularTotal(itemsPersona);
+    const totalFinal = pago.monto;
+    const numTicket = String(Date.now()).slice(-6);
+
+    const itemsHTML = grupos.map(g => `
+      <div class="t-item-row t-mb1">
+        <span>${g.qty}x</span>
+        <span>${g.nombre}</span>
+        <span>${fmtMoneyTicket(g.precio * g.qty)}</span>
+      </div>`).join('');
+
+    const iconoPago = { 'Efectivo':'(EF)','Débito':'(DB)','Crédito':'(CR)','Transferencia':'(TR)','Mixto':'(MX)' }[pago.formaPago] || '';
+
+    return `
+      <div class="t-title">${cfg.nombreLocal || 'Pub Restaurant'}</div>
+      ${cfg.direccion ? `<div class="t-subtitle">${cfg.direccion}</div>` : ''}
+      ${cfg.cuit      ? `<div class="t-subtitle">CUIT: ${cfg.cuit}</div>` : ''}
+      <hr class="t-hr-dash">
+      <div class="t-row t-mb1"><span>Fecha: ${fecha}</span><span>Hora: ${hora}</span></div>
+      <div class="t-row t-mb1"><span>Mesa: <strong>${mesa.numero}</strong></span><span>Persona: ${pago.persona}</span></div>
+      <hr class="t-hr-solid">
+      ${itemsHTML}
+      <hr class="t-hr-dash">
+      <div class="t-row t-mb1"><span>Subtotal</span><span>${fmtMoneyTicket(subtotal)}</span></div>
+      <div class="t-total-row"><span>TOTAL PAGADO</span><span>${fmtMoneyTicket(totalFinal)}</span></div>
+      <div class="t-row t-mt1 t-mb2 t-small"><span>Forma de pago:</span><span>${iconoPago} ${pago.formaPago}</span></div>
+      <hr class="t-hr-solid">
+      <div class="t-footer">${cfg.pieTicket || '¡Gracias por visitarnos!'}</div>
+      <div class="t-spacer"></div>
+    `;
+  }
+
+
+  /* ================================================================
      TICKET DE PRUEBA DE IMPRESORA
      ================================================================ */
   function testImpresora(tipo) {
@@ -268,8 +302,13 @@ const Tickets = (() => {
 
   /* ── API PÚBLICA ──────────────────────────────────────────── */
   return {
-    mostrar, cerrar, imprimir,
-    generarComanda, generarCuenta, generarCierre,
+    mostrar,
+    cerrar,
+    imprimir,
+    generarComanda,
+    generarCuenta,
+    generarCierre,
+    generarCierreParcial,   // <-- nuevo
     testImpresora
   };
 
