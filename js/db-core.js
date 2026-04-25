@@ -2,17 +2,15 @@
    PubPOS — MÓDULO: db-core.js
    Propósito: Núcleo de base de datos: inicialización, mesas, pedidos,
               comandas, mozos, configuración y persistencia local.
-   Cambios (2026-04-25):
-     • _normalizarMesa ahora mantiene el número como string
-       (soporta prefijos como "1A", "2B").
-     • _inicializarMesas asigna zona y prefijo sin sobreescribir
-       números ya con prefijo.
+   Cambio (2026-04-25):
+     • _inicializarMesas asigna zona por defecto a mesas sin ella,
+       pero NO modifica el número de mesa.
+     • mesa.numero sigue siendo número entero.
    ================================================================ */
 
 const DBCore = (function() {
   const module = {};
 
-  // Propiedades internas (se expondrán al objeto DB final)
   module.productos = [];
   module.pedidos = [];
   module.mesas = [];
@@ -33,13 +31,9 @@ const DBCore = (function() {
     };
   };
 
-  // ════════════════════════════════════════════════════════════
-  // CAMBIO IMPORTANTE: numero se guarda como string para
-  // permitir prefijos como "1A", "2B".
-  // ════════════════════════════════════════════════════════════
   module._normalizarMesa = function(m) {
     return {
-      numero: m.numero != null ? String(m.numero) : '0',
+      numero: this._validarNumero(m.numero, 0),   // siempre número
       estado: this._validarEstadoMesa(m.estado),
       pedidoId: m.pedidoId || null,
       items: Array.isArray(m.items) ? m.items : [],
@@ -97,34 +91,25 @@ const DBCore = (function() {
     };
   };
 
-  // ════════════════════════════════════════════════════════════
-  // INICIALIZACIÓN DE MESAS (con zona y prefijo)
-  // ════════════════════════════════════════════════════════════
+  /**
+   * Inicializa mesas: asigna zona por defecto si no existe,
+   * pero NO modifica el número de mesa.
+   */
   module._inicializarMesas = function() {
     const raw = localStorage.getItem('pubpos_mesas');
     if (raw) {
       const mesasParseadas = JSON.parse(raw);
       this.mesas = mesasParseadas.map(m => {
-        // Normalizar estructura
         const mesa = this._normalizarMesa(m);
-        // Si no tiene zona, asignar salón por defecto
-        if (!mesa.zona) mesa.zona = 'salon';
-        // Si el número NO tiene prefijo (solo dígitos), agregarlo según zona
-        if (/^\d+$/.test(mesa.numero)) {
-          const prefijo = mesa.zona === 'terraza' ? 'B' : 'A';
-          mesa.numero = mesa.numero + prefijo;
-        }
+        if (!mesa.zona) mesa.zona = 'salon';       // solo agrega zona
         return mesa;
       });
     } else {
       const cant = this.config.cantidadMesas || 12;
-      // Crear mesas nuevas ya con zona 'salon' y prefijo A
-      this.mesas = Array.from({ length: cant }, (_, i) => {
-        const mesa = mesaVacia(i + 1);
-        mesa.numero = String(i + 1) + 'A';
-        mesa.zona = 'salon';
-        return mesa;
-      });
+      this.mesas = Array.from({ length: cant }, (_, i) => ({
+        ...mesaVacia(i + 1),
+        zona: 'salon'                             // nuevas mesas en salón
+      }));
       this.saveMesas();
     }
   };
@@ -199,17 +184,15 @@ const DBCore = (function() {
   };
 
   module.getMesa = function(num) {
-    // Comparación flexible: el número puede venir como string o número
     return this.mesas.find(m => m.numero == num);
   };
 
   return module;
 })();
 
-// Función auxiliar global
 function mesaVacia(num) {
   return {
-    numero: String(num),   // <-- Convertir a string para consistencia
+    numero: num,  // se guarda como número
     estado: 'libre',
     pedidoId: null,
     items: [],

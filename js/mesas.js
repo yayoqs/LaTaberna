@@ -1,7 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: mesas.js (v3 – zonas con prefijo A/B)
-   Corregido: no modifica m.numero en render, solo muestra prefijo.
-   La asignación de zona y prefijo se hace una sola vez en db-core.
+   PubPOS — MÓDULO: mesas.js (v3 – colores por zona)
    ================================================================ */
 const Mesas = (() => {
 
@@ -35,9 +33,6 @@ const Mesas = (() => {
       return;
     }
 
-    // Ya NO modificamos DB.mesas aquí. Los números ya incluyen el prefijo
-    // (asignado en db-core.js al iniciar o al agregar mesa).
-
     // Filtrar por zona
     let mesasVisibles = DB.mesas.filter(m => m.estado !== 'fusionada');
     if (_zonaActiva !== 'todas') {
@@ -49,11 +44,12 @@ const Mesas = (() => {
     mesasVisibles.forEach(mesa => {
       const card = document.createElement('article');
       
-      if (mesa.esVirtual) {
-        card.className = `mesa-card mesa-virtual ${mesa.estado}`;
-      } else {
-        card.className = `mesa-card ${mesa.estado}`;
-      }
+      // Clases base
+      let clases = `mesa-card ${mesa.estado}`;
+      if (mesa.esVirtual) clases += ' mesa-virtual';
+      // Agregar clase por zona para colores
+      clases += ` zona-${mesa.zona || 'salon'}`;
+      card.className = clases;
 
       const puedeSeleccionar = _modoSeleccion && 
                                (mesa.estado === 'libre' || mesa.estado === 'ocupada' || mesa.estado === 'esperando') && 
@@ -110,7 +106,6 @@ const Mesas = (() => {
   function setZona(zona) {
     _zonaActiva = zona;
     render();
-    // Actualizar clases activas en botones de zona
     document.querySelectorAll('.zona-btn').forEach(btn => {
       btn.classList.toggle('active', btn.dataset.zona === zona);
     });
@@ -140,7 +135,7 @@ const Mesas = (() => {
       showToast('warning', 'Seleccioná al menos dos mesas para fusionar.');
       return;
     }
-    const numeros = Array.from(_mesasSeleccionadas).sort((a,b) => a.localeCompare(b));
+    const numeros = Array.from(_mesasSeleccionadas).sort((a,b) => a - b);
     const mozo = $id('mozoActivo')?.value || 'Mozo';
     const mesaVirtual = DB.fusionarMesas(numeros, mozo);
     if (mesaVirtual) {
@@ -152,22 +147,14 @@ const Mesas = (() => {
     }
   }
 
-  /* ── AGREGAR NUEVA MESA CON PREFIJO DE ZONA ─────────────── */
+  /* ── AGREGAR NUEVA MESA (número secuencial) ─────────────── */
   function agregarMesa() {
     if (typeof DB === 'undefined') return;
     const zona = _zonaActiva !== 'todas' ? _zonaActiva : 'salon';
-    const prefijo = zona === 'salon' ? 'A' : (zona === 'terraza' ? 'B' : 'X');
-    
-    // Buscar el número más alto entre las mesas con la misma zona (y mismo prefijo)
-    const mesasMismaZona = DB.mesas.filter(m => m.zona === zona);
-    let maxNum = 0;
-    mesasMismaZona.forEach(m => {
-      // El número puede ser "1A", extraemos la parte numérica
-      const numPart = parseInt(m.numero);
-      if (!isNaN(numPart) && numPart > maxNum) maxNum = numPart;
-    });
-    
-    const nuevoNum = (maxNum + 1).toString() + prefijo;
+    // Encontrar el número máximo entre todas las mesas (sin importar zona)
+    const maxNum = DB.mesas.reduce((max, m) => Math.max(max, m.numero || 0), 0);
+    const nuevoNum = maxNum + 1;
+
     DB.mesas.push({ ...mesaVacia(nuevoNum), zona });
     DB.config.cantidadMesas = DB.mesas.filter(m => !m.esVirtual).length;
     DB.saveMesas();
