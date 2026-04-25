@@ -3,6 +3,7 @@
    Archivo: css/pedido.css
    Propósito: Modal de pedido, carta de productos y comanda
    Versión: Pantalla completa en móviles, footer siempre visible
+   Corregido: header visible en móviles verticales
    ================================================================ */
 
 /* ── MODAL BASE ────────────────────────────────────────────── */
@@ -27,7 +28,7 @@
   background: var(--color-panel);
   flex-shrink: 0;
   gap: 12px;
-  flex-wrap: nowrap; /* Evitar que los botones bajen a otra línea */
+  flex-wrap: nowrap; /* Por defecto evitamos que bajen */
 }
 .modal-header h3 {
   font-size: 15px;
@@ -507,9 +508,43 @@ button, .btn-comanda, .btn-cuenta, .btn-cerrar-mesa, .cat-tab, .prod-card {
     overflow: hidden;
   }
 
+  /* ── CORRECCIÓN: HEADER SIEMPRE VISIBLE ── */
   .modal-pedido .modal-header {
     flex-shrink: 0;
-    padding: 10px 16px;
+    padding: 8px 12px;
+    flex-wrap: wrap;               /* ahora permite que bajen si no entran */
+    gap: 8px;
+    justify-content: space-between;
+  }
+  .modal-pedido .modal-title {
+    font-size: 16px;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .modal-pedido .modal-title i {
+    font-size: 1.2em;
+  }
+  .modal-pedido .modal-title .estado-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+  }
+  /* El botón de cerrar se mantiene visible a la derecha */
+  .modal-pedido .modal-close {
+    width: 30px;
+    height: 30px;
+    font-size: 14px;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+  /* El botón de transferencia se esconde en pantallas muy pequeñas si no entra,
+     pero se mantiene con un icono más chico */
+  .modal-pedido .btn-icon {
+    font-size: 11px;
+    padding: 4px 8px;
+    white-space: nowrap;
   }
 
   /* Cuerpo con Grid: dos filas explícitas */
@@ -517,7 +552,7 @@ button, .btn-comanda, .btn-cuenta, .btn-cerrar-mesa, .cat-tab, .prod-card {
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-rows: minmax(25vh, 35vh) 1fr; /* Carta: 25-35% altura, Comanda: resto */
+    grid-template-rows: minmax(25vh, 35vh) 1fr;
     grid-template-columns: 100%;
     overflow: hidden;
     gap: 0;
