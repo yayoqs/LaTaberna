@@ -1,6 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: kds.js (Kitchen Display System)
-   Propósito: Monitor de cocina y barra.
+   PubPOS — MÓDULO: kds.js (Kitchen Display System) v2
    ================================================================ */
 const KDS = (() => {
   const MINUTOS_URGENTE = 15;
@@ -13,7 +12,6 @@ const KDS = (() => {
     const ahora = Date.now();
     const rol = Auth.getRol();
 
-    // 1. Filtrar comandas visibles (ocultar las "lista" muy viejas)
     let comandasFiltradas = DB.comandas.filter(c => {
       if (c.estado === 'lista') {
         return (ahora - c.ts) < MINUTOS_OCULTAR_LISTA * 60 * 1000;
@@ -21,7 +19,6 @@ const KDS = (() => {
       return true;
     });
 
-    // 2. Aplicar filtro por rol para que cada quien vea solo lo suyo
     if (rol === 'cocina') {
       comandasFiltradas = comandasFiltradas.filter(c => 
         c.destino === 'cocina' || c.destino === 'ambos'
@@ -31,7 +28,6 @@ const KDS = (() => {
         c.destino === 'barra' || c.destino === 'ambos'
       );
     }
-    // admin y master ven todos (sin filtro adicional)
 
     if (!comandasFiltradas.length) {
       cont.innerHTML = `<div class="kds-empty"><i class="fas fa-check-circle"></i><p class="kds-empty-title">Todo en orden</p><p>No hay comandas pendientes</p></div>`;
@@ -48,14 +44,31 @@ const KDS = (() => {
     const destLabel = { cocina: 'Cocina', barra: 'Barra', ambos: 'Cocina + Barra' }[c.destino] || c.destino;
     const destCss = c.destino === 'barra' ? 'barra' : 'cocina';
 
-    const itemsHTML = c.items.map(it => `
-      <div class="kds-item">
-        <span class="kds-qty">${it.qty}</span>
-        <div>
-          <div class="kds-item-name">${it.nombre}</div>
-          ${it.obs ? `<div class="kds-item-obs"><i class="fas fa-exclamation-circle"></i> ${it.obs}</div>` : ''}
-        </div>
-      </div>`).join('');
+    const itemsHTML = c.items.map(it => {
+      // Buscar receta del producto por su prodId
+      const receta = DB.recetas?.find(r => r.productoId == it.prodId);
+      let recetaHTML = '';
+      if (receta && receta.ingredientes && receta.ingredientes.length) {
+        recetaHTML = receta.ingredientes.map(ing => {
+          const ingData = DB.ingredientes.find(i => i.id == ing.ingredienteId);
+          return ingData
+            ? `<li>${ingData.nombre}: ${ing.cantidad} ${ingData.unidad}</li>`
+            : '';
+        }).join('');
+        recetaHTML = `<details style="font-size:11px;margin-top:4px;"><summary>📋 Receta</summary><ul>${recetaHTML}</ul></details>`;
+      }
+
+      const icono = it.enviadoA === 'barra' ? '🍹' : '🍳';
+      return `
+        <div class="kds-item">
+          <span class="kds-qty">${it.qty}</span>
+          <div>
+            <div class="kds-item-name">${it.nombre} ${icono}</div>
+            ${it.obs ? `<div class="kds-item-obs"><i class="fas fa-exclamation-circle"></i> ${it.obs}</div>` : ''}
+            ${recetaHTML}
+          </div>
+        </div>`;
+    }).join('');
 
     let botonesHTML = '';
     if (c.estado !== 'lista') {

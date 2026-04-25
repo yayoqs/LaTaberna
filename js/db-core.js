@@ -2,12 +2,12 @@
    PubPOS — MÓDULO: db-core.js
    Propósito: Núcleo de base de datos: inicialización, mesas, pedidos,
               comandas, mozos, configuración y persistencia local.
+   Cambio (2026-04-25): Soporte de zona (salon / terraza) con migración.
    ================================================================ */
 
 const DBCore = (function() {
   const module = {};
 
-  // Propiedades internas (se expondrán al objeto DB final)
   module.productos = [];
   module.pedidos = [];
   module.mesas = [];
@@ -39,7 +39,8 @@ const DBCore = (function() {
       abiertaEn: m.abiertaEn || null,
       observaciones: this._validarString(m.observaciones, ''),
       mesasFusionadas: m.mesasFusionadas || null,
-      esVirtual: m.esVirtual || false
+      esVirtual: m.esVirtual || false,
+      zona: this._validarString(m.zona, 'salon')   // ← nuevo campo
     };
   };
 
@@ -88,14 +89,25 @@ const DBCore = (function() {
     };
   };
 
+  /**
+   * Inicializa mesas: asigna zona por defecto si no existe,
+   * pero NO modifica el número de mesa.
+   */
   module._inicializarMesas = function() {
     const raw = localStorage.getItem('pubpos_mesas');
     if (raw) {
       const mesasParseadas = JSON.parse(raw);
-      this.mesas = mesasParseadas.map(m => this._normalizarMesa(m));
+      this.mesas = mesasParseadas.map(m => {
+        const mesa = this._normalizarMesa(m);
+        if (!mesa.zona) mesa.zona = 'salon';   // migración silenciosa
+        return mesa;
+      });
     } else {
       const cant = this.config.cantidadMesas || 12;
-      this.mesas = Array.from({ length: cant }, (_, i) => mesaVacia(i + 1));
+      this.mesas = Array.from({ length: cant }, (_, i) => ({
+        ...mesaVacia(i + 1),
+        zona: 'salon'
+      }));
       this.saveMesas();
     }
   };
@@ -176,7 +188,6 @@ const DBCore = (function() {
   return module;
 })();
 
-// Función auxiliar global
 function mesaVacia(num) {
   return {
     numero: num,
@@ -186,6 +197,7 @@ function mesaVacia(num) {
     mozo: '',
     comensales: 1,
     abiertaEn: null,
-    observaciones: ''
+    observaciones: '',
+    zona: 'salon'   // ← zona por defecto
   };
 }

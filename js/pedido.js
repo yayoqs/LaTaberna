@@ -1,6 +1,7 @@
 /* ================================================================
    PubPOS — MÓDULO: pedido.js (Orquestador)
    Propósito: Coordinar apertura de mesa, envío de comandas, transferencia.
+   Cambios (2026-04-25): Verificación de permiso admin en transferencia.
    ================================================================ */
 
 const Pedido = (() => {
@@ -148,6 +149,7 @@ const Pedido = (() => {
 
   /* ── TRANSFERIR MESA (Cambio de ubicación) ────────────────── */
   function transferirMesa(mesaOrigenNum, mesaDestinoNum) {
+    // 🔒 VERIFICACIÓN DE PERMISO: solo administradores y master pueden transferir
     if (!Auth.esAdmin()) {
       showToast('error', 'Solo administradores pueden transferir pedidos entre mesas');
       return false;
@@ -209,6 +211,7 @@ const Pedido = (() => {
       showToast('warning', 'No hay mesa activa.');
       return;
     }
+    // 🔒 Solo administradores
     if (!Auth.esAdmin()) {
       showToast('error', 'Solo administradores pueden transferir mesas.');
       return;

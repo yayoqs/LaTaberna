@@ -1,7 +1,8 @@
 /* ================================================================
-   PubPOS — MÓDULO: despensa.js (v2.1 – ubicación, recetas visibles, sync)
+   PubPOS — MÓDULO: despensa.js (v3 – filtro por rol + ubicación)
    Propósito: Gestión de inventario (ingredientes, recetas, movimientos).
    ================================================================ */
+
 const Despensa = (() => {
 
   function render() {
@@ -17,11 +18,13 @@ const Despensa = (() => {
     let ingredientes = DB.ingredientes || [];
     const rol = Auth.getRol();
 
+    // 🔒 FILTRO POR ROL: cocina solo ve cocina, barra solo ve barra
     if (rol === 'cocina') {
       ingredientes = ingredientes.filter(i => i.categoria === 'cocina');
     } else if (rol === 'barra') {
       ingredientes = ingredientes.filter(i => i.categoria === 'barra');
     }
+    // admin/master ven todos
 
     if (!ingredientes.length) {
       tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;">No hay ingredientes visibles para tu rol.</td></tr>`;
@@ -97,6 +100,7 @@ const Despensa = (() => {
     `).join('');
   }
 
+  /* ── MODAL INGREDIENTE (con ubicación) ─────────────────────── */
   function mostrarModalIngrediente(ingrediente = null) {
     const esEdicion = !!ingrediente;
     const titulo = esEdicion ? 'Editar Ingrediente' : 'Nuevo Ingrediente';
@@ -185,6 +189,7 @@ const Despensa = (() => {
     showToast('success', `Stock de ${ing.nombre} actualizado`);
   }
 
+  /* ── MODAL RECETA (conservando sync) ─────────────────────── */
   function mostrarModalReceta() {
     let modal = document.getElementById('modalReceta');
     if (!modal) {
