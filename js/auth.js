@@ -1,5 +1,6 @@
 /* ================================================================
-   PubPOS — MÓDULO: auth.js (v4 – selector de simulación permanente para master)
+   PubPOS — MÓDULO: auth.js (v5 – selector de simulación permanente,
+              eliminación de selector de mozo para otros roles)
    ================================================================ */
 const Auth = (() => {
   const USUARIOS = [
@@ -128,7 +129,7 @@ const Auth = (() => {
 
   function getRol() { return _usuarioActual?.rol || null; }
   function getNombre() { return _usuarioActual?.nombre || ''; }
-  function esMasterReal() { return _usuarioActual?.rol === 'master'; }   // siempre devuelve true si el usuario real es master
+  function esMasterReal() { return _usuarioActual?.rol === 'master'; }
   function esMaster() { return _usuarioActual?.rol === 'master' && !_rolSimulado; }
   function esAdmin() { const r = getRolEfectivo(); return r === 'admin' || r === 'master'; }
   function esCocina() { const r = getRolEfectivo(); return r === 'cocina' || r === 'admin' || r === 'master'; }
@@ -165,17 +166,17 @@ const Auth = (() => {
       el.style.display = mostrar ? '' : 'none';
     });
 
-    // Selector de mozo / simulador de rol
+    // Contenedor del selector de mozo / simulador de rol
     const mozoContainer = document.querySelector('.mozo-selector');
     if (!mozoContainer || !_usuarioActual) return;
 
-    // Si el usuario real es master, mostramos SIEMPRE el selector de simulación
     if (esMasterReal()) {
+      // Siempre mostrar selector de simulación para master
       const rolesDisponibles = (typeof Roles !== 'undefined')
         ? Roles.lista.filter(r => r !== 'master')
         : [];
       const seleccionado = _rolSimulado || '';
-      const opciones = rolesDisponibles.map(r => 
+      const opciones = rolesDisponibles.map(r =>
         `<option value="${r}" ${r === seleccionado ? 'selected' : ''}>${r.charAt(0).toUpperCase() + r.slice(1)}</option>`
       ).join('');
       mozoContainer.innerHTML = `
@@ -185,27 +186,14 @@ const Auth = (() => {
           ${opciones}
         </select>
       `;
-      // Asegurar que el select refleje el valor actual
       const selectEl = mozoContainer.querySelector('#rolSimulado');
       if (selectEl) selectEl.value = seleccionado;
     } else {
-      // Comportamiento normal para otros roles
-      if (rolEfectivo === 'mesero' || rolEfectivo === 'admin') {
-        let mozosNombres = [];
-        if (typeof DB !== 'undefined' && Array.isArray(DB.mozos) && DB.mozos.length) {
-          mozosNombres = DB.mozos.filter(m => m.activo !== false).map(m => m.nombre);
-        } else {
-          mozosNombres = ['mesero'];
-        }
-        const options = mozosNombres.map(nombre => `<option value="${nombre}" selected>${nombre}</option>`).join('');
-        mozoContainer.innerHTML = `<i class="fas fa-user-tie"></i><select id="mozoActivo" onchange="Comanda?.setMozo?.(this.value)">${options}</select>`;
-      } else {
-        mozoContainer.innerHTML = `<i class="fas fa-user-tie"></i><span style="padding:6px 0;color:var(--color-text);font-weight:500;">${_usuarioActual.nombre}</span>`;
-      }
+      // Para cualquier otro rol: espacio vacío (sin selector de mozo)
+      mozoContainer.innerHTML = '';
     }
   }
 
-  // Método para cambiar el rol simulado (solo master)
   function _cambiarRolSimulado(rol) {
     if (!_usuarioActual || _usuarioActual.rol !== 'master') return;
     if (!rol) {
@@ -248,7 +236,8 @@ const Auth = (() => {
     _loginFromModal,
     _cambiarRolSimulado,
     getRolEfectivo,
-    esMasterReal     // exponemos por si hace falta
+    esMasterReal,
+    aplicarRestriccionesUI   // exponemos para que App lo llame al cambiar de vista
   };
 })();
 

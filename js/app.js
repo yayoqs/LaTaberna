@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: app.js (v2 – soporte para rol despensa)
+   PubPOS — MÓDULO: app.js (v2 – soporte para rol despensa, refresco de UI al cambiar vista)
    ================================================================ */
 const App = {
   async init() {
@@ -60,7 +60,6 @@ const App = {
     if (nombre === 'cocina' && !Auth.puedeAccederCocina()) { showToast('error', 'No tienes permiso para acceder a Cocina'); return; }
     if (nombre === 'config' && !Auth.esAdmin()) { showToast('error', 'Solo administradores pueden acceder a Configuración'); return; }
     if (nombre === 'despensa') {
-      // Ahora permite el acceso a usuarios con rol "despensa" además de admin, cocina y barra
       if (!Auth.esAdmin() && !Auth.esCocina() && !Auth.esBarra() && !Auth.esDespensa()) {
         showToast('error', 'No tienes permiso para acceder a Despensa');
         return;
@@ -75,6 +74,11 @@ const App = {
     if (btn) btn.classList.add('active');
 
     EventBus.emit('vista:cambiada', nombre);
+
+    // 🔁 Actualizar la UI del header (selector de simulación) al cambiar de vista
+    if (Auth.esMasterReal && Auth.esMasterReal()) {
+      Auth.aplicarRestriccionesUI();
+    }
 
     if (nombre === 'mesas' && window.Mesas) Mesas.render();
     if (nombre === 'cocina' && window.KDS) KDS.refresh();
