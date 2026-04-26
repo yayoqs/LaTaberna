@@ -1,22 +1,22 @@
 /* ================================================================
-   PubPOS — MÓDULO: auth.js (Corregido y completo)
+   PubPOS — MÓDULO: auth.js (v3 – roles genéricos + nuevos perfiles)
    ================================================================ */
-
 const Auth = (() => {
   const USUARIOS = [
-    { nombre: 'master',  password: 'master123', rol: 'master' },
-    { nombre: 'admin',   password: 'admin123',  rol: 'admin' },
-    { nombre: 'cocina',  password: 'cocina',    rol: 'cocina' },
-    { nombre: 'barra',   password: 'barra',     rol: 'barra' },
-    { nombre: 'caja',    password: 'caja',      rol: 'caja' },
-    { nombre: 'Carlos',  password: 'carlos',    rol: 'mesero' },
-    { nombre: 'Ana',     password: 'ana',       rol: 'mesero' },
-    { nombre: 'Luis',    password: 'luis',      rol: 'mesero' },
-    { nombre: 'María',   password: 'maria',     rol: 'mesero' },
-    { nombre: 'cliente', password: 'cliente',   rol: 'cliente' }
+    { nombre: 'master',   password: 'master123',  rol: 'master' },
+    { nombre: 'admin',    password: 'admin123',   rol: 'admin' },
+    { nombre: 'cocina',   password: 'cocina',     rol: 'cocina' },
+    { nombre: 'barra',    password: 'barra',      rol: 'barra' },
+    { nombre: 'caja',     password: 'caja',       rol: 'caja' },
+    { nombre: 'mesero',   password: 'mesero',     rol: 'mesero' },
+    { nombre: 'despensa', password: 'despensa',   rol: 'despensa' },      // nuevo
+    { nombre: 'eventos',  password: 'eventos',    rol: 'eventos' },       // nuevo
+    { nombre: 'reparto',  password: 'reparto',    rol: 'reparto' },       // nuevo
+    { nombre: 'cliente',  password: 'cliente',    rol: 'cliente' }
   ];
 
   let _usuarioActual = null;
+  let _rolSimulado = null;                // ← rol temporal para master
 
   function init() {
     const saved = sessionStorage.getItem('usuarioActual');
@@ -31,10 +31,11 @@ const Auth = (() => {
   }
 
   function getDefaultView() {
-    if (!_usuarioActual) return 'mesas';
-    const rol = _usuarioActual.rol;
+    const rol = getRolEfectivo();
     if (rol === 'cocina' || rol === 'barra') return 'cocina';
     if (rol === 'caja') return 'caja';
+    if (rol === 'despensa') return 'despensa';   // despensa ve directamente su inventario
+    // eventos y reparto, por ahora verán mesas (podríamos ajustar más adelante)
     return 'mesas';
   }
 
@@ -45,6 +46,7 @@ const Auth = (() => {
       return false;
     }
     _usuarioActual = { nombre: user.nombre, rol: user.rol };
+    _rolSimulado = null;
     sessionStorage.setItem('usuarioActual', JSON.stringify(_usuarioActual));
     aplicarRestriccionesUI();
     cerrarModalLogin();
@@ -56,6 +58,7 @@ const Auth = (() => {
 
   function logout() {
     _usuarioActual = null;
+    _rolSimulado = null;
     sessionStorage.removeItem('usuarioActual');
     document.querySelectorAll('[data-rol]').forEach(el => el.style.display = 'none');
     mostrarLogin();
@@ -77,7 +80,7 @@ const Auth = (() => {
           </div>
           <div class="modal-small-body">
             <label>Usuario</label>
-            <input type="text" id="loginUsuario" placeholder="Ej: admin, master, cocina, barra, caja, Carlos, Ana, Luis, María">
+            <input type="text" id="loginUsuario" placeholder="Ej: admin, master, cocina, barra, caja, mesero, despensa, eventos, reparto">
             <label>Contraseña</label>
             <input type="password" id="loginPassword" placeholder="Contraseña">
             <div class="modal-small-footer">
@@ -113,19 +116,27 @@ const Auth = (() => {
   }
 
   // --- Permisos y restricciones UI ---
+  function getRolEfectivo() {
+    if (_usuarioActual?.rol === 'master' && _rolSimulado) {
+      return _rolSimulado;
+    }
+    return _usuarioActual?.rol || null;
+  }
+
   function tienePermiso(permiso) {
-    if (!_usuarioActual) return false;
-    return Roles.getPermisos(_usuarioActual.rol)[permiso] === true;
+    const rol = getRolEfectivo();
+    if (!rol) return false;
+    return Roles.getPermisos(rol)[permiso] === true;
   }
 
   function getRol() { return _usuarioActual?.rol || null; }
   function getNombre() { return _usuarioActual?.nombre || ''; }
-  function esMaster() { return _usuarioActual?.rol === 'master'; }
-  function esAdmin() { return _usuarioActual?.rol === 'admin' || esMaster(); }
-  function esCocina() { return _usuarioActual?.rol === 'cocina' || esAdmin(); }
-  function esBarra() { return _usuarioActual?.rol === 'barra' || esAdmin(); }
-  function esCaja() { return _usuarioActual?.rol === 'caja' || esAdmin(); }
-  function esMesero() { return _usuarioActual?.rol === 'mesero' || esAdmin(); }
+  function esMaster() { return _usuarioActual?.rol === 'master' && !_rolSimulado; }
+  function esAdmin() { return getRolEfectivo() === 'admin' || esMaster(); }
+  function esCocina() { return getRolEfectivo() === 'cocina' || esAdmin(); }
+  function esBarra() { return getRolEfectivo() === 'barra' || esAdmin(); }
+  function esCaja() { return getRolEfectivo() === 'caja' || esAdmin(); }
+  function esMesero() { return getRolEfectivo() === 'mesero' || esAdmin(); }
 
   function puede(permiso) { return tienePermiso(permiso); }
   function puedeEliminarItemEnviado() { return tienePermiso('eliminarItemEnviado'); }
@@ -138,31 +149,74 @@ const Auth = (() => {
 
   function aplicarRestriccionesUI() {
     const userEl = document.getElementById('usuarioActualDisplay');
-    if (userEl) userEl.textContent = _usuarioActual ? `${_usuarioActual.nombre} (${_usuarioActual.rol})` : '';
+    const rolEfectivo = getRolEfectivo();
+    if (userEl) {
+      let displayText = _usuarioActual ? `${_usuarioActual.nombre} (${_usuarioActual.rol})` : '';
+      if (_rolSimulado) {
+        displayText += ` ⇒ ${_rolSimulado}`;
+      }
+      userEl.textContent = displayText;
+    }
 
+    // Mostrar/ocultar elementos según el rol efectivo
     document.querySelectorAll('[data-rol]').forEach(el => {
       const roles = el.dataset.rol.split(',').map(r => r.trim());
-      const mostrar = roles.includes(_usuarioActual?.rol) ||
-                     (esAdmin() && roles.includes('admin')) ||
-                     (esMaster() && roles.includes('master'));
+      const mostrar = roles.includes(rolEfectivo) ||
+                     (rolEfectivo === 'admin' && roles.includes('admin')) ||
+                     (rolEfectivo === 'master' && roles.includes('master'));
       el.style.display = mostrar ? '' : 'none';
     });
 
+    // --- Selector de mozo / vista de rol ---
     const mozoContainer = document.querySelector('.mozo-selector');
     if (!mozoContainer || !_usuarioActual) return;
-    if (!esMaster()) {
-      mozoContainer.innerHTML = `<i class="fas fa-user-tie"></i><span style="padding:6px 0;color:var(--color-text);font-weight:500;">${_usuarioActual.nombre}</span>`;
-    } else {
-      let mozosNombres = [];
-      if (typeof DB !== 'undefined' && Array.isArray(DB.mozos) && DB.mozos.length) {
-        mozosNombres = DB.mozos.filter(m => m.activo !== false).map(m => m.nombre);
-      } else {
-        mozosNombres = USUARIOS.filter(u => ['mesero','admin','master'].includes(u.rol)).map(u => u.nombre);
+
+    if (esMaster()) {
+      // Selector de roles para simulación (todos menos master)
+      const rolesDisponibles = Roles.lista.filter(r => r !== 'master');
+      const opciones = rolesDisponibles.map(r => `<option value="${r}" ${r === (_rolSimulado || 'admin') ? 'selected' : ''}>${r.charAt(0).toUpperCase() + r.slice(1)}</option>`).join('');
+      mozoContainer.innerHTML = `
+        <i class="fas fa-eye"></i>
+        <select id="rolSimulado" onchange="Auth._cambiarRolSimulado(this.value)">
+          <option value="">— Ver como —</option>
+          ${opciones}
+        </select>
+      `;
+      if (!_rolSimulado) {
+        document.getElementById('rolSimulado').value = '';
       }
-      const options = mozosNombres.map(nombre => `<option value="${nombre}" ${nombre === _usuarioActual.nombre ? 'selected' : ''}>${nombre}</option>`).join('');
-      mozoContainer.innerHTML = `<i class="fas fa-user-tie"></i><select id="mozoActivo" onchange="Comanda?.setMozo?.(this.value)">${options}</select>`;
+    } else {
+      // Para otros roles: mostrar nombre fijo o selector de mozo si es mesero/admin
+      if (getRolEfectivo() === 'mesero' || esAdmin()) {
+        let mozosNombres = [];
+        // Tomamos mozos desde DB.mozos, si existen; si no, usamos el usuario "mesero" genérico
+        if (typeof DB !== 'undefined' && Array.isArray(DB.mozos) && DB.mozos.length) {
+          mozosNombres = DB.mozos.filter(m => m.activo !== false).map(m => m.nombre);
+        } else {
+          mozosNombres = ['mesero']; // único mozo genérico
+        }
+        const options = mozosNombres.map(nombre => `<option value="${nombre}" selected>${nombre}</option>`).join('');
+        mozoContainer.innerHTML = `<i class="fas fa-user-tie"></i><select id="mozoActivo" onchange="Comanda?.setMozo?.(this.value)">${options}</select>`;
+      } else {
+        mozoContainer.innerHTML = `<i class="fas fa-user-tie"></i><span style="padding:6px 0;color:var(--color-text);font-weight:500;">${_usuarioActual.nombre}</span>`;
+      }
     }
   }
+
+  // Método para cambiar el rol simulado (solo master)
+  window.Auth._cambiarRolSimulado = function(rol) {
+    if (!_usuarioActual || _usuarioActual.rol !== 'master') return;
+    if (!rol) {
+      _rolSimulado = null;
+    } else {
+      if (!Roles.lista.includes(rol)) return;
+      _rolSimulado = rol;
+    }
+    aplicarRestriccionesUI();
+    // Redirigir a la vista por defecto del nuevo rol
+    const vistaInicial = getDefaultView();
+    if (window.App) App.showView(vistaInicial);
+  };
 
   return {
     init, login, logout, getRol, getNombre, tienePermiso, puede,
@@ -170,7 +224,8 @@ const Auth = (() => {
     puedeEliminarItemEnviado, puedeCerrarMesa, puedeAccederCaja, puedeAccederCocina,
     puedeCambiarEstadoComanda, puedeEditarProductos, puedeEditarPrecios,
     getDefaultView,
-    mostrarLogin, cerrarModalLogin, _loginFromModal
+    mostrarLogin, cerrarModalLogin, _loginFromModal,
+    getRolEfectivo
   };
 })();
 

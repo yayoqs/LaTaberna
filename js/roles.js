@@ -1,10 +1,9 @@
 /* ================================================================
-   PubPOS — MÓDULO: roles.js
-   Propósito: Definición de roles y matriz de permisos granular.
+   PubPOS — MÓDULO: roles.js (v2 – nuevos roles despensa, eventos, reparto)
    ================================================================ */
 
 const Roles = {
-  lista: ['master', 'admin', 'cocina', 'barra', 'caja', 'mesero', 'cliente'],
+  lista: ['master', 'admin', 'cocina', 'barra', 'caja', 'mesero', 'despensa', 'eventos', 'reparto', 'cliente'],
 
   permisos: {
     master: {
@@ -54,6 +53,31 @@ const Roles = {
       editarProductos: false, editarUsuarios: false, editarPrecios: false,
       verRecetasCocina: false, verRecetasBarra: false,
       editarInventarioCocina: false, editarInventarioBarra: false
+    },
+    despensa: {
+      verMesas: false, verCocina: false, verCaja: false, verConfig: false,
+      tomarPedido: false, modificarPedidoEnviado: false, eliminarItemEnviado: false,
+      cerrarMesa: false, accederCaja: false, accederCocina: false, cambiarEstadoComanda: false,
+      editarProductos: false, editarUsuarios: false, editarPrecios: false,
+      verRecetasCocina: true, verRecetasBarra: true,
+      editarInventarioCocina: true, editarInventarioBarra: true   // gestión completa de inventario
+    },
+    eventos: {
+      verMesas: true, verCocina: true, verCaja: false, verConfig: false,
+      tomarPedido: true, modificarPedidoEnviado: false, eliminarItemEnviado: false,
+      cerrarMesa: false, accederCaja: false, accederCocina: true, cambiarEstadoComanda: false,
+      editarProductos: false, editarUsuarios: false, editarPrecios: false,
+      verRecetasCocina: true, verRecetasBarra: true,   // puede ver recetas para coordinar
+      editarInventarioCocina: false, editarInventarioBarra: false
+    },
+    reparto: {
+      verMesas: false, verCocina: false, verCaja: false, verConfig: false,
+      tomarPedido: false, modificarPedidoEnviado: false, eliminarItemEnviado: false,
+      cerrarMesa: false, accederCaja: false, accederCocina: false, cambiarEstadoComanda: false,
+      editarProductos: false, editarUsuarios: false, editarPrecios: false,
+      verRecetasCocina: false, verRecetasBarra: false,
+      editarInventarioCocina: false, editarInventarioBarra: false
+      // aquí luego podremos agregar permisos de delivery
     },
     cliente: {
       verMesas: false, verCocina: false, verCaja: false, verConfig: false,
