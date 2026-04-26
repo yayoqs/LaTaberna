@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: auth.js (v3 – roles genéricos + simulación de vista para master)
+   PubPOS — MÓDULO: auth.js (v4 – selector de simulación permanente para master)
    ================================================================ */
 const Auth = (() => {
   const USUARIOS = [
@@ -123,12 +123,12 @@ const Auth = (() => {
   function tienePermiso(permiso) {
     const rol = getRolEfectivo();
     if (!rol) return false;
-    // protección: si Roles no se cargó, devolvemos false
     return (typeof Roles !== 'undefined' && Roles.getPermisos(rol)[permiso] === true);
   }
 
   function getRol() { return _usuarioActual?.rol || null; }
   function getNombre() { return _usuarioActual?.nombre || ''; }
+  function esMasterReal() { return _usuarioActual?.rol === 'master'; }   // siempre devuelve true si el usuario real es master
   function esMaster() { return _usuarioActual?.rol === 'master' && !_rolSimulado; }
   function esAdmin() { const r = getRolEfectivo(); return r === 'admin' || r === 'master'; }
   function esCocina() { const r = getRolEfectivo(); return r === 'cocina' || r === 'admin' || r === 'master'; }
@@ -156,7 +156,7 @@ const Auth = (() => {
       userEl.textContent = displayText;
     }
 
-    // Mostrar/ocultar elementos según rol
+    // Mostrar/ocultar elementos según el rol efectivo
     document.querySelectorAll('[data-rol]').forEach(el => {
       const roles = el.dataset.rol.split(',').map(r => r.trim());
       const mostrar = roles.includes(rolEfectivo) ||
@@ -169,12 +169,15 @@ const Auth = (() => {
     const mozoContainer = document.querySelector('.mozo-selector');
     if (!mozoContainer || !_usuarioActual) return;
 
-    if (esMaster()) {
-      // Selector de roles para simulación
+    // Si el usuario real es master, mostramos SIEMPRE el selector de simulación
+    if (esMasterReal()) {
       const rolesDisponibles = (typeof Roles !== 'undefined')
         ? Roles.lista.filter(r => r !== 'master')
         : [];
-      const opciones = rolesDisponibles.map(r => `<option value="${r}" ${r === (_rolSimulado || 'admin') ? 'selected' : ''}>${r.charAt(0).toUpperCase() + r.slice(1)}</option>`).join('');
+      const seleccionado = _rolSimulado || '';
+      const opciones = rolesDisponibles.map(r => 
+        `<option value="${r}" ${r === seleccionado ? 'selected' : ''}>${r.charAt(0).toUpperCase() + r.slice(1)}</option>`
+      ).join('');
       mozoContainer.innerHTML = `
         <i class="fas fa-eye"></i>
         <select id="rolSimulado" onchange="Auth._cambiarRolSimulado(this.value)">
@@ -182,17 +185,17 @@ const Auth = (() => {
           ${opciones}
         </select>
       `;
-      if (!_rolSimulado) {
-        document.getElementById('rolSimulado').value = '';
-      }
+      // Asegurar que el select refleje el valor actual
+      const selectEl = mozoContainer.querySelector('#rolSimulado');
+      if (selectEl) selectEl.value = seleccionado;
     } else {
-      // Mostrar nombre o selector de mozo (si es mesero o admin)
+      // Comportamiento normal para otros roles
       if (rolEfectivo === 'mesero' || rolEfectivo === 'admin') {
         let mozosNombres = [];
         if (typeof DB !== 'undefined' && Array.isArray(DB.mozos) && DB.mozos.length) {
           mozosNombres = DB.mozos.filter(m => m.activo !== false).map(m => m.nombre);
         } else {
-          mozosNombres = ['mesero']; // único mozo genérico
+          mozosNombres = ['mesero'];
         }
         const options = mozosNombres.map(nombre => `<option value="${nombre}" selected>${nombre}</option>`).join('');
         mozoContainer.innerHTML = `<i class="fas fa-user-tie"></i><select id="mozoActivo" onchange="Comanda?.setMozo?.(this.value)">${options}</select>`;
@@ -244,7 +247,8 @@ const Auth = (() => {
     cerrarModalLogin,
     _loginFromModal,
     _cambiarRolSimulado,
-    getRolEfectivo
+    getRolEfectivo,
+    esMasterReal     // exponemos por si hace falta
   };
 })();
 
