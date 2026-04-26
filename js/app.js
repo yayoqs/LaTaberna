@@ -10,7 +10,7 @@ const App = {
       await DB.init();
       if (typeof Config !== 'undefined' && Config.cargar) Config.cargar();
       this._iniciarReloj();
-      this._initRealVH();   // ← nuevo: altura real del viewport
+      this._initRealVH();   // altura real del viewport
       
       // Usar vista por defecto según rol (si ya hay sesión)
       if (Auth.getRol()) {
@@ -38,10 +38,6 @@ const App = {
     setInterval(actualizar, 1000);
   },
 
-  /**
-   * Calcula la altura real de la ventana (sin la barra de direcciones en móviles)
-   * y la almacena en la variable CSS --vh.
-   */
   _initRealVH() {
     function setRealVH() {
       const vh = window.innerHeight * 0.01;
@@ -67,7 +63,8 @@ const App = {
     if (nombre === 'cocina' && !Auth.puedeAccederCocina()) { showToast('error', 'No tienes permiso para acceder a Cocina'); return; }
     if (nombre === 'config' && !Auth.esAdmin()) { showToast('error', 'Solo administradores pueden acceder a Configuración'); return; }
     if (nombre === 'despensa') {
-      if (!Auth.esAdmin() && !Auth.esCocina() && !Auth.esBarra()) {
+      // Permitir acceso si es admin, cocina, barra o despensa
+      if (!Auth.esAdmin() && !Auth.esCocina() && !Auth.esBarra() && !Auth.esDespensa()) {
         showToast('error', 'No tienes permiso para acceder a Despensa');
         return;
       }
