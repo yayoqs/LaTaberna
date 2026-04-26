@@ -10,6 +10,7 @@ const App = {
       await DB.init();
       if (typeof Config !== 'undefined' && Config.cargar) Config.cargar();
       this._iniciarReloj();
+      this._initRealVH();   // ← nuevo: altura real del viewport
       
       // Usar vista por defecto según rol (si ya hay sesión)
       if (Auth.getRol()) {
@@ -35,6 +36,20 @@ const App = {
     };
     actualizar();
     setInterval(actualizar, 1000);
+  },
+
+  /**
+   * Calcula la altura real de la ventana (sin la barra de direcciones en móviles)
+   * y la almacena en la variable CSS --vh.
+   */
+  _initRealVH() {
+    function setRealVH() {
+      const vh = window.innerHeight * 0.01;
+      document.documentElement.style.setProperty('--vh', `${vh}px`);
+    }
+    window.addEventListener('resize', setRealVH);
+    window.addEventListener('orientationchange', setRealVH);
+    setRealVH();
   },
 
   _mostrarErrorCarga() {

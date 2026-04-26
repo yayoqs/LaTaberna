@@ -491,12 +491,14 @@ button, .btn-comanda, .btn-cuenta, .btn-cerrar-mesa, .cat-tab, .prod-card {
 @media (max-width: 767px) {
   .modal-overlay {
     padding: 0;
-    align-items: flex-end;
+    align-items: flex-start;  /* ← CAMBIO: antes era flex-end */
   }
 
   .modal-pedido {
     height: 100vh;
+    height: 100dvh;           /* altura real (ignora barra de direcciones) */
     max-height: 100vh;
+    max-height: 100dvh;
     width: 100%;
     border-radius: 0;
     margin: 0;
