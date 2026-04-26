@@ -3,7 +3,7 @@
    Archivo: css/pedido.css
    Propósito: Modal de pedido, carta de productos y comanda
    Versión: Pantalla completa en móviles, footer siempre visible
-   Corregido: header visible en móviles verticales
+   Fix: Header siempre visible en móviles (vertical/horizontal)
    ================================================================ */
 
 /* ── MODAL BASE ────────────────────────────────────────────── */
@@ -28,7 +28,7 @@
   background: var(--color-panel);
   flex-shrink: 0;
   gap: 12px;
-  flex-wrap: nowrap; /* Por defecto evitamos que bajen */
+  flex-wrap: nowrap;
 }
 .modal-header h3 {
   font-size: 15px;
@@ -489,13 +489,11 @@ button, .btn-comanda, .btn-cuenta, .btn-cerrar-mesa, .cat-tab, .prod-card {
    MÓVIL: PANTALLA COMPLETA, FOOTER SIEMPRE VISIBLE
    ================================================================ */
 @media (max-width: 767px) {
-  /* Overlay sin padding, modal pegado abajo */
   .modal-overlay {
     padding: 0;
     align-items: flex-end;
   }
 
-  /* Modal ocupa toda la pantalla */
   .modal-pedido {
     height: 100vh;
     max-height: 100vh;
@@ -508,18 +506,20 @@ button, .btn-comanda, .btn-cuenta, .btn-cerrar-mesa, .cat-tab, .prod-card {
     overflow: hidden;
   }
 
-  /* ── CORRECCIÓN: HEADER SIEMPRE VISIBLE ── */
+  /* Header: compacto pero siempre visible */
   .modal-pedido .modal-header {
     flex-shrink: 0;
     padding: 8px 12px;
-    flex-wrap: wrap;               /* ahora permite que bajen si no entran */
-    gap: 8px;
-    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px;
+    background: var(--color-panel);
+    z-index: 10;
   }
+
   .modal-pedido .modal-title {
     font-size: 16px;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 4px;
     align-items: center;
     flex: 1 1 auto;
     min-width: 0;
@@ -531,7 +531,13 @@ button, .btn-comanda, .btn-cuenta, .btn-cerrar-mesa, .cat-tab, .prod-card {
     font-size: 10px;
     padding: 2px 8px;
   }
-  /* El botón de cerrar se mantiene visible a la derecha */
+
+  .modal-pedido .btn-icon {
+    font-size: 11px;
+    padding: 4px 8px;
+    white-space: nowrap;
+  }
+
   .modal-pedido .modal-close {
     width: 30px;
     height: 30px;
@@ -539,26 +545,18 @@ button, .btn-comanda, .btn-cuenta, .btn-cerrar-mesa, .cat-tab, .prod-card {
     margin-left: auto;
     flex-shrink: 0;
   }
-  /* El botón de transferencia se esconde en pantallas muy pequeñas si no entra,
-     pero se mantiene con un icono más chico */
-  .modal-pedido .btn-icon {
-    font-size: 11px;
-    padding: 4px 8px;
-    white-space: nowrap;
-  }
 
-  /* Cuerpo con Grid: dos filas explícitas */
+  /* Cuerpo: carta arriba, comanda abajo */
   .modal-pedido .modal-body {
     flex: 1;
     min-height: 0;
     display: grid;
-    grid-template-rows: minmax(25vh, 35vh) 1fr;
+    grid-template-rows: minmax(20vh, 30vh) 1fr; /* más compacto */
     grid-template-columns: 100%;
     overflow: hidden;
     gap: 0;
   }
 
-  /* Panel Carta (fila 1) */
   .carta-panel {
     grid-row: 1;
     display: flex;
@@ -586,7 +584,6 @@ button, .btn-comanda, .btn-cuenta, .btn-cerrar-mesa, .cat-tab, .prod-card {
     align-content: start;
   }
 
-  /* Panel Comanda (fila 2) */
   .comanda-panel {
     grid-row: 2;
     display: flex;
@@ -617,7 +614,6 @@ button, .btn-comanda, .btn-cuenta, .btn-cerrar-mesa, .cat-tab, .prod-card {
     padding: 8px 12px;
   }
 
-  /* FOOTER SIEMPRE VISIBLE */
   .comanda-footer {
     flex-shrink: 0;
     padding: 10px 12px;
@@ -642,19 +638,5 @@ button, .btn-comanda, .btn-cuenta, .btn-cerrar-mesa, .cat-tab, .prod-card {
   .comanda-meta select,
   .comanda-meta input {
     font-size: 16px;
-  }
-
-  /* Ocultar scrollbars para estética */
-  .carta-productos::-webkit-scrollbar,
-  .comanda-items::-webkit-scrollbar {
-    width: 4px;
-  }
-
-  .comanda-vacia {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
   }
 }
