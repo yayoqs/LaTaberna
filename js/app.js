@@ -1,6 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: app.js
-   Propósito: Orquestador principal, gestión de vistas y eventos.
+   PubPOS — MÓDULO: app.js (v2 – soporte para rol despensa)
    ================================================================ */
 const App = {
   async init() {
@@ -10,9 +9,8 @@ const App = {
       await DB.init();
       if (typeof Config !== 'undefined' && Config.cargar) Config.cargar();
       this._iniciarReloj();
-      this._initRealVH();   // altura real del viewport
+      this._initRealVH();
       
-      // Usar vista por defecto según rol (si ya hay sesión)
       if (Auth.getRol()) {
         const vistaDefecto = Auth.getDefaultView();
         this.showView(vistaDefecto);
@@ -56,21 +54,19 @@ const App = {
   },
 
   showView(nombre) {
-    // Si no hay sesión, mostrar login
     if (!Auth.getRol()) { Auth.mostrarLogin(); return; }
-    // Validar permisos específicos
+
     if (nombre === 'caja' && !Auth.puedeAccederCaja()) { showToast('error', 'No tienes permiso para acceder a Caja'); return; }
     if (nombre === 'cocina' && !Auth.puedeAccederCocina()) { showToast('error', 'No tienes permiso para acceder a Cocina'); return; }
     if (nombre === 'config' && !Auth.esAdmin()) { showToast('error', 'Solo administradores pueden acceder a Configuración'); return; }
     if (nombre === 'despensa') {
-      // Permitir acceso si es admin, cocina, barra o despensa
+      // Ahora permite el acceso a usuarios con rol "despensa" además de admin, cocina y barra
       if (!Auth.esAdmin() && !Auth.esCocina() && !Auth.esBarra() && !Auth.esDespensa()) {
         showToast('error', 'No tienes permiso para acceder a Despensa');
         return;
       }
     }
 
-    // Activar vista y botón correspondiente
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
     const vista = $id(`view-${nombre}`);
@@ -80,7 +76,6 @@ const App = {
 
     EventBus.emit('vista:cambiada', nombre);
 
-    // Disparar renderizado específico
     if (nombre === 'mesas' && window.Mesas) Mesas.render();
     if (nombre === 'cocina' && window.KDS) KDS.refresh();
     if (nombre === 'caja' && window.Caja) Caja.render();
