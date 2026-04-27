@@ -1,10 +1,7 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-core.js (v2 – soporte de zonas múltiples)
-   Propósito: Núcleo de base de datos: inicialización, mesas, pedidos,
-              comandas, mozos, configuración y persistencia local.
-   Cambio (2026-04-27): Ahora las mesas se generan según DB.config.zonas
-                        en lugar de un único cantidadMesas.
-                        mesaVacia recibe el nombre de zona como parámetro.
+   PubPOS — MÓDULO: db-core.js (v2.1 – zonas con ajuste automático)
+   Propósito: Núcleo de base de datos. Ahora sincroniza las mesas
+              con DB.config.zonas sin perder el estado de las ocupadas.
    ================================================================ */
 
 const DBCore = (function() {
@@ -84,7 +81,7 @@ const DBCore = (function() {
     const raw = localStorage.getItem('pubpos_config');
     if (raw) {
       this.config = JSON.parse(raw);
-      // Migración única: si existe la clave obsoleta cantidadMesas
+      // Migración única: cantidadMesas -> zonas
       if (this.config.cantidadMesas && !this.config.zonas) {
         this.config.zonas = [
           { nombre: 'salon',   cantidad: this.config.cantidadMesas },
@@ -94,7 +91,6 @@ const DBCore = (function() {
         this.saveConfig();
       }
     } else {
-      // Configuración por defecto con dos zonas
       this.config = {
         nombreLocal: 'La Taberna',
         direccion: 'Av. Corrientes 1234',
@@ -109,33 +105,93 @@ const DBCore = (function() {
   };
 
   /**
-   * Inicializa mesas: genera la cantidad indicada en cada zona.
-   * Asigna números consecutivos globales empezando desde 1.
+   * Sincroniza las mesas reales con la configuración de zonas.
+   * - Si no hay mesas, las crea todas desde cero.
+   * - Si ya hay mesas, ajusta las cantidades por zona:
+   *   * Añade mesas libres si faltan.
+   *   * Elimina mesas libres sobrantes (las de mayor número).
+   *   * No modifica mesas con estado != 'libre'.
    */
   module._inicializarMesas = function() {
     const zonas = this.config.zonas || [{ nombre: 'salon', cantidad: 12 }];
-    const mesasExistentes = this.mesas.length > 0 ? this.mesas : [];
 
-    // Si ya existen mesas en localStorage, las normalizamos y respetamos.
-    // Si no, generamos desde cero según las zonas.
-    if (mesasExistentes.length === 0) {
+    if (this.mesas.length === 0) {
+      // Crear desde cero
       let numero = 1;
-      const nuevasMesas = [];
+      const nuevas = [];
       zonas.forEach(zona => {
         for (let i = 0; i < zona.cantidad; i++) {
-          nuevasMesas.push({
-            ...mesaVacia(numero, zona.nombre),
-            numero
-          });
+          nuevas.push({ ...mesaVacia(numero, zona.nombre), numero });
           numero++;
         }
       });
-      this.mesas = nuevasMesas;
+      this.mesas = nuevas;
     } else {
-      // Si hay mesas guardadas, las normalizamos (por si falta zona)
-      this.mesas = mesasExistentes.map(m => this._normalizarMesa(m));
-      // Podríamos ajustar para que la numeración sea consecutiva, pero lo dejamos como está.
+      // Filtrar solo mesas reales (no virtuales)
+      const mesasReales = this.mesas.filter(m => !m.esVirtual);
+      const mesasOcupadas = mesasReales.filter(m => m.estado !== 'libre');
+
+      const porZona = {};
+      zonas.forEach(z => { porZona[z.nombre] = { deseado: z.cantidad, actuales: [], libres: [] }; });
+
+      // Clasificar mesas existentes
+      mesasReales.forEach(m => {
+        const zona = m.zona || 'salon';
+        if (porZona[zona]) {
+          porZona[zona].actuales.push(m);
+          if (m.estado === 'libre') porZona[zona].libres.push(m);
+        } else {
+          // Si la mesa tiene una zona que ya no existe, la tratamos como libre para reasignar
+          m.zona = 'salon';
+          if (!porZona['salon']) porZona['salon'] = { deseado: 0, actuales: [], libres: [] };
+          porZona['salon'].actuales.push(m);
+          if (m.estado === 'libre') porZona['salon'].libres.push(m);
+        }
+      });
+
+      const nuevasMesas = [];
+      let maxNumero = Math.max(0, ...mesasReales.map(m => m.numero));
+
+      // Para cada zona, ajustar cantidad
+      zonas.forEach(z => {
+        const zonaData = porZona[z.nombre] || { deseado: z.cantidad, actuales: [], libres: [] };
+        if (!porZona[z.nombre]) porZona[z.nombre] = zonaData;
+
+        const actuales = zonaData.actuales;
+        const libres = zonaData.libres;
+        const diferencia = z.cantidad - actuales.length;
+
+        if (diferencia > 0) {
+          // Faltan mesas: crearlas libres con números nuevos
+          for (let i = 0; i < diferencia; i++) {
+            maxNumero++;
+            const nueva = { ...mesaVacia(maxNumero, z.nombre), numero: maxNumero };
+            nuevasMesas.push(nueva);
+            actuales.push(nueva);
+          }
+        } else if (diferencia < 0) {
+          // Sobran mesas: eliminar libres (las de mayor número)
+          const aEliminar = Math.min(-diferencia, libres.length);
+          // Ordenar libres por número descendente para eliminar las más altas
+          libres.sort((a,b) => b.numero - a.numero);
+          for (let i = 0; i < aEliminar; i++) {
+            const mesa = libres[i];
+            const idx = actuales.indexOf(mesa);
+            if (idx >= 0) actuales.splice(idx, 1);
+            // También quitarla del array global más tarde
+          }
+        }
+
+        // Añadir las actuales (sin las eliminadas) al pool final
+        nuevasMesas.push(...actuales);
+      });
+
+      // Reasignar el array global, asegurando no duplicar mesas ocupadas
+      const mapaFinal = new Map();
+      nuevasMesas.forEach(m => mapaFinal.set(m.numero, m));
+      this.mesas = Array.from(mapaFinal.values()).sort((a,b) => a.numero - b.numero);
     }
+
     this.saveMesas();
   };
 
@@ -215,11 +271,6 @@ const DBCore = (function() {
   return module;
 })();
 
-/**
- * Crea una mesa vacía con una zona específica.
- * @param {number} num - número de mesa
- * @param {string} [zona='salon'] - nombre de la zona
- */
 function mesaVacia(num, zona = 'salon') {
   return {
     numero: num,

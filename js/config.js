@@ -1,9 +1,5 @@
 /* ================================================================
    PubPOS — MÓDULO: config.js (v2.5 – gestión de múltiples zonas)
-   Propósito: Administrar productos, impresoras, datos del local y
-              ahora zonas/espacios dinámicos en lugar de una sola
-              cantidad de mesas.
-   Migración automática desde la configuración antigua.
    ================================================================ */
 const Config = (() => {
   const CATEGORIAS = ['Bebidas','Cervezas','Cocteles','Vinos','Entradas','Comidas','Postres'];
@@ -69,7 +65,7 @@ const Config = (() => {
         { nombre: 'salon',   cantidad: cfg.cantidadMesas },
         { nombre: 'terraza', cantidad: 0 }
       ];
-      delete cfg.cantidadMesas; // limpio la clave antigua
+      delete cfg.cantidadMesas;
       DB.saveConfig();
     }
 
@@ -157,7 +153,7 @@ const Config = (() => {
     delete DB.config.cantidadMesas;
 
     // Reconstruir mesas según las nuevas zonas
-    DB._inicializarMesas();   // ← usa DB.config.zonas
+    DB._inicializarMesas();   // ← sincroniza las mesas reales
 
     DB.saveConfig();
     DB.saveMesas();
@@ -273,13 +269,12 @@ const Config = (() => {
   function agregarMozo() { /* ... */ }
   function eliminarMozo(nombre) { /* ... */ }
 
-  // ── EXPORTACIÓN ───────────────────────────────────────────
   return {
     cargar, guardar, renderProductos,
     abrirModalProducto, cerrarModalProducto, guardarProducto,
     _editarProducto, _eliminarProducto,
     renderMozos, agregarMozo, eliminarMozo,
-    agregarZona, eliminarZona, _updateZona  // nuevas funciones públicas
+    agregarZona, eliminarZona, _updateZona
   };
 })();
 

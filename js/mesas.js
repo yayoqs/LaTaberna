@@ -1,8 +1,8 @@
 /* ================================================================
-   PubPOS — MÓDULO: mesas.js (v4 – botones de zona dinámicos)
-   Propósito: Renderizar la grilla de mesas. Ahora los botones de
-              filtro por zona se crean según DB.config.zonas, eliminando
-              los botones estáticos del HTML.
+   PubPOS — MÓDULO: mesas.js (v4.1 – colores de zona dinámicos)
+   Propósito: Renderizar la grilla de mesas. Ahora asigna un color
+              distintivo a cada zona usando una paleta, eliminando
+              la dependencia de estilos CSS fijos.
    ================================================================ */
 const Mesas = (() => {
 
@@ -22,13 +22,16 @@ const Mesas = (() => {
     fusionada: 'FUSIONADA'
   };
 
+  // Paleta de colores para zonas (8 colores, se repite si hay más)
+  const ZONA_COLORS = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#f97316','#ec4899'];
+
   let _modoSeleccion = false;
   let _mesasSeleccionadas = new Set();
-  let _zonaActiva = 'todas';   // 'todas' o nombre de zona
+  let _zonaActiva = 'todas';
 
   /* ── RENDERIZAR GRILLA ────────────────────────────────────── */
   function render() {
-    _renderZoneButtons();      // ← genera los botones según DB.config.zonas
+    _renderZoneButtons();
     _renderGrid();
   }
 
@@ -55,11 +58,18 @@ const Mesas = (() => {
     container.innerHTML = html;
   }
 
+  /* ── OBTENER COLOR PARA UNA ZONA ─────────────────────────── */
+  function _getZonaColor(zonaNombre) {
+    const zonas = DB.config.zonas || [];
+    const idx = zonas.findIndex(z => z.nombre === zonaNombre);
+    return ZONA_COLORS[idx >= 0 ? idx % ZONA_COLORS.length : 0];
+  }
+
   /* ── CAMBIO DE ZONA ───────────────────────────────────────── */
   function setZona(zona) {
     _zonaActiva = zona;
-    _renderGrid();           // solo re-renderiza la grilla
-    _renderZoneButtons();    // actualiza las clases 'active'
+    _renderGrid();
+    _renderZoneButtons();
   }
 
   /* ── RENDERIZAR LA GRILLA DE MESAS ───────────────────────── */
@@ -72,7 +82,6 @@ const Mesas = (() => {
       return;
     }
 
-    // Filtrar por zona
     let mesasVisibles = DB.mesas.filter(m => m.estado !== 'fusionada');
     if (_zonaActiva !== 'todas') {
       mesasVisibles = mesasVisibles.filter(m => m.zona === _zonaActiva);
@@ -85,8 +94,12 @@ const Mesas = (() => {
       
       let clases = `mesa-card ${mesa.estado}`;
       if (mesa.esVirtual) clases += ' mesa-virtual';
-      clases += ` zona-${mesa.zona || 'salon'}`;
       card.className = clases;
+
+      // Aplicar color de zona (borde izquierdo y fondo leve)
+      const colorZona = _getZonaColor(mesa.zona || 'salon');
+      card.style.borderLeft = `5px solid ${colorZona}`;
+      card.style.background = `linear-gradient(135deg, ${colorZona}10 0%, var(--color-card) 100%)`;
 
       const puedeSeleccionar = _modoSeleccion && 
                                (mesa.estado === 'libre' || mesa.estado === 'ocupada' || mesa.estado === 'esperando') && 
@@ -100,7 +113,7 @@ const Mesas = (() => {
           <i class="fas ${ICONOS[mesa.estado] || 'fa-chair'} mesa-icon"></i>
           <strong class="mesa-numero">${mesa.numero}</strong>
           <span class="mesa-estado-label">${LABELS[mesa.estado] || mesa.estado}</span>
-          <span class="mesa-zona-badge">${mesa.zona}</span>
+          <span class="mesa-zona-badge" style="background:${colorZona}; color:white;">${mesa.zona}</span>
         `;
         card.onclick = (e) => {
           if (e.target.type !== 'checkbox') {
@@ -127,7 +140,7 @@ const Mesas = (() => {
           <strong class="mesa-numero">${numeroMostrado}</strong>
           <span class="mesa-estado-label">${LABELS[mesa.estado] || mesa.estado}</span>
           ${mesa.esVirtual ? '<span class="mesa-virtual-badge"><i class="fas fa-link"></i> Unión</span>' : ''}
-          <span class="mesa-zona-badge">${mesa.zona}</span>
+          <span class="mesa-zona-badge" style="background:${colorZona}; color:white;">${mesa.zona}</span>
         `;
       }
       grid.appendChild(card);
@@ -175,7 +188,7 @@ const Mesas = (() => {
     }
   }
 
-  /* ── AGREGAR NUEVA MESA (número secuencial global) ──────────── */
+  /* ── AGREGAR NUEVA MESA ───────────────────────────────────── */
   function agregarMesa() {
     if (typeof DB === 'undefined') return;
     const zona = _zonaActiva !== 'todas' ? _zonaActiva : (DB.config.zonas[0]?.nombre || 'salon');
