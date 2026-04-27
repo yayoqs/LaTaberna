@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: app.js (v2 – soporte para rol despensa, refresco de UI al cambiar vista)
+   PubPOS — MÓDULO: app.js (v3 – soporte para vista recetas)
    ================================================================ */
 const App = {
   async init() {
@@ -56,6 +56,7 @@ const App = {
   showView(nombre) {
     if (!Auth.getRol()) { Auth.mostrarLogin(); return; }
 
+    // Validaciones de permisos por vista
     if (nombre === 'caja' && !Auth.puedeAccederCaja()) { showToast('error', 'No tienes permiso para acceder a Caja'); return; }
     if (nombre === 'cocina' && !Auth.puedeAccederCocina()) { showToast('error', 'No tienes permiso para acceder a Cocina'); return; }
     if (nombre === 'config' && !Auth.esAdmin()) { showToast('error', 'Solo administradores pueden acceder a Configuración'); return; }
@@ -65,9 +66,19 @@ const App = {
         return;
       }
     }
+    // NUEVA VALIDACIÓN PARA RECETAS
+    if (nombre === 'recetas') {
+      if (!Auth.esCocina() && !Auth.esBarra() && !Auth.esAdmin() && !Auth.esMaster()) {
+        showToast('error', 'No tienes permiso para acceder a Recetas');
+        return;
+      }
+    }
 
+    // Ocultar todas las vistas y desactivar botones de navegación
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    
+    // Activar la vista y el botón correspondiente
     const vista = $id(`view-${nombre}`);
     const btn = document.querySelector(`[data-view="${nombre}"]`);
     if (vista) vista.classList.add('active');
@@ -75,22 +86,25 @@ const App = {
 
     EventBus.emit('vista:cambiada', nombre);
 
-    // 🔁 Actualizar la UI del header (selector de simulación) al cambiar de vista
+    // Actualizar UI del header (selector de simulación) al cambiar de vista
     if (Auth.esMasterReal && Auth.esMasterReal()) {
       Auth.aplicarRestriccionesUI();
     }
 
+    // Llamar al render de cada módulo según la vista
     if (nombre === 'mesas' && window.Mesas) Mesas.render();
     if (nombre === 'cocina' && window.KDS) KDS.refresh();
     if (nombre === 'caja' && window.Caja) Caja.render();
     if (nombre === 'config' && window.Config) Config.renderProductos();
     if (nombre === 'despensa' && window.Despensa) Despensa.render();
+    if (nombre === 'recetas' && window.Recetas) Recetas.render();  // NUEVO
   },
 
   _suscribirEventos() {
     EventBus.on('sincronizacion:completada', () => {
       if (window.Mesas) Mesas.render();
       if (window.Carta) Carta.render();
+      if (window.Recetas) Recetas.render();  // Refrescar recetas cuando se sincroniza
     });
     EventBus.on('mesas:guardadas', () => { if (window.Mesas) Mesas.render(); });
     EventBus.on('comandas:guardadas', () => { if (window.KDS) KDS.refresh(); });
@@ -99,6 +113,9 @@ const App = {
     EventBus.on('inventario:stock_bajo', (data) => {
       showToast('warning', `⚠️ Stock bajo: ${data.ingrediente} (${data.stock} ${data.unidad})`);
     });
+    // NUEVO: refrescar recetas cuando se actualicen productos o recetas
+    EventBus.on('productos:cargados', () => { if (window.Recetas) Recetas.render(); });
+    EventBus.on('recetas:actualizadas', () => { if (window.Recetas) Recetas.render(); });
   }
 };
 

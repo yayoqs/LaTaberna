@@ -1,16 +1,44 @@
 /* ================================================================
-   PubPOS — MÓDULO: despensa.js (v3 – filtro por rol + ubicación)
-   Propósito: Gestión de inventario (ingredientes, recetas, movimientos).
+   PubPOS — MÓDULO: despensa.js (v4 – búsqueda, orden, exportar CSV,
+              mejoras en recetas)
    ================================================================ */
 
 const Despensa = (() => {
 
+  // ── ESTADO INTERNO ────────────────────────────────────────
+  let _ordenColumna = null;     // columna actualmente ordenada
+  let _ordenDireccion = 1;      // 1 ascendente, -1 descendente
+
   function render() {
+    _renderBusqueda();            // campo de búsqueda (se inserta dinámicamente)
     _renderTablaIngredientes();
     _renderMovimientos();
     _renderAlertasStock();
   }
 
+  // ── CAMPO DE BÚSQUEDA ────────────────────────────────────
+  function _renderBusqueda() {
+    const contenedor = document.getElementById('despensaBusquedaContainer');
+    if (!contenedor) return;
+
+    // Solo insertamos el input si no existe ya (para no perder el valor en re-renderizados)
+    if (!document.getElementById('ingredienteSearch')) {
+      contenedor.innerHTML = '';
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.id = 'ingredienteSearch';
+      input.placeholder = 'Buscar ingrediente...';
+      input.oninput = () => {
+        // Al escribir, reseteamos la ordenación para evitar confusiones
+        _ordenColumna = null;
+        _ordenDireccion = 1;
+        _renderTablaIngredientes();
+      };
+      contenedor.appendChild(input);
+    }
+  }
+
+  // ── TABLA DE INGREDIENTES (con orden y filtro de búsqueda) ──
   function _renderTablaIngredientes() {
     const tbody = document.getElementById('ingredientesBody');
     if (!tbody) return;
@@ -18,26 +46,52 @@ const Despensa = (() => {
     let ingredientes = DB.ingredientes || [];
     const rol = Auth.getRol();
 
-    // 🔒 FILTRO POR ROL: cocina solo ve cocina, barra solo ve barra
+    // Filtro por rol (ya existente)
     if (rol === 'cocina') {
       ingredientes = ingredientes.filter(i => i.categoria === 'cocina');
     } else if (rol === 'barra') {
       ingredientes = ingredientes.filter(i => i.categoria === 'barra');
     }
-    // admin/master ven todos
+
+    // Búsqueda en tiempo real
+    const termino = (document.getElementById('ingredienteSearch')?.value || '').trim().toLowerCase();
+    if (termino) {
+      ingredientes = ingredientes.filter(i =>
+        i.nombre.toLowerCase().includes(termino) ||
+        (i.categoria || '').toLowerCase().includes(termino) ||
+        (i.ubicacion || '').toLowerCase().includes(termino)
+      );
+    }
+
+    // Ordenación (si hay una columna activa)
+    if (_ordenColumna) {
+      ingredientes.sort((a, b) => {
+        let valA = a[_ordenColumna];
+        let valB = b[_ordenColumna];
+        if (typeof valA === 'string') valA = valA.toLowerCase();
+        if (typeof valB === 'string') valB = valB.toLowerCase();
+        if (valA < valB) return -1 * _ordenDireccion;
+        if (valA > valB) return 1 * _ordenDireccion;
+        return 0;
+      });
+    }
 
     if (!ingredientes.length) {
       tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:40px;">No hay ingredientes visibles para tu rol.</td></tr>`;
       return;
     }
 
-    const ordenados = [...ingredientes].sort((a, b) => {
-      const critA = a.stock <= a.stock_minimo ? 1 : 0;
-      const critB = b.stock <= b.stock_minimo ? 1 : 0;
-      return critB - critA || a.nombre.localeCompare(b.nombre);
-    });
+    // Ordenamos visualmente por stock bajo primero (si no hay orden explícita)
+    if (!_ordenColumna) {
+      // Mantiene el orden original de bajo stock, como antes
+      ingredientes.sort((a, b) => {
+        const critA = a.stock <= a.stock_minimo ? 1 : 0;
+        const critB = b.stock <= b.stock_minimo ? 1 : 0;
+        return critB - critA || a.nombre.localeCompare(b.nombre);
+      });
+    }
 
-    tbody.innerHTML = ordenados.map(ing => {
+    tbody.innerHTML = ingredientes.map(ing => {
       const bajoStock = ing.stock <= ing.stock_minimo;
       const rowClass = bajoStock ? 'stock-bajo' : '';
       return `
@@ -52,11 +106,22 @@ const Despensa = (() => {
             <button class="btn-ajuste" onclick="Despensa.ajusteRapido('${ing.id}')"><i class="fas fa-pen"></i> Ajustar</button>
             <button class="btn-ajuste" onclick="Despensa.editarIngrediente('${ing.id}')"><i class="fas fa-edit"></i></button>
           </td>
-        </tr>
-      `;
+        </tr>`;
     }).join('');
   }
 
+  // ── ORDENAR COLUMNAS (llamada desde los th) ──────────────
+  function ordenarTabla(columna) {
+    if (_ordenColumna === columna) {
+      _ordenDireccion *= -1;   // invertir dirección
+    } else {
+      _ordenColumna = columna;
+      _ordenDireccion = 1;    // primera vez ascendente
+    }
+    _renderTablaIngredientes();
+  }
+
+  // ── MOVIMIENTOS (sin cambios) ─────────────────────────────
   function _renderMovimientos() {
     const cont = document.getElementById('movimientosList');
     if (!cont) return;
@@ -78,11 +143,11 @@ const Despensa = (() => {
             <span style="color:var(--color-${clase});">${signo}${mov.cantidad.toFixed(2)}</span>
           </div>
           <div style="font-size:10px; color:var(--color-text-muted);">${mov.motivo} · ${new Date(mov.fecha).toLocaleString()}</div>
-        </div>
-      `;
+        </div>`;
     }).join('');
   }
 
+  // ── ALERTAS STOCK BAJO (sin cambios) ──────────────────────
   function _renderAlertasStock() {
     const cont = document.getElementById('alertasStockList');
     if (!cont) return;
@@ -96,11 +161,10 @@ const Despensa = (() => {
         <i class="fas fa-exclamation-triangle" style="color:var(--color-warning);"></i>
         <strong>${i.nombre}</strong><br>
         <span style="font-size:11px;">Quedan ${i.stock} ${i.unidad} (mínimo ${i.stock_minimo})</span>
-      </div>
-    `).join('');
+      </div>`).join('');
   }
 
-  /* ── MODAL INGREDIENTE (con ubicación) ─────────────────────── */
+  /* ── MODAL INGREDIENTE (con ubicación) ──────────────────── */
   function mostrarModalIngrediente(ingrediente = null) {
     const esEdicion = !!ingrediente;
     const titulo = esEdicion ? 'Editar Ingrediente' : 'Nuevo Ingrediente';
@@ -189,8 +253,9 @@ const Despensa = (() => {
     showToast('success', `Stock de ${ing.nombre} actualizado`);
   }
 
-  /* ── MODAL RECETA (conservando sync) ─────────────────────── */
-  function mostrarModalReceta() {
+  /* ── MODAL RECETA (conservando sync) ──────────────────── */
+  // Ahora acepta un productoId opcional para precargar el select
+  function mostrarModalReceta(productoId = null) {
     let modal = document.getElementById('modalReceta');
     if (!modal) {
       modal = document.createElement('div');
@@ -218,7 +283,15 @@ const Despensa = (() => {
     selProd.innerHTML = DB.productos.filter(p => p.activo !== false).map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
     const selIng = document.getElementById('recIngredienteId');
     selIng.innerHTML = DB.ingredientes.map(i => `<option value="${i.id}">${i.nombre} (${i.unidad})</option>`).join('');
-    mostrarRecetaActual();
+
+    // Si se proporciona un productoId, lo seleccionamos
+    if (productoId) {
+      selProd.value = productoId;
+      mostrarRecetaActual(); // actualiza la lista de ingredientes de la receta actual
+    } else {
+      mostrarRecetaActual(); // sin selección previa
+    }
+
     modal.style.display = 'flex';
   }
 
@@ -262,7 +335,7 @@ const Despensa = (() => {
     try {
       await DB.syncGuardarReceta(receta);
       cerrarModalReceta();
-      mostrarModalReceta(); // refrescar
+      mostrarModalReceta(productoId); // refrescar manteniendo el producto
       showToast('success', 'Receta asignada correctamente');
     } catch (e) {
       showToast('error', 'Error al asignar receta');
@@ -279,6 +352,7 @@ const Despensa = (() => {
     }
   }
 
+  // ── EXPORTAR MOVIMIENTOS (sin cambios) ───────────────────
   function exportarMovimientos() {
     const movs = DB.movimientos || [];
     let csv = 'Fecha,Ingrediente,Tipo,Cantidad,Motivo,Usuario\n';
@@ -295,6 +369,23 @@ const Despensa = (() => {
     URL.revokeObjectURL(url);
   }
 
+  // ── NUEVO: EXPORTAR INGREDIENTES ─────────────────────────
+  function exportarIngredientes() {
+    const ing = DB.ingredientes || [];
+    let csv = 'Nombre,Categoría,Stock,Unidad,Stock Mínimo,Ubicación\n';
+    ing.forEach(i => {
+      csv += `"${i.nombre}","${i.categoria || ''}",${i.stock},"${i.unidad}",${i.stock_minimo},"${i.ubicacion || ''}"\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ingredientes_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ── EVENTOS ─────────────────────────────────────────────
   function _initEventListeners() {
     EventBus.on('db:inicializada', render);
     EventBus.on('ingredientes:actualizados', render);
@@ -306,9 +397,21 @@ const Despensa = (() => {
   _initEventListeners();
 
   return {
-    render, mostrarModalIngrediente, cerrarModalIngrediente, guardarIngrediente,
-    editarIngrediente, ajusteRapido, mostrarModalReceta, cerrarModalReceta,
-    guardarReceta, mostrarRecetaActual, quitarIngredienteReceta, exportarMovimientos
+    render,
+    mostrarModalIngrediente,
+    cerrarModalIngrediente,
+    guardarIngrediente,
+    editarIngrediente,
+    ajusteRapido,
+    mostrarModalReceta,
+    cerrarModalReceta,
+    guardarReceta,
+    mostrarRecetaActual,
+    quitarIngredienteReceta,
+    exportarMovimientos,
+    exportarIngredientes,   // nuevo
+    ordenarTabla,           // nuevo, para usar en onclick de th
+    // No exponemos _renderBusqueda ni _ordenColumna internos
   };
 })();
 

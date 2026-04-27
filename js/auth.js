@@ -1,6 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: auth.js (v5 – selector de simulación permanente,
-              eliminación de selector de mozo para otros roles)
+   PubPOS — MÓDULO: auth.js (v5.1 – añadido puedeAccederRecetas)
    ================================================================ */
 const Auth = (() => {
   const USUARIOS = [
@@ -147,6 +146,12 @@ const Auth = (() => {
   function puedeEditarProductos() { return tienePermiso('editarProductos'); }
   function puedeEditarPrecios() { return tienePermiso('editarPrecios'); }
 
+  // NUEVA FUNCIÓN para verificar acceso a Recetas
+  function puedeAccederRecetas() {
+    const rol = getRolEfectivo();
+    return ['cocina', 'barra', 'admin', 'master'].includes(rol);
+  }
+
   // ── UI ────────────────────────────────────────────────────
   function aplicarRestriccionesUI() {
     const userEl = document.getElementById('usuarioActualDisplay');
@@ -237,7 +242,8 @@ const Auth = (() => {
     _cambiarRolSimulado,
     getRolEfectivo,
     esMasterReal,
-    aplicarRestriccionesUI   // exponemos para que App lo llame al cambiar de vista
+    aplicarRestriccionesUI,    // exponemos para que App lo llame al cambiar de vista
+    puedeAccederRecetas        // NUEVO
   };
 })();
 
