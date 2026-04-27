@@ -395,4 +395,47 @@
       <div id="pagosParcialesContainer"></div>
       <label>Forma de Pago (si no se divide)</label>
       <div class="formas-pago">
-        <button class="pago-btn active" data-pago="Efectivo" onclick="Cobro.selectPago(this)"><i class
+        <button class="pago-btn active" data-pago="Efectivo" onclick="Cobro.selectPago(this)"><i class="fas fa-money-bill"></i> Efectivo</button>
+        <button class="pago-btn" data-pago="Débito" onclick="Cobro.selectPago(this)"><i class="fas fa-credit-card"></i> Débito</button>
+        <button class="pago-btn" data-pago="Crédito" onclick="Cobro.selectPago(this)"><i class="fas fa-credit-card"></i> Crédito</button>
+        <button class="pago-btn" data-pago="Transferencia" onclick="Cobro.selectPago(this)"><i class="fas fa-mobile-alt"></i> Transf.</button>
+        <button class="pago-btn" data-pago="Mixto" onclick="Cobro.selectPago(this)"><i class="fas fa-layer-group"></i> Mixto</button>
+      </div>
+      <label for="cierreDescuento">Descuento (%)</label><input type="number" id="cierreDescuento" value="0" min="0" max="100" oninput="Cobro.actualizarTotalCierre()">
+      <div class="cierre-total-final" id="cierreTotalFinal"></div>
+      <div class="modal-small-footer"><button class="btn-secondary" onclick="Cobro.cerrarModalCierre()">Cancelar</button><button class="btn-primary" onclick="Cobro.confirmarCierre()"><i class="fas fa-check-circle"></i> Confirmar y Cobrar</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     NOTIFICACIONES TOAST
+     ============================================================ -->
+<div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+<!-- Scripts -->
+<script src="js/utils.js"></script>
+<script src="js/eventBus.js"></script>
+<script src="js/db-core.js"></script>
+<script src="js/db-sync.js"></script>
+<script src="js/db-inventario.js"></script>
+<script src="js/db-fusion.js"></script>
+<script src="js/db.js"></script>
+<script src="js/roles.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/mesas.js"></script>
+<script src="js/carta.js"></script>
+<script src="js/comanda.js"></script>
+<script src="js/cuenta.js"></script>
+<script src="js/cobro.js"></script>
+<script src="js/pedido.js"></script>
+<script src="js/kds.js"></script>
+<script src="js/caja.js"></script>
+<script src="js/tickets.js"></script>
+<script src="js/config.js"></script>
+<script src="js/despensa.js"></script>
+<script src="js/recetas.js"></script>  <!-- NUEVO -->
+<script src="js/app.js"></script>
+
+</body>
+</html>
