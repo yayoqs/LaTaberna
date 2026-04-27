@@ -1,6 +1,8 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-inventario.js (v3 – con ubicación)
+   PubPOS — MÓDULO: db-inventario.js (v4 – añade campo instrucciones
+              en recetas)
    Propósito: Gestión de ingredientes, recetas y movimientos de stock.
+   Cambio: Las recetas ahora incluyen instrucciones de preparación.
    ================================================================ */
 
 const DBInventario = (function() {
@@ -19,7 +21,7 @@ const DBInventario = (function() {
       unidad: this._validarString(i.unidad, 'u'),
       stock_minimo: this._validarNumero(i.stock_minimo, 0),
       categoria: this._validarString(i.categoria, 'general'),
-      ubicacion: this._validarString(i.ubicacion, '')  // ← nuevo campo
+      ubicacion: this._validarString(i.ubicacion, '')
     };
   };
 
@@ -30,7 +32,9 @@ const DBInventario = (function() {
       ingredientes: Array.isArray(r.ingredientes) ? r.ingredientes.map(ing => ({
         ingredienteId: this._validarId(ing.ingredienteId, 'ins'),
         cantidad: this._validarNumero(ing.cantidad, 0)
-      })) : []
+      })) : [],
+      // NUEVO CAMPO: instrucciones de preparación
+      instrucciones: this._validarString(r.instrucciones, '')
     };
   };
 
@@ -103,7 +107,7 @@ const DBInventario = (function() {
     }).filter(i => i !== undefined);
   };
 
-  // ── DESCONTAR STOCK (local) ──────────────────────────────────
+  // ── DESCONTAR STOCK ──────────────────────────────────────────
   module.consumirIngredientesDeProducto = async function(productoId, cantidad, motivo = 'Consumo') {
     const receta = this.recetas.find(r => r.productoId === productoId);
     if (!receta) return false;

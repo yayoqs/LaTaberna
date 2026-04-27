@@ -1,8 +1,42 @@
 /* ================================================================
-   PubPOS — MÓDULO: caja.js (Versión con EventBus)
+   PubPOS — MÓDULO: caja.js (v2 – vista autogenerada)
+   Propósito: Caja — Resumen del Turno. Ahora genera dinámicamente
+              #view-caja para eliminar dependencia HTML.
    ================================================================ */
 const Caja = (() => {
+
+  /* ── CREACIÓN DINÁMICA DE LA VISTA ───────────────────────── */
+  function _asegurarVista() {
+    if ($id('view-caja')) return;
+
+    const main = document.createElement('main');
+    main.id = 'view-caja';
+    main.className = 'view';
+    main.innerHTML = `
+      <div class="view-toolbar">
+        <h2><i class="fas fa-cash-register"></i> Caja — Resumen del Turno</h2>
+        <div class="toolbar-actions">
+          <button class="btn-primary" onclick="Caja.exportar()">
+            <i class="fas fa-file-alt"></i> Cierre de Caja
+          </button>
+        </div>
+      </div>
+      <div class="caja-stats" id="cajaStats"></div>
+      <div class="caja-table-wrap">
+        <table class="caja-table">
+          <thead>
+            <tr><th>Mesa</th><th>Apertura</th><th>Cierre</th><th>Mozo</th><th>Pax</th><th>Ítems</th><th>Total</th><th>Estado</th></tr>
+          </thead>
+          <tbody id="cajaBody"></tbody>
+        </table>
+      </div>
+    `;
+    const referencia = $id('toastContainer') || document.body.lastChild;
+    document.body.insertBefore(main, referencia);
+  }
+
   async function render() {
+    _asegurarVista();  // garantiza que exista la vista
     const statsEl = $id('cajaStats');
     const bodyEl = $id('cajaBody');
     if (!statsEl || !bodyEl) return;
@@ -70,4 +104,5 @@ const Caja = (() => {
 
   return { render, exportar };
 })();
+
 window.Caja = Caja;

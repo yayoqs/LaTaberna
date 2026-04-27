@@ -1,8 +1,7 @@
 /* ================================================================
-   PubPOS — MÓDULO: mesas.js (v4.1 – colores de zona dinámicos)
-   Propósito: Renderizar la grilla de mesas. Ahora asigna un color
-              distintivo a cada zona usando una paleta, eliminando
-              la dependencia de estilos CSS fijos.
+   PubPOS — MÓDULO: mesas.js (v5 – vista autogenerada)
+   Propósito: Mapa de mesas con zonas dinámicas y colores. Ahora
+              genera #view-mesas para eliminar HTML estático.
    ================================================================ */
 const Mesas = (() => {
 
@@ -22,15 +21,50 @@ const Mesas = (() => {
     fusionada: 'FUSIONADA'
   };
 
-  // Paleta de colores para zonas (8 colores, se repite si hay más)
   const ZONA_COLORS = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#f97316','#ec4899'];
 
   let _modoSeleccion = false;
   let _mesasSeleccionadas = new Set();
   let _zonaActiva = 'todas';
 
-  /* ── RENDERIZAR GRILLA ────────────────────────────────────── */
+  /* ── CREACIÓN DINÁMICA DE LA VISTA ───────────────────────── */
+  function _asegurarVista() {
+    if ($id('view-mesas')) return;
+
+    const main = document.createElement('main');
+    main.id = 'view-mesas';
+    main.className = 'view active'; // será la vista por defecto
+    main.innerHTML = `
+      <div class="view-toolbar">
+        <h2><i class="fas fa-grip"></i> Salón — Mapa de Mesas</h2>
+        <div class="toolbar-actions">
+          <span class="legend">
+            <span class="badge libre">Libre</span>
+            <span class="badge ocupada">Ocupada</span>
+            <span class="badge esperando">Lista</span>
+            <span class="badge cuenta">Cuenta</span>
+          </span>
+          <div id="zonaButtonsContainer" style="display: flex; gap: 4px;"></div>
+          <button class="btn-secondary" onclick="Mesas.agregarMesa()" data-rol="admin,master">
+            <i class="fas fa-plus"></i> Nueva Mesa
+          </button>
+          <button id="btnFusionar" class="btn-secondary" onclick="Mesas.toggleModoFusion()" data-rol="mesero,admin,master">
+            <i class="fas fa-object-group"></i> Fusionar Mesas
+          </button>
+          <button id="btnConfirmarFusion" class="btn-primary" onclick="Mesas.fusionarMesasSeleccionadas()" style="display:none;">
+            <i class="fas fa-check"></i> Confirmar Fusión
+          </button>
+        </div>
+      </div>
+      <div id="mesasGrid" class="mesas-grid"></div>
+    `;
+    const referencia = $id('toastContainer') || document.body.lastChild;
+    document.body.insertBefore(main, referencia);
+  }
+
+  /* ── RENDERIZAR ──────────────────────────────────────────── */
   function render() {
+    _asegurarVista();
     _renderZoneButtons();
     _renderGrid();
   }
@@ -58,7 +92,7 @@ const Mesas = (() => {
     container.innerHTML = html;
   }
 
-  /* ── OBTENER COLOR PARA UNA ZONA ─────────────────────────── */
+  /* ── COLOR DE ZONA ───────────────────────────────────────── */
   function _getZonaColor(zonaNombre) {
     const zonas = DB.config.zonas || [];
     const idx = zonas.findIndex(z => z.nombre === zonaNombre);
@@ -72,7 +106,7 @@ const Mesas = (() => {
     _renderZoneButtons();
   }
 
-  /* ── RENDERIZAR LA GRILLA DE MESAS ───────────────────────── */
+  /* ── RENDERIZAR LA GRILLA ────────────────────────────────── */
   function _renderGrid() {
     const grid = $id('mesasGrid');
     if (!grid) return;
@@ -96,7 +130,6 @@ const Mesas = (() => {
       if (mesa.esVirtual) clases += ' mesa-virtual';
       card.className = clases;
 
-      // Aplicar color de zona (borde izquierdo y fondo leve)
       const colorZona = _getZonaColor(mesa.zona || 'salon');
       card.style.borderLeft = `5px solid ${colorZona}`;
       card.style.background = `linear-gradient(135deg, ${colorZona}10 0%, var(--color-card) 100%)`;

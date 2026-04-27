@@ -1,5 +1,6 @@
 /* ================================================================
-   PubPOS — MÓDULO: auth.js (v5.1 – añadido puedeAccederRecetas)
+   PubPOS — MÓDULO: auth.js (v5.2 – añade puedeAccederReparto y
+              vista por defecto para reparto)
    ================================================================ */
 const Auth = (() => {
   const USUARIOS = [
@@ -30,11 +31,13 @@ const Auth = (() => {
     }
   }
 
+  // Vista por defecto según el rol (ahora incluye reparto)
   function getDefaultView() {
     const rol = getRolEfectivo();
     if (rol === 'cocina' || rol === 'barra') return 'cocina';
     if (rol === 'caja') return 'caja';
     if (rol === 'despensa') return 'despensa';
+    if (rol === 'reparto') return 'reparto';       // NUEVO
     return 'mesas';
   }
 
@@ -136,6 +139,7 @@ const Auth = (() => {
   function esCaja() { const r = getRolEfectivo(); return r === 'caja' || r === 'admin' || r === 'master'; }
   function esMesero() { const r = getRolEfectivo(); return r === 'mesero' || r === 'admin' || r === 'master'; }
   function esDespensa() { const r = getRolEfectivo(); return r === 'despensa' || r === 'admin' || r === 'master'; }
+  function esReparto() { const r = getRolEfectivo(); return r === 'reparto' || r === 'admin' || r === 'master'; }  // NUEVO
 
   function puede(permiso) { return tienePermiso(permiso); }
   function puedeEliminarItemEnviado() { return tienePermiso('eliminarItemEnviado'); }
@@ -145,11 +149,14 @@ const Auth = (() => {
   function puedeCambiarEstadoComanda() { return tienePermiso('cambiarEstadoComanda'); }
   function puedeEditarProductos() { return tienePermiso('editarProductos'); }
   function puedeEditarPrecios() { return tienePermiso('editarPrecios'); }
-
-  // NUEVA FUNCIÓN para verificar acceso a Recetas
   function puedeAccederRecetas() {
     const rol = getRolEfectivo();
     return ['cocina', 'barra', 'admin', 'master'].includes(rol);
+  }
+  // NUEVA función de permiso para Reparto
+  function puedeAccederReparto() {
+    const rol = getRolEfectivo();
+    return ['reparto', 'admin', 'master'].includes(rol);
   }
 
   // ── UI ────────────────────────────────────────────────────
@@ -176,7 +183,6 @@ const Auth = (() => {
     if (!mozoContainer || !_usuarioActual) return;
 
     if (esMasterReal()) {
-      // Siempre mostrar selector de simulación para master
       const rolesDisponibles = (typeof Roles !== 'undefined')
         ? Roles.lista.filter(r => r !== 'master')
         : [];
@@ -194,7 +200,6 @@ const Auth = (() => {
       const selectEl = mozoContainer.querySelector('#rolSimulado');
       if (selectEl) selectEl.value = seleccionado;
     } else {
-      // Para cualquier otro rol: espacio vacío (sin selector de mozo)
       mozoContainer.innerHTML = '';
     }
   }
@@ -228,6 +233,7 @@ const Auth = (() => {
     esCaja,
     esMesero,
     esDespensa,
+    esReparto,                // NUEVO
     puedeEliminarItemEnviado,
     puedeCerrarMesa,
     puedeAccederCaja,
@@ -242,8 +248,9 @@ const Auth = (() => {
     _cambiarRolSimulado,
     getRolEfectivo,
     esMasterReal,
-    aplicarRestriccionesUI,    // exponemos para que App lo llame al cambiar de vista
-    puedeAccederRecetas        // NUEVO
+    aplicarRestriccionesUI,
+    puedeAccederRecetas,
+    puedeAccederReparto       // NUEVO
   };
 })();
 

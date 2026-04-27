@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+<!<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -20,260 +20,98 @@
   <link rel="stylesheet" href="css/ticket.css">
   <link rel="stylesheet" href="css/despensa.css">
   <link rel="stylesheet" href="css/recetas.css">
+  <link rel="stylesheet" href="css/reparto.css">  <!-- NUEVO -->
   <link rel="stylesheet" href="css/responsive.css">
   <style>
     .item-persona-badge {
-      font-size: 10px;
-      background: var(--color-primary);
-      color: white;
-      padding: 2px 6px;
-      border-radius: 99px;
-      margin-left: 6px;
+      font-size: 10px; background: var(--color-primary); color: white;
+      padding: 2px 6px; border-radius: 99px; margin-left: 6px;
     }
-    .cierre-persona-group {
-      margin-bottom: 12px;
-      border-bottom: 1px dashed var(--color-border);
-    }
-    .cierre-persona-header {
-      font-weight: bold;
-      display: flex;
-      justify-content: space-between;
-    }
-    .pago-persona-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin: 6px 0;
-    }
+    .cierre-persona-group { margin-bottom: 12px; border-bottom: 1px dashed var(--color-border); }
+    .cierre-persona-header { font-weight: bold; display: flex; justify-content: space-between; }
+    .pago-persona-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
   </style>
 </head>
 <body>
 
-<!-- ============================================================
-     HEADER PRINCIPAL
-     ============================================================ -->
-<header class="app-header">
-
-  <div class="header-left">
-    <div class="logo">
-      <i class="fas fa-beer"></i>
-      <span>LaTaberna</span>
+  <!-- HEADER FIJO -->
+  <header class="app-header">
+    <div class="header-left">
+      <div class="logo">
+        <i class="fas fa-beer"></i>
+        <span>LaTaberna</span>
+      </div>
+      <div class="header-info">
+        <span id="currentDate"></span>
+        <span id="currentTime"></span>
+      </div>
     </div>
-    <div class="header-info">
-      <span id="currentDate"></span>
-      <span id="currentTime"></span>
-    </div>
-  </div>
 
-  <nav class="header-nav">
-    <button class="nav-btn" data-view="mesas" onclick="App.showView('mesas')" data-rol="mesero,admin,master,caja">
-      <i class="fas fa-chair"></i><span> Mesas</span>
-    </button>
-    <button class="nav-btn" data-view="cocina" onclick="App.showView('cocina')" data-rol="cocina,barra,admin,master">
-      <i class="fas fa-fire-burner"></i><span> Cocina</span>
-    </button>
-    <button class="nav-btn" data-view="caja" onclick="App.showView('caja')" data-rol="caja,admin,master">
-      <i class="fas fa-cash-register"></i><span> Caja</span>
-    </button>
-    <button class="nav-btn" data-view="despensa" onclick="App.showView('despensa')" data-rol="admin,master,cocina,barra">
-      <i class="fas fa-boxes"></i><span> Despensa</span>
-    </button>
-    <button class="nav-btn" data-view="recetas" onclick="App.showView('recetas')" data-rol="cocina,barra,admin,master">
-      <i class="fas fa-book"></i><span> Recetas</span>
-    </button>
-    <button class="nav-btn" data-view="config" onclick="App.showView('config')" data-rol="admin,master">
-      <i class="fas fa-sliders"></i><span> Config</span>
-    </button>
-  </nav>
-
-  <div class="header-right">
-    <span id="usuarioActualDisplay" style="margin-right:12px; font-size:13px; color:var(--color-text-sec);"></span>
-    <button class="btn-secondary" onclick="Auth.logout()" title="Cerrar sesión" style="padding:6px 10px;">
-      <i class="fas fa-sign-out-alt"></i>
-    </button>
-    <div class="mozo-selector">
-      <!-- Se rellena dinámicamente desde Auth.aplicarRestriccionesUI() -->
-    </div>
-  </div>
-
-</header>
-
-<!-- ============================================================
-     VISTA: MESAS (con contenedor dinámico para botones de zona)
-     ============================================================ -->
-<main id="view-mesas" class="view active">
-
-  <div class="view-toolbar">
-    <h2><i class="fas fa-grip"></i> Salón — Mapa de Mesas</h2>
-    <div class="toolbar-actions">
-      <span class="legend">
-        <span class="badge libre">Libre</span>
-        <span class="badge ocupada">Ocupada</span>
-        <span class="badge esperando">Lista</span>
-        <span class="badge cuenta">Cuenta</span>
-      </span>
-
-      <!-- CONTENEDOR DINÁMICO DE BOTONES DE ZONA -->
-      <div id="zonaButtonsContainer" style="display: flex; gap: 4px;"></div>
-
-      <button class="btn-secondary" onclick="Mesas.agregarMesa()" data-rol="admin,master">
-        <i class="fas fa-plus"></i> Nueva Mesa
+    <nav class="header-nav">
+      <button class="nav-btn" data-view="mesas" onclick="App.showView('mesas')" data-rol="mesero,admin,master,caja">
+        <i class="fas fa-chair"></i><span> Mesas</span>
       </button>
-      <button id="btnFusionar" class="btn-secondary" onclick="Mesas.toggleModoFusion()" data-rol="mesero,admin,master">
-        <i class="fas fa-object-group"></i> Fusionar Mesas
+      <button class="nav-btn" data-view="cocina" onclick="App.showView('cocina')" data-rol="cocina,barra,admin,master">
+        <i class="fas fa-fire-burner"></i><span> Cocina</span>
       </button>
-      <button id="btnConfirmarFusion" class="btn-primary" onclick="Mesas.fusionarMesasSeleccionadas()" style="display:none;">
-        <i class="fas fa-check"></i> Confirmar Fusión
+      <button class="nav-btn" data-view="caja" onclick="App.showView('caja')" data-rol="caja,admin,master">
+        <i class="fas fa-cash-register"></i><span> Caja</span>
       </button>
+      <button class="nav-btn" data-view="despensa" onclick="App.showView('despensa')" data-rol="admin,master,cocina,barra">
+        <i class="fas fa-boxes"></i><span> Despensa</span>
+      </button>
+      <button class="nav-btn" data-view="recetas" onclick="App.showView('recetas')" data-rol="cocina,barra,admin,master">
+        <i class="fas fa-book"></i><span> Recetas</span>
+      </button>
+      <!-- NUEVO BOTÓN REPARTO -->
+      <button class="nav-btn" data-view="reparto" onclick="App.showView('reparto')" data-rol="admin,master,reparto">
+        <i class="fas fa-motorcycle"></i><span> Reparto</span>
+      </button>
+      <button class="nav-btn" data-view="config" onclick="App.showView('config')" data-rol="admin,master">
+        <i class="fas fa-sliders"></i><span> Config</span>
+      </button>
+    </nav>
+
+    <div class="header-right">
+      <span id="usuarioActualDisplay" style="margin-right:12px; font-size:13px; color:var(--color-text-sec);"></span>
+      <button class="btn-secondary" onclick="Auth.logout()" title="Cerrar sesión" style="padding:6px 10px;">
+        <i class="fas fa-sign-out-alt"></i>
+      </button>
+      <div class="mozo-selector">
+        <!-- dinámico -->
+      </div>
     </div>
-  </div>
+  </header>
 
-  <div id="mesasGrid" class="mesas-grid"></div>
+  <!-- VISTAS GENERADAS 100% POR MÓDULOS JS -->
 
-</main><!-- /view-mesas -->
+  <!-- TOAST CONTAINER -->
+  <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
-<!-- ============================================================
-     VISTA: COCINA (KDS)
-     ============================================================ -->
-<main id="view-cocina" class="view">
-
-  <div class="view-toolbar">
-    <h2><i class="fas fa-fire-burner"></i> Monitor de Cocina</h2>
-    <div class="toolbar-actions">
-      <button class="btn-secondary" onclick="KDS.refresh()">
-        <i class="fas fa-sync-alt"></i> Actualizar
-      </button>
-    </div>
-  </div>
-
-  <div id="cocinaKDS" class="kds-grid"></div>
-
-</main><!-- /view-cocina -->
-
-<!-- ============================================================
-     VISTA: CAJA
-     ============================================================ -->
-<main id="view-caja" class="view">
-
-  <div class="view-toolbar">
-    <h2><i class="fas fa-cash-register"></i> Caja — Resumen del Turno</h2>
-    <div class="toolbar-actions">
-      <button class="btn-primary" onclick="Caja.exportar()">
-        <i class="fas fa-file-alt"></i> Cierre de Caja
-      </button>
-    </div>
-  </div>
-
-  <div class="caja-stats" id="cajaStats"></div>
-
-  <div class="caja-table-wrap">
-    <table class="caja-table">
-      <thead>
-        <tr><th>Mesa</th><th>Apertura</th><th>Cierre</th><th>Mozo</th><th>Pax</th><th>Ítems</th><th>Total</th><th>Estado</th></tr>
-      </thead>
-      <tbody id="cajaBody"></tbody>
-    </table>
-  </div>
-
-</main><!-- /view-caja -->
-
-<!-- ============================================================
-     VISTA: DESPENSA (con búsqueda y cabeceras ordenables)
-     ============================================================ -->
-<main id="view-despensa" class="view">
-  <div class="view-toolbar">
-    <h2><i class="fas fa-boxes"></i> Despensa — Control de Stock</h2>
-    <div class="toolbar-actions">
-      <div id="despensaBusquedaContainer" style="display: flex; align-items: center;"></div>
-      <button class="btn-primary" onclick="Despensa.mostrarModalIngrediente()">
-        <i class="fas fa-plus"></i> Nuevo Ingrediente
-      </button>
-      <button class="btn-secondary" onclick="Despensa.mostrarModalReceta()">
-        <i class="fas fa-link"></i> Asignar Receta
-      </button>
-      <button class="btn-secondary" onclick="Despensa.exportarMovimientos()">
-        <i class="fas fa-download"></i> Exportar Mov.
-      </button>
-      <button class="btn-secondary" onclick="Despensa.exportarIngredientes()">
-        <i class="fas fa-download"></i> Exportar Ing.
-      </button>
-    </div>
-  </div>
-  <div class="despensa-grid">
-    <div class="despensa-main">
-      <table class="ingredientes-table" id="ingredientesTable">
-        <thead>
-          <tr>
-            <th onclick="Despensa.ordenarTabla('nombre')">Ingrediente <i class="fas fa-sort"></i></th>
-            <th onclick="Despensa.ordenarTabla('categoria')">Categoría <i class="fas fa-sort"></i></th>
-            <th onclick="Despensa.ordenarTabla('stock')">Stock <i class="fas fa-sort"></i></th>
-            <th onclick="Despensa.ordenarTabla('unidad')">Unidad <i class="fas fa-sort"></i></th>
-            <th onclick="Despensa.ordenarTabla('stock_minimo')">Stock Mín. <i class="fas fa-sort"></i></th>
-            <th onclick="Despensa.ordenarTabla('ubicacion')">Ubicación <i class="fas fa-sort"></i></th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody id="ingredientesBody"></tbody>
-      </table>
-    </div>
-    <div class="despensa-sidebar">
-      <h4><i class="fas fa-history"></i> Movimientos</h4>
-      <div id="movimientosList"></div>
-      <h4><i class="fas fa-exclamation-triangle" style="color:var(--color-warning);"></i> Alertas Stock Bajo</h4>
-      <div id="alertasStockList"></div>
-      <button class="btn-secondary" onclick="Despensa.ajusteRapido()"><i class="fas fa-pen"></i> Ajuste Rápido</button>
-    </div>
-  </div>
-</main>
-
-<!-- ============================================================
-     VISTA: RECETAS
-     ============================================================ -->
-<main id="view-recetas" class="view">
-  <div class="view-toolbar">
-    <h2><i class="fas fa-book"></i> Recetas</h2>
-    <div class="toolbar-actions">
-      <button class="btn-secondary" onclick="Despensa.mostrarModalReceta()"><i class="fas fa-plus"></i> Nueva Receta</button>
-    </div>
-  </div>
-  <div class="recetas-table-wrap">
-    <table class="recetas-table">
-      <thead>
-        <tr><th>Producto</th><th>Destino</th><th>Ingredientes</th><th>Acciones</th></tr>
-      </thead>
-      <tbody id="recetasBody"></tbody>
-    </table>
-  </div>
-</main>
-
-<!-- Vista Config generada por config.js -->
-
-<!-- Toast Container -->
-<div id="toastContainer" class="toast-container" aria-live="polite"></div>
-
-<!-- Scripts -->
-<script src="js/utils.js"></script>
-<script src="js/eventBus.js"></script>
-<script src="js/db-core.js"></script>
-<script src="js/db-sync.js"></script>
-<script src="js/db-inventario.js"></script>
-<script src="js/db-fusion.js"></script>
-<script src="js/db.js"></script>
-<script src="js/roles.js"></script>
-<script src="js/auth.js"></script>
-<script src="js/mesas.js"></script>
-<script src="js/carta.js"></script>
-<script src="js/comanda.js"></script>
-<script src="js/cuenta.js"></script>
-<script src="js/cobro.js"></script>
-<script src="js/pedido.js"></script>
-<script src="js/kds.js"></script>
-<script src="js/caja.js"></script>
-<script src="js/tickets.js"></script>
-<script src="js/config.js"></script>
-<script src="js/despensa.js"></script>
-<script src="js/recetas.js"></script>
-<script src="js/app.js"></script>
+  <!-- SCRIPTS (orden obligatorio) -->
+  <script src="js/utils.js"></script>
+  <script src="js/eventBus.js"></script>
+  <script src="js/db-core.js"></script>
+  <script src="js/db-sync.js"></script>
+  <script src="js/db-inventario.js"></script>
+  <script src="js/db-fusion.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/roles.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/mesas.js"></script>
+  <script src="js/carta.js"></script>
+  <script src="js/comanda.js"></script>
+  <script src="js/cuenta.js"></script>
+  <script src="js/cobro.js"></script>
+  <script src="js/pedido.js"></script>
+  <script src="js/kds.js"></script>
+  <script src="js/caja.js"></script>
+  <script src="js/tickets.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/despensa.js"></script>
+  <script src="js/recetas.js"></script>
+  <script src="js/reparto.js"></script>  <!-- NUEVO -->
+  <script src="js/app.js"></script>
 
 </body>
 </html>

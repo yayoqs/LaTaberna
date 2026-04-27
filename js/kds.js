@@ -1,11 +1,37 @@
 /* ================================================================
-   PubPOS — MÓDULO: kds.js (Kitchen Display System) v2
+   PubPOS — MÓDULO: kds.js (v3 – vista autogenerada)
+   Propósito: Kitchen Display System. Ahora crea dinámicamente la
+              vista #view-cocina para eliminar dependencia HTML.
    ================================================================ */
 const KDS = (() => {
   const MINUTOS_URGENTE = 15;
   const MINUTOS_OCULTAR_LISTA = 10;
 
+  /* ── CREACIÓN DINÁMICA DE LA VISTA ───────────────────────── */
+  function _asegurarVista() {
+    if ($id('view-cocina')) return;
+
+    const main = document.createElement('main');
+    main.id = 'view-cocina';
+    main.className = 'view';
+    main.innerHTML = `
+      <div class="view-toolbar">
+        <h2><i class="fas fa-fire-burner"></i> Monitor de Cocina</h2>
+        <div class="toolbar-actions">
+          <button class="btn-secondary" onclick="KDS.refresh()">
+            <i class="fas fa-sync-alt"></i> Actualizar
+          </button>
+        </div>
+      </div>
+      <div id="cocinaKDS" class="kds-grid"></div>
+    `;
+    // Insertar antes del toastContainer
+    const referencia = $id('toastContainer') || document.body.lastChild;
+    document.body.insertBefore(main, referencia);
+  }
+
   function refresh() {
+    _asegurarVista();  // garantiza que exista
     const cont = $id('cocinaKDS');
     if (!cont) return;
 
@@ -45,7 +71,6 @@ const KDS = (() => {
     const destCss = c.destino === 'barra' ? 'barra' : 'cocina';
 
     const itemsHTML = c.items.map(it => {
-      // Buscar receta del producto por su prodId
       const receta = DB.recetas?.find(r => r.productoId == it.prodId);
       let recetaHTML = '';
       if (receta && receta.ingredientes && receta.ingredientes.length) {

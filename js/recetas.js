@@ -1,82 +1,223 @@
 /* ================================================================
-   PubPOS — MÓDULO: recetas.js (v1)
-   Propósito: Vista de recetas para cocina y barra.
-   - Muestra la tabla de productos con sus recetas.
-   - Filtra automáticamente por destino según el rol.
-   - Botón "Editar" que abre el modal de Despensa para asignar ingredientes.
+   PubPOS — MÓDULO: recetas.js (v3 – recetario con cuadrícula y
+              detalle de preparación)
+   Propósito: Mostrar solo productos con receta, con tarjetas
+              identificables. Al seleccionar una receta se despliegan
+              los ingredientes, pasos e instrucciones.
    ================================================================ */
 
 const Recetas = (() => {
 
-  // ── RENDERIZAR LA TABLA ──────────────────────────────────
+  // Estado para búsqueda en tiempo real
+  let _terminoBusqueda = '';
+
+  /* ── CREACIÓN DINÁMICA DE LA VISTA ───────────────────────── */
+  function _asegurarVista() {
+    if ($id('view-recetas')) return;
+
+    const main = document.createElement('main');
+    main.id = 'view-recetas';
+    main.className = 'view';
+    main.innerHTML = `
+      <div class="view-toolbar">
+        <h2><i class="fas fa-book"></i> Recetas</h2>
+        <div class="toolbar-actions">
+          <div class="recetas-search">
+            <i class="fas fa-search"></i>
+            <input type="text" id="recetasSearch" placeholder="Buscar receta..." oninput="Recetas.filtrar()">
+          </div>
+          <button class="btn-secondary" onclick="Despensa.mostrarModalReceta()"><i class="fas fa-plus"></i> Nueva Receta</button>
+        </div>
+      </div>
+      <div id="recetasGrid" class="recetas-grid"></div>
+    `;
+    const referencia = $id('toastContainer') || document.body.lastChild;
+    document.body.insertBefore(main, referencia);
+  }
+
+  /* ── RENDERIZAR LA CUADRÍCULA ────────────────────────────── */
   function render() {
-    const tbody = document.getElementById('recetasBody');
-    if (!tbody) return;
+    _asegurarVista();
+    const grid = $id('recetasGrid');
+    if (!grid) return;
 
     const rol = Auth.getRol();
     let productos = DB.productos.filter(p => p.activo !== false);
 
-    // Filtro por rol: cocina solo ve cocina/ambos, barra solo ve barra/ambos
+    // Filtrar por destino según el rol
     if (rol === 'cocina') {
       productos = productos.filter(p => p.destino === 'cocina' || p.destino === 'ambos');
     } else if (rol === 'barra') {
       productos = productos.filter(p => p.destino === 'barra' || p.destino === 'ambos');
     }
 
+    // Solo productos que tienen receta (tienen al menos un ingrediente)
+    productos = productos.filter(prod => {
+      const receta = DB.recetas.find(r => r.productoId == prod.id);
+      return receta && receta.ingredientes && receta.ingredientes.length > 0;
+    });
+
+    // Aplicar búsqueda
+    if (_terminoBusqueda) {
+      const term = _terminoBusqueda.toLowerCase();
+      productos = productos.filter(p => p.nombre.toLowerCase().includes(term));
+    }
+
     if (!productos.length) {
-      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:40px;color:var(--color-text-muted);">No hay productos con recetas disponibles para tu rol.</td></tr>`;
+      grid.innerHTML = `<div class="recetas-empty"><i class="fas fa-utensils"></i><p>No se encontraron recetas</p></div>`;
       return;
     }
 
-    tbody.innerHTML = productos.map(prod => {
+    // Ordenar alfabéticamente
+    productos.sort((a,b) => a.nombre.localeCompare(b.nombre));
+
+    grid.innerHTML = productos.map(prod => {
+      // Obtener primer ingrediente para un color derivado (hash simple)
       const receta = DB.recetas.find(r => r.productoId == prod.id);
-      const numIngredientes = receta ? receta.ingredientes.length : 0;
-      // Mostrar un resumen de los ingredientes (máximo 3 para no saturar)
-      let resumen = '—';
-      if (receta && receta.ingredientes.length > 0) {
-        const nombres = receta.ingredientes.slice(0, 3).map(ing => {
-          const ingData = DB.ingredientes.find(i => i.id == ing.ingredienteId);
-          return ingData ? `${ingData.nombre} (${ing.cantidad})` : ing.ingredienteId;
-        });
-        resumen = nombres.join(', ');
-        if (receta.ingredientes.length > 3) resumen += ` +${receta.ingredientes.length - 3} más`;
-      }
+      const inicial = prod.nombre.charAt(0).toUpperCase();
+      const color = _getColorFromName(prod.nombre);
 
       return `
-        <tr>
-          <td><strong>${prod.nombre}</strong></td>
-          <td><span class="prod-destino-tag ${prod.destino}">${prod.destino}</span></td>
-          <td style="font-size:12px;">${resumen}</td>
-          <td>
-            <button class="btn-secondary" onclick="Recetas.editarReceta('${prod.id}')">
-              <i class="fas fa-edit"></i> Editar
-            </button>
-          </td>
-        </tr>`;
+        <div class="receta-card" onclick="Recetas.mostrarDetalle('${prod.id}')">
+          <div class="receta-card-img" style="background-color: ${color};">
+            <span class="receta-card-inicial">${inicial}</span>
+          </div>
+          <div class="receta-card-nombre">${prod.nombre}</div>
+        </div>
+      `;
     }).join('');
   }
 
-  // ── ABRIR MODAL DE RECETA (APUNTANDO AL PRODUCTO) ────────
-  function editarReceta(productoId) {
-    // Reutiliza el modal de Despensa, que ahora acepta un productoId opcional
-    if (typeof Despensa !== 'undefined' && typeof Despensa.mostrarModalReceta === 'function') {
-      Despensa.mostrarModalReceta(productoId);
+  /* ── FILTRAR POR BÚSQUEDA ────────────────────────────────── */
+  function filtrar() {
+    _terminoBusqueda = $id('recetasSearch')?.value?.trim() || '';
+    render();
+  }
+
+  /* ── COLOR BASADO EN EL NOMBRE (hash simple) ──────────────── */
+  function _getColorFromName(nombre) {
+    let hash = 0;
+    for (let i = 0; i < nombre.length; i++) {
+      hash = nombre.charCodeAt(i) + ((hash << 5) - hash);
+      hash = hash & hash;
+    }
+    const h = Math.abs(hash) % 360;
+    return `hsl(${h}, 55%, 45%)`;
+  }
+
+  /* ── MOSTRAR DETALLE DE RECETA (MODAL) ───────────────────── */
+  function mostrarDetalle(prodId) {
+    const producto = DB.productos.find(p => p.id == prodId);
+    if (!producto) return;
+
+    const receta = DB.recetas.find(r => r.productoId == prodId);
+    if (!receta) {
+      showToast('error', 'No hay receta asignada a este producto');
+      return;
+    }
+
+    // Construir modal si no existe
+    let modal = $id('modalRecetaDetalle');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'modalRecetaDetalle';
+      modal.className = 'modal-overlay';
+      modal.style.display = 'none';
+      modal.innerHTML = `
+        <div class="modal-receta-detalle">
+          <div class="modal-header">
+            <h3 id="detalleTitulo"></h3>
+            <button class="modal-close" onclick="Recetas.cerrarDetalle()"><i class="fas fa-times"></i></button>
+          </div>
+          <div class="modal-body receta-detalle-body">
+            <div id="detalleIngredientes"></div>
+            <div id="detalleInstrucciones"></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-secondary" onclick="Recetas.cerrarDetalle()">Cerrar</button>
+            <button class="btn-primary" onclick="Recetas.editarRecetaDesdeDetalle('${prodId}')"><i class="fas fa-edit"></i> Editar Receta</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    // Llenar contenido
+    $id('detalleTitulo').innerHTML = `<i class="fas fa-utensils"></i> ${producto.nombre}`;
+
+    // Ingredientes
+    let htmlIng = '<h4>Ingredientes</h4><ul class="receta-ingredientes-lista">';
+    receta.ingredientes.forEach(ing => {
+      const ingData = DB.ingredientes.find(i => i.id == ing.ingredienteId);
+      if (ingData) {
+        const stockActual = ingData.stock;
+        const necesario = ing.cantidad;
+        const suficiente = stockActual >= necesario;
+        const claseStock = suficiente ? 'stock-suficiente' : 'stock-insuficiente';
+        htmlIng += `
+          <li>
+            <span class="ing-nombre">${ingData.nombre}</span>
+            <span class="ing-cantidad">${necesario} ${ingData.unidad}</span>
+            <span class="ing-stock ${claseStock}">
+              <i class="fas ${suficiente ? 'fa-check-circle' : 'fa-exclamation-triangle'}"></i>
+              Stock: ${stockActual} ${ingData.unidad}
+            </span>
+          </li>`;
+      } else {
+        htmlIng += `<li><span class="ing-nombre">${ing.ingredienteId}</span><span class="ing-cantidad">${ing.cantidad}</span></li>`;
+      }
+    });
+    htmlIng += '</ul>';
+    $id('detalleIngredientes').innerHTML = htmlIng;
+
+    // Instrucciones
+    const instrucciones = receta.instrucciones || 'Sin instrucciones de preparación.';
+    // Convertir saltos de línea en <p> o <br>
+    const pasosHTML = instrucciones
+      .split('\n')
+      .filter(line => line.trim())
+      .map((line, i) => `<div class="paso-item"><span class="paso-num">${i+1}</span><span class="paso-texto">${line}</span></div>`)
+      .join('');
+    $id('detalleInstrucciones').innerHTML = `
+      <h4>Preparación</h4>
+      <div class="receta-pasos">${pasosHTML || '<p>Sin instrucciones.</p>'}</div>
+    `;
+
+    // Guardar productoId en el modal para usarlo al editar
+    modal.dataset.productoId = prodId;
+
+    modal.style.display = 'flex';
+  }
+
+  function cerrarDetalle() {
+    const modal = $id('modalRecetaDetalle');
+    if (modal) modal.style.display = 'none';
+  }
+
+  function editarRecetaDesdeDetalle(prodId) {
+    cerrarDetalle();
+    if (typeof Despensa !== 'undefined' && Despensa.mostrarModalReceta) {
+      Despensa.mostrarModalReceta(prodId);
     } else {
       showToast('error', 'Módulo de Despensa no disponible');
     }
   }
 
-  // ── SUSCRIPCIÓN A EVENTOS ────────────────────────────────
+  /* ── SUSCRIPCIÓN A EVENTOS ───────────────────────────────── */
   function _initEventListeners() {
     EventBus.on('db:inicializada', render);
     EventBus.on('productos:cargados', render);
-    // Cuando se guarda/elimina una receta, emitimos un evento para refrescar
     EventBus.on('recetas:actualizadas', render);
   }
   _initEventListeners();
 
-  // ── API PÚBLICA ──────────────────────────────────────────
-  return { render, editarReceta };
+  return {
+    render,
+    filtrar,
+    mostrarDetalle,
+    cerrarDetalle,
+    editarRecetaDesdeDetalle
+  };
 })();
 
 window.Recetas = Recetas;

@@ -1,78 +1,217 @@
 /* ================================================================
    PubPOS — CSS MODULAR
    Archivo: css/recetas.css
-   Propósito: Estilos para la vista de Recetas (tabla de productos y resumen de ingredientes)
+   Propósito: Estilos para la vista de Recetas (cuadrícula de tarjetas,
+              modal de detalle con ingredientes y pasos).
    ================================================================ */
 
-/* ── CONTENEDOR DE LA TABLA ───────────────────────────────── */
-#view-recetas .recetas-table-wrap {
+/* ── BÚSQUEDA ─────────────────────────────────────────────── */
+.recetas-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+.recetas-search i { color: var(--color-text-muted); }
+.recetas-search input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--color-text);
+  font-size: 14px;
+  width: 200px;
+}
+.recetas-search input::placeholder { color: var(--color-text-muted); }
+
+/* ── GRID DE RECETAS ──────────────────────────────────────── */
+.recetas-grid {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
+  padding: 24px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 20px;
+  align-content: start;
 }
 
-/* ── TABLA ────────────────────────────────────────────────── */
-.recetas-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
+/* ── TARJETA DE RECETA ────────────────────────────────────── */
+.receta-card {
   background: var(--color-card);
+  border: 2px solid var(--color-border);
   border-radius: var(--radius);
   overflow: hidden;
-  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: var(--t);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.receta-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow);
+  border-color: var(--color-accent);
+}
+.receta-card:active { transform: scale(0.97); }
+
+.receta-card-img {
+  width: 100%;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-accent);
+}
+.receta-card-inicial {
+  font-size: 48px;
+  font-weight: 800;
+  color: rgba(255,255,255,0.9);
+  text-shadow: 0 2px 4px rgba(0,0,0,0.3);
 }
 
-.recetas-table th {
-  text-align: left;
-  padding: 12px 14px;
-  background: var(--color-panel);
-  color: var(--color-text-muted);
+.receta-card-nombre {
+  padding: 14px 10px;
+  font-size: 14px;
   font-weight: 600;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  border-bottom: 1px solid var(--color-border);
-  white-space: nowrap;
-  position: sticky;
-  top: 0;
-  z-index: 1;
-}
-
-.recetas-table td {
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--color-border);
+  text-align: center;
   color: var(--color-text);
-  vertical-align: middle;
+  line-height: 1.3;
+  width: 100%;
 }
 
-.recetas-table tbody tr:hover td {
-  background: var(--color-hover);
+/* ── ESTADO VACÍO ─────────────────────────────────────────── */
+.recetas-empty {
+  grid-column: 1/-1;
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--color-text-muted);
 }
+.recetas-empty i { font-size: 48px; opacity: .2; display: block; margin-bottom: 12px; }
 
-/* Etiqueta de destino (copia de pedido.css) */
-.prod-destino-tag {
-  font-size: 10px;
+/* ── MODAL DE DETALLE DE RECETA ───────────────────────────── */
+.modal-receta-detalle {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  width: 100%;
+  max-width: 560px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+}
+.receta-detalle-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.receta-detalle-body h4 {
+  font-size: 14px;
   font-weight: 700;
-  padding: 2px 10px;
-  border-radius: 99px;
   text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--color-accent);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
-.prod-destino-tag.barra  { background: rgba(139,92,246,.15); color: var(--color-barra); }
-.prod-destino-tag.cocina { background: rgba(249,115,22,.15);  color: var(--color-cocina); }
-.prod-destino-tag.ambos  { background: rgba(245,158,11,.15);  color: var(--color-accent); }
+
+/* ── LISTA DE INGREDIENTES ────────────────────────────────── */
+.receta-ingredientes-lista {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.receta-ingredientes-lista li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 13px;
+}
+.receta-ingredientes-lista .ing-nombre { flex: 1; font-weight: 500; }
+.receta-ingredientes-lista .ing-cantidad {
+  background: var(--color-panel);
+  padding: 4px 10px;
+  border-radius: var(--radius-xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.ing-stock {
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.ing-stock.stock-suficiente { color: var(--color-success); }
+.ing-stock.stock-insuficiente { color: var(--color-danger); }
+
+/* ── PASOS DE PREPARACIÓN ─────────────────────────────────── */
+.receta-pasos {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.paso-item {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+.paso-num {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: #000;
+  font-weight: 800;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.paso-texto {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--color-text);
+}
+
+/* ── FOOTER DEL MODAL ─────────────────────────────────────── */
+.modal-receta-detalle .modal-footer {
+  padding: 14px 20px;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
 
 /* ── RESPONSIVE ───────────────────────────────────────────── */
 @media (max-width: 600px) {
-  #view-recetas .recetas-table-wrap {
-    padding: 10px;
+  .recetas-grid {
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 14px;
+    padding: 16px;
+  }
+  .receta-card-img { height: 100px; }
+  .receta-card-inicial { font-size: 36px; }
+  .receta-card-nombre { font-size: 12px; }
+
+  .modal-receta-detalle {
+    max-width: 100%;
+    max-height: 95vh;
   }
 
-  .recetas-table {
-    font-size: 12px;
-  }
-
-  .recetas-table th:nth-child(3),
-  .recetas-table td:nth-child(3) {
-    display: none; /* Oculta columna de resumen en móviles para ganar espacio */
+  .receta-ingredientes-lista li {
+    flex-wrap: wrap;
   }
 }

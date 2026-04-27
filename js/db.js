@@ -1,6 +1,7 @@
 /* ================================================================
    PubPOS — MÓDULO: db.js (Orquestador)
    Propósito: Reúne todos los submódulos y coordina la inicialización.
+   Cambio: Ahora carga y expone pedidosDelivery para la vista de reparto.
    ================================================================ */
 
 var DB = (function() {
@@ -16,7 +17,7 @@ var DB = (function() {
     ...fusion
   };
 
-  combined.urlSheets = sync.urlSheets; // exponer la URL por si otros módulos la necesitan
+  combined.urlSheets = sync.urlSheets;
 
   combined.init = async function() {
     try {
@@ -30,6 +31,7 @@ var DB = (function() {
       this._cargarRecetasLocal();
       this._cargarMovimientosLocal();
       this._cargarSyncQueueLocal();
+      this._cargarPedidosDeliveryLocal();   // NUEVO
 
       await this._fetchProductos();
       this._fetchMozos().catch(e => console.warn("[DB] Mozos remotos no disponibles", e));
@@ -52,6 +54,7 @@ var DB = (function() {
     EventBus.emit('app:error', 'No se pudieron cargar los datos iniciales.');
   };
 
+  // Cerrar pedido de mesa (existente)
   combined.cerrarPedido = async function(id, formaPago, total, descuento) {
     const pedido = this.pedidos.find(p => p.id === id);
     if (!pedido) return null;
@@ -67,7 +70,6 @@ var DB = (function() {
 
     try {
       const items = JSON.parse(pedido.items || '[]');
-      // ⚠️ Cambio importante: Content-Type: text/plain para evitar CORS preflight
       await fetch(this.urlSheets, {
         method: 'POST',
         mode: 'cors',
@@ -89,6 +91,32 @@ var DB = (function() {
       total,
       updated_at: new Date().toISOString()
     });
+  };
+
+  // ── NUEVOS MÉTODOS PARA DELIVERY ──────────────────────────
+  combined.crearPedidoDelivery = function(datos) {
+    const nuevo = this._normalizarPedidoDelivery({
+      ...datos,
+      id: 'deliv_' + Date.now(),
+      created_at: new Date().toISOString()
+    });
+    this.pedidosDelivery.push(nuevo);
+    this.savePedidosDelivery();
+    return nuevo;
+  };
+
+  combined.actualizarPedidoDelivery = function(id, cambios) {
+    const idx = this.pedidosDelivery.findIndex(p => p.id === id);
+    if (idx >= 0) {
+      this.pedidosDelivery[idx] = { ...this.pedidosDelivery[idx], ...cambios };
+      this.savePedidosDelivery();
+    }
+    return this.pedidosDelivery[idx] || null;
+  };
+
+  combined.eliminarPedidoDelivery = function(id) {
+    this.pedidosDelivery = this.pedidosDelivery.filter(p => p.id !== id);
+    this.savePedidosDelivery();
   };
 
   return combined;
