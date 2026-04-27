@@ -22,7 +22,6 @@
   <link rel="stylesheet" href="css/recetas.css">
   <link rel="stylesheet" href="css/responsive.css">
   <style>
-    /* Estilos adicionales para split bill y persona activa (huérfanos hasta migrar a módulo) */
     .item-persona-badge {
       font-size: 10px;
       background: var(--color-primary);
@@ -51,7 +50,7 @@
 <body>
 
 <!-- ============================================================
-     HEADER PRINCIPAL (se mantiene estático, es el shell de la app)
+     HEADER PRINCIPAL
      ============================================================ -->
 <header class="app-header">
 
@@ -100,11 +99,10 @@
 </header>
 
 <!-- ============================================================
-     VISTAS (algunas aún estáticas, otras ya generadas por módulos)
+     VISTA: MESAS (con contenedor dinámico para botones de zona)
      ============================================================ -->
-
-<!-- Mesa (estática, pendiente de migración) -->
 <main id="view-mesas" class="view active">
+
   <div class="view-toolbar">
     <h2><i class="fas fa-grip"></i> Salón — Mapa de Mesas</h2>
     <div class="toolbar-actions">
@@ -114,15 +112,10 @@
         <span class="badge esperando">Lista</span>
         <span class="badge cuenta">Cuenta</span>
       </span>
-      <button class="nav-btn zona-btn active" data-zona="todas" onclick="Mesas.setZona('todas')">
-        <i class="fas fa-globe"></i> Todas
-      </button>
-      <button class="nav-btn zona-btn" data-zona="salon" onclick="Mesas.setZona('salon')">
-        <i class="fas fa-warehouse"></i> Salón
-      </button>
-      <button class="nav-btn zona-btn" data-zona="terraza" onclick="Mesas.setZona('terraza')">
-        <i class="fas fa-sun"></i> Terraza
-      </button>
+
+      <!-- CONTENEDOR DINÁMICO DE BOTONES DE ZONA -->
+      <div id="zonaButtonsContainer" style="display: flex; gap: 4px;"></div>
+
       <button class="btn-secondary" onclick="Mesas.agregarMesa()" data-rol="admin,master">
         <i class="fas fa-plus"></i> Nueva Mesa
       </button>
@@ -134,11 +127,16 @@
       </button>
     </div>
   </div>
-  <div id="mesasGrid" class="mesas-grid"></div>
-</main>
 
-<!-- Cocina (estática) -->
+  <div id="mesasGrid" class="mesas-grid"></div>
+
+</main><!-- /view-mesas -->
+
+<!-- ============================================================
+     VISTA: COCINA (KDS)
+     ============================================================ -->
 <main id="view-cocina" class="view">
+
   <div class="view-toolbar">
     <h2><i class="fas fa-fire-burner"></i> Monitor de Cocina</h2>
     <div class="toolbar-actions">
@@ -147,11 +145,16 @@
       </button>
     </div>
   </div>
-  <div id="cocinaKDS" class="kds-grid"></div>
-</main>
 
-<!-- Caja (estática) -->
+  <div id="cocinaKDS" class="kds-grid"></div>
+
+</main><!-- /view-cocina -->
+
+<!-- ============================================================
+     VISTA: CAJA
+     ============================================================ -->
 <main id="view-caja" class="view">
+
   <div class="view-toolbar">
     <h2><i class="fas fa-cash-register"></i> Caja — Resumen del Turno</h2>
     <div class="toolbar-actions">
@@ -160,7 +163,9 @@
       </button>
     </div>
   </div>
+
   <div class="caja-stats" id="cajaStats"></div>
+
   <div class="caja-table-wrap">
     <table class="caja-table">
       <thead>
@@ -169,9 +174,12 @@
       <tbody id="cajaBody"></tbody>
     </table>
   </div>
-</main>
 
-<!-- Despensa (estática) -->
+</main><!-- /view-caja -->
+
+<!-- ============================================================
+     VISTA: DESPENSA (con búsqueda y cabeceras ordenables)
+     ============================================================ -->
 <main id="view-despensa" class="view">
   <div class="view-toolbar">
     <h2><i class="fas fa-boxes"></i> Despensa — Control de Stock</h2>
@@ -218,7 +226,9 @@
   </div>
 </main>
 
-<!-- Recetas (estática) -->
+<!-- ============================================================
+     VISTA: RECETAS
+     ============================================================ -->
 <main id="view-recetas" class="view">
   <div class="view-toolbar">
     <h2><i class="fas fa-book"></i> Recetas</h2>
@@ -236,24 +246,12 @@
   </div>
 </main>
 
-<!-- Vista Config (generada dinámicamente por config.js) -->
-<!-- No hay HTML estático para #view-config -->
+<!-- Vista Config generada por config.js -->
 
-<!-- ============================================================
-     MODALES (ahora creados dinámicamente por sus módulos)
-     Los siguientes IDs eran estáticos y han sido eliminados:
-       #modalProducto → config.js
-       #modalTicket   → tickets.js
-       #modalCierre   → cobro.js
-       #modalPedido   → pedido.js
-     El modal de login (#modalLogin) se crea en auth.js
-     Los modales de ingrediente/receta se crean en despensa.js
-     ============================================================ -->
-
-<!-- Toast Container (siempre visible) -->
+<!-- Toast Container -->
 <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
-<!-- Scripts (orden de carga importante) -->
+<!-- Scripts -->
 <script src="js/utils.js"></script>
 <script src="js/eventBus.js"></script>
 <script src="js/db-core.js"></script>

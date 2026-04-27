@@ -1,8 +1,10 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-core.js
+   PubPOS — MÓDULO: db-core.js (v2 – soporte de zonas múltiples)
    Propósito: Núcleo de base de datos: inicialización, mesas, pedidos,
               comandas, mozos, configuración y persistencia local.
-   Cambio (2026-04-25): Soporte de zona (salon / terraza) con migración.
+   Cambio (2026-04-27): Ahora las mesas se generan según DB.config.zonas
+                        en lugar de un único cantidadMesas.
+                        mesaVacia recibe el nombre de zona como parámetro.
    ================================================================ */
 
 const DBCore = (function() {
@@ -40,7 +42,7 @@ const DBCore = (function() {
       observaciones: this._validarString(m.observaciones, ''),
       mesasFusionadas: m.mesasFusionadas || null,
       esVirtual: m.esVirtual || false,
-      zona: this._validarString(m.zona, 'salon')   // ← nuevo campo
+      zona: this._validarString(m.zona, (this.config.zonas && this.config.zonas[0]?.nombre) || 'salon')
     };
   };
 
@@ -80,36 +82,61 @@ const DBCore = (function() {
   /* ── PERSISTENCIA LOCAL ──────────────────────────────────── */
   module._cargarConfigLocal = function() {
     const raw = localStorage.getItem('pubpos_config');
-    this.config = raw ? JSON.parse(raw) : {
-      nombreLocal: 'La Taberna',
-      direccion: 'Av. Corrientes 1234',
-      cuit: '30-12345678-9',
-      pieTicket: '¡Gracias por visitarnos!',
-      cantidadMesas: 12
-    };
+    if (raw) {
+      this.config = JSON.parse(raw);
+      // Migración única: si existe la clave obsoleta cantidadMesas
+      if (this.config.cantidadMesas && !this.config.zonas) {
+        this.config.zonas = [
+          { nombre: 'salon',   cantidad: this.config.cantidadMesas },
+          { nombre: 'terraza', cantidad: 0 }
+        ];
+        delete this.config.cantidadMesas;
+        this.saveConfig();
+      }
+    } else {
+      // Configuración por defecto con dos zonas
+      this.config = {
+        nombreLocal: 'La Taberna',
+        direccion: 'Av. Corrientes 1234',
+        cuit: '30-12345678-9',
+        pieTicket: '¡Gracias por visitarnos!',
+        zonas: [
+          { nombre: 'salon',   cantidad: 12 },
+          { nombre: 'terraza', cantidad: 0 }
+        ]
+      };
+    }
   };
 
   /**
-   * Inicializa mesas: asigna zona por defecto si no existe,
-   * pero NO modifica el número de mesa.
+   * Inicializa mesas: genera la cantidad indicada en cada zona.
+   * Asigna números consecutivos globales empezando desde 1.
    */
   module._inicializarMesas = function() {
-    const raw = localStorage.getItem('pubpos_mesas');
-    if (raw) {
-      const mesasParseadas = JSON.parse(raw);
-      this.mesas = mesasParseadas.map(m => {
-        const mesa = this._normalizarMesa(m);
-        if (!mesa.zona) mesa.zona = 'salon';   // migración silenciosa
-        return mesa;
+    const zonas = this.config.zonas || [{ nombre: 'salon', cantidad: 12 }];
+    const mesasExistentes = this.mesas.length > 0 ? this.mesas : [];
+
+    // Si ya existen mesas en localStorage, las normalizamos y respetamos.
+    // Si no, generamos desde cero según las zonas.
+    if (mesasExistentes.length === 0) {
+      let numero = 1;
+      const nuevasMesas = [];
+      zonas.forEach(zona => {
+        for (let i = 0; i < zona.cantidad; i++) {
+          nuevasMesas.push({
+            ...mesaVacia(numero, zona.nombre),
+            numero
+          });
+          numero++;
+        }
       });
+      this.mesas = nuevasMesas;
     } else {
-      const cant = this.config.cantidadMesas || 12;
-      this.mesas = Array.from({ length: cant }, (_, i) => ({
-        ...mesaVacia(i + 1),
-        zona: 'salon'
-      }));
-      this.saveMesas();
+      // Si hay mesas guardadas, las normalizamos (por si falta zona)
+      this.mesas = mesasExistentes.map(m => this._normalizarMesa(m));
+      // Podríamos ajustar para que la numeración sea consecutiva, pero lo dejamos como está.
     }
+    this.saveMesas();
   };
 
   module._cargarComandasLocal = function() {
@@ -188,7 +215,12 @@ const DBCore = (function() {
   return module;
 })();
 
-function mesaVacia(num) {
+/**
+ * Crea una mesa vacía con una zona específica.
+ * @param {number} num - número de mesa
+ * @param {string} [zona='salon'] - nombre de la zona
+ */
+function mesaVacia(num, zona = 'salon') {
   return {
     numero: num,
     estado: 'libre',
@@ -198,6 +230,6 @@ function mesaVacia(num) {
     comensales: 1,
     abiertaEn: null,
     observaciones: '',
-    zona: 'salon'   // ← zona por defecto
+    zona: zona
   };
 }

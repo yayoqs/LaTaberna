@@ -1,5 +1,8 @@
 /* ================================================================
-   PubPOS — MÓDULO: mesas.js (v3 – colores por zona)
+   PubPOS — MÓDULO: mesas.js (v4 – botones de zona dinámicos)
+   Propósito: Renderizar la grilla de mesas. Ahora los botones de
+              filtro por zona se crean según DB.config.zonas, eliminando
+              los botones estáticos del HTML.
    ================================================================ */
 const Mesas = (() => {
 
@@ -21,15 +24,51 @@ const Mesas = (() => {
 
   let _modoSeleccion = false;
   let _mesasSeleccionadas = new Set();
-  let _zonaActiva = 'todas';   // 'todas', 'salon', 'terraza'
+  let _zonaActiva = 'todas';   // 'todas' o nombre de zona
 
   /* ── RENDERIZAR GRILLA ────────────────────────────────────── */
   function render() {
+    _renderZoneButtons();      // ← genera los botones según DB.config.zonas
+    _renderGrid();
+  }
+
+  /* ── BOTONES DE ZONA (DINÁMICOS) ─────────────────────────── */
+  function _renderZoneButtons() {
+    const container = document.getElementById('zonaButtonsContainer');
+    if (!container) return;
+
+    const zonas = DB.config.zonas || [];
+    let html = `
+      <button class="nav-btn zona-btn ${_zonaActiva === 'todas' ? 'active' : ''}" 
+              data-zona="todas" onclick="Mesas.setZona('todas')">
+        <i class="fas fa-globe"></i> Todas
+      </button>`;
+    
+    zonas.forEach(z => {
+      html += `
+        <button class="nav-btn zona-btn ${_zonaActiva === z.nombre ? 'active' : ''}" 
+                data-zona="${z.nombre}" onclick="Mesas.setZona('${z.nombre}')">
+          <i class="fas fa-map-marker-alt"></i> ${z.nombre.charAt(0).toUpperCase() + z.nombre.slice(1)}
+        </button>`;
+    });
+
+    container.innerHTML = html;
+  }
+
+  /* ── CAMBIO DE ZONA ───────────────────────────────────────── */
+  function setZona(zona) {
+    _zonaActiva = zona;
+    _renderGrid();           // solo re-renderiza la grilla
+    _renderZoneButtons();    // actualiza las clases 'active'
+  }
+
+  /* ── RENDERIZAR LA GRILLA DE MESAS ───────────────────────── */
+  function _renderGrid() {
     const grid = $id('mesasGrid');
     if (!grid) return;
 
     if (typeof DB === 'undefined' || !DB.mesas) {
-      setTimeout(render, 200);
+      setTimeout(_renderGrid, 200);
       return;
     }
 
@@ -100,20 +139,11 @@ const Mesas = (() => {
     }
   }
 
-  /* ── CAMBIO DE ZONA ───────────────────────────────────────── */
-  function setZona(zona) {
-    _zonaActiva = zona;
-    render();
-    document.querySelectorAll('.zona-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.zona === zona);
-    });
-  }
-
   /* ── MODO SELECCIÓN PARA FUSIÓN ───────────────────────────── */
   function toggleModoFusion() {
     _modoSeleccion = !_modoSeleccion;
     _mesasSeleccionadas.clear();
-    render();
+    _renderGrid();
     const btn = document.getElementById('btnFusionar');
     if (btn) {
       btn.innerHTML = _modoSeleccion ? '<i class="fas fa-times"></i> Cancelar' : '<i class="fas fa-object-group"></i> Fusionar Mesas';
@@ -148,15 +178,13 @@ const Mesas = (() => {
   /* ── AGREGAR NUEVA MESA (número secuencial global) ──────────── */
   function agregarMesa() {
     if (typeof DB === 'undefined') return;
-    const zona = _zonaActiva !== 'todas' ? _zonaActiva : 'salon';
+    const zona = _zonaActiva !== 'todas' ? _zonaActiva : (DB.config.zonas[0]?.nombre || 'salon');
     const maxNum = DB.mesas.reduce((max, m) => Math.max(max, m.numero || 0), 0);
     const nuevoNum = maxNum + 1;
 
-    DB.mesas.push({ ...mesaVacia(nuevoNum), zona });
-    DB.config.cantidadMesas = DB.mesas.filter(m => !m.esVirtual).length;
+    DB.mesas.push({ ...mesaVacia(nuevoNum, zona) });
     DB.saveMesas();
-    DB.saveConfig();
-    render();
+    _renderGrid();
     showToast('success', `Mesa ${nuevoNum} agregada (${zona})`);
   }
 
