@@ -1,13 +1,77 @@
 /* ================================================================
-   PubPOS — MÓDULO: pedido.js (Orquestador)
+   PubPOS — MÓDULO: pedido.js (v2 – modal de pedido dinámico)
    Propósito: Coordinar apertura de mesa, envío de comandas, transferencia.
-   Cambios (2026-04-25): Verificación de permiso admin en transferencia.
+   Ahora el modal #modalPedido se crea bajo demanda, eliminando la
+   dependencia de HTML estático.
    ================================================================ */
 
 const Pedido = (() => {
 
-  /* ── APERTURA DE MESA (sin cambiar estado aún) ─────────────── */
+  /* ── CREACIÓN DINÁMICA DEL MODAL DE PEDIDO ────────────────── */
+  function _asegurarModalPedido() {
+    if ($id('modalPedido')) return; // ya existe
+
+    const modal = document.createElement('div');
+    modal.id = 'modalPedido';
+    modal.className = 'modal-overlay';
+    modal.style.display = 'none';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.innerHTML = `
+      <div class="modal-pedido">
+        <div class="modal-header">
+          <div class="modal-title">
+            <i class="fas fa-chair"></i>
+            <span id="modalMesaTitulo">Mesa 1</span>
+            <span class="estado-badge" id="modalEstadoBadge">Libre</span>
+          </div>
+          <button class="btn-icon" onclick="Pedido.mostrarSelectorTransferencia()" title="Cambiar Mesa" style="background:transparent; border:1px solid var(--color-border); border-radius:var(--radius-sm); padding:6px 12px; color:var(--color-text-sec); margin-right:8px;" data-rol="admin,master">
+            <i class="fas fa-exchange-alt"></i> Cambiar Mesa
+          </button>
+          <button class="modal-close" onclick="Pedido.cerrar()" aria-label="Cerrar" style="margin-left: auto;">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="modal-body">
+          <section class="carta-panel">
+            <div class="carta-search"><i class="fas fa-search"></i><input type="text" id="searchProducto" placeholder="Buscar producto..." oninput="Carta.filtrar()" autocomplete="off"></div>
+            <div class="categorias-tabs" id="categoriasTabs"></div>
+            <div id="cartaProductos" class="carta-productos"></div>
+          </section>
+          <section class="comanda-panel">
+            <div class="comanda-header">
+              <div class="comanda-meta">
+                <span><i class="fas fa-user-tie"></i><select id="comandaMozo" onchange="Comanda.setMozo(this.value)"></select></span>
+                <span><i class="fas fa-users"></i><input type="number" id="comandaComensales" value="2" min="1" max="20" onchange="Comanda.setComensales(this.value)"> pax</span>
+              </div>
+              <div id="personaActivaContainer" style="display: flex; align-items: center; gap: 8px; margin-top: 8px;"></div>
+            </div>
+            <div id="comandaItems" class="comanda-items"></div>
+            <div class="comanda-obs"><input type="text" id="comandaObs" placeholder="Observaciones generales..." oninput="Comanda.setObservacionGeneral(this.value)"></div>
+            <div class="comanda-footer">
+              <div class="comanda-total"><span>Subtotal</span><span class="total-monto" id="subtotalDisplay">$0</span></div>
+              <div class="comanda-actions">
+                <button class="btn-comanda btn-barra" onclick="Pedido.enviarComanda('barra')"><i class="fas fa-wine-glass"></i> Barra</button>
+                <button class="btn-comanda btn-cocina" onclick="Pedido.enviarComanda('cocina')"><i class="fas fa-fire-burner"></i> Cocina</button>
+                <button class="btn-comanda btn-todo" onclick="Pedido.enviarComanda('todos')"><i class="fas fa-paper-plane"></i> Enviar Todo</button>
+              </div>
+              <div class="comanda-actions-2">
+                <button class="btn-cuenta" onclick="Cuenta.pedirCuenta()" data-rol="mesero,admin,master,caja"><i class="fas fa-file-invoice-dollar"></i> Pedir Cuenta</button>
+                <button class="btn-cerrar-mesa" onclick="Cobro.abrirModalCierre()" data-rol="caja,admin,master"><i class="fas fa-check-circle"></i> Cerrar Mesa</button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+
+
+  /* ── APERTURA DE MESA ─────────────────────────────────────── */
   async function abrirMesa(num) {
+    _asegurarModalPedido();  // ← asegura que el modal existe
+
     let mesa = DB.mesas.find(m => m.numero == num);
     if (!mesa) {
       console.error(`[Pedido] Mesa ${num} no encontrada.`);
@@ -147,9 +211,8 @@ const Pedido = (() => {
     showToast('success', `Comanda enviada → ${destinoLabel}`);
   }
 
-  /* ── TRANSFERIR MESA (Cambio de ubicación) ────────────────── */
+  /* ── TRANSFERIR MESA ──────────────────────────────────────── */
   function transferirMesa(mesaOrigenNum, mesaDestinoNum) {
-    // 🔒 VERIFICACIÓN DE PERMISO: solo administradores y master pueden transferir
     if (!Auth.esAdmin()) {
       showToast('error', 'Solo administradores pueden transferir pedidos entre mesas');
       return false;
@@ -211,7 +274,6 @@ const Pedido = (() => {
       showToast('warning', 'No hay mesa activa.');
       return;
     }
-    // 🔒 Solo administradores
     if (!Auth.esAdmin()) {
       showToast('error', 'Solo administradores pueden transferir mesas.');
       return;
@@ -251,8 +313,17 @@ const Pedido = (() => {
   EventBus.on('mesa:seleccionada', abrirMesa);
 
   return {
-    abrirMesa, cerrar, enviarComanda, transferirMesa, mostrarSelectorTransferencia,
-    pedirCuenta, cerrarMesa, _setCat, filtrarProductos, actualizarObsGeneral, _agregarItem
+    abrirMesa,
+    cerrar,
+    enviarComanda,
+    transferirMesa,
+    mostrarSelectorTransferencia,
+    pedirCuenta,
+    cerrarMesa,
+    _setCat,
+    filtrarProductos,
+    actualizarObsGeneral,
+    _agregarItem
   };
 })();
 

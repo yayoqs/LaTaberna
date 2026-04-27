@@ -1,11 +1,53 @@
 /* ================================================================
-   PubPOS — MÓDULO: cobro.js (v3 – split bill con validación)
+   PubPOS — MÓDULO: cobro.js (v4 – modal de cierre dinámico)
+   Propósito: Gestión del cierre de mesa (split bill, formas de pago).
+   Ahora el modal #modalCierre se crea bajo demanda, eliminando la
+   dependencia de HTML estático.
    ================================================================ */
 const Cobro = (() => {
   let _mesaACerrar = null;
   let _formaPago = 'Efectivo';
   let _pagosParciales = [];
 
+  /* ── CREACIÓN DINÁMICA DEL MODAL DE CIERRE ───────────────── */
+  function _asegurarModalCierre() {
+    if ($id('modalCierre')) return; // ya existe
+
+    const modal = document.createElement('div');
+    modal.id = 'modalCierre';
+    modal.className = 'modal-overlay';
+    modal.style.display = 'none';
+    modal.innerHTML = `
+      <div class="modal-small">
+        <div class="modal-header">
+          <h3><i class="fas fa-file-invoice-dollar"></i> Cierre de Mesa</h3>
+          <button class="modal-close" onclick="Cobro.cerrarModalCierre()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-small-body">
+          <div class="cierre-resumen" id="cierreResumen"></div>
+          <div id="pagosParcialesContainer"></div>
+          <label>Forma de Pago (si no se divide)</label>
+          <div class="formas-pago">
+            <button class="pago-btn active" data-pago="Efectivo" onclick="Cobro.selectPago(this)"><i class="fas fa-money-bill"></i> Efectivo</button>
+            <button class="pago-btn" data-pago="Débito" onclick="Cobro.selectPago(this)"><i class="fas fa-credit-card"></i> Débito</button>
+            <button class="pago-btn" data-pago="Crédito" onclick="Cobro.selectPago(this)"><i class="fas fa-credit-card"></i> Crédito</button>
+            <button class="pago-btn" data-pago="Transferencia" onclick="Cobro.selectPago(this)"><i class="fas fa-mobile-alt"></i> Transf.</button>
+            <button class="pago-btn" data-pago="Mixto" onclick="Cobro.selectPago(this)"><i class="fas fa-layer-group"></i> Mixto</button>
+          </div>
+          <label for="cierreDescuento">Descuento (%)</label>
+          <input type="number" id="cierreDescuento" value="0" min="0" max="100" oninput="Cobro.actualizarTotalCierre()">
+          <div class="cierre-total-final" id="cierreTotalFinal"></div>
+          <div class="modal-small-footer">
+            <button class="btn-secondary" onclick="Cobro.cerrarModalCierre()">Cancelar</button>
+            <button class="btn-primary" onclick="Cobro.confirmarCierre()"><i class="fas fa-check-circle"></i> Confirmar y Cobrar</button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+
+  /* ── ABRIR MODAL DE CIERRE ───────────────────────────────── */
   function abrirModalCierre() {
     if (!Auth.puedeCerrarMesa()) {
       showToast('error', 'No tienes permiso para cerrar mesas');
@@ -25,6 +67,7 @@ const Cobro = (() => {
     const obsInput = document.getElementById('comandaObs');
     if (obsInput) _mesaACerrar.observaciones = obsInput.value;
 
+    _asegurarModalCierre();  // ← crea el modal si no existe
     _renderResumen();
     _inicializarPagosParciales();
 
@@ -145,7 +188,6 @@ const Cobro = (() => {
         showToast('error', 'No hay pagos registrados.');
         return;
       }
-      // Validar que la suma de pagos sea igual al total (con margen de redondeo)
       const sumaPagos = pagos.reduce((s, p) => s + p.monto, 0);
       const total = calcularTotal(_mesaACerrar.items);
       if (Math.abs(sumaPagos - total) > 0.01) {
@@ -160,7 +202,6 @@ const Cobro = (() => {
       pagos = [{ persona: 'Total', monto: totalFinal, formaPago: _formaPago }];
     }
 
-    // Cerrar el pedido una sola vez con el primer pago (o el único)
     try {
       if (_mesaACerrar.pedidoId) {
         await DB.cerrarPedido(_mesaACerrar.pedidoId, pagos[0].formaPago, pagos[0].monto, 0);
@@ -169,7 +210,6 @@ const Cobro = (() => {
       console.warn('[Cobro] Error al cerrar pedido:', e);
     }
 
-    // Generar tickets individuales si es split
     if (usarSplit) {
       pagos.forEach(pago => {
         const ticketHTML = Tickets.generarCierreParcial(_mesaACerrar, pago);
@@ -180,7 +220,6 @@ const Cobro = (() => {
       Tickets.mostrar(ticketHTML, `Comprobante — Mesa ${_mesaACerrar.numero}`);
     }
 
-    // Liberar mesa
     if (_mesaACerrar.esVirtual) {
       DB.liberarMesasFusionadas(_mesaACerrar);
     } else {
@@ -202,9 +241,14 @@ const Cobro = (() => {
   EventBus.on('cobro:solicitado', abrirModalCierre);
 
   return {
-    abrirModalCierre, cerrarModalCierre, selectPago,
-    actualizarTotalCierre, confirmarCierre,
-    actualizarFormaPagoPersona, actualizarMontoPersona, cobrarTodoJunto
+    abrirModalCierre,
+    cerrarModalCierre,
+    selectPago,
+    actualizarTotalCierre,
+    confirmarCierre,
+    actualizarFormaPagoPersona,
+    actualizarMontoPersona,
+    cobrarTodoJunto
   };
 })();
 

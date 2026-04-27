@@ -19,10 +19,10 @@
   <link rel="stylesheet" href="css/modals.css">
   <link rel="stylesheet" href="css/ticket.css">
   <link rel="stylesheet" href="css/despensa.css">
-  <link rel="stylesheet" href="css/recetas.css">  <!-- NUEVO -->
+  <link rel="stylesheet" href="css/recetas.css">
   <link rel="stylesheet" href="css/responsive.css">
   <style>
-    /* Estilos adicionales para split bill y persona activa (migrados de la versión anterior) */
+    /* Estilos adicionales para split bill y persona activa (huérfanos hasta migrar a módulo) */
     .item-persona-badge {
       font-size: 10px;
       background: var(--color-primary);
@@ -51,7 +51,7 @@
 <body>
 
 <!-- ============================================================
-     HEADER PRINCIPAL
+     HEADER PRINCIPAL (se mantiene estático, es el shell de la app)
      ============================================================ -->
 <header class="app-header">
 
@@ -79,7 +79,6 @@
     <button class="nav-btn" data-view="despensa" onclick="App.showView('despensa')" data-rol="admin,master,cocina,barra">
       <i class="fas fa-boxes"></i><span> Despensa</span>
     </button>
-    <!-- NUEVO BOTÓN RECETAS -->
     <button class="nav-btn" data-view="recetas" onclick="App.showView('recetas')" data-rol="cocina,barra,admin,master">
       <i class="fas fa-book"></i><span> Recetas</span>
     </button>
@@ -101,10 +100,11 @@
 </header>
 
 <!-- ============================================================
-     VISTA: MESAS (con selector de zona)
+     VISTAS (algunas aún estáticas, otras ya generadas por módulos)
      ============================================================ -->
-<main id="view-mesas" class="view active">
 
+<!-- Mesa (estática, pendiente de migración) -->
+<main id="view-mesas" class="view active">
   <div class="view-toolbar">
     <h2><i class="fas fa-grip"></i> Salón — Mapa de Mesas</h2>
     <div class="toolbar-actions">
@@ -114,8 +114,6 @@
         <span class="badge esperando">Lista</span>
         <span class="badge cuenta">Cuenta</span>
       </span>
-
-      <!-- Botones de Zona -->
       <button class="nav-btn zona-btn active" data-zona="todas" onclick="Mesas.setZona('todas')">
         <i class="fas fa-globe"></i> Todas
       </button>
@@ -125,7 +123,6 @@
       <button class="nav-btn zona-btn" data-zona="terraza" onclick="Mesas.setZona('terraza')">
         <i class="fas fa-sun"></i> Terraza
       </button>
-
       <button class="btn-secondary" onclick="Mesas.agregarMesa()" data-rol="admin,master">
         <i class="fas fa-plus"></i> Nueva Mesa
       </button>
@@ -137,16 +134,11 @@
       </button>
     </div>
   </div>
-
   <div id="mesasGrid" class="mesas-grid"></div>
+</main>
 
-</main><!-- /view-mesas -->
-
-<!-- ============================================================
-     VISTA: COCINA (KDS)
-     ============================================================ -->
+<!-- Cocina (estática) -->
 <main id="view-cocina" class="view">
-
   <div class="view-toolbar">
     <h2><i class="fas fa-fire-burner"></i> Monitor de Cocina</h2>
     <div class="toolbar-actions">
@@ -155,16 +147,11 @@
       </button>
     </div>
   </div>
-
   <div id="cocinaKDS" class="kds-grid"></div>
+</main>
 
-</main><!-- /view-cocina -->
-
-<!-- ============================================================
-     VISTA: CAJA
-     ============================================================ -->
+<!-- Caja (estática) -->
 <main id="view-caja" class="view">
-
   <div class="view-toolbar">
     <h2><i class="fas fa-cash-register"></i> Caja — Resumen del Turno</h2>
     <div class="toolbar-actions">
@@ -173,9 +160,7 @@
       </button>
     </div>
   </div>
-
   <div class="caja-stats" id="cajaStats"></div>
-
   <div class="caja-table-wrap">
     <table class="caja-table">
       <thead>
@@ -184,17 +169,13 @@
       <tbody id="cajaBody"></tbody>
     </table>
   </div>
+</main>
 
-</main><!-- /view-caja -->
-
-<!-- ============================================================
-     VISTA: DESPENSA (con búsqueda y cabeceras ordenables)
-     ============================================================ -->
+<!-- Despensa (estática) -->
 <main id="view-despensa" class="view">
   <div class="view-toolbar">
     <h2><i class="fas fa-boxes"></i> Despensa — Control de Stock</h2>
     <div class="toolbar-actions">
-      <!-- Contenedor para el input de búsqueda (insertado dinámicamente) -->
       <div id="despensaBusquedaContainer" style="display: flex; align-items: center;"></div>
       <button class="btn-primary" onclick="Despensa.mostrarModalIngrediente()">
         <i class="fas fa-plus"></i> Nuevo Ingrediente
@@ -237,183 +218,42 @@
   </div>
 </main>
 
-<!-- ============================================================
-     VISTA: RECETAS (NUEVA)
-     ============================================================ -->
+<!-- Recetas (estática) -->
 <main id="view-recetas" class="view">
   <div class="view-toolbar">
     <h2><i class="fas fa-book"></i> Recetas</h2>
     <div class="toolbar-actions">
-      <!-- Opcional: botón para nueva receta (ya está en Despensa) -->
       <button class="btn-secondary" onclick="Despensa.mostrarModalReceta()"><i class="fas fa-plus"></i> Nueva Receta</button>
     </div>
   </div>
   <div class="recetas-table-wrap">
     <table class="recetas-table">
       <thead>
-        <tr>
-          <th>Producto</th>
-          <th>Destino</th>
-          <th>Ingredientes</th>
-          <th>Acciones</th>
-        </tr>
+        <tr><th>Producto</th><th>Destino</th><th>Ingredientes</th><th>Acciones</th></tr>
       </thead>
       <tbody id="recetasBody"></tbody>
     </table>
   </div>
-</main><!-- /view-recetas -->
-
-<!-- ============================================================
-     VISTA: CONFIGURACIÓN
-     ============================================================ -->
-<main id="view-config" class="view">
-  <div class="view-toolbar">
-    <h2><i class="fas fa-sliders"></i> Configuración</h2>
-  </div>
-  <div class="config-grid">
-    <section class="config-card">
-      <h3><i class="fas fa-utensils"></i> Productos / Carta</h3>
-      <div class="config-actions">
-        <button class="btn-primary" onclick="Config.abrirModalProducto()" data-rol="admin,master">
-          <i class="fas fa-plus"></i> Nuevo Producto
-        </button>
-      </div>
-      <div id="productosLista" class="productos-config-lista"></div>
-    </section>
-    <section class="config-card">
-      <h3><i class="fas fa-print"></i> Impresoras</h3>
-      <div class="impresoras-config">
-        <div class="impresora-item"><span class="impresora-label"><i class="fas fa-fire-burner"></i>Cocina</span><input type="text" id="impCocinaIP" placeholder="IP o nombre" value="192.168.1.100"><select id="impCocinaProto"><option value="network">Red</option><option value="usb" selected>USB</option></select><button class="btn-test" onclick="Tickets.testImpresora('cocina')"><i class="fas fa-vial"></i> Probar</button></div>
-        <div class="impresora-item"><span class="impresora-label"><i class="fas fa-wine-glass"></i>Barra</span><input type="text" id="impBarraIP" placeholder="IP o nombre" value="192.168.1.101"><select id="impBarraProto"><option value="network">Red</option><option value="usb" selected>USB</option></select><button class="btn-test" onclick="Tickets.testImpresora('barra')"><i class="fas fa-vial"></i> Probar</button></div>
-        <div class="impresora-item"><span class="impresora-label"><i class="fas fa-cash-register"></i>Caja</span><input type="text" id="impCajaIP" placeholder="IP o nombre" value="192.168.1.102"><select id="impCajaProto"><option value="network">Red</option><option value="usb" selected>USB</option></select><button class="btn-test" onclick="Tickets.testImpresora('caja')"><i class="fas fa-vial"></i> Probar</button></div>
-        <div class="info-box"><i class="fas fa-info-circle"></i><p>Para impresión directa instalá QZ Tray.</p></div>
-      </div>
-    </section>
-    <section class="config-card">
-      <h3><i class="fas fa-store"></i> Datos del Local</h3>
-      <div class="local-config">
-        <label>Nombre del Local</label><input type="text" id="cfgNombreLocal" value="Mi Pub Restaurant">
-        <label>Dirección</label><input type="text" id="cfgDireccion" value="Av. Corrientes 1234, CABA">
-        <label>CUIT / RUT</label><input type="text" id="cfgCuit" value="30-12345678-9">
-        <label>Pie de ticket</label><input type="text" id="cfgPie" value="¡Gracias por visitarnos!">
-        <label>Cantidad de Mesas</label><input type="number" id="cfgMesas" value="6" min="1" max="60">
-        <button class="btn-primary" onclick="Config.guardar()"><i class="fas fa-save"></i> Guardar</button>
-      </div>
-    </section>
-  </div>
 </main>
 
-<!-- ============================================================
-     MODAL: PEDIDO DE MESA
-     ============================================================ -->
-<div id="modalPedido" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true">
-  <div class="modal-pedido">
-    <div class="modal-header">
-      <div class="modal-title">
-        <i class="fas fa-chair"></i>
-        <span id="modalMesaTitulo">Mesa 1</span>
-        <span class="estado-badge" id="modalEstadoBadge">Libre</span>
-      </div>
-      <button class="btn-icon" onclick="Pedido.mostrarSelectorTransferencia()" title="Cambiar Mesa" style="background:transparent; border:1px solid var(--color-border); border-radius:var(--radius-sm); padding:6px 12px; color:var(--color-text-sec); margin-right:8px;" data-rol="admin,master">
-        <i class="fas fa-exchange-alt"></i> Cambiar Mesa
-      </button>
-      <button class="modal-close" onclick="Pedido.cerrar()" aria-label="Cerrar" style="margin-left: auto;">
-        <i class="fas fa-times"></i>
-      </button>
-    </div>
-    <div class="modal-body">
-      <section class="carta-panel">
-        <div class="carta-search"><i class="fas fa-search"></i><input type="text" id="searchProducto" placeholder="Buscar producto..." oninput="Carta.filtrar()" autocomplete="off"></div>
-        <div class="categorias-tabs" id="categoriasTabs"></div>
-        <div id="cartaProductos" class="carta-productos"></div>
-      </section>
-      <section class="comanda-panel">
-        <div class="comanda-header">
-          <div class="comanda-meta">
-            <span><i class="fas fa-user-tie"></i><select id="comandaMozo" onchange="Comanda.setMozo(this.value)"></select></span>
-            <span><i class="fas fa-users"></i><input type="number" id="comandaComensales" value="2" min="1" max="20" onchange="Comanda.setComensales(this.value)"> pax</span>
-          </div>
-          <div id="personaActivaContainer" style="display: flex; align-items: center; gap: 8px; margin-top: 8px;"></div>
-        </div>
-        <div id="comandaItems" class="comanda-items"></div>
-        <div class="comanda-obs"><input type="text" id="comandaObs" placeholder="Observaciones generales..." oninput="Comanda.setObservacionGeneral(this.value)"></div>
-        <div class="comanda-footer">
-          <div class="comanda-total"><span>Subtotal</span><span class="total-monto" id="subtotalDisplay">$0</span></div>
-          <div class="comanda-actions">
-            <button class="btn-comanda btn-barra" onclick="Pedido.enviarComanda('barra')"><i class="fas fa-wine-glass"></i> Barra</button>
-            <button class="btn-comanda btn-cocina" onclick="Pedido.enviarComanda('cocina')"><i class="fas fa-fire-burner"></i> Cocina</button>
-            <button class="btn-comanda btn-todo" onclick="Pedido.enviarComanda('todos')"><i class="fas fa-paper-plane"></i> Enviar Todo</button>
-          </div>
-          <div class="comanda-actions-2">
-            <button class="btn-cuenta" onclick="Cuenta.pedirCuenta()" data-rol="mesero,admin,master,caja"><i class="fas fa-file-invoice-dollar"></i> Pedir Cuenta</button>
-            <button class="btn-cerrar-mesa" onclick="Cobro.abrirModalCierre()" data-rol="caja,admin,master"><i class="fas fa-check-circle"></i> Cerrar Mesa</button>
-          </div>
-        </div>
-      </section>
-    </div>
-  </div>
-</div>
+<!-- Vista Config (generada dinámicamente por config.js) -->
+<!-- No hay HTML estático para #view-config -->
 
 <!-- ============================================================
-     MODAL: NUEVO / EDITAR PRODUCTO
+     MODALES (ahora creados dinámicamente por sus módulos)
+     Los siguientes IDs eran estáticos y han sido eliminados:
+       #modalProducto → config.js
+       #modalTicket   → tickets.js
+       #modalCierre   → cobro.js
+       #modalPedido   → pedido.js
+     El modal de login (#modalLogin) se crea en auth.js
+     Los modales de ingrediente/receta se crean en despensa.js
      ============================================================ -->
-<div id="modalProducto" class="modal-overlay" style="display:none;">
-  <div class="modal-small">
-    <div class="modal-header"><h3><i class="fas fa-utensils"></i> <span id="productoModalTitulo">Nuevo Producto</span></h3><button class="modal-close" onclick="Config.cerrarModalProducto()"><i class="fas fa-times"></i></button></div>
-    <div class="modal-small-body">
-      <input type="hidden" id="prodId">
-      <label for="prodNombre">Nombre *</label><input type="text" id="prodNombre" placeholder="Nombre del producto" autocomplete="off">
-      <label for="prodPrecio">Precio *</label><input type="number" id="prodPrecio" placeholder="0.00" min="0" step="0.01">
-      <label for="prodCategoria">Categoría *</label><select id="prodCategoria"><option>Bebidas</option><option>Cervezas</option><option>Cocteles</option><option>Vinos</option><option>Entradas</option><option>Comidas</option><option>Postres</option></select>
-      <label for="prodDestino">Destino Comanda *</label><select id="prodDestino"><option value="barra">Barra</option><option value="cocina">Cocina</option><option value="ambos">Ambos</option></select>
-      <label for="prodDescripcion">Descripción</label><input type="text" id="prodDescripcion" placeholder="Descripción breve (opcional)">
-      <div class="prod-activo-row"><label for="prodActivo">Activo</label><input type="checkbox" id="prodActivo" checked></div>
-      <div class="modal-small-footer"><button class="btn-secondary" onclick="Config.cerrarModalProducto()">Cancelar</button><button class="btn-primary" onclick="Config.guardarProducto()"><i class="fas fa-save"></i> Guardar</button></div>
-    </div>
-  </div>
-</div>
 
-<!-- ============================================================
-     MODAL: VISTA PREVIA TICKET
-     ============================================================ -->
-<div id="modalTicket" class="modal-overlay" style="display:none;">
-  <div class="modal-ticket">
-    <div class="modal-header"><h3 id="ticketModalTitulo"><i class="fas fa-print"></i> Vista Previa del Ticket</h3><button class="modal-close" onclick="Tickets.cerrar()"><i class="fas fa-times"></i></button></div>
-    <div class="ticket-preview-wrap"><div id="ticketContent" class="ticket-80mm"></div></div>
-    <div class="ticket-actions"><button class="btn-secondary" onclick="Tickets.cerrar()">Cerrar</button><button class="btn-print" onclick="Tickets.imprimir()"><i class="fas fa-print"></i> Imprimir</button></div>
-  </div>
-</div>
-
-<!-- ============================================================
-     MODAL: CIERRE DE MESA / COBRO
-     ============================================================ -->
-<div id="modalCierre" class="modal-overlay" style="display:none;">
-  <div class="modal-small">
-    <div class="modal-header"><h3><i class="fas fa-file-invoice-dollar"></i> Cierre de Mesa</h3><button class="modal-close" onclick="Cobro.cerrarModalCierre()"><i class="fas fa-times"></i></button></div>
-    <div class="modal-small-body">
-      <div class="cierre-resumen" id="cierreResumen"></div>
-      <div id="pagosParcialesContainer"></div>
-      <label>Forma de Pago (si no se divide)</label>
-      <div class="formas-pago">
-        <button class="pago-btn active" data-pago="Efectivo" onclick="Cobro.selectPago(this)"><i class="fas fa-money-bill"></i> Efectivo</button>
-        <button class="pago-btn" data-pago="Débito" onclick="Cobro.selectPago(this)"><i class="fas fa-credit-card"></i> Débito</button>
-        <button class="pago-btn" data-pago="Crédito" onclick="Cobro.selectPago(this)"><i class="fas fa-credit-card"></i> Crédito</button>
-        <button class="pago-btn" data-pago="Transferencia" onclick="Cobro.selectPago(this)"><i class="fas fa-mobile-alt"></i> Transf.</button>
-        <button class="pago-btn" data-pago="Mixto" onclick="Cobro.selectPago(this)"><i class="fas fa-layer-group"></i> Mixto</button>
-      </div>
-      <label for="cierreDescuento">Descuento (%)</label><input type="number" id="cierreDescuento" value="0" min="0" max="100" oninput="Cobro.actualizarTotalCierre()">
-      <div class="cierre-total-final" id="cierreTotalFinal"></div>
-      <div class="modal-small-footer"><button class="btn-secondary" onclick="Cobro.cerrarModalCierre()">Cancelar</button><button class="btn-primary" onclick="Cobro.confirmarCierre()"><i class="fas fa-check-circle"></i> Confirmar y Cobrar</button></div>
-    </div>
-  </div>
-</div>
-
-<!-- ============================================================
-     NOTIFICACIONES TOAST
-     ============================================================ -->
+<!-- Toast Container (siempre visible) -->
 <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
-<!-- Scripts -->
+<!-- Scripts (orden de carga importante) -->
 <script src="js/utils.js"></script>
 <script src="js/eventBus.js"></script>
 <script src="js/db-core.js"></script>
@@ -434,7 +274,7 @@
 <script src="js/tickets.js"></script>
 <script src="js/config.js"></script>
 <script src="js/despensa.js"></script>
-<script src="js/recetas.js"></script>  <!-- NUEVO -->
+<script src="js/recetas.js"></script>
 <script src="js/app.js"></script>
 
 </body>
