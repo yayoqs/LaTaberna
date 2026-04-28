@@ -17,6 +17,7 @@ const App = {
       }
       
       this._suscribirEventos();
+      DB._iniciarSyncPeriodica();   // inicia el intervalo de 30 segundos
       console.log('[App] Sistema listo.');
     } catch (e) {
       console.error('[App] Fallo en arranque:', e);
