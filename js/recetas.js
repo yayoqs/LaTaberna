@@ -1,14 +1,12 @@
 /* ================================================================
-   PubPOS — MÓDULO: recetas.js (v3 – recetario con cuadrícula y
-              detalle de preparación)
-   Propósito: Mostrar solo productos con receta, con tarjetas
-              identificables. Al seleccionar una receta se despliegan
-              los ingredientes, pasos e instrucciones.
+   PubPOS — MÓDULO: recetas.js (v3.1 – soporte para íconos y badges)
+   Propósito: Cuadrícula de recetas con detalle inmersivo.
+              Ahora incluye badge con cantidad de ingredientes en
+              las tarjetas e íconos de categoría en la lista.
    ================================================================ */
 
 const Recetas = (() => {
 
-  // Estado para búsqueda en tiempo real
   let _terminoBusqueda = '';
 
   /* ── CREACIÓN DINÁMICA DE LA VISTA ───────────────────────── */
@@ -51,13 +49,13 @@ const Recetas = (() => {
       productos = productos.filter(p => p.destino === 'barra' || p.destino === 'ambos');
     }
 
-    // Solo productos que tienen receta (tienen al menos un ingrediente)
+    // Solo productos con receta
     productos = productos.filter(prod => {
       const receta = DB.recetas.find(r => r.productoId == prod.id);
       return receta && receta.ingredientes && receta.ingredientes.length > 0;
     });
 
-    // Aplicar búsqueda
+    // Búsqueda
     if (_terminoBusqueda) {
       const term = _terminoBusqueda.toLowerCase();
       productos = productos.filter(p => p.nombre.toLowerCase().includes(term));
@@ -68,12 +66,12 @@ const Recetas = (() => {
       return;
     }
 
-    // Ordenar alfabéticamente
+    // Orden alfabético
     productos.sort((a,b) => a.nombre.localeCompare(b.nombre));
 
     grid.innerHTML = productos.map(prod => {
-      // Obtener primer ingrediente para un color derivado (hash simple)
       const receta = DB.recetas.find(r => r.productoId == prod.id);
+      const numIng = receta ? receta.ingredientes.length : 0;
       const inicial = prod.nombre.charAt(0).toUpperCase();
       const color = _getColorFromName(prod.nombre);
 
@@ -81,6 +79,7 @@ const Recetas = (() => {
         <div class="receta-card" onclick="Recetas.mostrarDetalle('${prod.id}')">
           <div class="receta-card-img" style="background-color: ${color};">
             <span class="receta-card-inicial">${inicial}</span>
+            <span class="receta-card-badge" title="${numIng} ingrediente(s)">${numIng} <i class="fas fa-boxes"></i></span>
           </div>
           <div class="receta-card-nombre">${prod.nombre}</div>
         </div>
@@ -94,7 +93,7 @@ const Recetas = (() => {
     render();
   }
 
-  /* ── COLOR BASADO EN EL NOMBRE (hash simple) ──────────────── */
+  /* ── COLOR BASADO EN EL NOMBRE ───────────────────────────── */
   function _getColorFromName(nombre) {
     let hash = 0;
     for (let i = 0; i < nombre.length; i++) {
@@ -103,6 +102,16 @@ const Recetas = (() => {
     }
     const h = Math.abs(hash) % 360;
     return `hsl(${h}, 55%, 45%)`;
+  }
+
+  /* ── ÍCONO SEGÚN CATEGORÍA DE INGREDIENTE ────────────────── */
+  function _iconoPorCategoria(categoria) {
+    const mapa = {
+      cocina: 'fa-fire-burner',
+      barra: 'fa-wine-glass',
+      general: 'fa-box'
+    };
+    return mapa[categoria] || 'fa-box';
   }
 
   /* ── MOSTRAR DETALLE DE RECETA (MODAL) ───────────────────── */
@@ -142,25 +151,24 @@ const Recetas = (() => {
       document.body.appendChild(modal);
     }
 
-    // Llenar contenido
+    // Título
     $id('detalleTitulo').innerHTML = `<i class="fas fa-utensils"></i> ${producto.nombre}`;
 
     // Ingredientes
-    let htmlIng = '<h4>Ingredientes</h4><ul class="receta-ingredientes-lista">';
+    let htmlIng = '<h4><i class="fas fa-list-ul"></i> Ingredientes</h4><ul class="receta-ingredientes-lista">';
     receta.ingredientes.forEach(ing => {
       const ingData = DB.ingredientes.find(i => i.id == ing.ingredienteId);
       if (ingData) {
-        const stockActual = ingData.stock;
-        const necesario = ing.cantidad;
-        const suficiente = stockActual >= necesario;
+        const suficiente = ingData.stock >= ing.cantidad;
         const claseStock = suficiente ? 'stock-suficiente' : 'stock-insuficiente';
+        const iconoCat = _iconoPorCategoria(ingData.categoria || 'general');
         htmlIng += `
           <li>
-            <span class="ing-nombre">${ingData.nombre}</span>
-            <span class="ing-cantidad">${necesario} ${ingData.unidad}</span>
+            <span class="ing-nombre"><i class="fas ${iconoCat}"></i> ${ingData.nombre}</span>
+            <span class="ing-cantidad">${ing.cantidad} ${ingData.unidad}</span>
             <span class="ing-stock ${claseStock}">
               <i class="fas ${suficiente ? 'fa-check-circle' : 'fa-exclamation-triangle'}"></i>
-              Stock: ${stockActual} ${ingData.unidad}
+              Stock: ${ingData.stock} ${ingData.unidad}
             </span>
           </li>`;
       } else {
@@ -172,18 +180,17 @@ const Recetas = (() => {
 
     // Instrucciones
     const instrucciones = receta.instrucciones || 'Sin instrucciones de preparación.';
-    // Convertir saltos de línea en <p> o <br>
     const pasosHTML = instrucciones
       .split('\n')
       .filter(line => line.trim())
       .map((line, i) => `<div class="paso-item"><span class="paso-num">${i+1}</span><span class="paso-texto">${line}</span></div>`)
       .join('');
     $id('detalleInstrucciones').innerHTML = `
-      <h4>Preparación</h4>
+      <h4><i class="fas fa-tasks"></i> Preparación</h4>
       <div class="receta-pasos">${pasosHTML || '<p>Sin instrucciones.</p>'}</div>
     `;
 
-    // Guardar productoId en el modal para usarlo al editar
+    // Guardar referencia para editar
     modal.dataset.productoId = prodId;
 
     modal.style.display = 'flex';

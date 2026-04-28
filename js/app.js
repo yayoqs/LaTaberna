@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: app.js (v4 – soporte para vista reparto y recetas)
+   PubPOS — MÓDULO: app.js (v4.1 – mejora visibilidad de campos en móviles)
    ================================================================ */
 const App = {
   async init() {
@@ -10,6 +10,7 @@ const App = {
       if (typeof Config !== 'undefined' && Config.cargar) Config.cargar();
       this._iniciarReloj();
       this._initRealVH();
+      this._mejorarFocoEnModales();   // ← NUEVO: mejora visibilidad en móviles
 
       if (Auth.getRol()) {
         const vistaDefecto = Auth.getDefaultView();
@@ -53,10 +54,31 @@ const App = {
     }
   },
 
+  /* ── NUEVO: mejora la visibilidad de campos al enfocarlos en móviles ── */
+  _mejorarFocoEnModales() {
+    document.addEventListener('focusin', (e) => {
+      const target = e.target;
+      if (!target.matches('input, textarea, select')) return;
+      const overlay = target.closest('.modal-overlay');
+      if (!overlay || overlay.style.display === 'none') return;
+
+      setTimeout(() => {
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const scrollableParent = target.closest('.modal-small-body, .receta-detalle-body, .modal-body');
+        if (scrollableParent) {
+          const rect = target.getBoundingClientRect();
+          const parentRect = scrollableParent.getBoundingClientRect();
+          if (rect.bottom > parentRect.bottom || rect.top < parentRect.top) {
+            target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+        }
+      }, 300);
+    });
+  },
+
   showView(nombre) {
     if (!Auth.getRol()) { Auth.mostrarLogin(); return; }
 
-    // Validaciones de permisos por vista
     if (nombre === 'caja' && !Auth.puedeAccederCaja()) { showToast('error', 'No tienes permiso para acceder a Caja'); return; }
     if (nombre === 'cocina' && !Auth.puedeAccederCocina()) { showToast('error', 'No tienes permiso para acceder a Cocina'); return; }
     if (nombre === 'config' && !Auth.esAdmin()) { showToast('error', 'Solo administradores pueden acceder a Configuración'); return; }
@@ -79,11 +101,9 @@ const App = {
       }
     }
 
-    // Ocultar todas las vistas y desactivar botones
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
 
-    // Activar vista y botón
     const vista = $id(`view-${nombre}`);
     const btn = document.querySelector(`[data-view="${nombre}"]`);
     if (vista) vista.classList.add('active');
@@ -91,12 +111,10 @@ const App = {
 
     EventBus.emit('vista:cambiada', nombre);
 
-    // Actualizar UI del header (selector de simulación)
     if (Auth.esMasterReal && Auth.esMasterReal()) {
       Auth.aplicarRestriccionesUI();
     }
 
-    // Llamar al render de cada módulo
     if (nombre === 'mesas' && window.Mesas) Mesas.render();
     if (nombre === 'cocina' && window.KDS) KDS.refresh();
     if (nombre === 'caja' && window.Caja) Caja.render();
@@ -120,17 +138,10 @@ const App = {
     EventBus.on('inventario:stock_bajo', (data) => {
       showToast('warning', `⚠️ Stock bajo: ${data.ingrediente} (${data.stock} ${data.unidad})`);
     });
-    EventBus.on('productos:cargados', () => {
-      if (window.Recetas) Recetas.render();
-    });
-    EventBus.on('recetas:actualizadas', () => {
-      if (window.Recetas) Recetas.render();
-    });
-    EventBus.on('pedidosDelivery:guardados', () => {
-      if (window.Reparto) Reparto.render();
-    });
+    EventBus.on('productos:cargados', () => { if (window.Recetas) Recetas.render(); });
+    EventBus.on('recetas:actualizadas', () => { if (window.Recetas) Recetas.render(); });
+    EventBus.on('pedidosDelivery:guardados', () => { if (window.Reparto) Reparto.render(); });
     EventBus.on('sync:colaActualizada', (pendientes) => {
-      // Opcional: mostrar un indicador de sincronización pendiente en el header
       const badge = document.getElementById('syncPendingBadge');
       if (badge) {
         badge.textContent = pendientes > 0 ? pendientes : '';
