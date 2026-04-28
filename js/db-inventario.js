@@ -1,8 +1,8 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-inventario.js (v4 – añade campo instrucciones
-              en recetas)
+   PubPOS — MÓDULO: db-inventario.js (v5 – añade campo valor_unitario
+              en ingredientes para cálculo de inventario)
    Propósito: Gestión de ingredientes, recetas y movimientos de stock.
-   Cambio: Las recetas ahora incluyen instrucciones de preparación.
+   Cambio: Los ingredientes ahora incluyen valor unitario (costo).
    ================================================================ */
 
 const DBInventario = (function() {
@@ -21,7 +21,8 @@ const DBInventario = (function() {
       unidad: this._validarString(i.unidad, 'u'),
       stock_minimo: this._validarNumero(i.stock_minimo, 0),
       categoria: this._validarString(i.categoria, 'general'),
-      ubicacion: this._validarString(i.ubicacion, '')
+      ubicacion: this._validarString(i.ubicacion, ''),
+      valor_unitario: this._validarNumero(i.valor_unitario, 0)   // NUEVO
     };
   };
 
@@ -33,7 +34,6 @@ const DBInventario = (function() {
         ingredienteId: this._validarId(ing.ingredienteId, 'ins'),
         cantidad: this._validarNumero(ing.cantidad, 0)
       })) : [],
-      // NUEVO CAMPO: instrucciones de preparación
       instrucciones: this._validarString(r.instrucciones, '')
     };
   };

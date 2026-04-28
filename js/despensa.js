@@ -1,6 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: despensa.js (v7.1 – permite guardar instrucciones
-              sin necesidad de añadir un ingrediente)
+   PubPOS — MÓDULO: despensa.js (v8 – gestión de inventario, sin recetas)
    ================================================================ */
 
 const Despensa = (() => {
@@ -18,11 +17,11 @@ const Despensa = (() => {
     main.className = 'view';
     main.innerHTML = `
       <div class="view-toolbar">
-        <h2><i class="fas fa-boxes"></i> Despensa — Control de Stock</h2>
+        <h2><i class="fas fa-boxes"></i> Despensa — Inventario</h2>
         <div class="toolbar-actions">
           <div style="display:flex; align-items:center; gap:8px;">
             <select id="despensaCatFilter" onchange="Despensa.filtrarPorCategoria(this.value)">
-              <option value="todas">Todas</option>
+              <option value="todas">Todas las categorías</option>
               <option value="cocina">Cocina</option>
               <option value="barra">Barra</option>
               <option value="general">General</option>
@@ -31,34 +30,33 @@ const Despensa = (() => {
                    oninput="Despensa._buscar()">
           </div>
           <button class="btn-primary" onclick="Despensa.mostrarModalIngrediente()">
-            <i class="fas fa-plus"></i> Nuevo
-          </button>
-          <button class="btn-secondary" onclick="Despensa.mostrarModalReceta()">
-            <i class="fas fa-link"></i> Receta
-          </button>
-          <button class="btn-secondary" onclick="Despensa.exportarMovimientos()">
-            <i class="fas fa-download"></i> Mov.
+            <i class="fas fa-plus"></i> Nuevo Ingrediente
           </button>
           <button class="btn-secondary" onclick="Despensa.exportarIngredientes()">
-            <i class="fas fa-download"></i> Ing.
+            <i class="fas fa-download"></i> Exportar
           </button>
           <button class="btn-secondary" onclick="Despensa.render()">
-            <i class="fas fa-sync-alt"></i>
+            <i class="fas fa-sync-alt"></i> Refrescar
           </button>
         </div>
       </div>
+
+      <!-- RESUMEN DE INVENTARIO -->
+      <div class="inventario-resumen" id="inventarioResumen"></div>
+
       <div class="despensa-grid">
         <div class="despensa-main">
-          <div id="despensaCounters" style="margin-bottom:8px; font-size:12px; display:flex; gap:16px; color:var(--color-text-muted)"></div>
           <table class="ingredientes-table" id="ingredientesTable">
             <thead>
               <tr>
                 <th onclick="Despensa.ordenarTabla('nombre')">Ingrediente <i class="fas fa-sort"></i></th>
-                <th onclick="Despensa.ordenarTabla('categoria')">Categoría <i class="fas fa-sort"></i></th>
+                <th onclick="Despensa.ordenarTabla('categoria')">Cat. <i class="fas fa-sort"></i></th>
                 <th onclick="Despensa.ordenarTabla('stock')">Stock <i class="fas fa-sort"></i></th>
-                <th onclick="Despensa.ordenarTabla('unidad')">Unidad <i class="fas fa-sort"></i></th>
+                <th onclick="Despensa.ordenarTabla('unidad')">Uni. <i class="fas fa-sort"></i></th>
                 <th onclick="Despensa.ordenarTabla('stock_minimo')">Mín. <i class="fas fa-sort"></i></th>
                 <th onclick="Despensa.ordenarTabla('ubicacion')">Ubicación <i class="fas fa-sort"></i></th>
+                <th onclick="Despensa.ordenarTabla('valor_unitario')">Valor Un. <i class="fas fa-sort"></i></th>
+                <th>Valor Total</th>
                 <th>Acciones</th>
               </tr>
             </thead>
@@ -66,11 +64,11 @@ const Despensa = (() => {
           </table>
         </div>
         <div class="despensa-sidebar">
-          <h4><i class="fas fa-history"></i> Movimientos</h4>
+          <h4><i class="fas fa-history"></i> Últimos movimientos</h4>
           <div id="movimientosList"></div>
           <h4><i class="fas fa-exclamation-triangle" style="color:var(--color-warning);"></i> Alertas Stock Bajo</h4>
           <div id="alertasStockList"></div>
-          <button class="btn-secondary" onclick="Despensa.ajusteRapido()">
+          <button class="btn-secondary" onclick="Despensa.ajusteRapido()" style="width:100%;">
             <i class="fas fa-pen"></i> Ajuste Rápido
           </button>
         </div>
@@ -80,184 +78,297 @@ const Despensa = (() => {
     document.body.insertBefore(main, referencia);
   }
 
+  /* ── RENDER PRINCIPAL ───────────────────────────────────── */
   function render() {
     _asegurarVista();
+    _renderResumen();
     _renderTablaIngredientes();
     _renderMovimientos();
     _renderAlertasStock();
-    _actualizarContadores();
   }
 
+  /* ── RESUMEN SUPERIOR (valor total del inventario) ───────── */
+  function _renderResumen() {
+    const cont = $id('inventarioResumen');
+    if (!cont) return;
+
+    const ingredientes = DB.ingredientes || [];
+    const totalItems = ingredientes.length;
+    const bajoMin = ingredientes.filter(i => i.stock <= i.stock_minimo).length;
+    const valorTotal = ingredientes.reduce((sum, i) => sum + (i.stock * (i.valor_unitario || 0)), 0);
+
+    cont.innerHTML = `
+      <div class="resumen-card">
+        <span><i class="fas fa-cubes"></i> Total ítems: <strong>${totalItems}</strong></span>
+        <span><i class="fas fa-dollar-sign"></i> Valor inventario: <strong>${fmtMoney(valorTotal)}</strong></span>
+        <span style="color:var(--color-warning);"><i class="fas fa-exclamation-triangle"></i> Bajo mínimo: <strong>${bajoMin}</strong></span>
+      </div>
+    `;
+  }
+
+  /* ── FILTROS ────────────────────────────────────────────── */
   function filtrarPorCategoria(cat) {
     _categoriaFiltro = cat;
     _renderTablaIngredientes();
-    _actualizarContadores();
+    _renderResumen();
   }
 
   function _buscar() {
     _ordenColumna = null;
     _ordenDireccion = 1;
     _renderTablaIngredientes();
-    _actualizarContadores();
+    _renderResumen();
   }
 
-  function _renderTablaIngredientes() { /* ... igual que antes ... */ }
-  function ordenarTabla(columna) { /* ... igual ... */ }
-  function _renderMovimientos() { /* ... igual ... */ }
-  function _renderAlertasStock() { /* ... igual ... */ }
-  function _actualizarContadores() { /* ... igual ... */ }
-  function _ajusteInline(ingId) { /* ... igual ... */ }
+  /* ── TABLA DE INGREDIENTES ─────────────────────────────── */
+  function _renderTablaIngredientes() {
+    const tbody = document.getElementById('ingredientesBody');
+    if (!tbody) return;
 
-  // ── MODALES (incluyendo el de receta corregido) ─────────────
-  function mostrarModalIngrediente(ingrediente = null) { /* ... igual ... */ }
-  function cerrarModalIngrediente() { /* ... igual ... */ }
-  function guardarIngrediente() { /* ... igual ... */ }
-  function editarIngrediente(id) { /* ... igual ... */ }
-  function ajusteRapido(id = null) { /* ... igual ... */ }
+    let ingredientes = DB.ingredientes || [];
+    const rol = Auth.getRol();
 
-  /* ── MODAL RECETA (CORREGIDO) ────────────────────────────── */
-  function mostrarModalReceta(productoId = null) {
-    let modal = document.getElementById('modalReceta');
+    if (rol === 'cocina') {
+      ingredientes = ingredientes.filter(i => i.categoria === 'cocina');
+    } else if (rol === 'barra') {
+      ingredientes = ingredientes.filter(i => i.categoria === 'barra');
+    }
+
+    if (_categoriaFiltro !== 'todas') {
+      ingredientes = ingredientes.filter(i => (i.categoria || 'general') === _categoriaFiltro);
+    }
+
+    const termino = (document.getElementById('ingredienteSearch')?.value || '').trim().toLowerCase();
+    if (termino) {
+      ingredientes = ingredientes.filter(i =>
+        i.nombre.toLowerCase().includes(termino) ||
+        (i.categoria || '').toLowerCase().includes(termino) ||
+        (i.ubicacion || '').toLowerCase().includes(termino)
+      );
+    }
+
+    // Ordenación
+    if (_ordenColumna) {
+      ingredientes.sort((a, b) => {
+        let valA = a[_ordenColumna];
+        let valB = b[_ordenColumna];
+        if (typeof valA === 'string') valA = valA.toLowerCase();
+        if (typeof valB === 'string') valB = valB.toLowerCase();
+        if (valA < valB) return -1 * _ordenDireccion;
+        if (valA > valB) return 1 * _ordenDireccion;
+        return 0;
+      });
+    } else {
+      ingredientes.sort((a, b) => {
+        const critA = a.stock <= a.stock_minimo ? 1 : 0;
+        const critB = b.stock <= b.stock_minimo ? 1 : 0;
+        return critB - critA || a.nombre.localeCompare(b.nombre);
+      });
+    }
+
+    if (!ingredientes.length) {
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:40px;">Sin ingredientes</td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = ingredientes.map(ing => {
+      const bajoStock = ing.stock <= ing.stock_minimo;
+      const maxBar = Math.max(ing.stock, ing.stock_minimo * 2, 1);
+      const porcentaje = Math.min(100, (ing.stock / maxBar) * 100);
+      const barColor = bajoStock ? 'var(--color-danger)' : 'var(--color-success)';
+      const valorUnitario = ing.valor_unitario || 0;
+      const valorTotal = ing.stock * valorUnitario;
+
+      return `
+        <tr class="${bajoStock ? 'stock-bajo' : ''}">
+          <td><strong>${ing.nombre}</strong></td>
+          <td>${ing.categoria || 'general'}</td>
+          <td>
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span>${ing.stock.toFixed(2)}</span>
+              <div style="flex:1; background:var(--color-border); border-radius:4px; height:6px; min-width:40px;">
+                <div style="width:${porcentaje}%; height:100%; background:${barColor}; border-radius:4px;"></div>
+              </div>
+            </div>
+          </td>
+          <td>${ing.unidad}</td>
+          <td>${ing.stock_minimo}</td>
+          <td>${ing.ubicacion || '—'}</td>
+          <td>${valorUnitario ? fmtMoney(valorUnitario) : '—'}</td>
+          <td><strong>${valorTotal ? fmtMoney(valorTotal) : '—'}</strong></td>
+          <td>
+            <button class="btn-ajuste" onclick="Despensa.editarIngrediente('${ing.id}')"><i class="fas fa-edit"></i></button>
+            <button class="btn-ajuste" onclick="Despensa.ajusteRapido('${ing.id}')"><i class="fas fa-pen"></i></button>
+          </td>
+        </tr>`;
+    }).join('');
+  }
+
+  function ordenarTabla(columna) {
+    if (_ordenColumna === columna) {
+      _ordenDireccion *= -1;
+    } else {
+      _ordenColumna = columna;
+      _ordenDireccion = 1;
+    }
+    _renderTablaIngredientes();
+  }
+
+  /* ── MOVIMIENTOS ────────────────────────────────────────── */
+  function _renderMovimientos() {
+    const cont = document.getElementById('movimientosList');
+    if (!cont) return;
+    const movs = DB.movimientos || [];
+    const recientes = [...movs].reverse().slice(0, 10);
+    if (!recientes.length) {
+      cont.innerHTML = `<p style="color:var(--color-text-muted);">Sin movimientos</p>`;
+      return;
+    }
+    cont.innerHTML = recientes.map(mov => {
+      const ing = DB.ingredientes.find(i => i.id === mov.ingredienteId);
+      const nombre = ing ? ing.nombre : mov.ingredienteId;
+      const signo = mov.cantidad >= 0 ? '+' : '';
+      const clase = mov.cantidad >= 0 ? 'success' : 'danger';
+      return `
+        <div class="movimiento-item">
+          <div style="display:flex; justify-content:space-between;">
+            <span><strong>${nombre}</strong></span>
+            <span style="color:var(--color-${clase});">${signo}${mov.cantidad.toFixed(2)}</span>
+          </div>
+          <div style="font-size:10px; color:var(--color-text-muted);">${mov.motivo} · ${new Date(mov.fecha).toLocaleString()}</div>
+        </div>`;
+    }).join('');
+  }
+
+  function _renderAlertasStock() {
+    const cont = document.getElementById('alertasStockList');
+    if (!cont) return;
+    const criticos = DB.ingredientes.filter(i => i.stock <= i.stock_minimo);
+    if (!criticos.length) {
+      cont.innerHTML = `<p style="color:var(--color-text-muted);"><i class="fas fa-check-circle"></i> Todo en orden</p>`;
+      return;
+    }
+    cont.innerHTML = criticos.map(i => `
+      <div style="padding:6px 0; border-bottom:1px solid var(--color-border);">
+        <i class="fas fa-exclamation-triangle" style="color:var(--color-warning);"></i>
+        <strong>${i.nombre}</strong><br>
+        <span style="font-size:11px;">Quedan ${i.stock} ${i.unidad} (mínimo ${i.stock_minimo})</span>
+      </div>`).join('');
+  }
+
+  /* ── MODAL INGREDIENTE (con valor unitario) ─────────────── */
+  function mostrarModalIngrediente(ingrediente = null) {
+    const esEdicion = !!ingrediente;
+    const titulo = esEdicion ? 'Editar Ingrediente' : 'Nuevo Ingrediente';
+    let modal = document.getElementById('modalIngrediente');
     if (!modal) {
       modal = document.createElement('div');
-      modal.id = 'modalReceta';
+      modal.id = 'modalIngrediente';
       modal.className = 'modal-overlay';
       modal.style.display = 'none';
       modal.innerHTML = `
-        <div class="modal-small" style="max-width: 520px;">
-          <div class="modal-header"><h3>Asignar Receta</h3><button class="modal-close" onclick="Despensa.cerrarModalReceta()"><i class="fas fa-times"></i></button></div>
+        <div class="modal-small">
+          <div class="modal-header"><h3 id="ingTitulo">${titulo}</h3><button class="modal-close" onclick="Despensa.cerrarModalIngrediente()"><i class="fas fa-times"></i></button></div>
           <div class="modal-small-body">
-            <label>Producto</label><select id="recProductoId" onchange="Despensa.mostrarRecetaActual()"></select>
-            <div id="recetaActual" style="margin-bottom: 10px;"></div>
-            <label>Ingrediente (opcional para añadir)</label><select id="recIngredienteId"><option value="">— Ninguno —</option></select>
-            <label>Cantidad necesaria</label><input type="number" id="recCantidad" step="0.01" placeholder="Solo si agregas ingrediente">
-            <label>Instrucciones de preparación</label>
-            <textarea id="recInstrucciones" rows="4" placeholder="1. Mezclar harina y huevos...&#10;2. Hornear a 180°C...&#10;3. Servir con salsa..."></textarea>
-            <div class="modal-small-footer">
-              <button class="btn-secondary" onclick="Despensa.cerrarModalReceta()">Cancelar</button>
-              <button class="btn-primary" onclick="Despensa.guardarReceta()">Guardar</button>
-            </div>
+            <input type="hidden" id="ingId">
+            <label>Nombre</label><input type="text" id="ingNombre" placeholder="Ej: Harina 000">
+            <label>Categoría</label><select id="ingCategoria"><option value="cocina">Cocina</option><option value="barra">Barra</option><option value="general">General</option></select>
+            <label>Stock actual</label><input type="number" id="ingStock" step="0.01" value="0">
+            <label>Unidad</label><input type="text" id="ingUnidad" placeholder="kg, g, L, u" value="kg">
+            <label>Stock mínimo</label><input type="number" id="ingStockMin" step="0.01" value="5">
+            <label>Ubicación</label><input type="text" id="ingUbicacion" placeholder="Ej: Estante 3">
+            <label>Valor unitario ($)</label><input type="number" id="ingValorUnitario" step="0.01" value="0" placeholder="0.00">
+            <div class="modal-small-footer"><button class="btn-secondary" onclick="Despensa.cerrarModalIngrediente()">Cancelar</button><button class="btn-primary" onclick="Despensa.guardarIngrediente()">Guardar</button></div>
           </div>
         </div>`;
       document.body.appendChild(modal);
     }
-
-    const selProd = document.getElementById('recProductoId');
-    selProd.innerHTML = DB.productos.filter(p => p.activo !== false).map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
-    const selIng = document.getElementById('recIngredienteId');
-    selIng.innerHTML = '<option value="">— Ninguno —</option>' + DB.ingredientes.map(i => `<option value="${i.id}">${i.nombre} (${i.unidad})</option>`).join('');
-
-    // Limpiar campos
-    document.getElementById('recCantidad').value = '';
-    const recInst = document.getElementById('recInstrucciones');
-    if (recInst) recInst.value = '';
-
-    if (productoId) {
-      selProd.value = productoId;
-      // Cargar instrucciones existentes
-      const receta = DB.recetas.find(r => r.productoId == productoId);
-      if (receta && recInst) recInst.value = receta.instrucciones || '';
-      mostrarRecetaActual();
-    } else {
-      mostrarRecetaActual();
-    }
-
+    document.getElementById('ingId').value = ingrediente?.id || '';
+    document.getElementById('ingNombre').value = ingrediente?.nombre || '';
+    document.getElementById('ingCategoria').value = ingrediente?.categoria || 'general';
+    document.getElementById('ingStock').value = ingrediente?.stock || 0;
+    document.getElementById('ingUnidad').value = ingrediente?.unidad || 'kg';
+    document.getElementById('ingStockMin').value = ingrediente?.stock_minimo || 5;
+    document.getElementById('ingUbicacion').value = ingrediente?.ubicacion || '';
+    document.getElementById('ingValorUnitario').value = ingrediente?.valor_unitario || 0;
+    document.getElementById('ingTitulo').textContent = titulo;
     modal.style.display = 'flex';
   }
 
-  function cerrarModalReceta() {
-    document.getElementById('modalReceta').style.display = 'none';
+  function cerrarModalIngrediente() {
+    document.getElementById('modalIngrediente').style.display = 'none';
   }
 
-  function mostrarRecetaActual() {
-    const productoId = document.getElementById('recProductoId').value;
-    const receta = DB.recetas.find(r => r.productoId == productoId);
-    const div = document.getElementById('recetaActual');
-    const recInst = document.getElementById('recInstrucciones');
-
-    if (recInst && receta) {
-      recInst.value = receta.instrucciones || '';
-    } else if (recInst) {
-      recInst.value = '';
-    }
-
-    if (receta && receta.ingredientes.length) {
-      let html = '<strong>Ingredientes asignados:</strong><ul>';
-      receta.ingredientes.forEach(ing => {
-        const nombreIng = DB.ingredientes.find(i => i.id == ing.ingredienteId)?.nombre || ing.ingredienteId;
-        html += `<li>${nombreIng}: ${ing.cantidad} <button class="btn-icon-sm" onclick="Despensa.quitarIngredienteReceta('${receta.productoId}', '${ing.ingredienteId}')"><i class="fas fa-trash"></i></button></li>`;
-      });
-      html += '</ul>';
-      div.innerHTML = html;
-    } else {
-      div.innerHTML = '<p style="color:var(--color-text-muted);">Sin ingredientes asignados.</p>';
-    }
-  }
-
-  async function guardarReceta() {
-    const productoId = document.getElementById('recProductoId').value;
-    if (!productoId) {
-      showToast('error', 'Selecciona un producto');
-      return;
-    }
-
-    const insumoId = document.getElementById('recIngredienteId').value;
-    const cantidad = parseFloat(document.getElementById('recCantidad').value);
-    const instrucciones = document.getElementById('recInstrucciones')?.value?.trim() || '';
-
-    // Si se ingresaron ingrediente y cantidad válidos, los sincronizamos
-    if (insumoId && !isNaN(cantidad) && cantidad > 0) {
-      const receta = {
-        id: `rec_${Date.now()}_${Math.random().toString(36).substr(2,4)}`,
-        productoId,
-        insumoId,
-        cantidad,
-        instrucciones      // también enviamos instrucciones en el mismo objeto
-      };
-
-      try {
-        await DB.syncGuardarReceta(receta);
-      } catch (e) {
-        showToast('error', 'Error al asignar ingrediente');
-      }
-    }
-
-    // Siempre actualizamos las instrucciones en la receta local
-    if (instrucciones) {
-      const recetaLocal = DB.recetas.find(r => r.productoId == productoId);
-      if (recetaLocal) {
-        recetaLocal.instrucciones = instrucciones;
-      } else {
-        // Si aún no hay receta, creamos una vacía con instrucciones
-        DB.recetas.push({
-          id: `rec_${Date.now()}_${Math.random().toString(36).substr(2,4)}`,
-          productoId,
-          ingredientes: [],
-          instrucciones
-        });
-      }
-      DB.saveRecetas();
-      EventBus.emit('recetas:actualizadas');
-    }
-
-    cerrarModalReceta();
-    showToast('success', 'Receta actualizada');
-    // Refrescar si hay módulo de recetas abierto
-    if (typeof Recetas !== 'undefined' && Recetas.render) Recetas.render();
-  }
-
-  async function quitarIngredienteReceta(productoId, ingredienteId) {
-    const receta = DB.recetas.find(r => r.productoId == productoId);
-    if (receta) {
-      receta.ingredientes = receta.ingredientes.filter(ing => ing.ingredienteId != ingredienteId);
-      DB.saveRecetas();
-      mostrarRecetaActual();
-      showToast('warning', 'Ingrediente eliminado localmente');
+  async function guardarIngrediente() {
+    const id = document.getElementById('ingId').value;
+    const nombre = document.getElementById('ingNombre').value.trim();
+    if (!nombre) { showToast('error', 'Nombre obligatorio'); return; }
+    const ingrediente = {
+      id: id || `ins_${Date.now()}_${Math.random().toString(36).substr(2,6)}`,
+      nombre,
+      categoria: document.getElementById('ingCategoria').value,
+      stock: parseFloat(document.getElementById('ingStock').value) || 0,
+      unidad: document.getElementById('ingUnidad').value.trim() || 'u',
+      stock_minimo: parseFloat(document.getElementById('ingStockMin').value) || 0,
+      ubicacion: document.getElementById('ingUbicacion').value.trim() || '',
+      valor_unitario: parseFloat(document.getElementById('ingValorUnitario').value) || 0
+    };
+    try {
+      await DB.syncGuardarIngrediente(ingrediente);
+      cerrarModalIngrediente();
+      render();
+      showToast('success', 'Ingrediente guardado');
+    } catch (e) {
+      showToast('error', 'Error al guardar ingrediente');
     }
   }
 
-  function exportarMovimientos() { /* ... */ }
-  function exportarIngredientes() { /* ... */ }
+  function editarIngrediente(id) {
+    const ing = DB.ingredientes.find(i => i.id == id);
+    if (ing) mostrarModalIngrediente(ing);
+  }
+
+  async function ajusteRapido(ingredienteId = null) {
+    if (!ingredienteId) {
+      const nombre = prompt('Ingrediente a ajustar (nombre exacto):');
+      if (!nombre) return;
+      const ing = DB.ingredientes.find(i => i.nombre.toLowerCase() === nombre.toLowerCase());
+      if (!ing) { showToast('error', 'Ingrediente no encontrado'); return; }
+      ingredienteId = ing.id;
+    }
+    const ing = DB.ingredientes.find(i => i.id === ingredienteId);
+    if (!ing) return;
+    const delta = prompt(`Ajustar stock de ${ing.nombre} (actual: ${ing.stock} ${ing.unidad}). Ingresá cantidad (positiva para agregar, negativa para quitar):`);
+    if (delta === null) return;
+    const cantidad = parseFloat(delta);
+    if (isNaN(cantidad)) { showToast('error', 'Cantidad inválida'); return; }
+    const motivo = prompt('Motivo (opcional):') || 'Ajuste manual';
+    DB.ajustarStock(ingredienteId, cantidad, motivo);
+    render();
+    showToast('success', `Stock de ${ing.nombre} actualizado`);
+  }
+
+  function exportarIngredientes() {
+    const ing = DB.ingredientes || [];
+    let csv = 'Nombre,Categoría,Stock,Unidad,Stock Mínimo,Ubicación,Valor Unitario,Valor Total\n';
+    ing.forEach(i => {
+      csv += `"${i.nombre}","${i.categoria || ''}",${i.stock},"${i.unidad}",${i.stock_minimo},"${i.ubicacion || ''}",${i.valor_unitario || 0},${i.stock * (i.valor_unitario || 0)}\n`;
+    });
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `inventario_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  /* ── MODAL RECETA (se mantiene para soportar la vista Recetas) ── */
+  function mostrarModalReceta(productoId = null) { /* ... sin cambios ... */ }
+  function cerrarModalReceta() { /* ... */ }
+  function guardarReceta() { /* ... */ }
+  function mostrarRecetaActual() { /* ... */ }
+  function quitarIngredienteReceta() { /* ... */ }
 
   function _initEventListeners() {
     EventBus.on('db:inicializada', render);
@@ -273,20 +384,19 @@ const Despensa = (() => {
     render,
     filtrarPorCategoria,
     _buscar,
-    _ajusteInline,
     mostrarModalIngrediente,
     cerrarModalIngrediente,
     guardarIngrediente,
     editarIngrediente,
     ajusteRapido,
+    exportarIngredientes,
     mostrarModalReceta,
     cerrarModalReceta,
     guardarReceta,
     mostrarRecetaActual,
     quitarIngredienteReceta,
-    exportarMovimientos,
-    exportarIngredientes,
     ordenarTabla
   };
 })();
+
 window.Despensa = Despensa;

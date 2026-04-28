@@ -1,9 +1,33 @@
 /* ================================================================
    PubPOS — CSS MODULAR
    Archivo: css/despensa.css
-   Propósito: Estilos específicos para la vista de Despensa
-              (tabla de ingredientes, sidebar, modales de ajuste).
+   Propósito: Estilos para la vista de Despensa (tabla de inventario,
+              resumen, sidebar, modales).
    ================================================================ */
+
+/* ── RESUMEN SUPERIOR ─────────────────────────────────────── */
+.inventario-resumen {
+  padding: 12px 20px 0;
+}
+.resumen-card {
+  display: flex;
+  gap: 24px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 14px 20px;
+  font-size: 13px;
+  color: var(--color-text-sec);
+  flex-wrap: wrap;
+}
+.resumen-card strong {
+  color: var(--color-text);
+  margin-left: 4px;
+}
+.resumen-card i {
+  margin-right: 6px;
+  color: var(--color-accent);
+}
 
 /* ── LAYOUT PRINCIPAL (Grid de 2 columnas) ─────────────────── */
 .despensa-grid {
@@ -68,7 +92,7 @@
 
 .ingredientes-table th {
   text-align: left;
-  padding: 12px 10px;
+  padding: 12px 8px;
   background: var(--color-panel);
   color: var(--color-text-muted);
   font-weight: 600;
@@ -80,10 +104,15 @@
   position: sticky;
   top: 0;
   z-index: 1;
+  cursor: pointer;
+  user-select: none;
+}
+.ingredientes-table th:hover {
+  color: var(--color-accent);
 }
 
 .ingredientes-table td {
-  padding: 10px;
+  padding: 8px 8px;
   border-bottom: 1px solid var(--color-border);
   color: var(--color-text);
   vertical-align: middle;
@@ -169,13 +198,6 @@
   font-size: 14px;
 }
 
-/* Botón de Ajuste Rápido en sidebar */
-.despensa-sidebar .btn-secondary {
-  width: 100%;
-  justify-content: center;
-  margin-top: 8px;
-}
-
 /* ── RESPONSIVE: TABLETS ──────────────────────────────────── */
 @media (max-width: 900px) {
   .despensa-grid {
@@ -185,7 +207,7 @@
   }
 
   .ingredientes-table {
-    min-width: 650px;
+    min-width: 800px;  /* más ancha por las nuevas columnas */
   }
 
   .btn-ajuste {
@@ -222,19 +244,9 @@
   }
 
   .ingredientes-table {
-    min-width: 600px;
+    min-width: 700px;
     font-size: 12px;
     display: table;
-  }
-
-  .ingredientes-table th:nth-child(2),
-  .ingredientes-table td:nth-child(2) {
-    display: none;
-  }
-
-  .ingredientes-table th:nth-child(5),
-  .ingredientes-table td:nth-child(5) {
-    display: none;
   }
 
   .btn-ajuste {
@@ -288,6 +300,7 @@
   letter-spacing: 0.5px;
   margin-bottom: -4px;
 }
+
 /* 🆕 Filtro de categoría */
 #despensaCatFilter {
   background: var(--color-panel);
@@ -298,15 +311,13 @@
   font-size: 12px;
 }
 
-/* 🆕 Input de ajuste inline */
-.ingredientes-table input[type="number"] {
+/* 🆕 Input de búsqueda en toolbar */
+#ingredienteSearch {
   background: var(--color-panel);
   border: 1px solid var(--color-border);
   color: var(--color-text);
-  border-radius: 4px;
-}
-
-/* 🆕 Contadores */
-#despensaCounters span {
-  margin-right: 8px;
+  padding: 6px 10px;
+  border-radius: var(--radius-xs);
+  font-size: 12px;
+  width: 180px;
 }
