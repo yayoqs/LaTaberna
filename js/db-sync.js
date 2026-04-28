@@ -7,7 +7,7 @@ const DBSync = (function() {
   const module = {};
 
   // ⚠️ URL de la implementación web de Apps Script (reemplazar si se republica)
-  module.urlSheets = "https://script.google.com/macros/s/AKfycbzdWbbDPqqFgKGsfMvuqBBgbmjkD1t3Pyhdn8u6byEfelnnGA5xeFdzRVCKgDiAxr6_dg/exec";
+  module.urlSheets = "https://script.google.com/macros/s/AKfycbxwAz63XN3bJEEG7XCFXkUZOUnw42qG8V248Tkqn30Zxy0ouV-UC4wSIdzgz3hnIM9sKQ/exec";
 
   module.syncQueue = [];
 
