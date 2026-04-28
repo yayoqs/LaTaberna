@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: app.js (v4 – soporte para vista reparto)
+   PubPOS — MÓDULO: app.js (v4 – soporte para vista reparto y recetas)
    ================================================================ */
 const App = {
   async init() {
@@ -10,14 +10,13 @@ const App = {
       if (typeof Config !== 'undefined' && Config.cargar) Config.cargar();
       this._iniciarReloj();
       this._initRealVH();
-      
+
       if (Auth.getRol()) {
         const vistaDefecto = Auth.getDefaultView();
         this.showView(vistaDefecto);
       }
-      
+
       this._suscribirEventos();
-      DB._iniciarSyncPeriodica();   // inicia el intervalo de 30 segundos
       console.log('[App] Sistema listo.');
     } catch (e) {
       console.error('[App] Fallo en arranque:', e);
@@ -73,7 +72,6 @@ const App = {
         return;
       }
     }
-    // NUEVA VALIDACIÓN PARA REPARTO
     if (nombre === 'reparto') {
       if (!Auth.puedeAccederReparto()) {
         showToast('error', 'No tienes permiso para acceder a Reparto');
@@ -84,7 +82,7 @@ const App = {
     // Ocultar todas las vistas y desactivar botones
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-    
+
     // Activar vista y botón
     const vista = $id(`view-${nombre}`);
     const btn = document.querySelector(`[data-view="${nombre}"]`);
@@ -105,7 +103,7 @@ const App = {
     if (nombre === 'config' && window.Config) Config.renderProductos();
     if (nombre === 'despensa' && window.Despensa) Despensa.render();
     if (nombre === 'recetas' && window.Recetas) Recetas.render();
-    if (nombre === 'reparto' && window.Reparto) Reparto.render();  // NUEVO
+    if (nombre === 'reparto' && window.Reparto) Reparto.render();
   },
 
   _suscribirEventos() {
@@ -113,6 +111,7 @@ const App = {
       if (window.Mesas) Mesas.render();
       if (window.Carta) Carta.render();
       if (window.Recetas) Recetas.render();
+      if (window.Reparto) Reparto.render();
     });
     EventBus.on('mesas:guardadas', () => { if (window.Mesas) Mesas.render(); });
     EventBus.on('comandas:guardadas', () => { if (window.KDS) KDS.refresh(); });
@@ -121,10 +120,23 @@ const App = {
     EventBus.on('inventario:stock_bajo', (data) => {
       showToast('warning', `⚠️ Stock bajo: ${data.ingrediente} (${data.stock} ${data.unidad})`);
     });
-    EventBus.on('productos:cargados', () => { if (window.Recetas) Recetas.render(); });
-    EventBus.on('recetas:actualizadas', () => { if (window.Recetas) Recetas.render(); });
-    // NUEVO: refrescar reparto cuando cambien sus datos
-    EventBus.on('pedidosDelivery:guardados', () => { if (window.Reparto) Reparto.render(); });
+    EventBus.on('productos:cargados', () => {
+      if (window.Recetas) Recetas.render();
+    });
+    EventBus.on('recetas:actualizadas', () => {
+      if (window.Recetas) Recetas.render();
+    });
+    EventBus.on('pedidosDelivery:guardados', () => {
+      if (window.Reparto) Reparto.render();
+    });
+    EventBus.on('sync:colaActualizada', (pendientes) => {
+      // Opcional: mostrar un indicador de sincronización pendiente en el header
+      const badge = document.getElementById('syncPendingBadge');
+      if (badge) {
+        badge.textContent = pendientes > 0 ? pendientes : '';
+        badge.style.display = pendientes > 0 ? 'inline-block' : 'none';
+      }
+    });
   }
 };
 
