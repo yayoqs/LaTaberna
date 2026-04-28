@@ -1,13 +1,11 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-sync.js (v2.5)
-   Propósito: Sincronización con Google Sheets mediante App Script.
-   Mejoras: Cabeceras extra y logs para depuración.
+   PubPOS — MÓDULO: db-sync.js (v3 – escritura vía GET sin CORS)
    ================================================================ */
 const DBSync = (function() {
   const module = {};
 
-  // ⚠️ URL de la implementación web de Apps Script (reemplazar si se republica)
-  module.urlSheets = "https://script.google.com/macros/s/AKfycby-OsMq4i74BbCuygr7HgUYr33nsmSGRxOSjvg9CHWKVUKGi9k46njI4VPQ0bny31te-w/exec";
+  // ⚠️ Pega aquí la URL de la NUEVA implementación que acabas de publicar
+  module.urlSheets = "https://script.google.com/macros/s/AKfycbwxUO3pQxKkGqge4vz2sSkxvAubELGMAOJomcTlGuYh8f8hSNsg6cdsN2GGiogjO9mVaQ/exec";
 
   module.syncQueue = [];
 
@@ -21,9 +19,6 @@ const DBSync = (function() {
     EventBus.emit('sync:colaActualizada', this.syncQueue.length);
   };
 
-  /**
-   * Encola una operación para sincronizar más tarde.
-   */
   module._encolarOperacion = function(action, payload) {
     this.syncQueue.push({
       id: `sync_${Date.now()}_${Math.random().toString(36)}`,
@@ -34,12 +29,9 @@ const DBSync = (function() {
     });
     this._saveSyncQueue();
     console.log(`[DB Sync] Operación "${action}" encolada.`);
-    showToast('info', `<i class="fas fa-cloud-upload-alt"></i> Cambios guardados localmente. Se sincronizarán cuando haya conexión.`);
+    showToast('info', '<i class="fas fa-cloud-upload-alt"></i> Cambios guardados localmente. Se sincronizarán cuando haya conexión.');
   };
 
-  /**
-   * Procesa la cola de sincronización.
-   */
   module._procesarSyncQueue = async function() {
     if (this.syncQueue.length === 0) return;
     console.log(`[DB Sync] Procesando cola (${this.syncQueue.length} operaciones)...`);
@@ -47,12 +39,10 @@ const DBSync = (function() {
     this.syncQueue = [];
     this._saveSyncQueue();
 
-    let exitos = 0;
-    let fallos = 0;
-
+    let exitos = 0, fallos = 0;
     for (const item of queueCopy) {
       try {
-        const res = await this._postData(item.action, item.payload);
+        await this._sendDataViaGet(item.action, item.payload);
         exitos++;
       } catch (e) {
         console.warn(`[DB Sync] Falló "${item.action}", re-encolando.`, e);
@@ -60,7 +50,7 @@ const DBSync = (function() {
         if (item.intentos < 5) {
           this.syncQueue.push(item);
         } else {
-          console.error(`[DB Sync] Descartando "${item.action}" después de 5 intentos.`);
+          console.error(`[DB Sync] Descartando "${item.action}" tras 5 intentos.`);
         }
         fallos++;
       }
@@ -77,37 +67,23 @@ const DBSync = (function() {
   };
 
   /**
-   * Función central para hacer POST al servidor con las cabeceras mejoradas.
-   * ✅ Agregamos 'Accept: application/json' para garantizar respuesta JSON.
+   * Envía datos de escritura usando una petición GET con el JSON como parámetro.
+   * Esto evita CORS en todos los casos.
    */
-  module._postData = async function(action, payload) {
-    const url = this.urlSheets;
-    const body = JSON.stringify({ action, ...payload });
-    console.log(`[DB Sync] Enviando "${action}" → ${url}`);
-    
-    const res = await fetch(url, {
-      method: 'POST',
-      mode: 'cors',
-      headers: {
-        'Content-Type': 'text/plain',   // evita preflight CORS complejo
-        'Accept': 'application/json'    // le pide al servidor que devuelva JSON
-      },
-      body: body
-    });
-
-    if (!res.ok) {
-      throw new Error(`HTTP ${res.status} (${res.statusText})`);
-    }
-
-    const data = await res.json();
-    if (data.error) {
-      throw new Error(data.error);
-    }
+  module._sendDataViaGet = async function(action, payload) {
+    const data = { action, ...payload };
+    const param = encodeURIComponent(JSON.stringify(data));
+    const url = `${this.urlSheets}?json=${param}`;
+    console.log(`[DB Sync] GET write -> ${url.substring(0, 150)}...`);
+    const res = await fetch(url, { mode: 'cors' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const respData = await res.json();
+    if (respData.error) throw new Error(respData.error);
     console.log(`[DB Sync] "${action}" completado con éxito.`);
-    return data;
+    return respData;
   };
 
-  /* ── FETCH DE DATOS (GET) ────────────────────────────────── */
+  // ── LECTURAS (GET normal) ──────────────────────────────────
   module._fetchProductos = async function() {
     try {
       const res = await fetch(`${this.urlSheets}?action=getProductos`, { mode: 'cors' });
@@ -138,7 +114,7 @@ const DBSync = (function() {
         console.log(`[DB Sync] ${this.mozos.length} mozos sincronizados.`);
       }
     } catch (e) {
-      console.warn("[DB Sync] Error obteniendo mozos, se mantendrán los locales.", e.message);
+      console.warn("[DB Sync] Error obteniendo mozos, manteniendo locales.", e.message);
     }
   };
 
@@ -147,14 +123,11 @@ const DBSync = (function() {
       const res = await fetch(`${this.urlSheets}?action=getInsumos`, { mode: 'cors' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      let ingredientes = [];
-      if (data && Array.isArray(data.insumos)) {
-        ingredientes = data.insumos;
-      } else if (data && Array.isArray(data.ingredientes)) {
-        ingredientes = data.ingredientes;
-      }
-      if (ingredientes.length) {
-        this.ingredientes = ingredientes.map(i => this._normalizarIngrediente(i));
+      let ing = [];
+      if (data && Array.isArray(data.insumos)) ing = data.insumos;
+      else if (data && Array.isArray(data.ingredientes)) ing = data.ingredientes;
+      if (ing.length) {
+        this.ingredientes = ing.map(i => this._normalizarIngrediente(i));
         this.saveIngredientes();
         console.log(`[DB Sync] ${this.ingredientes.length} ingredientes sincronizados.`);
       }
@@ -168,13 +141,11 @@ const DBSync = (function() {
       const res = await fetch(`${this.urlSheets}?action=getRecetas`, { mode: 'cors' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      let recetasPlanas = [];
-      if (data && Array.isArray(data.recetas)) {
-        recetasPlanas = data.recetas;
-      }
-      if (recetasPlanas.length) {
+      let recetas = [];
+      if (data && Array.isArray(data.recetas)) recetas = data.recetas;
+      if (recetas.length) {
         const mapa = new Map();
-        recetasPlanas.forEach(row => {
+        recetas.forEach(row => {
           const prodId = row.productoId || row[0];
           const ingId = row.insumoId || row[1];
           const cant = row.cantidad || row[2];
@@ -182,10 +153,7 @@ const DBSync = (function() {
           if (!mapa.has(prodId)) {
             mapa.set(prodId, { id: `rec_${prodId}`, productoId: prodId, ingredientes: [] });
           }
-          mapa.get(prodId).ingredientes.push({
-            ingredienteId: ingId,
-            cantidad: parseFloat(cant)
-          });
+          mapa.get(prodId).ingredientes.push({ ingredienteId: ingId, cantidad: parseFloat(cant) });
         });
         this.recetas = Array.from(mapa.values());
         this.saveRecetas();
@@ -197,7 +165,7 @@ const DBSync = (function() {
   };
 
   module.sincronizarTodo = async function() {
-    showToast('info', '<i class="fas fa-sync-alt fa-spin"></i> Sincronizando...');
+    showToast('info', 'Sincronizando...');
     try {
       await Promise.all([
         this._fetchProductos(),
@@ -206,26 +174,24 @@ const DBSync = (function() {
         this._fetchRecetas()
       ]);
       await this._procesarSyncQueue();
-      showToast('success', '<i class="fas fa-check-circle"></i> Datos sincronizados');
+      showToast('success', 'Datos sincronizados');
       EventBus.emit('sincronizacion:completada');
     } catch (e) {
-      console.error("[DB Sync] Error:", e);
       showToast('error', '<i class="fas fa-exclamation-circle"></i> Error de conexión');
     }
   };
 
-  // ─── PRODUCTOS ──────────────────────────────────────────────
+  // ── ESCRITURAS (ahora vía GET) ─────────────────────────────
   module.syncGuardarProducto = async function(producto) {
     const idx = this.productos.findIndex(p => p.id == producto.id);
     if (idx >= 0) this.productos[idx] = producto;
     else this.productos.push(producto);
     localStorage.setItem('pubpos_cache_prod', JSON.stringify(this.productos));
     EventBus.emit('productos:cargados', this.productos);
-
     try {
-      await this._postData('guardarProducto', { producto });
+      await this._sendDataViaGet('guardarProducto', { producto });
     } catch (e) {
-      console.warn('[DB Sync] Error, se encolará:', e);
+      console.warn('[DB Sync] Error, encolando:', e);
       this._encolarOperacion('guardarProducto', { producto });
     }
   };
@@ -234,11 +200,10 @@ const DBSync = (function() {
     this.productos = this.productos.filter(p => p.id != productoId);
     localStorage.setItem('pubpos_cache_prod', JSON.stringify(this.productos));
     EventBus.emit('productos:cargados', this.productos);
-
     try {
-      await this._postData('eliminarProducto', { productoId });
+      await this._sendDataViaGet('eliminarProducto', { productoId });
     } catch (e) {
-      console.warn('[DB Sync] Error, se encolará:', e);
+      console.warn('[DB Sync] Error, encolando:', e);
       this._encolarOperacion('eliminarProducto', { productoId });
     }
   };
@@ -248,18 +213,17 @@ const DBSync = (function() {
     if (idx >= 0) this.mozos[idx] = mozo;
     else this.mozos.push(mozo);
     this.saveMozos();
-
     try {
-      await this._postData('guardarMozo', { mozo });
+      await this._sendDataViaGet('guardarMozo', { mozo });
     } catch (e) {
-      console.warn('[DB Sync] Offline, mozo encolado.');
+      console.warn('[DB Sync] Offline, encolando mozo.');
       this._encolarOperacion('guardarMozo', { mozo });
     }
   };
 
   module.syncGuardarPedido = async function(pedido) {
     try {
-      await this._postData('guardarPedido', { pedido });
+      await this._sendDataViaGet('guardarPedido', { pedido });
     } catch (e) {
       console.warn('[DB Sync] Offline, pedido encolado.');
       this._encolarOperacion('guardarPedido', { pedido });
@@ -271,11 +235,10 @@ const DBSync = (function() {
     if (idx >= 0) this.ingredientes[idx] = ingrediente;
     else this.ingredientes.push(ingrediente);
     this.saveIngredientes();
-
     try {
-      await this._postData('guardarIngrediente', { ingrediente });
+      await this._sendDataViaGet('guardarIngrediente', { ingrediente });
     } catch (e) {
-      console.warn('[DB Sync] Error, se encolará:', e);
+      console.warn('[DB Sync] Error, encolando ingrediente:', e);
       this._encolarOperacion('guardarIngrediente', { ingrediente });
     }
   };
@@ -283,11 +246,10 @@ const DBSync = (function() {
   module.syncEliminarIngrediente = async function(ingredienteId) {
     this.ingredientes = this.ingredientes.filter(i => i.id != ingredienteId);
     this.saveIngredientes();
-
     try {
-      await this._postData('eliminarIngrediente', { ingredienteId });
+      await this._sendDataViaGet('eliminarIngrediente', { ingredienteId });
     } catch (e) {
-      console.warn('[DB Sync] Error, se encolará:', e);
+      console.warn('[DB Sync] Error, encolando eliminación:', e);
       this._encolarOperacion('eliminarIngrediente', { ingredienteId });
     }
   };
@@ -299,17 +261,13 @@ const DBSync = (function() {
       this.recetas.push(recetaLocal);
     }
     const ingIdx = recetaLocal.ingredientes.findIndex(ing => ing.ingredienteId == receta.insumoId);
-    if (ingIdx >= 0) {
-      recetaLocal.ingredientes[ingIdx].cantidad = receta.cantidad;
-    } else {
-      recetaLocal.ingredientes.push({ ingredienteId: receta.insumoId, cantidad: receta.cantidad });
-    }
+    if (ingIdx >= 0) recetaLocal.ingredientes[ingIdx].cantidad = receta.cantidad;
+    else recetaLocal.ingredientes.push({ ingredienteId: receta.insumoId, cantidad: receta.cantidad });
     this.saveRecetas();
-
     try {
-      await this._postData('guardarReceta', { receta });
+      await this._sendDataViaGet('guardarReceta', { receta });
     } catch (e) {
-      console.warn('[DB Sync] Error, se encolará:', e);
+      console.warn('[DB Sync] Error, encolando receta:', e);
       this._encolarOperacion('guardarReceta', { receta });
     }
   };
