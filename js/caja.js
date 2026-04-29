@@ -1,7 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: caja.js (v2 – vista autogenerada)
-   Propósito: Caja — Resumen del Turno. Ahora genera dinámicamente
-              #view-caja para eliminar dependencia HTML.
+   PubPOS — MÓDULO: caja.js (v3 – exportar conectado a Drive)
    ================================================================ */
 const Caja = (() => {
 
@@ -36,7 +34,7 @@ const Caja = (() => {
   }
 
   async function render() {
-    _asegurarVista();  // garantiza que exista la vista
+    _asegurarVista();
     const statsEl = $id('cajaStats');
     const bodyEl = $id('cajaBody');
     if (!statsEl || !bodyEl) return;
@@ -93,8 +91,51 @@ const Caja = (() => {
       </tr>`;
   }
 
-  function exportar() {
-    showToast('info', '<i class="fas fa-info-circle"></i> Exportación CSV próximamente disponible');
+  // ================================================================
+  // FASE 1: Exportar el cierre de caja a Google Drive (PDF)
+  // Antes: solo mostraba un toast diciendo "próximamente".
+  // Ahora: recoge los datos del turno, los envía al backend
+  //        y muestra el enlace al PDF generado.
+  // ================================================================
+  async function exportar() {
+    try {
+      // ── 1. Recopilar los mismos datos que ya se muestran en pantalla ──
+      const todos = await DB.fetchTodosPedidos();
+      const cerrados = todos.filter(p => p.estado === 'cerrada');
+      const abiertos = todos.filter(p => p.estado !== 'cerrada' && p.estado !== 'cancelada');
+
+      const totalVentas = cerrados.reduce((s, p) => s + (p.total || 0), 0);
+      const ticketPromedio = cerrados.length ? totalVentas / cerrados.length : 0;
+
+      // ── 2. Construir el objeto que espera el backend ──
+      const datosCierre = {
+        resumen: {
+          totalVentas,
+          mesasCerradas: cerrados.length,
+          ticketPromedio,
+          mesasAbiertas: abiertos.length
+        },
+        pedidos: todos  // El backend filtrará solo los cerrados para el detalle
+      };
+
+      // ── 3. Mostrar feedback al usuario ──
+      showToast('info', '<i class="fas fa-spinner fa-spin"></i> Generando informe de cierre...');
+
+      // ── 4. Llamar al backend usando el nuevo método genérico ──
+      const respuesta = await DB.llamar('generarCierre', datosCierre);
+
+      // ── 5. Interpretar la respuesta ──
+      if (respuesta.error) {
+        showToast('error', `Error: ${respuesta.error}`);
+      } else {
+        // Mostrar enlace al PDF (se abre en pestaña nueva)
+        showToast('success', `<i class="fas fa-check-circle"></i> PDF generado: <a href="${respuesta.pdfUrl}" target="_blank" style="color:var(--color-accent);">Abrir PDF</a>`);
+        console.log('[Caja] PDF generado:', respuesta.pdfUrl);
+      }
+    } catch (e) {
+      console.error('[Caja] Error exportando:', e);
+      showToast('error', '<i class="fas fa-exclamation-circle"></i> Error al generar el cierre. ¿Está bien configurada la hoja AppConfig?');
+    }
   }
 
   // Suscripción a eventos

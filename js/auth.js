@@ -1,6 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: auth.js (v5.2 – añade puedeAccederReparto y
-              vista por defecto para reparto)
+   PubPOS — MÓDULO: auth.js (v5.3 – añade acceso a Menú para cliente)
    ================================================================ */
 const Auth = (() => {
   const USUARIOS = [
@@ -17,7 +16,7 @@ const Auth = (() => {
   ];
 
   let _usuarioActual = null;
-  let _rolSimulado = null;    // solo master puede simular otro rol
+  let _rolSimulado = null;
 
   function init() {
     const saved = sessionStorage.getItem('usuarioActual');
@@ -31,13 +30,14 @@ const Auth = (() => {
     }
   }
 
-  // Vista por defecto según el rol (ahora incluye reparto)
+  // Vista por defecto según el rol
   function getDefaultView() {
     const rol = getRolEfectivo();
     if (rol === 'cocina' || rol === 'barra') return 'cocina';
     if (rol === 'caja') return 'caja';
     if (rol === 'despensa') return 'despensa';
-    if (rol === 'reparto') return 'reparto';       // NUEVO
+    if (rol === 'reparto') return 'reparto';
+    if (rol === 'cliente') return 'menu';       // NUEVO: cliente ve el menú
     return 'mesas';
   }
 
@@ -83,7 +83,7 @@ const Auth = (() => {
           </div>
           <div class="modal-small-body">
             <label>Usuario</label>
-            <input type="text" id="loginUsuario" placeholder="Ej: admin, master, cocina, barra, caja, mesero, despensa, eventos, reparto">
+            <input type="text" id="loginUsuario" placeholder="Ej: admin, master, cocina, barra, caja, mesero, despensa, eventos, reparto, cliente">
             <label>Contraseña</label>
             <input type="password" id="loginPassword" placeholder="Contraseña">
             <div class="modal-small-footer">
@@ -139,7 +139,8 @@ const Auth = (() => {
   function esCaja() { const r = getRolEfectivo(); return r === 'caja' || r === 'admin' || r === 'master'; }
   function esMesero() { const r = getRolEfectivo(); return r === 'mesero' || r === 'admin' || r === 'master'; }
   function esDespensa() { const r = getRolEfectivo(); return r === 'despensa' || r === 'admin' || r === 'master'; }
-  function esReparto() { const r = getRolEfectivo(); return r === 'reparto' || r === 'admin' || r === 'master'; }  // NUEVO
+  function esReparto() { const r = getRolEfectivo(); return r === 'reparto' || r === 'admin' || r === 'master'; }
+  function esCliente() { const r = getRolEfectivo(); return r === 'cliente' || r === 'admin' || r === 'master'; }
 
   function puede(permiso) { return tienePermiso(permiso); }
   function puedeEliminarItemEnviado() { return tienePermiso('eliminarItemEnviado'); }
@@ -153,10 +154,14 @@ const Auth = (() => {
     const rol = getRolEfectivo();
     return ['cocina', 'barra', 'admin', 'master'].includes(rol);
   }
-  // NUEVA función de permiso para Reparto
   function puedeAccederReparto() {
     const rol = getRolEfectivo();
     return ['reparto', 'admin', 'master'].includes(rol);
+  }
+  // NUEVO: acceso a Menú (todos los roles pueden ver el menú)
+  function puedeAccederMenu() {
+    const rol = getRolEfectivo();
+    return rol !== null; // cualquier rol autenticado puede ver el menú
   }
 
   // ── UI ────────────────────────────────────────────────────
@@ -169,7 +174,6 @@ const Auth = (() => {
       userEl.textContent = displayText;
     }
 
-    // Mostrar/ocultar elementos según el rol efectivo
     document.querySelectorAll('[data-rol]').forEach(el => {
       const roles = el.dataset.rol.split(',').map(r => r.trim());
       const mostrar = roles.includes(rolEfectivo) ||
@@ -178,7 +182,6 @@ const Auth = (() => {
       el.style.display = mostrar ? '' : 'none';
     });
 
-    // Contenedor del selector de mozo / simulador de rol
     const mozoContainer = document.querySelector('.mozo-selector');
     if (!mozoContainer || !_usuarioActual) return;
 
@@ -233,7 +236,8 @@ const Auth = (() => {
     esCaja,
     esMesero,
     esDespensa,
-    esReparto,                // NUEVO
+    esReparto,
+    esCliente,                // NUEVO
     puedeEliminarItemEnviado,
     puedeCerrarMesa,
     puedeAccederCaja,
@@ -250,7 +254,8 @@ const Auth = (() => {
     esMasterReal,
     aplicarRestriccionesUI,
     puedeAccederRecetas,
-    puedeAccederReparto       // NUEVO
+    puedeAccederReparto,
+    puedeAccederMenu         // NUEVO
   };
 })();
 

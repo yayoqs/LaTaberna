@@ -1,11 +1,11 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-sync.js (v3 – escritura vía GET sin CORS)
+   PubPOS — MÓDULO: db-sync.js (v4 – añade método público llamar)
    ================================================================ */
 const DBSync = (function() {
   const module = {};
 
-  // ⚠️ Pega aquí la URL de la NUEVA implementación que acabas de publicar
-  module.urlSheets = "https://script.google.com/macros/s/AKfycbwxUO3pQxKkGqge4vz2sSkxvAubELGMAOJomcTlGuYh8f8hSNsg6cdsN2GGiogjO9mVaQ/exec";
+  // ⚠️ Pega aquí la URL de tu implementación de Apps Script
+  module.urlSheets = "https://script.google.com/macros/s/AKfycbx5ejYByMGWfydfL4a6KLRpSEeus4NEeWHxfcZaXLDfcFE7U50rVkCBNdet_uohVfWS/exec";
 
   module.syncQueue = [];
 
@@ -274,6 +274,33 @@ const DBSync = (function() {
 
   module.getPendingSyncCount = function() {
     return this.syncQueue.length;
+  };
+
+  // ================================================================
+  // FASE 1: Nuevo método público genérico para llamadas al backend
+  // Uso: DB.llamar('generarCierre', { resumen: {...}, pedidos: [...] })
+  // Retorna la respuesta JSON del backend.
+  // A diferencia de _sendDataViaGet (que es privada), esta función
+  // es accesible desde cualquier módulo (caja.js, eventos.js, etc.)
+  // sin necesidad de modificar db-sync.js para cada nueva acción.
+  // ================================================================
+  module.llamar = async function(action, payload) {
+    try {
+      // Construye un objeto con action + el payload recibido
+      const data = { action, ...payload };
+      const param = encodeURIComponent(JSON.stringify(data));
+      const url = `${this.urlSheets}?json=${param}`;
+      console.log(`[DB Sync] Llamada genérica -> ${action}`);
+      const res = await fetch(url, { mode: 'cors' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const respData = await res.json();
+      if (respData.error) throw new Error(respData.error);
+      console.log(`[DB Sync] "${action}" completado con éxito.`);
+      return respData;
+    } catch (e) {
+      console.warn(`[DB Sync] Error en llamada "${action}":`, e);
+      throw e;
+    }
   };
 
   return module;

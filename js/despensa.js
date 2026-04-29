@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: despensa.js (v8 – gestión de inventario, sin recetas)
+   PubPOS — MÓDULO: despensa.js (v9 – solo inventario, sin recetas)
    ================================================================ */
 
 const Despensa = (() => {
@@ -147,7 +147,6 @@ const Despensa = (() => {
       );
     }
 
-    // Ordenación
     if (_ordenColumna) {
       ingredientes.sort((a, b) => {
         let valA = a[_ordenColumna];
@@ -363,13 +362,6 @@ const Despensa = (() => {
     URL.revokeObjectURL(url);
   }
 
-  /* ── MODAL RECETA (se mantiene para soportar la vista Recetas) ── */
-  function mostrarModalReceta(productoId = null) { /* ... sin cambios ... */ }
-  function cerrarModalReceta() { /* ... */ }
-  function guardarReceta() { /* ... */ }
-  function mostrarRecetaActual() { /* ... */ }
-  function quitarIngredienteReceta() { /* ... */ }
-
   function _initEventListeners() {
     EventBus.on('db:inicializada', render);
     EventBus.on('ingredientes:actualizados', render);
@@ -390,11 +382,6 @@ const Despensa = (() => {
     editarIngrediente,
     ajusteRapido,
     exportarIngredientes,
-    mostrarModalReceta,
-    cerrarModalReceta,
-    guardarReceta,
-    mostrarRecetaActual,
-    quitarIngredienteReceta,
     ordenarTabla
   };
 })();

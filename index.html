@@ -1,4 +1,4 @@
-<!<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
@@ -20,7 +20,8 @@
   <link rel="stylesheet" href="css/ticket.css">
   <link rel="stylesheet" href="css/despensa.css">
   <link rel="stylesheet" href="css/recetas.css">
-  <link rel="stylesheet" href="css/reparto.css">  <!-- NUEVO -->
+  <link rel="stylesheet" href="css/reparto.css">
+  <link rel="stylesheet" href="css/menu.css">    <!-- NUEVO -->
   <link rel="stylesheet" href="css/responsive.css">
   <style>
     .item-persona-badge {
@@ -63,9 +64,12 @@
       <button class="nav-btn" data-view="recetas" onclick="App.showView('recetas')" data-rol="cocina,barra,admin,master">
         <i class="fas fa-book"></i><span> Recetas</span>
       </button>
-      <!-- NUEVO BOTÓN REPARTO -->
       <button class="nav-btn" data-view="reparto" onclick="App.showView('reparto')" data-rol="admin,master,reparto">
         <i class="fas fa-motorcycle"></i><span> Reparto</span>
+      </button>
+      <!-- NUEVO BOTÓN MENÚ -->
+      <button class="nav-btn" data-view="menu" onclick="App.showView('menu')" data-rol="cliente,mesero,admin,master,caja">
+        <i class="fas fa-utensils"></i><span> Menú</span>
       </button>
       <button class="nav-btn" data-view="config" onclick="App.showView('config')" data-rol="admin,master">
         <i class="fas fa-sliders"></i><span> Config</span>
@@ -83,7 +87,7 @@
     </div>
   </header>
 
-  <!-- VISTAS GENERADAS 100% POR MÓDULOS JS -->
+  <!-- VISTAS GENERADAS POR MÓDULOS JS -->
 
   <!-- TOAST CONTAINER -->
   <div id="toastContainer" class="toast-container" aria-live="polite"></div>
@@ -110,7 +114,8 @@
   <script src="js/config.js"></script>
   <script src="js/despensa.js"></script>
   <script src="js/recetas.js"></script>
-  <script src="js/reparto.js"></script>  <!-- NUEVO -->
+  <script src="js/reparto.js"></script>
+  <script src="js/menu.js"></script>     <!-- NUEVO -->
   <script src="js/app.js"></script>
 
 </body>
