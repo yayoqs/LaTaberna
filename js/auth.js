@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: auth.js (v5.3 – añade acceso a Menú para cliente)
+   PubPOS — MÓDULO: auth.js (v5.4 – añade permiso para eventos)
    ================================================================ */
 const Auth = (() => {
   const USUARIOS = [
@@ -37,7 +37,8 @@ const Auth = (() => {
     if (rol === 'caja') return 'caja';
     if (rol === 'despensa') return 'despensa';
     if (rol === 'reparto') return 'reparto';
-    if (rol === 'cliente') return 'menu';       // NUEVO: cliente ve el menú
+    if (rol === 'eventos') return 'eventos';       // NUEVO
+    if (rol === 'cliente') return 'menu';
     return 'mesas';
   }
 
@@ -141,6 +142,7 @@ const Auth = (() => {
   function esDespensa() { const r = getRolEfectivo(); return r === 'despensa' || r === 'admin' || r === 'master'; }
   function esReparto() { const r = getRolEfectivo(); return r === 'reparto' || r === 'admin' || r === 'master'; }
   function esCliente() { const r = getRolEfectivo(); return r === 'cliente' || r === 'admin' || r === 'master'; }
+  function esEventos() { const r = getRolEfectivo(); return r === 'eventos' || r === 'admin' || r === 'master'; }
 
   function puede(permiso) { return tienePermiso(permiso); }
   function puedeEliminarItemEnviado() { return tienePermiso('eliminarItemEnviado'); }
@@ -150,6 +152,7 @@ const Auth = (() => {
   function puedeCambiarEstadoComanda() { return tienePermiso('cambiarEstadoComanda'); }
   function puedeEditarProductos() { return tienePermiso('editarProductos'); }
   function puedeEditarPrecios() { return tienePermiso('editarPrecios'); }
+
   function puedeAccederRecetas() {
     const rol = getRolEfectivo();
     return ['cocina', 'barra', 'admin', 'master'].includes(rol);
@@ -158,10 +161,14 @@ const Auth = (() => {
     const rol = getRolEfectivo();
     return ['reparto', 'admin', 'master'].includes(rol);
   }
-  // NUEVO: acceso a Menú (todos los roles pueden ver el menú)
   function puedeAccederMenu() {
     const rol = getRolEfectivo();
-    return rol !== null; // cualquier rol autenticado puede ver el menú
+    return rol !== null;
+  }
+  // NUEVO: Acceso a la vista de eventos
+  function puedeAccederEventos() {
+    const rol = getRolEfectivo();
+    return ['eventos', 'admin', 'master'].includes(rol);
   }
 
   // ── UI ────────────────────────────────────────────────────
@@ -237,7 +244,8 @@ const Auth = (() => {
     esMesero,
     esDespensa,
     esReparto,
-    esCliente,                // NUEVO
+    esCliente,
+    esEventos,
     puedeEliminarItemEnviado,
     puedeCerrarMesa,
     puedeAccederCaja,
@@ -255,7 +263,8 @@ const Auth = (() => {
     aplicarRestriccionesUI,
     puedeAccederRecetas,
     puedeAccederReparto,
-    puedeAccederMenu         // NUEVO
+    puedeAccederMenu,
+    puedeAccederEventos
   };
 })();
 

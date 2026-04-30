@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: app.js (v4.3 – corrección superposición, soporte imágenes)
+   PubPOS — MÓDULO: app.js (v4.4 – añade vista eventos)
    ================================================================ */
 const App = {
   async init() {
@@ -78,53 +78,37 @@ const App = {
   showView(nombre) {
     if (!Auth.getRol()) { Auth.mostrarLogin(); return; }
 
-    // Validaciones de permisos
+    // Validaciones
     if (nombre === 'caja' && !Auth.puedeAccederCaja()) { showToast('error', 'No tienes permiso para acceder a Caja'); return; }
     if (nombre === 'cocina' && !Auth.puedeAccederCocina()) { showToast('error', 'No tienes permiso para acceder a Cocina'); return; }
     if (nombre === 'config' && !Auth.esAdmin()) { showToast('error', 'Solo administradores pueden acceder a Configuración'); return; }
-    if (nombre === 'despensa') {
-      if (!Auth.esAdmin() && !Auth.esCocina() && !Auth.esBarra() && !Auth.esDespensa()) {
-        showToast('error', 'No tienes permiso para acceder a Despensa'); return;
-      }
-    }
-    if (nombre === 'recetas') {
-      if (!Auth.esCocina() && !Auth.esBarra() && !Auth.esAdmin() && !Auth.esMaster()) {
-        showToast('error', 'No tienes permiso para acceder a Recetas'); return;
-      }
-    }
-    if (nombre === 'reparto') {
-      if (!Auth.puedeAccederReparto()) { showToast('error', 'No tienes permiso para acceder a Reparto'); return; }
-    }
-    if (nombre === 'menu') {
-      if (!Auth.puedeAccederMenu()) { showToast('error', 'No tienes permiso para acceder al Menú'); return; }
-    }
+    if (nombre === 'despensa') { if (!Auth.esAdmin() && !Auth.esCocina() && !Auth.esBarra() && !Auth.esDespensa()) { showToast('error', 'No tienes permiso para acceder a Despensa'); return; } }
+    if (nombre === 'recetas') { if (!Auth.esCocina() && !Auth.esBarra() && !Auth.esAdmin() && !Auth.esMaster()) { showToast('error', 'No tienes permiso para acceder a Recetas'); return; } }
+    if (nombre === 'reparto') { if (!Auth.puedeAccederReparto()) { showToast('error', 'No tienes permiso para acceder a Reparto'); return; } }
+    if (nombre === 'menu') { if (!Auth.puedeAccederMenu()) { showToast('error', 'No tienes permiso para acceder al Menú'); return; } }
+    if (nombre === 'eventos') { if (!Auth.puedeAccederEventos()) { showToast('error', 'No tienes permiso para acceder a Eventos'); return; } }
 
-    // 🔧 CORRECCIÓN: Aseguramos que todas las vistas estén ocultas y sin estilo inline
     document.querySelectorAll('.view').forEach(v => {
       v.classList.remove('active');
-      v.style.display = '';   // Quita cualquier display inline que pudiera interferir
+      v.style.display = '';
     });
 
-    // Desactivar botones de navegación
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
 
-    // Activar vista y botón
     const vista = $id(`view-${nombre}`);
     const btn = document.querySelector(`[data-view="${nombre}"]`);
     if (vista) {
       vista.classList.add('active');
-      vista.style.display = ''; // Dejar que CSS maneje el display (flex)
+      vista.style.display = '';
     }
     if (btn) btn.classList.add('active');
 
     EventBus.emit('vista:cambiada', nombre);
 
-    // Actualizar UI del header (selector de simulación)
     if (Auth.esMasterReal && Auth.esMasterReal()) {
       Auth.aplicarRestriccionesUI();
     }
 
-    // Llamar al render de cada módulo
     if (nombre === 'mesas' && window.Mesas) Mesas.render();
     if (nombre === 'cocina' && window.KDS) KDS.refresh();
     if (nombre === 'caja' && window.Caja) Caja.render();
@@ -133,6 +117,7 @@ const App = {
     if (nombre === 'recetas' && window.Recetas) Recetas.render();
     if (nombre === 'reparto' && window.Reparto) Reparto.render();
     if (nombre === 'menu' && window.Menu) Menu.render();
+    if (nombre === 'eventos' && window.Eventos) Eventos.render();
   },
 
   _suscribirEventos() {
@@ -142,6 +127,7 @@ const App = {
       if (window.Recetas) Recetas.render();
       if (window.Reparto) Reparto.render();
       if (window.Menu) Menu.render();
+      if (window.Eventos) Eventos.render();
     });
     EventBus.on('mesas:guardadas', () => { if (window.Mesas) Mesas.render(); });
     EventBus.on('comandas:guardadas', () => { if (window.KDS) KDS.refresh(); });

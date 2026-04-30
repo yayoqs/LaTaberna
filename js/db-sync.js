@@ -1,11 +1,11 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-sync.js (v4 – añade método público llamar)
+   PubPOS — MÓDULO: db-sync.js (v4 – incluye método público llamar)
    ================================================================ */
 const DBSync = (function() {
   const module = {};
 
-  // ⚠️ Pega aquí la URL de tu implementación de Apps Script
-  module.urlSheets = "https://script.google.com/macros/s/AKfycbwyGTeErNXLWs-FBh_xeGBmsIsuqdMAREdM-6BDBscyDCwdsBPvJmXYQdOCsF1spPAqyA/exec";
+  // ⚠️ Reemplaza con tu URL actualizada después de implementar la Fase 2
+  module.urlSheets = "https://script.google.com/macros/s/AKfycbwnuMnw0mF4XKX0gq1ilqdzgP1Hw67tXW-FHHYcWlU1HF6LmZFzg5fkznNSkE3-48J5_w/exec";
 
   module.syncQueue = [];
 
@@ -276,17 +276,9 @@ const DBSync = (function() {
     return this.syncQueue.length;
   };
 
-  // ================================================================
-  // FASE 1: Nuevo método público genérico para llamadas al backend
-  // Uso: DB.llamar('generarCierre', { resumen: {...}, pedidos: [...] })
-  // Retorna la respuesta JSON del backend.
-  // A diferencia de _sendDataViaGet (que es privada), esta función
-  // es accesible desde cualquier módulo (caja.js, eventos.js, etc.)
-  // sin necesidad de modificar db-sync.js para cada nueva acción.
-  // ================================================================
+  // ── MÉTODO GENÉRICO PARA NUEVAS ACCIONES (Fase 1, 2, etc.) ─
   module.llamar = async function(action, payload) {
     try {
-      // Construye un objeto con action + el payload recibido
       const data = { action, ...payload };
       const param = encodeURIComponent(JSON.stringify(data));
       const url = `${this.urlSheets}?json=${param}`;
