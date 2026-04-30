@@ -1,7 +1,7 @@
 /* ================================================================
-   PubPOS — MÓDULO: tickets.js (v2 – con split bill)
-   Propósito: Generación y visualización/impresión de tickets 80mm.
-   Incluye ticket individual para split bill (generarCierreParcial).
+   PubPOS — MÓDULO: tickets.js (v3 – modal dinámico)
+   Corrección Fase 1: El modal de ticket ahora se crea bajo demanda,
+   eliminando la dependencia de HTML estático.
    ================================================================ */
 
 const Tickets = (() => {
@@ -10,9 +10,38 @@ const Tickets = (() => {
   let _htmlActual   = '';
   let _tituloActual = '';
 
+  /* ── ASEGURAR QUE EL MODAL DE TICKET EXISTA ──────────────── */
+  function _asegurarModalTicket() {
+    if ($id('modalTicket')) return; // ya existe
+
+    const modal = document.createElement('div');
+    modal.id = 'modalTicket';
+    modal.className = 'modal-overlay';
+    modal.style.display = 'none';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+    modal.innerHTML = `
+      <div class="modal-ticket">
+        <div class="modal-header">
+          <h3 id="ticketModalTitulo"><i class="fas fa-print"></i> Ticket</h3>
+          <button class="modal-close" onclick="Tickets.cerrar()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="ticket-preview-wrap">
+          <div id="ticketContent" class="ticket-80mm"></div>
+        </div>
+        <div class="ticket-actions">
+          <button class="btn-secondary" onclick="Tickets.cerrar()">Cerrar</button>
+          <button class="btn-primary" onclick="Tickets.imprimir()"><i class="fas fa-print"></i> Imprimir</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
 
   /* ── MOSTRAR MODAL DE PREVIEW ─────────────────────────────── */
   function mostrar(htmlContent, titulo) {
+    _asegurarModalTicket();  // ← garantiza que el modal existe
+
     _htmlActual   = htmlContent;
     _tituloActual = titulo;
     $id('ticketModalTitulo').innerHTML = `<i class="fas fa-print" aria-hidden="true"></i> ${titulo}`;
@@ -21,7 +50,8 @@ const Tickets = (() => {
   }
 
   function cerrar() {
-    $id('modalTicket').style.display = 'none';
+    const modal = $id('modalTicket');
+    if (modal) modal.style.display = 'none';
   }
 
 
@@ -308,7 +338,7 @@ const Tickets = (() => {
     generarComanda,
     generarCuenta,
     generarCierre,
-    generarCierreParcial, 
+    generarCierreParcial,
     testImpresora
   };
 
