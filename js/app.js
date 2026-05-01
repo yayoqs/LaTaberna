@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: app.js (v4.4 – añade vista eventos)
+   PubPOS — MÓDULO: app.js (v4.5 – añade vista personal)
    ================================================================ */
 const App = {
   async init() {
@@ -82,11 +82,28 @@ const App = {
     if (nombre === 'caja' && !Auth.puedeAccederCaja()) { showToast('error', 'No tienes permiso para acceder a Caja'); return; }
     if (nombre === 'cocina' && !Auth.puedeAccederCocina()) { showToast('error', 'No tienes permiso para acceder a Cocina'); return; }
     if (nombre === 'config' && !Auth.esAdmin()) { showToast('error', 'Solo administradores pueden acceder a Configuración'); return; }
-    if (nombre === 'despensa') { if (!Auth.esAdmin() && !Auth.esCocina() && !Auth.esBarra() && !Auth.esDespensa()) { showToast('error', 'No tienes permiso para acceder a Despensa'); return; } }
-    if (nombre === 'recetas') { if (!Auth.esCocina() && !Auth.esBarra() && !Auth.esAdmin() && !Auth.esMaster()) { showToast('error', 'No tienes permiso para acceder a Recetas'); return; } }
-    if (nombre === 'reparto') { if (!Auth.puedeAccederReparto()) { showToast('error', 'No tienes permiso para acceder a Reparto'); return; } }
-    if (nombre === 'menu') { if (!Auth.puedeAccederMenu()) { showToast('error', 'No tienes permiso para acceder al Menú'); return; } }
-    if (nombre === 'eventos') { if (!Auth.puedeAccederEventos()) { showToast('error', 'No tienes permiso para acceder a Eventos'); return; } }
+    if (nombre === 'despensa') {
+      if (!Auth.esAdmin() && !Auth.esCocina() && !Auth.esBarra() && !Auth.esDespensa()) {
+        showToast('error', 'No tienes permiso para acceder a Despensa'); return;
+      }
+    }
+    if (nombre === 'recetas') {
+      if (!Auth.esCocina() && !Auth.esBarra() && !Auth.esAdmin() && !Auth.esMaster()) {
+        showToast('error', 'No tienes permiso para acceder a Recetas'); return;
+      }
+    }
+    if (nombre === 'reparto') {
+      if (!Auth.puedeAccederReparto()) { showToast('error', 'No tienes permiso para acceder a Reparto'); return; }
+    }
+    if (nombre === 'menu') {
+      if (!Auth.puedeAccederMenu()) { showToast('error', 'No tienes permiso para acceder al Menú'); return; }
+    }
+    if (nombre === 'eventos') {
+      if (!Auth.puedeAccederEventos()) { showToast('error', 'No tienes permiso para acceder a Eventos'); return; }
+    }
+    if (nombre === 'personal') {
+      if (!Auth.puedeAccederPersonal()) { showToast('error', 'No tienes permiso para acceder a Personal'); return; }
+    }
 
     document.querySelectorAll('.view').forEach(v => {
       v.classList.remove('active');
@@ -118,6 +135,7 @@ const App = {
     if (nombre === 'reparto' && window.Reparto) Reparto.render();
     if (nombre === 'menu' && window.Menu) Menu.render();
     if (nombre === 'eventos' && window.Eventos) Eventos.render();
+    if (nombre === 'personal' && window.Personal) Personal.render();
   },
 
   _suscribirEventos() {
@@ -128,6 +146,7 @@ const App = {
       if (window.Reparto) Reparto.render();
       if (window.Menu) Menu.render();
       if (window.Eventos) Eventos.render();
+      if (window.Personal) Personal.render();
     });
     EventBus.on('mesas:guardadas', () => { if (window.Mesas) Mesas.render(); });
     EventBus.on('comandas:guardadas', () => { if (window.KDS) KDS.refresh(); });

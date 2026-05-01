@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: auth.js (v5.4 – añade permiso para eventos)
+   PubPOS — MÓDULO: auth.js (v5.5 – añade permiso para personal)
    ================================================================ */
 const Auth = (() => {
   const USUARIOS = [
@@ -30,14 +30,13 @@ const Auth = (() => {
     }
   }
 
-  // Vista por defecto según el rol
   function getDefaultView() {
     const rol = getRolEfectivo();
     if (rol === 'cocina' || rol === 'barra') return 'cocina';
     if (rol === 'caja') return 'caja';
     if (rol === 'despensa') return 'despensa';
     if (rol === 'reparto') return 'reparto';
-    if (rol === 'eventos') return 'eventos';       // NUEVO
+    if (rol === 'eventos') return 'eventos';
     if (rol === 'cliente') return 'menu';
     return 'mesas';
   }
@@ -67,7 +66,6 @@ const Auth = (() => {
     mostrarLogin();
   }
 
-  // ── MODAL DE LOGIN ──────────────────────────────────────────
   let loginModal = null;
 
   function mostrarLogin() {
@@ -116,11 +114,8 @@ const Auth = (() => {
     if (passInput) passInput.value = '';
   }
 
-  // ── PERMISOS ──────────────────────────────────────────────
   function getRolEfectivo() {
-    if (_usuarioActual?.rol === 'master' && _rolSimulado) {
-      return _rolSimulado;
-    }
+    if (_usuarioActual?.rol === 'master' && _rolSimulado) return _rolSimulado;
     return _usuarioActual?.rol || null;
   }
 
@@ -152,7 +147,6 @@ const Auth = (() => {
   function puedeCambiarEstadoComanda() { return tienePermiso('cambiarEstadoComanda'); }
   function puedeEditarProductos() { return tienePermiso('editarProductos'); }
   function puedeEditarPrecios() { return tienePermiso('editarPrecios'); }
-
   function puedeAccederRecetas() {
     const rol = getRolEfectivo();
     return ['cocina', 'barra', 'admin', 'master'].includes(rol);
@@ -161,17 +155,17 @@ const Auth = (() => {
     const rol = getRolEfectivo();
     return ['reparto', 'admin', 'master'].includes(rol);
   }
-  function puedeAccederMenu() {
-    const rol = getRolEfectivo();
-    return rol !== null;
-  }
-  // NUEVO: Acceso a la vista de eventos
+  function puedeAccederMenu() { return getRolEfectivo() !== null; }
   function puedeAccederEventos() {
     const rol = getRolEfectivo();
     return ['eventos', 'admin', 'master'].includes(rol);
   }
+  // Fase 3
+  function puedeAccederPersonal() {
+    const rol = getRolEfectivo();
+    return ['admin', 'master'].includes(rol);
+  }
 
-  // ── UI ────────────────────────────────────────────────────
   function aplicarRestriccionesUI() {
     const userEl = document.getElementById('usuarioActualDisplay');
     const rolEfectivo = getRolEfectivo();
@@ -227,7 +221,6 @@ const Auth = (() => {
     if (window.App) App.showView(vistaInicial);
   }
 
-  // ── API PÚBLICA ──────────────────────────────────────────
   return {
     init,
     login,
@@ -264,7 +257,8 @@ const Auth = (() => {
     puedeAccederRecetas,
     puedeAccederReparto,
     puedeAccederMenu,
-    puedeAccederEventos
+    puedeAccederEventos,
+    puedeAccederPersonal
   };
 })();
 
