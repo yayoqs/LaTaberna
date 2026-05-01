@@ -1,7 +1,7 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-core.js (v2.3 – añade pedidosDelivery)
-   Propósito: Núcleo de base de datos: mesas, pedidos, comandas,
-              mozos, configuración y ahora pedidos de delivery.
+   PubPOS — MÓDULO: db-core.js (v2.4 – añade campo imagen a productos)
+   Propósito: Núcleo de base de datos. Ahora los productos pueden
+              tener una URL de imagen opcional.
    ================================================================ */
 
 const DBCore = (function() {
@@ -13,7 +13,7 @@ const DBCore = (function() {
   module.comandas = [];
   module.config = {};
   module.mozos = [];
-  module.pedidosDelivery = [];   // NUEVO
+  module.pedidosDelivery = [];
 
   /* ── NORMALIZACIONES ─────────────────────────────────────── */
   module._normalizarProducto = function(p) {
@@ -24,7 +24,8 @@ const DBCore = (function() {
       categoria: this._validarString(p.categoria, 'General'),
       destino: this._validarDestino(p.destino),
       descripcion: this._validarString(p.descripcion, ''),
-      activo: this._validarBooleano(p.activo, true)
+      activo: this._validarBooleano(p.activo, true),
+      imagen: this._validarString(p.imagen, '')   // NUEVO: URL de imagen, opcional
     };
   };
 
@@ -52,7 +53,6 @@ const DBCore = (function() {
     };
   };
 
-  // NUEVA normalización
   module._normalizarPedidoDelivery = function(pd) {
     return {
       id: this._validarId(pd.id, 'deliv'),
@@ -205,7 +205,6 @@ const DBCore = (function() {
     }
   };
 
-  // NUEVA carga de pedidos delivery desde localStorage
   module._cargarPedidosDeliveryLocal = function() {
     const raw = localStorage.getItem('pubpos_pedidos_delivery');
     if (raw) {
@@ -230,8 +229,6 @@ const DBCore = (function() {
     EventBus.emit('pedidos:guardados', this.pedidos);
   };
   module.saveMozos = function() { localStorage.setItem('pubpos_mozos', JSON.stringify(this.mozos)); };
-
-  // NUEVO guardado de pedidos delivery
   module.savePedidosDelivery = function() {
     localStorage.setItem('pubpos_pedidos_delivery', JSON.stringify(this.pedidosDelivery));
     EventBus.emit('pedidosDelivery:guardados', this.pedidosDelivery);

@@ -1,10 +1,9 @@
 /* ================================================================
-   PubPOS — MÓDULO: config.js (v2.5 – gestión de múltiples zonas)
+   PubPOS — MÓDULO: config.js (v2.6 – añade campo imagen en modal)
    ================================================================ */
 const Config = (() => {
   const CATEGORIAS = ['Bebidas','Cervezas','Cocteles','Vinos','Entradas','Comidas','Postres'];
 
-  // ── INICIALIZACIÓN (crea la vista si no existe) ───────────
   function _asegurarVista() {
     if ($id('view-config')) return;
 
@@ -41,11 +40,21 @@ const Config = (() => {
             <label>Dirección</label><input type="text" id="cfgDireccion" value="Av. Corrientes 1234, CABA">
             <label>CUIT / RUT</label><input type="text" id="cfgCuit" value="30-12345678-9">
             <label>Pie de ticket</label><input type="text" id="cfgPie" value="¡Gracias por visitarnos!">
-            <!-- ZONAS (nueva sección) -->
             <label>Zonas / Espacios</label>
             <div id="zonasContainer" style="display:flex; flex-direction:column; gap:6px;"></div>
             <button class="btn-secondary" onclick="Config.agregarZona()"><i class="fas fa-plus"></i> Añadir Zona</button>
             <button class="btn-primary" onclick="Config.guardar()"><i class="fas fa-save"></i> Guardar</button>
+          </div>
+        </section>
+        <!-- Sección Mozos -->
+        <section class="config-card">
+          <h3><i class="fas fa-user-tie"></i> Mozos</h3>
+          <div class="local-config">
+            <div id="mozosLista" style="display:flex; flex-direction:column; gap:6px; max-height:180px; overflow-y:auto;"></div>
+            <div style="display:flex; gap:8px; margin-top:8px;">
+              <input type="text" id="nuevoMozoNombre" placeholder="Nombre del mozo">
+              <button class="btn-secondary" onclick="Config.agregarMozo()"><i class="fas fa-plus"></i> Añadir</button>
+            </div>
           </div>
         </section>
       </div>
@@ -54,12 +63,9 @@ const Config = (() => {
     document.body.insertBefore(main, referencia);
   }
 
-  // ── CARGA DE DATOS (incluye migración de zonas) ──────────
   function cargar() {
     _asegurarVista();
     const cfg = DB.config;
-
-    // Migración única: si existe cantidadMesas pero no zonas
     if (cfg.cantidadMesas && !cfg.zonas) {
       cfg.zonas = [
         { nombre: 'salon',   cantidad: cfg.cantidadMesas },
@@ -68,7 +74,6 @@ const Config = (() => {
       delete cfg.cantidadMesas;
       DB.saveConfig();
     }
-
     $id('cfgNombreLocal').value = cfg.nombreLocal || '';
     $id('cfgDireccion').value = cfg.direccion || '';
     $id('cfgCuit').value = cfg.cuit || '';
@@ -77,7 +82,6 @@ const Config = (() => {
     renderMozos();
   }
 
-  // ── RENDERIZAR ZONAS EN EL FORMULARIO ────────────────────
   function _renderZonas() {
     const container = $id('zonasContainer');
     if (!container) return;
@@ -93,17 +97,12 @@ const Config = (() => {
     `).join('');
   }
 
-  // ── ACTUALIZAR VALOR DE UNA ZONA (en memoria) ────────────
   function _updateZona(idx, campo, valor) {
     if (!DB.config.zonas) return;
-    if (campo === 'cantidad') {
-      DB.config.zonas[idx].cantidad = parseInt(valor) || 0;
-    } else {
-      DB.config.zonas[idx].nombre = valor.trim() || `zona_${idx+1}`;
-    }
+    if (campo === 'cantidad') DB.config.zonas[idx].cantidad = parseInt(valor) || 0;
+    else DB.config.zonas[idx].nombre = valor.trim() || `zona_${idx+1}`;
   }
 
-  // ── AGREGAR NUEVA ZONA ──────────────────────────────────
   function agregarZona() {
     if (!DB.config.zonas) DB.config.zonas = [];
     const nombre = prompt('Nombre de la nueva zona (ej: Terraza, Patio, VIP):');
@@ -114,20 +113,14 @@ const Config = (() => {
     _renderZonas();
   }
 
-  // ── ELIMINAR ZONA ───────────────────────────────────────
   function eliminarZona(idx) {
-    if (!DB.config.zonas || DB.config.zonas.length <= 1) {
-      showToast('error', 'Debe existir al menos una zona.');
-      return;
-    }
-    if (!confirm(`¿Eliminar la zona "${DB.config.zonas[idx].nombre}"? Las mesas de esa zona quedarán sin zona asignada.`)) return;
+    if (!DB.config.zonas || DB.config.zonas.length <= 1) { showToast('error', 'Debe existir al menos una zona.'); return; }
+    if (!confirm(`¿Eliminar la zona "${DB.config.zonas[idx].nombre}"?`)) return;
     DB.config.zonas.splice(idx, 1);
     _renderZonas();
   }
 
-  // ── GUARDAR CONFIGURACIÓN (incluye zonas) ────────────────
   function guardar() {
-    // Leer valores de los inputs de zona (por si no se disparó onchange)
     const zonasContainer = $id('zonasContainer');
     if (zonasContainer) {
       const filas = zonasContainer.querySelectorAll('div');
@@ -139,7 +132,6 @@ const Config = (() => {
         };
       });
     }
-
     DB.config = {
       ...DB.config,
       nombreLocal: $val('cfgNombreLocal'),
@@ -148,20 +140,15 @@ const Config = (() => {
       pieTicket: $val('cfgPie'),
       zonas: DB.config.zonas || [{ nombre: 'salon', cantidad: 12 }]
     };
-
-    // Eliminar clave obsoleta si existiera por migración
     delete DB.config.cantidadMesas;
-
-    // Reconstruir mesas según las nuevas zonas
-    DB._inicializarMesas();   // ← sincroniza las mesas reales
-
+    DB._inicializarMesas();
     DB.saveConfig();
     DB.saveMesas();
     if (window.Mesas) Mesas.render();
     showToast('success', '<i class="fas fa-check-circle"></i> Configuración guardada');
   }
 
-  // ── RESTO DE FUNCIONES (sin cambios) ──────────────────────
+  // ── PRODUCTOS ────────────────────────────────────────────
   function renderProductos() {
     _asegurarVista();
     const cont = $id('productosLista');
@@ -184,6 +171,7 @@ const Config = (() => {
         <span class="prod-config-nombre">${p.nombre}</span>
         <span class="prod-config-cat">${p.destino}</span>
         <span class="prod-config-precio">${fmtMoney(p.precio)}</span>
+        ${p.imagen ? '<span class="prod-config-img"><i class="fas fa-image"></i></span>' : ''}
         <button class="btn-icon-sm edit" onclick="Config._editarProducto('${p.id}')"><i class="fas fa-pen"></i></button>
         <button class="btn-icon-sm del" onclick="Config._eliminarProducto('${p.id}')"><i class="fas fa-trash"></i></button>
       </div>`;
@@ -206,12 +194,14 @@ const Config = (() => {
             <label for="prodCategoria">Categoría *</label><select id="prodCategoria"><option>Bebidas</option><option>Cervezas</option><option>Cocteles</option><option>Vinos</option><option>Entradas</option><option>Comidas</option><option>Postres</option></select>
             <label for="prodDestino">Destino Comanda *</label><select id="prodDestino"><option value="barra">Barra</option><option value="cocina">Cocina</option><option value="ambos">Ambos</option></select>
             <label for="prodDescripcion">Descripción</label><input type="text" id="prodDescripcion" placeholder="Descripción breve (opcional)">
+            <label for="prodImagen">Imagen (URL)</label><input type="text" id="prodImagen" placeholder="https://... (opcional)">
             <div class="prod-activo-row"><label for="prodActivo">Activo</label><input type="checkbox" id="prodActivo" checked></div>
             <div class="modal-small-footer"><button class="btn-secondary" onclick="Config.cerrarModalProducto()">Cancelar</button><button class="btn-primary" onclick="Config.guardarProducto()"><i class="fas fa-save"></i> Guardar</button></div>
           </div>
         </div>`;
       document.body.appendChild(modal);
     }
+
     $id('productoModalTitulo').textContent = prod ? 'Editar Producto' : 'Nuevo Producto';
     $id('prodId').value = prod?.id || '';
     $id('prodNombre').value = prod?.nombre || '';
@@ -219,6 +209,7 @@ const Config = (() => {
     $id('prodCategoria').value = prod?.categoria || 'Comidas';
     $id('prodDestino').value = prod?.destino || 'cocina';
     $id('prodDescripcion').value = prod?.descripcion || '';
+    $id('prodImagen').value = prod?.imagen || '';
     $id('prodActivo').checked = prod ? (prod.activo !== false) : true;
     modal.style.display = 'flex';
   }
@@ -236,6 +227,7 @@ const Config = (() => {
       categoria: $id('prodCategoria')?.value || 'General',
       destino: $id('prodDestino')?.value || 'cocina',
       descripcion: $val('prodDescripcion'),
+      imagen: $val('prodImagen'),
       activo: $id('prodActivo')?.checked ?? true
     };
     try {
@@ -265,10 +257,41 @@ const Config = (() => {
     }
   }
 
-  function renderMozos() { /* ... igual ... */ }
-  function agregarMozo() { /* ... */ }
-  function eliminarMozo(nombre) { /* ... */ }
+  // ── MOZOS ────────────────────────────────────────────────
+  function renderMozos() {
+    const container = $id('mozosLista');
+    if (!container) return;
+    const mozos = DB.mozos || [];
+    container.innerHTML = mozos.map((m, idx) => `
+      <div style="display:flex; align-items:center; gap:8px;">
+        <span style="flex:1;">${m.nombre}</span>
+        <span style="font-size:10px; color:${m.activo !== false ? 'var(--color-success)' : 'var(--color-text-muted)'};">
+          ${m.activo !== false ? 'Activo' : 'Inactivo'}
+        </span>
+        <button class="btn-icon-sm del" onclick="Config.eliminarMozo(${idx})"><i class="fas fa-trash"></i></button>
+      </div>
+    `).join('');
+  }
 
+  function agregarMozo() {
+    const nombre = $val('nuevoMozoNombre');
+    if (!nombre) return;
+    DB.mozos.push({ id: 'mozo_' + Date.now(), nombre, activo: true });
+    DB.saveMozos();
+    $id('nuevoMozoNombre').value = '';
+    renderMozos();
+    showToast('success', 'Mozo añadido');
+  }
+
+  function eliminarMozo(idx) {
+    if (!confirm('¿Eliminar mozo?')) return;
+    DB.mozos.splice(idx, 1);
+    DB.saveMozos();
+    renderMozos();
+    showToast('warning', 'Mozo eliminado');
+  }
+
+  // ── API PÚBLICA ──────────────────────────────────────────
   return {
     cargar, guardar, renderProductos,
     abrirModalProducto, cerrarModalProducto, guardarProducto,
