@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: menu.js (v1.1 – imágenes placeholder, eslogan)
+   PubPOS — MÓDULO: menu.js (v1.2 – imágenes desde Sheets o placeholder)
    ================================================================ */
 const Menu = (() => {
 
@@ -61,16 +61,7 @@ const Menu = (() => {
     _renderProductos();
   }
 
-  function _generarImagenURL(nombre) {
-    // Usamos un placeholder de Unsplash con palabras clave de comida/bebida
-    // Más un seed único basado en el nombre del producto para consistencia
-    const seed = encodeURIComponent(nombre + '-food');
-    return `https://source.unsplash.com/featured/400x300/?food,drink&sig=${nombre.length}`;
-    // Alternativa con picsum (comentada):
-    // const idx = Math.abs(nombre.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)) % 1000;
-    // return `https://picsum.photos/seed/${seed}/400/300`;
-  }
-
+  /* ── RENDERIZAR PRODUCTOS (con soporte para imagen de Sheets) ── */
   function _renderProductos() {
     const grid = $id('menuGrid');
     if (!grid) return;
@@ -95,11 +86,20 @@ const Menu = (() => {
     productos.sort((a,b) => a.nombre.localeCompare(b.nombre));
 
     grid.innerHTML = productos.map(prod => {
-      const imgUrl = _generarImagenURL(prod.nombre);
       const desc = prod.descripcion || 'Consulta a nuestro personal para más detalles.';
+      // Si hay imagen real, se usará como background; si no, se usará un color
+      const tieneImagen = prod.imagen && prod.imagen.trim() !== '';
+      const estiloImagen = tieneImagen
+        ? `background-image: url('${prod.imagen}');`
+        : `background-color: ${_getColorFromName(prod.nombre)};`;
+      const contenidoImagen = tieneImagen
+        ? ''
+        : `<span class="menu-card-inicial" style="display:block;font-size:52px;font-weight:800;color:rgba(255,255,255,.85);text-shadow:0 4px 12px rgba(0,0,0,.35);">${prod.nombre.charAt(0).toUpperCase()}</span>`;
+
       return `
         <div class="menu-card" onclick="Menu.mostrarDetalle('${prod.id}')">
-          <div class="menu-card-img" style="background-image: url('${imgUrl}');">
+          <div class="menu-card-img" style="${estiloImagen}">
+            ${contenidoImagen}
             <span class="menu-card-precio">${fmtMoney(prod.precio)}</span>
           </div>
           <div class="menu-card-body">
@@ -111,6 +111,18 @@ const Menu = (() => {
     }).join('');
   }
 
+  /* ── COLOR POR NOMBRE ──────────────────────────────────── */
+  function _getColorFromName(nombre) {
+    let hash = 0;
+    for (let i = 0; i < nombre.length; i++) {
+      hash = nombre.charCodeAt(i) + ((hash << 5) - hash);
+      hash = hash & hash;
+    }
+    const h = Math.abs(hash) % 360;
+    return `hsl(${h}, 55%, 45%)`;
+  }
+
+  /* ── MOSTRAR DETALLE ───────────────────────────────────── */
   function mostrarDetalle(prodId) {
     const producto = DB.productos.find(p => p.id == prodId);
     if (!producto) return;
@@ -141,13 +153,22 @@ const Menu = (() => {
       document.body.appendChild(modal);
     }
 
-    const imgUrl = _generarImagenURL(producto.nombre);
+    const tieneImagen = producto.imagen && producto.imagen.trim() !== '';
     $id('menuDetalleTitulo').innerHTML = `<i class="fas fa-utensils"></i> ${producto.nombre}`;
-    $id('menuDetalleImg').style.backgroundImage = `url('${imgUrl}')`;
+    const imgEl = $id('menuDetalleImg');
+    if (tieneImagen) {
+      imgEl.style.backgroundImage = `url('${producto.imagen}')`;
+      imgEl.style.backgroundColor = '';
+      imgEl.innerHTML = '';
+    } else {
+      imgEl.style.backgroundImage = '';
+      imgEl.style.backgroundColor = _getColorFromName(producto.nombre);
+      imgEl.innerHTML = `<span style="font-size:64px;font-weight:800;color:rgba(255,255,255,.9);text-shadow:0 4px 12px rgba(0,0,0,.4);">${producto.nombre.charAt(0)}</span>`;
+    }
     $id('menuDetalleDesc').textContent = producto.descripcion || 'Sin descripción disponible.';
     $id('menuDetallePrecio').innerHTML = `<span class="precio-etiqueta">${fmtMoney(producto.precio)}</span>`;
 
-    // Mostrar ingredientes principales si hay receta
+    // Ingredientes principales si hay receta
     const receta = DB.recetas.find(r => r.productoId == prodId);
     if (receta && receta.ingredientes.length) {
       const nombres = receta.ingredientes.map(ing => {

@@ -66,10 +66,6 @@ const DBSync = (function() {
     EventBus.emit('sync:colaActualizada', this.syncQueue.length);
   };
 
-  /**
-   * Envía datos de escritura usando una petición GET con el JSON como parámetro.
-   * Esto evita CORS en todos los casos.
-   */
   module._sendDataViaGet = async function(action, payload) {
     const data = { action, ...payload };
     const param = encodeURIComponent(JSON.stringify(data));
@@ -93,7 +89,10 @@ const DBSync = (function() {
         this.productos = data.productos.map(p => this._normalizarProducto(p));
         localStorage.setItem('pubpos_cache_prod', JSON.stringify(this.productos));
         EventBus.emit('productos:cargados', this.productos);
-        console.log(`[DB Sync] ${this.productos.length} productos sincronizados.`);
+
+        // 🔍 NUEVO: diagnóstico de imágenes
+        const conImagen = this.productos.filter(p => p.imagen && p.imagen.trim() !== '').length;
+        console.log(`[DB Sync] ${this.productos.length} productos sincronizados (${conImagen} con imagen).`);
       }
     } catch (e) {
       console.warn("[DB Sync] Error obteniendo productos, usando caché local.", e.message);
@@ -276,7 +275,7 @@ const DBSync = (function() {
     return this.syncQueue.length;
   };
 
-  // ── MÉTODO GENÉRICO PARA NUEVAS ACCIONES (Fase 1, 2, etc.) ─
+  // ── MÉTODO GENÉRICO PARA NUEVAS ACCIONES ──────────────────
   module.llamar = async function(action, payload) {
     try {
       const data = { action, ...payload };
