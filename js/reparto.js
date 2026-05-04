@@ -1,5 +1,7 @@
 /* ================================================================
-   PubPOS — MÓDULO: reparto.js (v3.3 – selector con búsqueda + lista sin scroll)
+   PubPOS — MÓDULO: reparto.js (v3.3 – selector con búsqueda y lista libre)
+   Propósito: Gestión de pedidos de envío. El modal permite buscar
+              productos por nombre, la lista de ítems crece sin límite.
    ================================================================ */
 const Reparto = (() => {
 
@@ -90,7 +92,7 @@ const Reparto = (() => {
     }).join('');
   }
 
-  /* ── MODAL NUEVO PEDIDO (MEJORADO CON BÚSQUEDA) ──────────── */
+  /* ── MODAL NUEVO PEDIDO (CON BÚSQUEDA DE PRODUCTOS) ──────── */
   let _itemsTemporales = [];
 
   function mostrarModalNuevo() {
@@ -114,24 +116,20 @@ const Reparto = (() => {
             <label>Teléfono</label><input type="text" id="repTelefono" placeholder="+56 9 ...">
 
             <label>Productos</label>
-            <!-- 🔍 Búsqueda de producto -->
             <div style="position:relative;">
-              <input type="text" id="repSearchProducto" placeholder="Buscar producto..." oninput="Reparto._filtrarSelectProducto()" style="width:100%;">
-              <select id="repProductoSelect" size="6" style="width:100%; margin-top:4px; display:block;">
-                <option value="">— Seleccionar producto —</option>
-              </select>
+              <input type="text" id="repBusquedaProducto" placeholder="Buscar producto..." autocomplete="off"
+                     oninput="Reparto._filtrarProductos()" style="width:100%;">
+              <div id="repResultadosBusqueda" style="position:absolute; top:100%; left:0; right:0; background:var(--color-panel); border:1px solid var(--color-border); border-radius:var(--radius-sm); z-index:10; max-height:200px; overflow-y:auto; display:none;">
+              </div>
             </div>
-
-            <div style="display:flex; gap:8px; align-items:flex-end; margin-top:6px;">
-              <input type="number" id="repCantidad" value="1" min="1" style="width:60px;" placeholder="Cant."
+            <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
+              <input type="number" id="repCantidad" value="1" min="1" style="width:70px;" placeholder="Cant."
                      onkeydown="if(event.key==='Enter'){ event.preventDefault(); Reparto._agregarItemAlPedido(); }">
-              <button class="btn-secondary" onclick="Reparto._agregarItemAlPedido()" style="white-space:nowrap;">
-                <i class="fas fa-plus"></i> Agregar
-              </button>
+              <button class="btn-secondary" onclick="Reparto._agregarItemAlPedido()"><i class="fas fa-plus"></i> Agregar</button>
             </div>
 
             <!-- Lista de items (sin límite de altura) -->
-            <div id="repItemsLista" style="display:flex; flex-direction:column; gap:6px; margin-top:8px; max-height:none; overflow-y:visible;">
+            <div id="repItemsLista" style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">
             </div>
 
             <label>Total ($)</label>
@@ -155,11 +153,10 @@ const Reparto = (() => {
     $id('repTotal').value = '0';
     $id('repRepartidor').value = '';
     $id('repObservaciones').value = '';
-    $id('repSearchProducto').value = '';
-
-    // Llenar select de productos
-    _rellenarSelectProductos();
+    $id('repBusquedaProducto').value = '';
     $id('repCantidad').value = 1;
+    $id('repResultadosBusqueda').style.display = 'none';
+
     _renderItemsTemporales();
     modal.style.display = 'flex';
   }
@@ -169,53 +166,77 @@ const Reparto = (() => {
     if (modal) modal.style.display = 'none';
   }
 
-  /* ── LLENAR SELECT CON TODOS LOS PRODUCTOS ────────────────── */
-  function _rellenarSelectProductos() {
-    const select = $id('repProductoSelect');
-    if (!select) return;
-    const productos = DB.productos.filter(p => p.activo !== false).sort((a,b) => a.nombre.localeCompare(b.nombre));
-    select.innerHTML = '<option value="">— Seleccionar producto —</option>' +
-      productos.map(p => `<option value="${p.id}">${p.nombre} (${fmtMoney(p.precio)})</option>`).join('');
-  }
+  // ── BÚSQUEDA DE PRODUCTOS ─────────────────────────────────
+  let _productoSeleccionado = null; // producto actualmente seleccionado
 
-  /* ── FILTRAR SELECT AL ESCRIBIR ──────────────────────────── */
-  function _filtrarSelectProducto() {
-    const termino = ($id('repSearchProducto')?.value || '').trim().toLowerCase();
-    const select = $id('repProductoSelect');
-    if (!select) return;
+  function _filtrarProductos() {
+    const input = $id('repBusquedaProducto');
+    const resultadoDiv = $id('repResultadosBusqueda');
+    if (!input || !resultadoDiv) return;
 
-    // Mostrar u ocultar opciones según el texto
-    for (const option of select.options) {
-      if (option.value === '') continue; // no ocultar la opción vacía
-      const texto = option.text.toLowerCase();
-      option.style.display = texto.includes(termino) ? '' : 'none';
-    }
-    // Si el filtro borra la selección actual, resetear
-    if (select.selectedOptions[0]?.style.display === 'none') {
-      select.value = '';
-    }
-  }
-
-  /* ── AGREGAR ÍTEM AL PEDIDO ─────────────────────────────── */
-  function _agregarItemAlPedido() {
-    const productoId = $id('repProductoSelect')?.value;
-    const cantidad = parseInt($id('repCantidad')?.value) || 1;
-
-    if (!productoId) {
-      showToast('warning', 'Selecciona un producto');
+    const termino = input.value.trim().toLowerCase();
+    if (!termino) {
+      resultadoDiv.style.display = 'none';
+      _productoSeleccionado = null;
       return;
     }
+
+    const productosFiltrados = DB.productos.filter(p =>
+      p.activo !== false &&
+      p.nombre.toLowerCase().includes(termino)
+    );
+
+    if (productosFiltrados.length === 0) {
+      resultadoDiv.innerHTML = '<div style="padding:8px; color:var(--color-text-muted);">Sin resultados</div>';
+      resultadoDiv.style.display = 'block';
+      _productoSeleccionado = null;
+      return;
+    }
+
+    resultadoDiv.innerHTML = productosFiltrados.map(p => `
+      <div class="resultado-item" data-id="${p.id}" data-nombre="${p.nombre}" data-precio="${p.precio}"
+           style="padding:8px 12px; cursor:pointer; border-bottom:1px solid var(--color-border); transition:var(--t);"
+           onmouseover="this.style.background='var(--color-hover)'" onmouseout="this.style.background=''"
+           onclick="Reparto._seleccionarProducto(this)">
+        <strong>${p.nombre}</strong> <span style="float:right; color:var(--color-accent);">${fmtMoney(p.precio)}</span>
+      </div>
+    `).join('');
+    resultadoDiv.style.display = 'block';
+    _productoSeleccionado = null; // se selecciona al hacer clic
+  }
+
+  function _seleccionarProducto(elemento) {
+    const id = elemento.dataset.id;
+    const nombre = elemento.dataset.nombre;
+    const precio = parseFloat(elemento.dataset.precio);
+
+    _productoSeleccionado = { id, nombre, precio };
+
+    // Mostrar el nombre en el input de búsqueda y ocultar resultados
+    $id('repBusquedaProducto').value = nombre;
+    $id('repResultadosBusqueda').style.display = 'none';
+    // Enfocar cantidad para agilizar
+    $id('repCantidad').focus();
+  }
+
+  /* ── AGREGAR ÍTEM ───────────────────────────────────────── */
+  function _agregarItemAlPedido() {
+    if (!_productoSeleccionado) {
+      showToast('warning', 'Selecciona un producto de la lista');
+      return;
+    }
+
+    const cantidad = parseInt($id('repCantidad')?.value) || 1;
     if (cantidad <= 0) {
       showToast('warning', 'Cantidad inválida');
       return;
     }
 
-    const producto = DB.productos.find(p => p.id === productoId);
+    const prodId = _productoSeleccionado.id;
+    const producto = DB.productos.find(p => p.id === prodId);
     if (!producto) return;
 
-    // 🔮 Futuro: validar stock según receta aquí
-
-    const existente = _itemsTemporales.find(it => it.prodId === productoId);
+    const existente = _itemsTemporales.find(it => it.prodId === prodId);
     if (existente) {
       existente.qty += cantidad;
     } else {
@@ -227,8 +248,11 @@ const Reparto = (() => {
       });
     }
 
+    // Limpiar selección para nuevo producto
+    $id('repBusquedaProducto').value = '';
+    _productoSeleccionado = null;
     $id('repCantidad').value = 1;
-    $id('repCantidad').focus();
+    $id('repBusquedaProducto').focus();
 
     _renderItemsTemporales();
   }
@@ -288,13 +312,63 @@ const Reparto = (() => {
   }
 
   /* ── ENVIAR A COCINA ────────────────────────────────────── */
-  function enviarACocina(deliveryId) { /* ... igual ... */ }
+  function enviarACocina(deliveryId) {
+    const pedido = DB.pedidosDelivery.find(p => p.id === deliveryId);
+    if (!pedido) {
+      showToast('error', 'Pedido no encontrado');
+      return;
+    }
+
+    const comanda = {
+      id: 'kds_deliv_' + Date.now() + '_' + Math.random().toString(36).substr(2,6),
+      mesa: `Delivery ${deliveryId.slice(-6)}`,
+      mozo: pedido.repartidor || 'Delivery',
+      destino: 'cocina',
+      items: pedido.items.map(it => ({
+        prodId: it.prodId || it.nombre,
+        nombre: it.nombre,
+        precio: it.precio || 0,
+        qty: it.qty,
+        obs: '',
+        enviado: false,
+        enviadoA: null,
+        enviadoTs: null,
+        persona: 'Delivery'
+      })),
+      observaciones: `${pedido.direccion} - ${pedido.telefono}`,
+      estado: 'nueva',
+      ts: Date.now(),
+      deliveryId: deliveryId
+    };
+
+    DB.comandas.push(comanda);
+    DB.saveComandas();
+    EventBus.emit('comanda:enviada', comanda);
+
+    DB.actualizarPedidoDelivery(deliveryId, { estado: 'en_preparacion' });
+    render();
+    showToast('success', 'Pedido enviado a Cocina/Barra');
+  }
 
   /* ── CAMBIAR ESTADO ──────────────────────────────────────── */
-  function cambiarEstado(id, nuevoEstado) { /* ... igual ... */ }
+  function cambiarEstado(id, nuevoEstado) {
+    const labels = {
+      en_preparacion: 'En preparación',
+      en_camino: 'En camino',
+      entregado: 'Entregado'
+    };
+    DB.actualizarPedidoDelivery(id, { estado: nuevoEstado });
+    render();
+    showToast('success', `Pedido → ${labels[nuevoEstado] || nuevoEstado}`);
+  }
 
   /* ── ELIMINAR PEDIDO ─────────────────────────────────────── */
-  function eliminarPedido(id) { /* ... igual ... */ }
+  function eliminarPedido(id) {
+    if (!confirm('¿Eliminar este pedido?')) return;
+    DB.eliminarPedidoDelivery(id);
+    render();
+    showToast('warning', 'Pedido eliminado');
+  }
 
   /* ── SUSCRIPCIÓN A EVENTOS ───────────────────────────────── */
   function _initEventListeners() {
@@ -318,7 +392,8 @@ const Reparto = (() => {
     guardarNuevoPedido,
     _agregarItemAlPedido,
     _quitarItemTemporal,
-    _filtrarSelectProducto,   // NUEVO
+    _filtrarProductos,
+    _seleccionarProducto,
     cambiarEstado,
     eliminarPedido,
     enviarACocina
