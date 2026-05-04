@@ -22,6 +22,7 @@
   <link rel="stylesheet" href="css/recetas.css">
   <link rel="stylesheet" href="css/reparto.css">
   <link rel="stylesheet" href="css/menu.css">
+  <link rel="stylesheet" href="css/perfil.css">   <!-- NUEVO Perfil -->
   <link rel="stylesheet" href="css/responsive.css">
   <style>
     .item-persona-badge {
@@ -70,13 +71,12 @@
       <button class="nav-btn" data-view="menu" onclick="App.showView('menu')" data-rol="cliente,mesero,admin,master,caja">
         <i class="fas fa-utensils"></i><span> Menú</span>
       </button>
-      <!-- Botón de Eventos (Fase 2) -->
       <button class="nav-btn" data-view="eventos" onclick="App.showView('eventos')" data-rol="eventos,admin,master">
         <i class="fas fa-calendar-alt"></i><span> Eventos</span>
       </button>
-      <!-- Botón de Personal (Fase 3) -->
-      <button class="nav-btn" data-view="personal" onclick="App.showView('personal')" data-rol="admin,master">
-        <i class="fas fa-id-card"></i><span> Personal</span>
+      <!-- NUEVO BOTÓN PERFIL (reemplaza a Personal) -->
+      <button class="nav-btn" data-view="perfil" onclick="App.showView('perfil')" data-rol="mesero,admin,master,caja,cocina,barra,despensa,eventos,reparto,cliente">
+        <i class="fas fa-id-card"></i><span> Perfil</span>
       </button>
       <button class="nav-btn" data-view="config" onclick="App.showView('config')" data-rol="admin,master">
         <i class="fas fa-sliders"></i><span> Config</span>
@@ -123,8 +123,8 @@
   <script src="js/recetas.js"></script>
   <script src="js/reparto.js"></script>
   <script src="js/menu.js"></script>
-  <script src="js/eventos.js"></script>   <!-- Fase 2 -->
-  <script src="js/personal.js"></script>  <!-- Fase 3 -->
+  <script src="js/eventos.js"></script>
+  <script src="js/perfil.js"></script>   <!-- reemplaza a personal.js -->
   <script src="js/app.js"></script>
 
 </body>

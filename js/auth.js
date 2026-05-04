@@ -1,5 +1,8 @@
 /* ================================================================
-   PubPOS — MÓDULO: auth.js (v5.5 – añade permiso para personal)
+   PubPOS — MÓDULO: auth.js (v5.6 – ajuste para Perfil de Usuario)
+   Cambios:
+   - Vista por defecto de admin vuelve a 'mesas' (Perfil no es principal).
+   - Nuevo método getUsuarioActual() para que el perfil obtenga datos.
    ================================================================ */
 const Auth = (() => {
   const USUARIOS = [
@@ -38,6 +41,8 @@ const Auth = (() => {
     if (rol === 'reparto') return 'reparto';
     if (rol === 'eventos') return 'eventos';
     if (rol === 'cliente') return 'menu';
+    // admin y master vuelven a mesas como vista principal
+    // (el perfil se accede desde el botón "Perfil")
     return 'mesas';
   }
 
@@ -127,6 +132,18 @@ const Auth = (() => {
 
   function getRol() { return _usuarioActual?.rol || null; }
   function getNombre() { return _usuarioActual?.nombre || ''; }
+
+  // NUEVO: retorna el objeto completo del usuario logueado (nombre, rol, y simulación si aplica)
+  function getUsuarioActual() {
+    if (!_usuarioActual) return null;
+    return {
+      nombre: _usuarioActual.nombre,
+      rol: _usuarioActual.rol,
+      rolEfectivo: getRolEfectivo(),
+      simulando: _rolSimulado || null
+    };
+  }
+
   function esMasterReal() { return _usuarioActual?.rol === 'master'; }
   function esMaster() { return _usuarioActual?.rol === 'master' && !_rolSimulado; }
   function esAdmin() { const r = getRolEfectivo(); return r === 'admin' || r === 'master'; }
@@ -160,10 +177,8 @@ const Auth = (() => {
     const rol = getRolEfectivo();
     return ['eventos', 'admin', 'master'].includes(rol);
   }
-  // Fase 3
-  function puedeAccederPersonal() {
-    const rol = getRolEfectivo();
-    return ['admin', 'master'].includes(rol);
+  function puedeAccederPerfil() {
+    return getRolEfectivo() !== null; // todos los usuarios autenticados
   }
 
   function aplicarRestriccionesUI() {
@@ -222,43 +237,18 @@ const Auth = (() => {
   }
 
   return {
-    init,
-    login,
-    logout,
-    getRol,
-    getNombre,
-    tienePermiso,
-    puede,
-    esMaster,
-    esAdmin,
-    esCocina,
-    esBarra,
-    esCaja,
-    esMesero,
-    esDespensa,
-    esReparto,
-    esCliente,
-    esEventos,
-    puedeEliminarItemEnviado,
-    puedeCerrarMesa,
-    puedeAccederCaja,
-    puedeAccederCocina,
-    puedeCambiarEstadoComanda,
-    puedeEditarProductos,
-    puedeEditarPrecios,
-    getDefaultView,
-    mostrarLogin,
-    cerrarModalLogin,
-    _loginFromModal,
-    _cambiarRolSimulado,
-    getRolEfectivo,
-    esMasterReal,
-    aplicarRestriccionesUI,
-    puedeAccederRecetas,
-    puedeAccederReparto,
-    puedeAccederMenu,
-    puedeAccederEventos,
-    puedeAccederPersonal
+    init, login, logout,
+    getRol, getNombre, getUsuarioActual,   // ← nuevo método
+    tienePermiso, puede,
+    esMaster, esAdmin, esCocina, esBarra, esCaja, esMesero,
+    esDespensa, esReparto, esCliente, esEventos,
+    puedeEliminarItemEnviado, puedeCerrarMesa,
+    puedeAccederCaja, puedeAccederCocina, puedeCambiarEstadoComanda,
+    puedeEditarProductos, puedeEditarPrecios,
+    getDefaultView, mostrarLogin, cerrarModalLogin, _loginFromModal,
+    _cambiarRolSimulado, getRolEfectivo, esMasterReal, aplicarRestriccionesUI,
+    puedeAccederRecetas, puedeAccederReparto, puedeAccederMenu,
+    puedeAccederEventos, puedeAccederPerfil
   };
 })();
 

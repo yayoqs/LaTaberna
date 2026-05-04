@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: app.js (v4.5 – añade vista personal)
+   PubPOS — MÓDULO: app.js (v4.6 – añade vista perfil)
    ================================================================ */
 const App = {
   async init() {
@@ -101,8 +101,8 @@ const App = {
     if (nombre === 'eventos') {
       if (!Auth.puedeAccederEventos()) { showToast('error', 'No tienes permiso para acceder a Eventos'); return; }
     }
-    if (nombre === 'personal') {
-      if (!Auth.puedeAccederPersonal()) { showToast('error', 'No tienes permiso para acceder a Personal'); return; }
+    if (nombre === 'perfil') {
+      if (!Auth.puedeAccederPerfil()) { showToast('error', 'No tienes permiso para acceder a Perfil'); return; }
     }
 
     document.querySelectorAll('.view').forEach(v => {
@@ -135,7 +135,7 @@ const App = {
     if (nombre === 'reparto' && window.Reparto) Reparto.render();
     if (nombre === 'menu' && window.Menu) Menu.render();
     if (nombre === 'eventos' && window.Eventos) Eventos.render();
-    if (nombre === 'personal' && window.Personal) Personal.render();
+    if (nombre === 'perfil' && window.Perfil) Perfil.render();   // ← NUEVO
   },
 
   _suscribirEventos() {
@@ -146,7 +146,7 @@ const App = {
       if (window.Reparto) Reparto.render();
       if (window.Menu) Menu.render();
       if (window.Eventos) Eventos.render();
-      if (window.Personal) Personal.render();
+      if (window.Perfil) Perfil.render();                        // ← NUEVO
     });
     EventBus.on('mesas:guardadas', () => { if (window.Mesas) Mesas.render(); });
     EventBus.on('comandas:guardadas', () => { if (window.KDS) KDS.refresh(); });

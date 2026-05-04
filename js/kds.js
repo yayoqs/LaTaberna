@@ -1,7 +1,9 @@
 /* ================================================================
-   PubPOS — MÓDULO: kds.js (v3 – vista autogenerada)
-   Propósito: Kitchen Display System. Ahora crea dinámicamente la
-              vista #view-cocina para eliminar dependencia HTML.
+   PubPOS — MÓDULO: kds.js (v3.1 – comunicación con Reparto)
+   Propósito: Kitchen Display System. Ahora, al marcar una comanda
+              como "lista", si pertenece a un pedido de delivery
+              emite el evento 'delivery:listo' para que Reparto
+              pueda reaccionar.
    ================================================================ */
 const KDS = (() => {
   const MINUTOS_URGENTE = 15;
@@ -25,13 +27,12 @@ const KDS = (() => {
       </div>
       <div id="cocinaKDS" class="kds-grid"></div>
     `;
-    // Insertar antes del toastContainer
     const referencia = $id('toastContainer') || document.body.lastChild;
     document.body.insertBefore(main, referencia);
   }
 
   function refresh() {
-    _asegurarVista();  // garantiza que exista
+    _asegurarVista();
     const cont = $id('cocinaKDS');
     if (!cont) return;
 
@@ -69,6 +70,9 @@ const KDS = (() => {
     const tiempoTxt = minutos === 0 ? 'Ahora' : `Hace ${minutos} min`;
     const destLabel = { cocina: 'Cocina', barra: 'Barra', ambos: 'Cocina + Barra' }[c.destino] || c.destino;
     const destCss = c.destino === 'barra' ? 'barra' : 'cocina';
+    // Mostrar etiqueta si es delivery
+    const esDelivery = !!c.deliveryId;
+    const etiquetaDelivery = esDelivery ? `<span class="kds-destino-tag" style="background:rgba(34,197,94,.2);color:var(--color-success);">Delivery</span>` : '';
 
     const itemsHTML = c.items.map(it => {
       const receta = DB.recetas?.find(r => r.productoId == it.prodId);
@@ -108,7 +112,7 @@ const KDS = (() => {
     return `
       <article class="kds-card ${c.estado}" id="kds-${c.id}">
         <div class="kds-header">
-          <div class="kds-mesa"><i class="fas fa-chair"></i> Mesa ${c.mesa} <span class="kds-mozo">${c.mozo}</span></div>
+          <div class="kds-mesa"><i class="fas fa-chair"></i> ${c.mesa} ${etiquetaDelivery} <span class="kds-mozo">${c.mozo}</span></div>
           <div class="kds-meta"><span class="kds-destino-tag ${destCss}">${destLabel}</span><span class="kds-time${urgente ? ' urgente' : ''}">${tiempoTxt}</span></div>
         </div>
         <div class="kds-items">${itemsHTML}</div>
@@ -117,11 +121,14 @@ const KDS = (() => {
       </article>`;
   }
 
+  /* ── CAMBIAR ESTADO (con notificación a Reparto) ──────────── */
   function _setEstado(id, estado) {
     const c = DB.comandas.find(x => x.id === id);
     if (!c) return;
     c.estado = estado;
+
     if (estado === 'lista') {
+      // Si es una comanda de mesa normal
       const mesa = DB.getMesa(c.mesa);
       if (mesa && mesa.estado === 'ocupada') {
         mesa.estado = 'esperando';
@@ -129,7 +136,14 @@ const KDS = (() => {
         EventBus.emit('mesa:actualizada', { mesa: c.mesa, estado: 'esperando' });
       }
       EventBus.emit('comanda:lista', { id, mesa: c.mesa });
+
+      // NUEVO: Si la comanda es de delivery, notificar a Reparto
+      if (c.deliveryId) {
+        EventBus.emit('delivery:listo', { deliveryId: c.deliveryId, comandaId: id });
+        console.log(`[KDS] Delivery listo: ${c.deliveryId}`);
+      }
     }
+
     DB.saveComandas();
     refresh();
     showToast('success', `<i class="fas fa-check"></i> Mesa ${c.mesa} → ${estado === 'lista' ? 'LISTA ✓' : 'En proceso'}`);
@@ -140,7 +154,6 @@ const KDS = (() => {
     EventBus.on('comanda:enviada', refresh);
     EventBus.on('db:inicializada', refresh);
   }
-
   _initEventListeners();
 
   return { refresh, _setEstado };
