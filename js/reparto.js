@@ -1,8 +1,8 @@
 /* ================================================================
-   PubPOS — MÓDULO: reparto.js (v3 – pedido con selección de menú)
-   Propósito: Gestionar pedidos de envío. Ahora el modal de nuevo
-              pedido permite buscar y agregar productos del catálogo,
-              calculando el total automáticamente.
+   PubPOS — MÓDULO: reparto.js (v3.2 – modal con scroll inteligente)
+   Propósito: Gestionar pedidos de envío. El modal de nuevo pedido
+              ahora limita la altura de la lista de ítems al 30% del
+              viewport y activa scroll solo cuando es necesario.
    ================================================================ */
 const Reparto = (() => {
 
@@ -93,8 +93,8 @@ const Reparto = (() => {
     }).join('');
   }
 
-  /* ── MODAL NUEVO PEDIDO (MEJORADO CON MENÚ) ─────────────── */
-  let _itemsTemporales = [];  // items acumulados antes de guardar
+  /* ── MODAL NUEVO PEDIDO (SCROLL DINÁMICO) ────────────────── */
+  let _itemsTemporales = [];
 
   function mostrarModalNuevo() {
     _itemsTemporales = [];
@@ -121,14 +121,15 @@ const Reparto = (() => {
               <select id="repProductoSelect" style="flex:1;">
                 <option value="">— Seleccionar producto —</option>
               </select>
-              <input type="number" id="repCantidad" value="1" min="1" style="width:60px;" placeholder="Cant.">
+              <input type="number" id="repCantidad" value="1" min="1" style="width:60px;" placeholder="Cant."
+                     onkeydown="if(event.key==='Enter'){ event.preventDefault(); Reparto._agregarItemAlPedido(); }">
               <button class="btn-secondary" onclick="Reparto._agregarItemAlPedido()" style="white-space:nowrap;">
                 <i class="fas fa-plus"></i> Agregar
               </button>
             </div>
 
-            <!-- Lista de items agregados (dinámica) -->
-            <div id="repItemsLista" style="display:flex; flex-direction:column; gap:6px; margin-top:8px; max-height:160px; overflow-y:auto;">
+            <!-- Lista de items con altura limitada y scroll dinámico -->
+            <div id="repItemsLista" style="display:flex; flex-direction:column; gap:6px; margin-top:8px; max-height:30vh; overflow-y:auto;">
             </div>
 
             <label>Total ($)</label>
@@ -187,7 +188,6 @@ const Reparto = (() => {
     const producto = DB.productos.find(p => p.id === productoId);
     if (!producto) return;
 
-    // Buscar si ya existe en la lista
     const existente = _itemsTemporales.find(it => it.prodId === productoId);
     if (existente) {
       existente.qty += cantidad;
@@ -199,6 +199,10 @@ const Reparto = (() => {
         qty: cantidad
       });
     }
+
+    $id('repCantidad').value = 1;
+    $id('repCantidad').focus();
+
     _renderItemsTemporales();
   }
 
@@ -244,7 +248,7 @@ const Reparto = (() => {
     const nuevo = DB.crearPedidoDelivery({
       direccion,
       telefono,
-      items: _itemsTemporales.map(it => ({ ...it })), // copia
+      items: _itemsTemporales.map(it => ({ ...it })),
       total,
       repartidor,
       observaciones,
