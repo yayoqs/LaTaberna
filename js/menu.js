@@ -1,302 +1,206 @@
 /* ================================================================
-   PubPOS — CSS MODULAR
-   Archivo: css/menu.css  (v4 – altura mínima en tarjetas)
+   PubPOS — MÓDULO: menu.js (v1.2 – imágenes desde Sheets o placeholder)
    ================================================================ */
+const Menu = (() => {
 
-/* ── BANNER ────────────────────────────────────────────────── */
-.menu-banner {
-  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
-  padding: 16px 24px;
-  text-align: center;
-  position: relative;
-  overflow: hidden;
-  flex-shrink: 0;
-  border-bottom: 1px solid var(--color-border);
-}
-.menu-banner::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: radial-gradient(circle at 20% 80%, rgba(245,158,11,.08) 0%, transparent 50%),
-                    radial-gradient(circle at 80% 20%, rgba(99,102,241,.08) 0%, transparent 50%);
-  pointer-events: none;
-}
-.menu-banner-content {
-  position: relative;
-  z-index: 1;
-}
-.menu-banner-content p {
-  font-size: 15px;
-  font-weight: 500;
-  color: rgba(255,255,255,.7);
-  margin-bottom: 12px;
-  font-style: italic;
-}
-.menu-banner-search {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  max-width: 400px;
-  margin: 0 auto;
-  background: rgba(255,255,255,.1);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(255,255,255,.15);
-  border-radius: 24px;
-  padding: 8px 16px;
-  position: relative;
-  z-index: 1;
-  transition: var(--t);
-}
-.menu-banner-search:focus-within {
-  background: rgba(255,255,255,.15);
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 3px rgba(245,158,11,.2);
-}
-.menu-banner-search i { color: rgba(255,255,255,.5); font-size: 16px; }
-.menu-banner-search input {
-  flex: 1;
-  background: transparent;
-  border: none;
-  outline: none;
-  color: #fff;
-  font-size: 14px;
-}
-.menu-banner-search input::placeholder { color: rgba(255,255,255,.4); }
+  let _categoriaActiva = 'Todas';
+  let _terminoBusqueda = '';
 
-/* ── CATEGORÍAS ──────────────────────────────────────────── */
-.menu-categorias {
-  display: flex;
-  gap: 8px;
-  padding: 12px 20px;
-  overflow-x: auto;
-  flex-shrink: 0;
-  background: var(--color-card);
-  border-bottom: 1px solid var(--color-border);
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-}
-.menu-categorias::-webkit-scrollbar { display: none; }
-.menu-cat-btn {
-  background: transparent;
-  border: 1px solid var(--color-border);
-  border-radius: 24px;
-  color: var(--color-text-sec);
-  padding: 7px 16px;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: var(--t);
-}
-.menu-cat-btn:hover { border-color: var(--color-accent); color: var(--color-accent); }
-.menu-cat-btn.active {
-  background: var(--color-accent);
-  color: #000;
-  border-color: var(--color-accent);
-  font-weight: 700;
-}
+  function _asegurarVista() {
+    if ($id('view-menu')) return;
 
-/* ── CUADRÍCULA ───────────────────────────────────────────── */
-.menu-grid {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px 20px;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 16px;
-  align-content: start;
-}
-
-/* ── TARJETA (con altura mínima consistente) ──────────────── */
-.menu-card {
-  background: var(--color-card);
-  border: 1px solid var(--color-border);
-  border-radius: 16px;
-  overflow: hidden;
-  cursor: pointer;
-  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
-  display: flex;
-  flex-direction: column;
-  min-height: 280px;            /* ← ALTURA MÍNIMA */
-}
-.menu-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 10px 28px rgba(0,0,0,.4);
-  border-color: var(--color-accent);
-}
-.menu-card:active { transform: scale(.98); }
-
-/* Imagen de la tarjeta (altura fija para consistencia) */
-.menu-card-img {
-  height: 160px;                /* ← ALTURA FIJA DE IMAGEN */
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.menu-card-img::after {
-  content: '';
-  position: absolute;
-  bottom: 0; left: 0; right: 0;
-  height: 50%;
-  background: linear-gradient(to top, rgba(0,0,0,.4), transparent);
-  pointer-events: none;
-}
-/* Inicial (cuando no hay imagen) */
-.menu-card-inicial {
-  font-size: 52px;
-  font-weight: 800;
-  color: rgba(255,255,255,.85);
-  text-shadow: 0 4px 12px rgba(0,0,0,.35);
-}
-
-/* Precio sobre la imagen */
-.menu-card-precio {
-  position: absolute;
-  bottom: 10px;
-  right: 14px;
-  background: var(--color-accent);
-  color: #000;
-  font-weight: 800;
-  font-size: 15px;
-  padding: 5px 12px;
-  border-radius: 20px;
-  z-index: 2;
-  box-shadow: 0 2px 8px rgba(0,0,0,.3);
-}
-
-/* Cuerpo de la tarjeta (altura flexible para rellenar) */
-.menu-card-body {
-  padding: 14px 16px;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;       /* centra contenido verticalmente */
-}
-.menu-card-body h3 {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--color-text);
-  margin-bottom: 6px;
-  line-height: 1.2;
-  /* Asegurar que nombres largos no rompan el layout */
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-.menu-card-body p {
-  font-size: 12px;
-  color: var(--color-text-muted);
-  line-height: 1.5;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-}
-
-/* ── ESTADO VACÍO ─────────────────────────────────────────── */
-.menu-empty {
-  grid-column: 1/-1;
-  text-align: center;
-  padding: 60px 20px;
-  color: var(--color-text-muted);
-}
-.menu-empty i { font-size: 48px; opacity: .2; display: block; margin-bottom: 12px; }
-
-/* ── MODAL DE DETALLE ────────────────────────────────────── */
-.modal-menu-detalle {
-  background: var(--color-card);
-  border: 1px solid var(--color-border);
-  border-radius: 20px;
-  width: 100%;
-  max-width: 500px;
-  box-shadow: 0 20px 50px rgba(0,0,0,.6);
-  display: flex;
-  flex-direction: column;
-  max-height: 85vh;
-  animation: menuFadeIn .3s ease;
-}
-@keyframes menuFadeIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.menu-detalle-img {
-  width: 100%;
-  height: 180px;
-  background-size: cover;
-  background-position: center;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 16px;
-  border-radius: 0;
-}
-.menu-detalle-body {
-  padding: 18px 22px;
-  flex: 1;
-  overflow-y: auto;
-}
-.menu-detalle-desc {
-  font-size: 14px;
-  color: var(--color-text-sec);
-  line-height: 1.6;
-  margin-bottom: 14px;
-}
-.menu-detalle-precio {
-  text-align: center;
-  margin: 8px 0;
-}
-.precio-etiqueta {
-  display: inline-block;
-  background: var(--color-accent);
-  color: #000;
-  font-size: 22px;
-  font-weight: 800;
-  padding: 8px 24px;
-  border-radius: 30px;
-  box-shadow: 0 4px 14px rgba(245,158,11,.3);
-}
-
-/* ── RESPONSIVE ───────────────────────────────────────────── */
-@media (max-width: 600px) {
-  .menu-banner {
-    padding: 12px 16px;
+    const main = document.createElement('main');
+    main.id = 'view-menu';
+    main.className = 'view';
+    main.innerHTML = `
+      <div class="menu-banner">
+        <div class="menu-banner-content">
+          <p>🗺️ “Donde cada trago es una aventura”</p>
+          <div class="menu-banner-search">
+            <i class="fas fa-search"></i>
+            <input type="text" id="menuSearch" placeholder="Buscar en el menú..." oninput="Menu.filtrar()">
+          </div>
+        </div>
+      </div>
+      <div class="menu-categorias" id="menuCategorias"></div>
+      <div class="menu-grid" id="menuGrid"></div>
+    `;
+    const referencia = $id('toastContainer') || document.body.lastChild;
+    document.body.insertBefore(main, referencia);
   }
-  .menu-banner-content p {
-    font-size: 13px;
-    margin-bottom: 10px;
+
+  function render() {
+    _asegurarVista();
+    _renderCategorias();
+    _renderProductos();
   }
-  .menu-grid {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-    gap: 12px;
-    padding: 12px;
+
+  function _renderCategorias() {
+    const container = $id('menuCategorias');
+    if (!container) return;
+
+    const categorias = ['Todas', ...new Set(
+      DB.productos.filter(p => p.activo !== false).map(p => p.categoria)
+    )].filter(Boolean);
+
+    container.innerHTML = categorias.map(cat => `
+      <button class="menu-cat-btn ${cat === _categoriaActiva ? 'active' : ''}"
+              onclick="Menu.setCategoria('${cat}')">${cat}</button>
+    `).join('');
   }
-  .menu-card {
-    min-height: 220px;           /* ajuste para móvil */
+
+  function setCategoria(cat) {
+    _categoriaActiva = cat;
+    _terminoBusqueda = $id('menuSearch')?.value?.trim() || '';
+    _renderProductos();
+    _renderCategorias();
   }
-  .menu-card-img {
-    height: 120px;               /* ajuste para móvil */
+
+  function filtrar() {
+    _terminoBusqueda = $id('menuSearch')?.value?.trim() || '';
+    _renderProductos();
   }
-  .menu-card-inicial {
-    font-size: 40px;
+
+  /* ── RENDERIZAR PRODUCTOS (con soporte para imagen de Sheets) ── */
+  function _renderProductos() {
+    const grid = $id('menuGrid');
+    if (!grid) return;
+
+    let productos = DB.productos.filter(p => p.activo !== false);
+    if (_categoriaActiva !== 'Todas') {
+      productos = productos.filter(p => p.categoria === _categoriaActiva);
+    }
+    if (_terminoBusqueda) {
+      const term = _terminoBusqueda.toLowerCase();
+      productos = productos.filter(p =>
+        p.nombre.toLowerCase().includes(term) ||
+        (p.descripcion || '').toLowerCase().includes(term)
+      );
+    }
+
+    if (!productos.length) {
+      grid.innerHTML = `<div class="menu-empty"><i class="fas fa-search"></i><p>No se encontraron productos</p></div>`;
+      return;
+    }
+
+    productos.sort((a,b) => a.nombre.localeCompare(b.nombre));
+
+    grid.innerHTML = productos.map(prod => {
+      const desc = prod.descripcion || 'Consulta a nuestro personal para más detalles.';
+      // Si hay imagen real, se usará como background; si no, se usará un color
+      const tieneImagen = prod.imagen && prod.imagen.trim() !== '';
+      const estiloImagen = tieneImagen
+        ? `background-image: url('${prod.imagen}');`
+        : `background-color: ${_getColorFromName(prod.nombre)};`;
+      const contenidoImagen = tieneImagen
+        ? ''
+        : `<span class="menu-card-inicial" style="display:block;font-size:52px;font-weight:800;color:rgba(255,255,255,.85);text-shadow:0 4px 12px rgba(0,0,0,.35);">${prod.nombre.charAt(0).toUpperCase()}</span>`;
+
+      return `
+        <div class="menu-card" onclick="Menu.mostrarDetalle('${prod.id}')">
+          <div class="menu-card-img" style="${estiloImagen}">
+            ${contenidoImagen}
+            <span class="menu-card-precio">${fmtMoney(prod.precio)}</span>
+          </div>
+          <div class="menu-card-body">
+            <h3>${prod.nombre}</h3>
+            <p>${desc.length > 60 ? desc.substring(0,60)+'...' : desc}</p>
+          </div>
+        </div>
+      `;
+    }).join('');
   }
-  .menu-card-precio {
-    font-size: 13px;
-    padding: 4px 10px;
+
+  /* ── COLOR POR NOMBRE ──────────────────────────────────── */
+  function _getColorFromName(nombre) {
+    let hash = 0;
+    for (let i = 0; i < nombre.length; i++) {
+      hash = nombre.charCodeAt(i) + ((hash << 5) - hash);
+      hash = hash & hash;
+    }
+    const h = Math.abs(hash) % 360;
+    return `hsl(${h}, 55%, 45%)`;
   }
-  .menu-card-body h3 { font-size: 13px; }
-  .menu-categorias {
-    padding: 8px 14px;
-    gap: 6px;
+
+  /* ── MOSTRAR DETALLE ───────────────────────────────────── */
+  function mostrarDetalle(prodId) {
+    const producto = DB.productos.find(p => p.id == prodId);
+    if (!producto) return;
+
+    let modal = $id('modalMenuDetalle');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'modalMenuDetalle';
+      modal.className = 'modal-overlay';
+      modal.style.display = 'none';
+      modal.innerHTML = `
+        <div class="modal-menu-detalle">
+          <div class="modal-header">
+            <h3 id="menuDetalleTitulo"></h3>
+            <button class="modal-close" onclick="Menu.cerrarDetalle()"><i class="fas fa-times"></i></button>
+          </div>
+          <div class="modal-body menu-detalle-body">
+            <div id="menuDetalleImg" class="menu-detalle-img"></div>
+            <p id="menuDetalleDesc" class="menu-detalle-desc"></p>
+            <div id="menuDetallePrecio" class="menu-detalle-precio"></div>
+            <div id="menuDetalleExtra" class="menu-detalle-extra"></div>
+          </div>
+          <div class="modal-footer">
+            <button class="btn-secondary" onclick="Menu.cerrarDetalle()">Cerrar</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+    }
+
+    const tieneImagen = producto.imagen && producto.imagen.trim() !== '';
+    $id('menuDetalleTitulo').innerHTML = `<i class="fas fa-utensils"></i> ${producto.nombre}`;
+    const imgEl = $id('menuDetalleImg');
+    if (tieneImagen) {
+      imgEl.style.backgroundImage = `url('${producto.imagen}')`;
+      imgEl.style.backgroundColor = '';
+      imgEl.innerHTML = '';
+    } else {
+      imgEl.style.backgroundImage = '';
+      imgEl.style.backgroundColor = _getColorFromName(producto.nombre);
+      imgEl.innerHTML = `<span style="font-size:64px;font-weight:800;color:rgba(255,255,255,.9);text-shadow:0 4px 12px rgba(0,0,0,.4);">${producto.nombre.charAt(0)}</span>`;
+    }
+    $id('menuDetalleDesc').textContent = producto.descripcion || 'Sin descripción disponible.';
+    $id('menuDetallePrecio').innerHTML = `<span class="precio-etiqueta">${fmtMoney(producto.precio)}</span>`;
+
+    // Ingredientes principales si hay receta
+    const receta = DB.recetas.find(r => r.productoId == prodId);
+    if (receta && receta.ingredientes.length) {
+      const nombres = receta.ingredientes.map(ing => {
+        const ingData = DB.ingredientes.find(i => i.id == ing.ingredienteId);
+        return ingData ? ingData.nombre : ing.ingredienteId;
+      }).join(', ');
+      $id('menuDetalleExtra').innerHTML = `<p style="font-size:12px;color:var(--color-text-muted);margin-top:12px;"><strong>Ingredientes principales:</strong> ${nombres}</p>`;
+    } else {
+      $id('menuDetalleExtra').innerHTML = '';
+    }
+
+    modal.style.display = 'flex';
   }
-  .menu-cat-btn {
-    padding: 6px 12px;
-    font-size: 12px;
+
+  function cerrarDetalle() {
+    const modal = $id('modalMenuDetalle');
+    if (modal) modal.style.display = 'none';
   }
-}
+
+  function _initEventListeners() {
+    EventBus.on('db:inicializada', render);
+    EventBus.on('productos:cargados', render);
+  }
+  _initEventListeners();
+
+  return {
+    render,
+    filtrar,
+    setCategoria,
+    mostrarDetalle,
+    cerrarDetalle
+  };
+})();
+
+window.Menu = Menu;
