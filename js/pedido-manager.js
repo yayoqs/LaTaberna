@@ -1,36 +1,28 @@
 /* ================================================================
-   PubPOS — MÓDULO: pedido-manager.js (v1 – Fase 1: PedidoManager + Bitácora)
-   Propósito: Centraliza la creación y cierre de pedidos (mesas y delivery)
-              y registra cada acción en una bitácora de auditoría por turno.
+   PubPOS — MÓDULO: pedido-manager.js (v1.1 – sincroniza pedidos con Sheets)
+   Corrección: ahora, al crear un pedido de mesa, se llama a
+   DB.syncGuardarPedido() para que el pedido se refleje en Google Sheets.
    ================================================================ */
 const PedidoManager = (() => {
 
-  let turnoActual = null;     // objeto turno { id, inicio, estado }
-  let auditLog = [];          // bitácora en memoria
+  let turnoActual = null;
+  let auditLog = [];
 
   /* ── INICIALIZACIÓN ─────────────────────────────────────── */
   function init() {
-    // Intentar cargar turno existente
     const turnoGuardado = localStorage.getItem('pubpos_turno_actual');
     if (turnoGuardado) {
-      try {
-        turnoActual = JSON.parse(turnoGuardado);
-        console.log(`[PedidoManager] Turno existente: ${turnoActual.id}`);
-      } catch (e) {
-        turnoActual = null;
-      }
+      try { turnoActual = JSON.parse(turnoGuardado); } catch { turnoActual = null; }
     }
 
-    // Si no hay turno, crear uno nuevo
     if (!turnoActual || turnoActual.estado === 'cerrado') {
       _iniciarNuevoTurno();
     }
 
-    // Cargar bitácora del turno actual
     _cargarAuditLog();
 
     EventBus.emit('turno:iniciado', turnoActual);
-    console.log(`[PedidoManager] Turno activo: ${turnoActual.id} (${auditLog.length} registros en bitácora).`);
+    console.log(`[PedidoManager] Turno activo: ${turnoActual.id} (${auditLog.length} registros).`);
     return turnoActual;
   }
 
@@ -70,7 +62,6 @@ const PedidoManager = (() => {
     EventBus.emit('audit:actualizado', { turnoId: turnoActual.id, total: auditLog.length });
   }
 
-  /* ── REGISTRO DE AUDITORÍA ─────────────────────────────── */
   function _registrarAuditoria(tipo, datos) {
     const entrada = {
       id: 'aud_' + Date.now() + '_' + Math.random().toString(36).substr(2,6),
@@ -85,23 +76,17 @@ const PedidoManager = (() => {
   }
 
   /* ── MÉTODOS DE PEDIDOS (MESA) ──────────────────────────── */
-  /**
-   * Crea un pedido para una mesa.
-   * @returns {object} pedido creado
-   */
   function crearPedidoMesa(numeroMesa, mozo, comensales) {
     if (!turnoActual || turnoActual.estado !== 'abierto') {
       console.error('[PedidoManager] No hay turno abierto.');
       return null;
     }
 
-    // Usar la misma lógica de DB (core) para generar el pedido
     if (typeof DB === 'undefined' || !DB.crearPedido) {
       console.error('[PedidoManager] DB no disponible');
       return null;
     }
 
-    // Buscar la mesa y marcarla como ocupada si está libre
     const mesa = DB.getMesa(numeroMesa);
     if (mesa && mesa.estado === 'libre') {
       mesa.estado = 'ocupada';
@@ -110,11 +95,18 @@ const PedidoManager = (() => {
       mesa.comensales = comensales;
     }
 
-    // Crear pedido en DB (core)
+    // Crear pedido localmente (core)
     const pedido = DB.crearPedido(numeroMesa, mozo, comensales);
     if (!pedido) return null;
 
-    // Registrar en bitácora
+    // ── NUEVO: Sincronizar con Google Sheets ──
+    if (typeof DB.syncGuardarPedido === 'function') {
+      DB.syncGuardarPedido(pedido).catch(err => {
+        console.warn('[PedidoManager] No se pudo sincronizar el pedido con Sheets:', err);
+        // No bloqueamos la UI; el pedido ya está creado localmente
+      });
+    }
+
     _registrarAuditoria('mesa:abierta', {
       mesa: numeroMesa,
       pedidoId: pedido.id,
@@ -122,16 +114,12 @@ const PedidoManager = (() => {
       comensales: comensales
     });
 
-    // Emitir evento para UI
     EventBus.emit('mesa:actualizada', { mesa: numeroMesa, estado: 'ocupada' });
     EventBus.emit('pedido:creado', pedido);
 
     return pedido;
   }
 
-  /**
-   * Agrega un ítem a un pedido existente.
-   */
   function agregarItemAPedido(pedidoId, item) {
     const pedido = DB.pedidos.find(p => p.id === pedidoId);
     if (!pedido) {
@@ -139,7 +127,6 @@ const PedidoManager = (() => {
       return false;
     }
 
-    // Actualizar items en el pedido (core)
     let items = [];
     try { items = JSON.parse(pedido.items || '[]'); } catch {}
     items.push(item);
@@ -147,7 +134,6 @@ const PedidoManager = (() => {
     pedido.total = items.reduce((sum, it) => sum + it.precio * it.qty, 0);
     DB.savePedidos();
 
-    // Registrar en bitácora
     _registrarAuditoria('pedido:item_agregado', {
       pedidoId: pedidoId,
       item: item.nombre,
@@ -159,9 +145,6 @@ const PedidoManager = (() => {
     return true;
   }
 
-  /**
-   * Cierra un pedido de mesa y registra el pago.
-   */
   function cerrarPedidoMesa(pedidoId, formaPago, total, descuento) {
     const pedido = DB.pedidos.find(p => p.id === pedidoId);
     if (!pedido) {
@@ -169,7 +152,6 @@ const PedidoManager = (() => {
       return null;
     }
 
-    // Llamar a DB.cerrarPedido (orquestador) que descuenta stock
     if (typeof DB.cerrarPedido !== 'function') {
       console.error('[PedidoManager] DB.cerrarPedido no disponible');
       return null;
@@ -177,7 +159,6 @@ const PedidoManager = (() => {
 
     DB.cerrarPedido(pedidoId, formaPago, total, descuento);
 
-    // Registrar en bitácora
     _registrarAuditoria('pedido:cerrado', {
       pedidoId: pedidoId,
       mesa: pedido.mesa,
@@ -186,7 +167,6 @@ const PedidoManager = (() => {
       descuento: descuento
     });
 
-    // Liberar mesa
     const mesa = DB.getMesa(pedido.mesa);
     if (mesa && !mesa.esVirtual) {
       const idx = DB.mesas.findIndex(m => m.numero === mesa.numero);
@@ -199,9 +179,6 @@ const PedidoManager = (() => {
   }
 
   /* ── MÉTODOS DE DELIVERY ────────────────────────────────── */
-  /**
-   * Crea un pedido de delivery (reparto).
-   */
   function crearPedidoDelivery(datos) {
     if (!turnoActual || turnoActual.estado !== 'abierto') {
       console.error('[PedidoManager] No hay turno abierto.');
@@ -220,9 +197,6 @@ const PedidoManager = (() => {
     return nuevo;
   }
 
-  /**
-   * Envía un pedido de delivery a cocina/barra creando una comanda KDS.
-   */
   function enviarPedidoDeliveryACocina(deliveryId) {
     const pedido = DB.pedidosDelivery.find(p => p.id === deliveryId);
     if (!pedido) {
@@ -230,8 +204,6 @@ const PedidoManager = (() => {
       return false;
     }
 
-    // (Opcional: validar stock como en reparto.js)
-    // Crear comanda similar a reparto.enviarACocina
     const comanda = {
       id: 'kds_deliv_' + Date.now() + '_' + Math.random().toString(36).substr(2,6),
       mesa: `Delivery ${deliveryId.slice(-6)}`,
@@ -271,16 +243,13 @@ const PedidoManager = (() => {
     getTurnoActual: () => turnoActual,
     getAuditLog: () => auditLog,
 
-    // Mesa
     crearPedidoMesa,
     agregarItemAPedido,
     cerrarPedidoMesa,
 
-    // Delivery
     crearPedidoDelivery,
     enviarPedidoDeliveryACocina,
 
-    // Bitácora expuesta (debug / reportes)
     registrar: _registrarAuditoria
   };
 })();
