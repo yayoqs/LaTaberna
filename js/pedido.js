@@ -1,8 +1,8 @@
 /* ================================================================
-   PubPOS — MÓDULO: pedido.js (v2.1 – delega en PedidoManager)
-   Propósito: Coordinar apertura de mesa, envío de comandas, transferencia.
-              Ahora utiliza PedidoManager para registrar las acciones en
-              la bitácora del turno.
+   PubPOS — MÓDULO: pedido.js (v2.2 – soporte PedidoService)
+   Propósito: Coordinar la apertura de mesa, envío de comandas y
+              transferencia. Ahora prefiere PedidoService (DDD) si
+              existe, con fallback a PedidoManager y DB original.
    ================================================================ */
 
 const Pedido = (() => {
@@ -85,17 +85,38 @@ const Pedido = (() => {
       mesa.items = [];
       mesa.observaciones = '';
 
-      // ── DELEGAR AL PEDIDOMANAGER ──
-      let pedidoId;
-      if (typeof PedidoManager !== 'undefined' && PedidoManager.crearPedidoMesa) {
-        const pedido = PedidoManager.crearPedidoMesa(num, mesa.mozo, mesa.comensales);
-        if (pedido) {
-          pedidoId = pedido.id;
-          mesa.pedidoId = pedidoId;
+      // ── PREFERIR PedidoService (DDD) ──
+      let pedidoId = null;
+      if (typeof PedidoService !== 'undefined' && PedidoService.crearPedidoMesa) {
+        try {
+          const pedido = await PedidoService.crearPedidoMesa({
+            numeroMesa: num,
+            mozo: mesa.mozo,
+            comensales: mesa.comensales
+          });
+          if (pedido) {
+            pedidoId = pedido.id;
+            mesa.pedidoId = pedidoId;
+          }
+        } catch (e) {
+          console.warn('[Pedido] Error con PedidoService, intentando PedidoManager:', e);
         }
       }
-      
-      // Fallback si PedidoManager no está disponible
+
+      // ── FALLBACK a PedidoManager ──
+      if (!pedidoId && typeof PedidoManager !== 'undefined' && PedidoManager.crearPedidoMesa) {
+        try {
+          const pedido = PedidoManager.crearPedidoMesa(num, mesa.mozo, mesa.comensales);
+          if (pedido) {
+            pedidoId = pedido.id;
+            mesa.pedidoId = pedidoId;
+          }
+        } catch (e) {
+          console.warn('[Pedido] Error con PedidoManager, usando DB directa:', e);
+        }
+      }
+
+      // ── FALLBACK final a DB.crearPedido ──
       if (!pedidoId) {
         try {
           const nuevoPedido = await DB.crearPedido(num, mesa.mozo, mesa.comensales);
@@ -105,7 +126,7 @@ const Pedido = (() => {
           mesa.pedidoId = 'local_' + Date.now();
         }
       }
-      
+
       DB.saveMesas();
     }
 

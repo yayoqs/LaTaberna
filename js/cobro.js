@@ -1,5 +1,8 @@
 /* ================================================================
-   PubPOS — MÓDULO: cobro.js (v4.2 – corrección visibilidad pago único)
+   PubPOS — MÓDULO: cobro.js (v4.3 – cierre vía PedidoService)
+   Propósito: Gestión del cierre de mesa. Ahora intenta usar el
+              servicio de dominio PedidoService para cerrar el pedido
+              con las reglas de negocio encapsuladas.
    ================================================================ */
 const Cobro = (() => {
   let _mesaACerrar = null;
@@ -99,7 +102,6 @@ const Cobro = (() => {
     html += `<div class="cierre-resumen-row total-row"><span>Total</span><span>${fmtMoney(_mesaACerrar.total)}</span></div>`;
     resumenEl.innerHTML = html;
 
-    // Renderizar pagos parciales si hay múltiples personas
     if (Object.keys(porPersona).length > 1) {
       _renderPagosParciales(porPersona);
     } else {
@@ -214,23 +216,31 @@ const Cobro = (() => {
       pagos = [{ persona: 'Total', monto: totalFinal, formaPago: _formaPago }];
     }
 
+    // ── DELEGAR A PedidoService (DDD) ──
     if (_mesaACerrar.pedidoId) {
       try {
-        if (typeof PedidoManager !== 'undefined' && PedidoManager.cerrarPedidoMesa) {
-          PedidoManager.cerrarPedidoMesa(
-            _mesaACerrar.pedidoId,
-            pagos[0].formaPago,
-            pagos[0].monto,
-            0
-          );
+        let cerrado = false;
+        if (typeof PedidoService !== 'undefined' && PedidoService.cerrarPedido) {
+          await PedidoService.cerrarPedido(_mesaACerrar.pedidoId, {
+            formaPago: pagos[0].formaPago,
+            totalFinal: pagos[0].monto,
+            descuento: 0
+          });
+          cerrado = true;
+        } else if (typeof PedidoManager !== 'undefined' && PedidoManager.cerrarPedidoMesa) {
+          PedidoManager.cerrarPedidoMesa(_mesaACerrar.pedidoId, pagos[0].formaPago, pagos[0].monto, 0);
+          cerrado = true;
         } else {
           await DB.cerrarPedido(_mesaACerrar.pedidoId, pagos[0].formaPago, pagos[0].monto, 0);
+          cerrado = true;
         }
+        if (!cerrado) showToast('error', 'No se pudo cerrar el pedido.');
       } catch (e) {
         console.warn('[Cobro] Error al cerrar pedido:', e);
       }
     }
 
+    // Generar tickets
     if (usarSplit) {
       pagos.forEach(pago => {
         const ticketHTML = Tickets.generarCierreParcial(_mesaACerrar, pago);
@@ -241,6 +251,7 @@ const Cobro = (() => {
       Tickets.mostrar(ticketHTML, `Comprobante — Mesa ${_mesaACerrar.numero}`);
     }
 
+    // Liberar mesa
     if (_mesaACerrar.esVirtual) {
       DB.liberarMesasFusionadas(_mesaACerrar);
     } else {

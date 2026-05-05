@@ -1,8 +1,6 @@
 /* ================================================================
    PubPOS — CSS MODULAR
-   Archivo: css/perfil.css
-   Propósito: Estilos para la vista de Perfil de Usuario (avatar,
-              tarjeta de información, documentos).
+   Archivo: css/perfil.css  (v2 – soporte para foto de perfil y detalles)
    ================================================================ */
 
 /* ── CONTENEDOR PRINCIPAL ─────────────────────────────────── */
@@ -31,12 +29,12 @@
   box-shadow: var(--shadow-sm);
 }
 
-/* Avatar */
+/* Avatar (ahora soporta foto de fondo) */
 .perfil-avatar {
   width: 88px;
   height: 88px;
   border-radius: 50%;
-  background: var(--color-accent);
+  background-color: var(--color-accent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -44,6 +42,10 @@
   font-weight: 800;
   color: #000;
   box-shadow: 0 4px 12px rgba(245,158,11,.3);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  flex-shrink: 0;
 }
 .perfil-avatar span {
   line-height: 1;
@@ -70,6 +72,27 @@
   font-size: 11px;
   color: var(--color-accent);
   margin-top: 2px;
+}
+
+/* Detalles extra (teléfono, email) */
+.perfil-detalles {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+}
+.perfil-detalle-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--color-text-sec);
+}
+.perfil-detalle-item i {
+  width: 18px;
+  text-align: center;
+  color: var(--color-accent);
 }
 
 /* ── SECCIÓN DE DOCUMENTOS ────────────────────────────────── */

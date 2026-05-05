@@ -1,14 +1,16 @@
 /* ================================================================
-   PubPOS — MÓDULO: bootstrap.js (v1 – inicialización desacoplada)
-   Propósito: Configura todas las dependencias (repositorios, managers)
-              y arranca la aplicación. Si algo falla, lo registra sin
-              detener el resto de módulos no críticos.
+   PubPOS — MÓDULO: bootstrap.js (v1.2 – captura de errores global)
+   Propósito: Inicializar la aplicación con inyección de dependencias
+              y un listener global que muestra cualquier error no
+              controlado como toast para el usuario.
    ================================================================ */
-
 const Bootstrap = (() => {
 
   async function arrancar() {
     console.log('[Bootstrap] Iniciando aplicación...');
+
+    // ── CAPTURA GLOBAL DE ERRORES (NUEVO) ──────────────────
+    _instalarManejadorErrores();
 
     // ── 1. Autenticación (crítica) ─────────────────────────
     try {
@@ -16,7 +18,7 @@ const Bootstrap = (() => {
       console.log('[Bootstrap] Auth listo.');
     } catch (e) {
       console.error('[Bootstrap] Error en Auth:', e);
-      // Sin auth no podemos continuar
+      showToast('error', 'Error crítico al iniciar autenticación');
       return;
     }
 
@@ -26,7 +28,7 @@ const Bootstrap = (() => {
       console.log('[Bootstrap] DB lista.');
     } catch (e) {
       console.error('[Bootstrap] Error en DB:', e);
-      // Sin DB no podemos operar
+      showToast('error', 'Error crítico al cargar los datos');
       return;
     }
 
@@ -37,18 +39,24 @@ const Bootstrap = (() => {
       console.warn('[Bootstrap] Config no disponible:', e);
     }
 
-    // ── 4. Inyección de dependencias ───────────────────────
-    // Seleccionar el adaptador de repositorio
+    // ── 4. Inyección de dependencias (REPOSITORIOS) ────────
     let pedidoRepo;
     if (typeof PedidoRepositoryLocal !== 'undefined') {
       pedidoRepo = PedidoRepositoryLocal;
       console.log('[Bootstrap] Usando PedidoRepositoryLocal.');
     } else {
-      console.warn('[Bootstrap] PedidoRepositoryLocal no encontrado. Se usará DB directa como fallback.');
-      // Podríamos crear un adaptador simple de fallback, pero por ahora avisamos.
+      console.warn('[Bootstrap] PedidoRepositoryLocal no encontrado.');
     }
 
-    // ── 5. Iniciar PedidoManager con el repositorio ─────────
+    // ── 5. Configurar Servicios de Dominio (DDD) ────────────
+    if (typeof PedidoService !== 'undefined' && pedidoRepo) {
+      PedidoService.configurar(pedidoRepo);
+      console.log('[Bootstrap] PedidoService configurado.');
+    } else {
+      console.warn('[Bootstrap] Servicio de pedidos no disponible.');
+    }
+
+    // ── 6. Iniciar PedidoManager ────────────────────────────
     try {
       if (typeof PedidoManager !== 'undefined') {
         const turno = PedidoManager.init({ pedidoRepo });
@@ -60,12 +68,18 @@ const Bootstrap = (() => {
       console.error('[Bootstrap] Error al iniciar PedidoManager:', e);
     }
 
-    // ── 6. TurnoManager (no requiere init especial) ─────────
+    // ── 7. TurnoManager ─────────────────────────────────────
     if (typeof TurnoManager === 'undefined') {
       console.warn('[Bootstrap] TurnoManager no encontrado.');
     }
 
-    // ── 7. Mostrar vista inicial ────────────────────────────
+    // ── 8. Inicializar UI ───────────────────────────────────
+    if (typeof App !== 'undefined' && App.init) {
+      App.init();
+      console.log('[Bootstrap] UI iniciada.');
+    }
+
+    // ── 9. Mostrar vista inicial ────────────────────────────
     try {
       if (Auth.getRol()) {
         const vistaDefecto = Auth.getDefaultView();
@@ -80,10 +94,31 @@ const Bootstrap = (() => {
     console.log('[Bootstrap] Aplicación lista.');
   }
 
+  /**
+   * Instala manejadores globales para capturar errores no controlados
+   * y promesas rechazadas sin catch, mostrándolos como toasts.
+   */
+  function _instalarManejadorErrores() {
+    // Errores síncronos
+    window.addEventListener('error', (event) => {
+      const mensaje = event.message || 'Error inesperado';
+      console.error('[Global Error]', mensaje, event);
+      showToast('error', `<i class="fas fa-bug"></i> ${mensaje}`);
+    });
+
+    // Promesas rechazadas sin control
+    window.addEventListener('unhandledrejection', (event) => {
+      const mensaje = (event.reason && event.reason.message) || 'Error en operación asíncrona';
+      console.error('[Unhandled Rejection]', mensaje, event.reason);
+      showToast('error', `<i class="fas fa-exclamation-triangle"></i> ${mensaje}`);
+    });
+
+    console.log('[Bootstrap] Manejador global de errores activado.');
+  }
+
   return { arrancar };
 })();
 
-// Reemplazar el event listener del DOM para usar Bootstrap
 document.addEventListener('DOMContentLoaded', () => {
   Bootstrap.arrancar();
 });

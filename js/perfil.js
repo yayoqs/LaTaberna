@@ -1,9 +1,15 @@
 /* ================================================================
-   PubPOS — MÓDULO: perfil.js (v1 – Perfil del Usuario)
-   Propósito: Cada usuario autenticado ve su propio perfil, puede
-              editar su nombre y consultar sus documentos desde Drive.
+   PubPOS — MÓDULO: perfil.js (v2 – Perfil enriquecido)
+   Propósito: Cada usuario ve y edita su perfil con nombre, teléfono,
+              email y una foto de perfil (URL). Los datos adicionales
+              se persisten en localStorage.
    ================================================================ */
 const Perfil = (() => {
+
+  // Clave para guardar datos extendidos en localStorage
+  function _storageKey(usuario) {
+    return `pubpos_perfil_${usuario}`;
+  }
 
   /* ── CREACIÓN DINÁMICA DE LA VISTA ───────────────────────── */
   function _asegurarVista() {
@@ -30,6 +36,9 @@ const Perfil = (() => {
             <span class="perfil-rol" id="perfilRol"></span>
             <span class="perfil-simulacion" id="perfilSimulacion" style="display:none;"></span>
           </div>
+          <div class="perfil-detalles" id="perfilDetalles" style="width:100%; margin-top:12px;">
+            <!-- Se llena dinámicamente -->
+          </div>
         </section>
 
         <!-- Sección de documentos -->
@@ -55,7 +64,10 @@ const Perfil = (() => {
       return;
     }
 
-    // Mostrar datos del usuario
+    // Cargar datos extendidos desde localStorage
+    const extras = _cargarExtras(usuario.nombre);
+
+    // Mostrar nombre y rol
     $id('perfilNombre').textContent = usuario.nombre;
     $id('perfilRol').textContent = `Rol: ${usuario.rolEfectivo}`;
     if (usuario.simulando) {
@@ -65,15 +77,52 @@ const Perfil = (() => {
       $id('perfilSimulacion').style.display = 'none';
     }
 
-    // Avatar con inicial
-    const inicial = usuario.nombre.charAt(0).toUpperCase();
-    $id('perfilAvatar').innerHTML = `<span>${inicial}</span>`;
+    // Avatar: si hay foto, usarla; si no, inicial
+    _renderAvatar(usuario.nombre, extras.foto);
+
+    // Detalles extra (teléfono, email)
+    _renderDetalles(extras);
 
     // Cargar documentos desde el backend
     await _cargarDocumentos();
   }
 
-  /* ── MODAL PARA EDITAR NOMBRE ───────────────────────────── */
+  function _renderAvatar(nombre, fotoUrl) {
+    const avatarEl = $id('perfilAvatar');
+    if (!avatarEl) return;
+
+    if (fotoUrl && fotoUrl.trim() !== '') {
+      avatarEl.innerHTML = '';
+      avatarEl.style.backgroundImage = `url('${fotoUrl}')`;
+      avatarEl.style.backgroundSize = 'cover';
+      avatarEl.style.backgroundPosition = 'center';
+      avatarEl.style.color = 'transparent'; // esconde la inicial
+    } else {
+      avatarEl.style.backgroundImage = '';
+      avatarEl.style.backgroundSize = '';
+      avatarEl.style.color = '#000';
+      avatarEl.innerHTML = `<span>${nombre.charAt(0).toUpperCase()}</span>`;
+    }
+  }
+
+  function _renderDetalles(extras) {
+    const cont = $id('perfilDetalles');
+    if (!cont) return;
+
+    let html = '';
+    if (extras.telefono) {
+      html += `<div class="perfil-detalle-item"><i class="fas fa-phone"></i> ${extras.telefono}</div>`;
+    }
+    if (extras.email) {
+      html += `<div class="perfil-detalle-item"><i class="fas fa-envelope"></i> ${extras.email}</div>`;
+    }
+    if (!html) {
+      html = '<p style="color:var(--color-text-muted); font-size:12px;">Sin información adicional.</p>';
+    }
+    cont.innerHTML = html;
+  }
+
+  /* ── MODAL PARA EDITAR PERFIL ────────────────────────────── */
   function mostrarModalEditar() {
     let modal = $id('modalEditarPerfil');
     if (!modal) {
@@ -82,7 +131,7 @@ const Perfil = (() => {
       modal.className = 'modal-overlay';
       modal.style.display = 'none';
       modal.innerHTML = `
-        <div class="modal-small">
+        <div class="modal-small" style="max-width:460px;">
           <div class="modal-header">
             <h3><i class="fas fa-pen"></i> Editar Perfil</h3>
             <button class="modal-close" onclick="Perfil.cerrarModalEditar()"><i class="fas fa-times"></i></button>
@@ -90,6 +139,16 @@ const Perfil = (() => {
           <div class="modal-small-body">
             <label>Nombre</label>
             <input type="text" id="editarPerfilNombre" placeholder="Tu nombre">
+
+            <label>Teléfono</label>
+            <input type="text" id="editarPerfilTelefono" placeholder="+56 9 ...">
+
+            <label>Email</label>
+            <input type="email" id="editarPerfilEmail" placeholder="correo@ejemplo.com">
+
+            <label>Foto de perfil (URL)</label>
+            <input type="text" id="editarPerfilFoto" placeholder="https://... (opcional)">
+
             <div class="modal-small-footer">
               <button class="btn-secondary" onclick="Perfil.cerrarModalEditar()">Cancelar</button>
               <button class="btn-primary" onclick="Perfil.guardarPerfil()"><i class="fas fa-save"></i> Guardar</button>
@@ -99,9 +158,16 @@ const Perfil = (() => {
       `;
       document.body.appendChild(modal);
     }
-    // Precargar nombre actual
+
+    // Precargar datos actuales
     const usuario = Auth.getUsuarioActual();
     $id('editarPerfilNombre').value = usuario ? usuario.nombre : '';
+
+    const extras = _cargarExtras(usuario ? usuario.nombre : '');
+    $id('editarPerfilTelefono').value = extras.telefono || '';
+    $id('editarPerfilEmail').value = extras.email || '';
+    $id('editarPerfilFoto').value = extras.foto || '';
+
     modal.style.display = 'flex';
   }
 
@@ -111,24 +177,46 @@ const Perfil = (() => {
   }
 
   async function guardarPerfil() {
+    const usuario = Auth.getUsuarioActual();
+    if (!usuario) {
+      showToast('error', 'No hay sesión activa');
+      return;
+    }
+
     const nuevoNombre = $val('editarPerfilNombre');
+    const telefono = $val('editarPerfilTelefono');
+    const email = $val('editarPerfilEmail');
+    const foto = $val('editarPerfilFoto');
+
     if (!nuevoNombre) {
       showToast('error', 'El nombre no puede estar vacío');
       return;
     }
 
-    // Actualizar el nombre en el objeto del usuario (solo en memoria)
-    const usuario = Auth.getUsuarioActual();
-    if (usuario) {
-      // Actualizamos sessionStorage y el display
-      Auth._usuarioActual.nombre = nuevoNombre;
-      sessionStorage.setItem('usuarioActual', JSON.stringify(Auth._usuarioActual));
-      Auth.aplicarRestriccionesUI();
-    }
+    // Actualizar nombre en sessionStorage (Auth)
+    Auth._usuarioActual.nombre = nuevoNombre;
+    sessionStorage.setItem('usuarioActual', JSON.stringify(Auth._usuarioActual));
+    Auth.aplicarRestriccionesUI();
+
+    // Guardar datos extendidos en localStorage
+    _guardarExtras(nuevoNombre, { telefono, email, foto });
 
     cerrarModalEditar();
     render();
     showToast('success', 'Perfil actualizado');
+  }
+
+  /* ── CARGA / GUARDADO DE DATOS EXTRAS ──────────────────── */
+  function _cargarExtras(usuario) {
+    const raw = localStorage.getItem(_storageKey(usuario));
+    if (raw) {
+      try { return JSON.parse(raw); } catch { return {}; }
+    }
+    return {};
+  }
+
+  function _guardarExtras(usuario, datos) {
+    localStorage.setItem(_storageKey(usuario), JSON.stringify(datos));
   }
 
   /* ── CARGAR DOCUMENTOS ──────────────────────────────────── */
@@ -137,7 +225,6 @@ const Perfil = (() => {
     if (!docsContainer) return;
 
     try {
-      // Intentar obtener documentos del usuario desde el backend
       const respuesta = await DB.llamar('getDocumentosUsuario', {
         usuario: Auth.getNombre()
       });
