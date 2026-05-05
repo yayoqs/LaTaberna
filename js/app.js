@@ -1,39 +1,23 @@
 /* ================================================================
-   PubPOS — MÓDULO: app.js (v4.7 – inicializa PedidoManager)
+   PubPOS — MÓDULO: app.js (v5 – controlador de vistas ligero)
+   Propósito: Gestionar la navegación entre vistas, el reloj y la UI.
+              La inicialización pesada ahora reside en Bootstrap.js.
    ================================================================ */
 const App = {
+  /**
+   * Inicializa los componentes de UI que no dependen de la lógica de negocio.
+   * La inicialización de módulos (Auth, DB, PedidoManager, etc.) la hace Bootstrap.
+   */
   async init() {
-    try {
-      console.log('[App] Iniciando aplicación...');
-      Auth.init();
-      await DB.init();
-      if (typeof Config !== 'undefined' && Config.cargar) Config.cargar();
-
-      // Inicializar el sistema de turnos y bitácora
-      if (typeof PedidoManager !== 'undefined') {
-        const turno = PedidoManager.init();
-        console.log(`[App] PedidoManager activo. Turno: ${turno?.id}`);
-      } else {
-        console.warn('[App] PedidoManager no encontrado. Se usará modo sin bitácora.');
-      }
-
-      this._iniciarReloj();
-      this._initRealVH();
-      this._mejorarFocoEnModales();
-
-      if (Auth.getRol()) {
-        const vistaDefecto = Auth.getDefaultView();
-        this.showView(vistaDefecto);
-      }
-
-      this._suscribirEventos();
-      console.log('[App] Sistema listo.');
-    } catch (e) {
-      console.error('[App] Fallo en arranque:', e);
-      this._mostrarErrorCarga();
-    }
+    console.log('[App] Iniciando UI...');
+    this._iniciarReloj();
+    this._initRealVH();
+    this._mejorarFocoEnModales();
+    this._suscribirEventos();
+    console.log('[App] UI lista.');
   },
 
+  /* ── RELOJ ─────────────────────────────────────────────── */
   _iniciarReloj() {
     const actualizar = () => {
       const ahora = new Date();
@@ -46,6 +30,7 @@ const App = {
     setInterval(actualizar, 1000);
   },
 
+  /* ── TAMAÑO REAL DE VIEWPORT (móviles) ──────────────────── */
   _initRealVH() {
     function setRealVH() {
       const vh = window.innerHeight * 0.01;
@@ -56,13 +41,7 @@ const App = {
     setRealVH();
   },
 
-  _mostrarErrorCarga() {
-    const toast = document.getElementById('toastContainer');
-    if (toast) {
-      toast.innerHTML = '<div class="toast error"><i class="fas fa-exclamation-circle"></i> Error al cargar la aplicación. Recarga la página.</div>';
-    }
-  },
-
+  /* ── MEJORA FOCO EN MODALES ─────────────────────────────── */
   _mejorarFocoEnModales() {
     document.addEventListener('focusin', (e) => {
       const target = e.target;
@@ -84,10 +63,11 @@ const App = {
     });
   },
 
+  /* ── NAVEGACIÓN ENTRE VISTAS ────────────────────────────── */
   showView(nombre) {
     if (!Auth.getRol()) { Auth.mostrarLogin(); return; }
 
-    // Validaciones
+    // Validaciones de permisos
     if (nombre === 'caja' && !Auth.puedeAccederCaja()) { showToast('error', 'No tienes permiso para acceder a Caja'); return; }
     if (nombre === 'cocina' && !Auth.puedeAccederCocina()) { showToast('error', 'No tienes permiso para acceder a Cocina'); return; }
     if (nombre === 'config' && !Auth.esAdmin()) { showToast('error', 'Solo administradores pueden acceder a Configuración'); return; }
@@ -114,13 +94,14 @@ const App = {
       if (!Auth.puedeAccederPerfil()) { showToast('error', 'No tienes permiso para acceder a Perfil'); return; }
     }
 
+    // Ocultar todas las vistas y desactivar botones
     document.querySelectorAll('.view').forEach(v => {
       v.classList.remove('active');
       v.style.display = '';
     });
-
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
 
+    // Activar la vista y el botón correspondiente
     const vista = $id(`view-${nombre}`);
     const btn = document.querySelector(`[data-view="${nombre}"]`);
     if (vista) {
@@ -131,10 +112,12 @@ const App = {
 
     EventBus.emit('vista:cambiada', nombre);
 
+    // Actualizar UI del header (selector de simulación)
     if (Auth.esMasterReal && Auth.esMasterReal()) {
       Auth.aplicarRestriccionesUI();
     }
 
+    // Llamar al render de cada módulo
     if (nombre === 'mesas' && window.Mesas) Mesas.render();
     if (nombre === 'cocina' && window.KDS) KDS.refresh();
     if (nombre === 'caja' && window.Caja) Caja.render();
@@ -147,6 +130,7 @@ const App = {
     if (nombre === 'perfil' && window.Perfil) Perfil.render();
   },
 
+  /* ── SUSCRIPCIÓN A EVENTOS DE UI ────────────────────────── */
   _suscribirEventos() {
     EventBus.on('sincronizacion:completada', () => {
       if (window.Mesas) Mesas.render();
@@ -179,12 +163,41 @@ const App = {
     });
     EventBus.on('turno:iniciado', (turno) => {
       console.log('[App] Turno iniciado:', turno?.id);
+      if (window.Caja) Caja.render();
+    });
+    EventBus.on('turno:cerrado', () => {
+      showToast('success', 'Turno cerrado correctamente.');
+      if (window.Caja) Caja.render();
     });
     EventBus.on('audit:actualizado', (info) => {
       console.log(`[App] Bitácora actualizada: ${info.total} registros.`);
     });
+  },
+
+  /**
+   * Función pública para invocar el cierre de turno desde cualquier vista.
+   */
+  async cerrarTurnoApp() {
+    if (typeof TurnoManager === 'undefined') {
+      showToast('error', 'Sistema de turnos no disponible.');
+      return;
+    }
+
+    if (!confirm('¿Estás seguro de cerrar el turno actual? Se resetearán mesas y pedidos. Se guardará un respaldo en Drive.')) {
+      return;
+    }
+
+    const resultado = await TurnoManager.cerrarTurno();
+    if (resultado.exito) {
+      showToast('success', resultado.mensaje);
+      if (window.Mesas) Mesas.render();
+      if (window.KDS) KDS.refresh();
+      if (window.Caja) Caja.render();
+      if (window.Reparto) Reparto.render();
+    } else {
+      showToast('error', resultado.mensaje);
+    }
   }
 };
 
-document.addEventListener('DOMContentLoaded', () => App.init());
 window.App = App;

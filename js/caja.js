@@ -1,5 +1,8 @@
 /* ================================================================
-   PubPOS — MÓDULO: caja.js (v3 – exportar conectado a Drive)
+   PubPOS — MÓDULO: caja.js (v3.2 – integración con cierre de turno)
+   Propósito: Resumen del turno y cierre de caja. El botón "Cierre de
+              Caja" ahora invoca el cierre completo del turno (respaldo
+              en Drive + reseteo local) a través de TurnoManager.
    ================================================================ */
 const Caja = (() => {
 
@@ -14,7 +17,7 @@ const Caja = (() => {
       <div class="view-toolbar">
         <h2><i class="fas fa-cash-register"></i> Caja — Resumen del Turno</h2>
         <div class="toolbar-actions">
-          <button class="btn-primary" onclick="Caja.exportar()">
+          <button class="btn-primary" onclick="Caja.cerrarTurno()">
             <i class="fas fa-file-alt"></i> Cierre de Caja
           </button>
         </div>
@@ -91,50 +94,46 @@ const Caja = (() => {
       </tr>`;
   }
 
-  // ================================================================
-  // FASE 1: Exportar el cierre de caja a Google Drive (PDF)
-  // Antes: solo mostraba un toast diciendo "próximamente".
-  // Ahora: recoge los datos del turno, los envía al backend
-  //        y muestra el enlace al PDF generado.
-  // ================================================================
-  async function exportar() {
-    try {
-      // ── 1. Recopilar los mismos datos que ya se muestran en pantalla ──
-      const todos = await DB.fetchTodosPedidos();
-      const cerrados = todos.filter(p => p.estado === 'cerrada');
-      const abiertos = todos.filter(p => p.estado !== 'cerrada' && p.estado !== 'cancelada');
+  /**
+   * Cierra el turno actual desde la vista de Caja.
+   * Delega en TurnoManager a través de App.cerrarTurnoApp().
+   */
+  async function cerrarTurno() {
+    if (typeof TurnoManager === 'undefined') {
+      showToast('error', 'Sistema de turnos no disponible.');
+      return;
+    }
 
-      const totalVentas = cerrados.reduce((s, p) => s + (p.total || 0), 0);
-      const ticketPromedio = cerrados.length ? totalVentas / cerrados.length : 0;
+    // Verificar que el usuario tenga permiso (admin/master)
+    if (!Auth.esAdmin() && !Auth.esMaster()) {
+      showToast('error', 'Solo administradores pueden cerrar el turno.');
+      return;
+    }
 
-      // ── 2. Construir el objeto que espera el backend ──
-      const datosCierre = {
-        resumen: {
-          totalVentas,
-          mesasCerradas: cerrados.length,
-          ticketPromedio,
-          mesasAbiertas: abiertos.length
-        },
-        pedidos: todos  // El backend filtrará solo los cerrados para el detalle
-      };
+    // Confirmación de seguridad
+    if (!confirm(
+      '¿Estás seguro de cerrar el turno actual?\n\n' +
+      '• Se guardará un archivo de respaldo en Drive.\n' +
+      '• Se resetearán todas las mesas (quedarán libres).\n' +
+      '• Se eliminarán los pedidos y la cola de sincronización.\n' +
+      '• Se iniciará un nuevo turno limpio.\n\n' +
+      'Esta acción no se puede deshacer.'
+    )) {
+      return;
+    }
 
-      // ── 3. Mostrar feedback al usuario ──
-      showToast('info', '<i class="fas fa-spinner fa-spin"></i> Generando informe de cierre...');
+    showToast('info', '<i class="fas fa-spinner fa-spin"></i> Cerrando turno...');
+    const resultado = await TurnoManager.cerrarTurno();
 
-      // ── 4. Llamar al backend usando el nuevo método genérico ──
-      const respuesta = await DB.llamar('generarCierre', datosCierre);
-
-      // ── 5. Interpretar la respuesta ──
-      if (respuesta.error) {
-        showToast('error', `Error: ${respuesta.error}`);
-      } else {
-        // Mostrar enlace al PDF (se abre en pestaña nueva)
-        showToast('success', `<i class="fas fa-check-circle"></i> PDF generado: <a href="${respuesta.pdfUrl}" target="_blank" style="color:var(--color-accent);">Abrir PDF</a>`);
-        console.log('[Caja] PDF generado:', respuesta.pdfUrl);
-      }
-    } catch (e) {
-      console.error('[Caja] Error exportando:', e);
-      showToast('error', '<i class="fas fa-exclamation-circle"></i> Error al generar el cierre. ¿Está bien configurada la hoja AppConfig?');
+    if (resultado.exito) {
+      showToast('success', resultado.mensaje);
+      // Refrescar todas las vistas críticas
+      if (window.Mesas) Mesas.render();
+      if (window.KDS) KDS.refresh();
+      if (window.Reparto) Reparto.render();
+      render(); // refrescar caja
+    } else {
+      showToast('error', resultado.mensaje);
     }
   }
 
@@ -142,8 +141,10 @@ const Caja = (() => {
   EventBus.on('pedidos:guardados', render);
   EventBus.on('pedido:cerrado', render);
   EventBus.on('db:inicializada', render);
+  EventBus.on('turno:iniciado', render);
+  EventBus.on('turno:cerrado', render);
 
-  return { render, exportar };
+  return { render, cerrarTurno };
 })();
 
 window.Caja = Caja;

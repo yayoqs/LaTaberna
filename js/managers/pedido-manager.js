@@ -1,15 +1,32 @@
 /* ================================================================
-   PubPOS — MÓDULO: pedido-manager.js (v1.1 – sincroniza pedidos con Sheets)
-   Corrección: ahora, al crear un pedido de mesa, se llama a
-   DB.syncGuardarPedido() para que el pedido se refleje en Google Sheets.
+   PubPOS — MÓDULO: pedido-manager.js (v3 – inyección de repositorio)
+   Propósito: Fachada CQRS para pedidos, gestión de turnos y bitácora.
+              Ahora acepta un repositorio de pedidos opcional. Si no
+              se provee, usa PedidoRepositoryLocal por defecto.
    ================================================================ */
 const PedidoManager = (() => {
 
   let turnoActual = null;
   let auditLog = [];
+  let _pedidoRepo = null;   // repositorio inyectado
 
   /* ── INICIALIZACIÓN ─────────────────────────────────────── */
-  function init() {
+  /**
+   * @param {object} options - Opciones de inicialización.
+   * @param {object} [options.pedidoRepo] - Repositorio de pedidos (implementa PedidoRepository).
+   */
+  function init(options = {}) {
+    // Seleccionar repositorio
+    if (options.pedidoRepo) {
+      _pedidoRepo = options.pedidoRepo;
+    } else if (typeof PedidoRepositoryLocal !== 'undefined') {
+      _pedidoRepo = PedidoRepositoryLocal;
+    } else {
+      console.error('[PedidoManager] No se encontró un repositorio de pedidos válido.');
+      return null;
+    }
+
+    // Cargar o crear turno
     const turnoGuardado = localStorage.getItem('pubpos_turno_actual');
     if (turnoGuardado) {
       try { turnoActual = JSON.parse(turnoGuardado); } catch { turnoActual = null; }
@@ -36,11 +53,7 @@ const PedidoManager = (() => {
       String(ahora.getMinutes()).padStart(2, '0') +
       String(ahora.getSeconds()).padStart(2, '0');
 
-    turnoActual = {
-      id: id,
-      inicio: ahora.toISOString(),
-      estado: 'abierto'
-    };
+    turnoActual = { id, inicio: ahora.toISOString(), estado: 'abierto' };
     localStorage.setItem('pubpos_turno_actual', JSON.stringify(turnoActual));
     auditLog = [];
     localStorage.setItem('pubpos_audit_' + turnoActual.id, JSON.stringify(auditLog));
@@ -49,11 +62,7 @@ const PedidoManager = (() => {
   function _cargarAuditLog() {
     if (!turnoActual) return;
     const raw = localStorage.getItem('pubpos_audit_' + turnoActual.id);
-    if (raw) {
-      try { auditLog = JSON.parse(raw); } catch { auditLog = []; }
-    } else {
-      auditLog = [];
-    }
+    auditLog = raw ? (() => { try { return JSON.parse(raw); } catch { return []; } })() : [];
   }
 
   function _guardarAuditLog() {
@@ -66,8 +75,7 @@ const PedidoManager = (() => {
     const entrada = {
       id: 'aud_' + Date.now() + '_' + Math.random().toString(36).substr(2,6),
       timestamp: new Date().toISOString(),
-      tipo: tipo,
-      datos: datos,
+      tipo, datos,
       usuario: (typeof Auth !== 'undefined' && Auth.getNombre) ? Auth.getNombre() : 'sistema'
     };
     auditLog.push(entrada);
@@ -76,14 +84,29 @@ const PedidoManager = (() => {
   }
 
   /* ── MÉTODOS DE PEDIDOS (MESA) ──────────────────────────── */
-  function crearPedidoMesa(numeroMesa, mozo, comensales) {
+  async function crearPedidoMesa(numeroMesa, mozo, comensales) {
+    // Preferir CommandBus si existe y tiene handler registrado
+    if (typeof CommandBus !== 'undefined' && CommandBus.ejecutar) {
+      const resultado = await CommandBus.ejecutar({
+        type: 'crearPedidoMesa',
+        datos: { numeroMesa, mozo, comensales, repo: _pedidoRepo }
+      });
+      if (resultado.exito) return resultado.data;
+      console.error('[PedidoManager] Error vía CommandBus:', resultado.error);
+      return null;
+    }
+
+    // Fallback directo con el repositorio inyectado
+    return _crearPedidoMesaDirecto(numeroMesa, mozo, comensales);
+  }
+
+  function _crearPedidoMesaDirecto(numeroMesa, mozo, comensales) {
     if (!turnoActual || turnoActual.estado !== 'abierto') {
       console.error('[PedidoManager] No hay turno abierto.');
       return null;
     }
-
-    if (typeof DB === 'undefined' || !DB.crearPedido) {
-      console.error('[PedidoManager] DB no disponible');
+    if (!_pedidoRepo) {
+      console.error('[PedidoManager] Repositorio no disponible');
       return null;
     }
 
@@ -95,37 +118,34 @@ const PedidoManager = (() => {
       mesa.comensales = comensales;
     }
 
-    // Crear pedido localmente (core)
-    const pedido = DB.crearPedido(numeroMesa, mozo, comensales);
+    // Usar el repositorio inyectado (no DB directamente)
+    let pedido;
+    try {
+      pedido = _pedidoRepo.crearPedidoMesa({ mesa: numeroMesa, mozo, comensales });
+    } catch (e) {
+      console.error('[PedidoManager] Error al crear pedido:', e);
+      return null;
+    }
     if (!pedido) return null;
 
-    // ── NUEVO: Sincronizar con Google Sheets ──
+    // El repositorio ya sincroniza con Sheets internamente (PedidoRepositoryLocal)
+    // Pero mantenemos la llamada a syncGuardarPedido si existe por compatibilidad
     if (typeof DB.syncGuardarPedido === 'function') {
-      DB.syncGuardarPedido(pedido).catch(err => {
-        console.warn('[PedidoManager] No se pudo sincronizar el pedido con Sheets:', err);
-        // No bloqueamos la UI; el pedido ya está creado localmente
-      });
+      DB.syncGuardarPedido(pedido).catch(err => console.warn('[PedidoManager] Sync fallido:', err));
     }
 
     _registrarAuditoria('mesa:abierta', {
-      mesa: numeroMesa,
-      pedidoId: pedido.id,
-      mozo: mozo,
-      comensales: comensales
+      mesa: numeroMesa, pedidoId: pedido.id, mozo, comensales
     });
 
     EventBus.emit('mesa:actualizada', { mesa: numeroMesa, estado: 'ocupada' });
     EventBus.emit('pedido:creado', pedido);
-
     return pedido;
   }
 
   function agregarItemAPedido(pedidoId, item) {
     const pedido = DB.pedidos.find(p => p.id === pedidoId);
-    if (!pedido) {
-      console.warn('[PedidoManager] Pedido no encontrado:', pedidoId);
-      return false;
-    }
+    if (!pedido) { console.warn('[PedidoManager] Pedido no encontrado:', pedidoId); return false; }
 
     let items = [];
     try { items = JSON.parse(pedido.items || '[]'); } catch {}
@@ -135,10 +155,7 @@ const PedidoManager = (() => {
     DB.savePedidos();
 
     _registrarAuditoria('pedido:item_agregado', {
-      pedidoId: pedidoId,
-      item: item.nombre,
-      qty: item.qty,
-      precio: item.precio
+      pedidoId, item: item.nombre, qty: item.qty, precio: item.precio
     });
 
     EventBus.emit('pedido:actualizado', pedido);
@@ -147,10 +164,7 @@ const PedidoManager = (() => {
 
   function cerrarPedidoMesa(pedidoId, formaPago, total, descuento) {
     const pedido = DB.pedidos.find(p => p.id === pedidoId);
-    if (!pedido) {
-      console.warn('[PedidoManager] Pedido no encontrado:', pedidoId);
-      return null;
-    }
+    if (!pedido) { console.warn('[PedidoManager] Pedido no encontrado para cerrar:', pedidoId); return null; }
 
     if (typeof DB.cerrarPedido !== 'function') {
       console.error('[PedidoManager] DB.cerrarPedido no disponible');
@@ -160,11 +174,7 @@ const PedidoManager = (() => {
     DB.cerrarPedido(pedidoId, formaPago, total, descuento);
 
     _registrarAuditoria('pedido:cerrado', {
-      pedidoId: pedidoId,
-      mesa: pedido.mesa,
-      total: total,
-      formaPago: formaPago,
-      descuento: descuento
+      pedidoId, mesa: pedido.mesa, total, formaPago, descuento
     });
 
     const mesa = DB.getMesa(pedido.mesa);
@@ -174,7 +184,7 @@ const PedidoManager = (() => {
       DB.saveMesas();
     }
 
-    EventBus.emit('pedido:cerrado', { mesa: pedido.mesa, pedidoId: pedidoId });
+    EventBus.emit('pedido:cerrado', { mesa: pedido.mesa, pedidoId });
     return pedido;
   }
 
@@ -188,9 +198,7 @@ const PedidoManager = (() => {
     const nuevo = DB.crearPedidoDelivery(datos);
 
     _registrarAuditoria('delivery:creado', {
-      deliveryId: nuevo.id,
-      direccion: datos.direccion,
-      total: datos.total
+      deliveryId: nuevo.id, direccion: datos.direccion, total: datos.total
     });
 
     EventBus.emit('pedidosDelivery:guardados');
@@ -199,10 +207,7 @@ const PedidoManager = (() => {
 
   function enviarPedidoDeliveryACocina(deliveryId) {
     const pedido = DB.pedidosDelivery.find(p => p.id === deliveryId);
-    if (!pedido) {
-      console.warn('[PedidoManager] Delivery no encontrado:', deliveryId);
-      return false;
-    }
+    if (!pedido) { console.warn('[PedidoManager] Delivery no encontrado:', deliveryId); return false; }
 
     const comanda = {
       id: 'kds_deliv_' + Date.now() + '_' + Math.random().toString(36).substr(2,6),
@@ -211,30 +216,29 @@ const PedidoManager = (() => {
       destino: 'cocina',
       items: pedido.items.map(it => ({
         prodId: it.prodId || it.nombre,
-        nombre: it.nombre,
-        precio: it.precio || 0,
-        qty: it.qty,
-        obs: '',
-        enviado: false
+        nombre: it.nombre, precio: it.precio || 0, qty: it.qty, obs: '', enviado: false
       })),
       observaciones: `${pedido.direccion} - ${pedido.telefono}`,
-      estado: 'nueva',
-      ts: Date.now(),
-      deliveryId: deliveryId
+      estado: 'nueva', ts: Date.now(), deliveryId
     };
 
     DB.comandas.push(comanda);
     DB.saveComandas();
     DB.actualizarPedidoDelivery(deliveryId, { estado: 'en_preparacion' });
 
-    _registrarAuditoria('delivery:enviado_a_cocina', {
-      deliveryId: deliveryId,
-      comandaId: comanda.id
-    });
+    _registrarAuditoria('delivery:enviado_a_cocina', { deliveryId, comandaId: comanda.id });
 
     EventBus.emit('comanda:enviada', comanda);
     EventBus.emit('pedidosDelivery:guardados');
     return true;
+  }
+
+  /* ── CIERRE DE TURNO ────────────────────────────────────── */
+  async function finalizarTurno() {
+    if (typeof TurnoManager === 'undefined') {
+      return { exito: false, mensaje: 'TurnoManager no disponible.' };
+    }
+    return await TurnoManager.cerrarTurno();
   }
 
   /* ── API PÚBLICA ────────────────────────────────────────── */
@@ -250,7 +254,8 @@ const PedidoManager = (() => {
     crearPedidoDelivery,
     enviarPedidoDeliveryACocina,
 
-    registrar: _registrarAuditoria
+    registrar: _registrarAuditoria,
+    finalizarTurno
   };
 })();
 

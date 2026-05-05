@@ -22,7 +22,7 @@
   <link rel="stylesheet" href="css/recetas.css">
   <link rel="stylesheet" href="css/reparto.css">
   <link rel="stylesheet" href="css/menu.css">
-  <link rel="stylesheet" href="css/perfil.css">   <!-- NUEVO Perfil -->
+  <link rel="stylesheet" href="css/perfil.css">
   <link rel="stylesheet" href="css/responsive.css">
   <style>
     .item-persona-badge {
@@ -74,7 +74,6 @@
       <button class="nav-btn" data-view="eventos" onclick="App.showView('eventos')" data-rol="eventos,admin,master">
         <i class="fas fa-calendar-alt"></i><span> Eventos</span>
       </button>
-      <!-- NUEVO BOTÓN PERFIL (reemplaza a Personal) -->
       <button class="nav-btn" data-view="perfil" onclick="App.showView('perfil')" data-rol="mesero,admin,master,caja,cocina,barra,despensa,eventos,reparto,cliente">
         <i class="fas fa-id-card"></i><span> Perfil</span>
       </button>
@@ -84,7 +83,10 @@
     </nav>
 
     <div class="header-right">
-      <span id="usuarioActualDisplay" style="margin-right:12px; font-size:13px; color:var(--color-text-sec);"></span>
+      <button class="btn-secondary" onclick="App.cerrarTurnoApp()" title="Cerrar Turno" style="padding:6px 10px;" data-rol="admin,master">
+        <i class="fas fa-door-closed"></i><span> Cerrar Turno</span>
+      </button>
+      <span id="usuarioActualDisplay" style="margin:0 12px; font-size:13px; color:var(--color-text-sec);"></span>
       <button class="btn-secondary" onclick="Auth.logout()" title="Cerrar sesión" style="padding:6px 10px;">
         <i class="fas fa-sign-out-alt"></i>
       </button>
@@ -124,8 +126,19 @@
   <script src="js/reparto.js"></script>
   <script src="js/menu.js"></script>
   <script src="js/eventos.js"></script>
-  <script src="js/perfil.js"></script>   <!-- reemplaza a personal.js -->
+  <script src="js/perfil.js"></script>
+
+  <!-- CQRS y Arquitectura Hexagonal -->
+  <script src="js/lib/command-bus.js"></script>
+  <script src="js/comandos/crear-pedido-mesa.js"></script>
+  <script src="js/repositorios/pedido-repository.js"></script>
+
+  <!-- Turno Manager (Fase 2) -->
+  <script src="js/managers/pedido-manager.js"></script>
+  <script src="js/managers/turno-manager.js"></script>
+
   <script src="js/app.js"></script>
+  <script src="js/bootstrap.js"></script>
 
 </body>
 </html>

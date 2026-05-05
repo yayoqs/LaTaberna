@@ -1,7 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: cobro.js (v4.1 – delegado a PedidoManager)
-   Propósito: Gestión del cierre de mesa. Ahora utiliza el método
-              centralizado cerrarPedidoMesa para registrar en la bitácora.
+   PubPOS — MÓDULO: cobro.js (v4.2 – corrección visibilidad pago único)
    ================================================================ */
 const Cobro = (() => {
   let _mesaACerrar = null;
@@ -17,14 +15,14 @@ const Cobro = (() => {
     modal.className = 'modal-overlay';
     modal.style.display = 'none';
     modal.innerHTML = `
-      <div class="modal-small">
+      <div class="modal-small" style="max-width:500px;">
         <div class="modal-header">
           <h3><i class="fas fa-file-invoice-dollar"></i> Cierre de Mesa</h3>
           <button class="modal-close" onclick="Cobro.cerrarModalCierre()"><i class="fas fa-times"></i></button>
         </div>
         <div class="modal-small-body">
           <div class="cierre-resumen" id="cierreResumen"></div>
-          <div id="pagosParcialesContainer"></div>
+          <div id="pagosParcialesContainer" style="display:none;"></div>
           <label>Forma de Pago (si no se divide)</label>
           <div class="formas-pago">
             <button class="pago-btn active" data-pago="Efectivo" onclick="Cobro.selectPago(this)"><i class="fas fa-money-bill"></i> Efectivo</button>
@@ -36,8 +34,11 @@ const Cobro = (() => {
           <label for="cierreDescuento">Descuento (%)</label>
           <input type="number" id="cierreDescuento" value="0" min="0" max="100" oninput="Cobro.actualizarTotalCierre()">
           <div class="cierre-total-final" id="cierreTotalFinal"></div>
-          <div class="modal-small-footer">
+          <div class="modal-small-footer" style="flex-wrap:wrap; gap:8px;">
             <button class="btn-secondary" onclick="Cobro.cerrarModalCierre()">Cancelar</button>
+            <button class="btn-secondary" onclick="Cobro.cobrarTodoJunto()" style="margin-right:auto;">
+              <i class="fas fa-layer-group"></i> Cobrar todo junto
+            </button>
             <button class="btn-primary" onclick="Cobro.confirmarCierre()"><i class="fas fa-check-circle"></i> Confirmar y Cobrar</button>
           </div>
         </div>
@@ -70,7 +71,11 @@ const Cobro = (() => {
     _inicializarPagosParciales();
 
     const modal = document.getElementById('modalCierre');
-    if (modal) modal.style.display = 'flex';
+    if (modal) {
+      const ppContainer = document.getElementById('pagosParcialesContainer');
+      if (ppContainer) ppContainer.style.display = 'none';
+      modal.style.display = 'flex';
+    }
   }
 
   function _renderResumen() {
@@ -94,21 +99,99 @@ const Cobro = (() => {
     html += `<div class="cierre-resumen-row total-row"><span>Total</span><span>${fmtMoney(_mesaACerrar.total)}</span></div>`;
     resumenEl.innerHTML = html;
 
-    _renderPagosParciales(porPersona);
+    // Renderizar pagos parciales si hay múltiples personas
+    if (Object.keys(porPersona).length > 1) {
+      _renderPagosParciales(porPersona);
+    } else {
+      const ppContainer = document.getElementById('pagosParcialesContainer');
+      if (ppContainer) ppContainer.style.display = 'none';
+    }
+
+    _actualizarTotalFinal();
   }
 
-  function _renderPagosParciales(porPersona) { /* ... igual que antes ... */ }
-  function _inicializarPagosParciales() { /* ... igual que antes ... */ }
-  function actualizarFormaPagoPersona(persona, forma) { /* ... */ }
-  function actualizarMontoPersona(persona, montoStr) { /* ... */ }
-  function cobrarTodoJunto() { /* ... */ }
-  function selectPago(btn) { /* ... */ }
-  function actualizarTotalCierre() { /* ... */ }
-  function _actualizarTotalFinal() { /* ... */ }
+  function _renderPagosParciales(porPersona) {
+    const container = document.getElementById('pagosParcialesContainer');
+    if (!container) return;
+    let html = '<h4>Pago por persona</h4>';
+    for (const persona of Object.keys(porPersona)) {
+      const pagoExistente = _pagosParciales.find(p => p.persona === persona);
+      const montoSugerido = porPersona[persona].subtotal;
+      const monto = pagoExistente ? pagoExistente.monto : montoSugerido;
+      const forma = pagoExistente ? pagoExistente.formaPago : 'Efectivo';
+
+      html += `<div class="pago-persona-row">
+        <span>${persona}: ${fmtMoney(montoSugerido)}</span>
+        <select id="formaPago_${persona}" onchange="Cobro.actualizarFormaPagoPersona('${persona}', this.value)">
+          <option value="Efectivo" ${forma === 'Efectivo' ? 'selected' : ''}>Efectivo</option>
+          <option value="Débito" ${forma === 'Débito' ? 'selected' : ''}>Débito</option>
+          <option value="Crédito" ${forma === 'Crédito' ? 'selected' : ''}>Crédito</option>
+        </select>
+        <input type="number" id="monto_${persona}" value="${monto}" step="0.01" min="0" onchange="Cobro.actualizarMontoPersona('${persona}', this.value)">
+      </div>`;
+    }
+    html += `<button class="btn-secondary" onclick="Cobro.cobrarTodoJunto()" style="margin-top:8px;">Cobrar todo junto</button>`;
+    container.innerHTML = html;
+    container.style.display = 'block';
+  }
+
+  function _inicializarPagosParciales() {
+    _pagosParciales = [];
+    const porPersona = {};
+    _mesaACerrar.items.forEach(it => {
+      const p = it.persona || 'General';
+      if (!porPersona[p]) porPersona[p] = 0;
+      porPersona[p] += it.precio * it.qty;
+    });
+    for (const [persona, monto] of Object.entries(porPersona)) {
+      _pagosParciales.push({ persona, monto, formaPago: 'Efectivo' });
+    }
+  }
+
+  function actualizarFormaPagoPersona(persona, forma) {
+    const pago = _pagosParciales.find(p => p.persona === persona);
+    if (pago) pago.formaPago = forma;
+  }
+
+  function actualizarMontoPersona(persona, montoStr) {
+    const monto = parseFloat(montoStr);
+    if (isNaN(monto)) return;
+    const pago = _pagosParciales.find(p => p.persona === persona);
+    if (pago) pago.monto = monto;
+  }
+
+  function cobrarTodoJunto() {
+    const container = document.getElementById('pagosParcialesContainer');
+    if (container) container.style.display = 'none';
+    document.getElementById('cierreDescuento').value = 0;
+    _actualizarTotalFinal();
+  }
+
+  function selectPago(btn) {
+    _formaPago = btn.dataset.pago;
+    document.querySelectorAll('.pago-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.pago === _formaPago);
+    });
+  }
+
+  function actualizarTotalCierre() {
+    _actualizarTotalFinal();
+  }
+
+  function _actualizarTotalFinal() {
+    if (!_mesaACerrar) return;
+    const subtotal = calcularTotal(_mesaACerrar.items);
+    const descuentoInput = document.getElementById('cierreDescuento');
+    const descuento = parseFloat(descuentoInput?.value) || 0;
+    const total = subtotal * (1 - descuento / 100);
+    const totalEl = document.getElementById('cierreTotalFinal');
+    if (totalEl) totalEl.textContent = `TOTAL A COBRAR: ${fmtMoney(total)}`;
+  }
 
   async function confirmarCierre() {
     if (!_mesaACerrar) return;
-    const usarSplit = document.getElementById('pagosParcialesContainer')?.style.display !== 'none';
+    const ppContainer = document.getElementById('pagosParcialesContainer');
+    const usarSplit = ppContainer && ppContainer.style.display !== 'none';
     let pagos = [];
 
     if (usarSplit) {
@@ -131,10 +214,8 @@ const Cobro = (() => {
       pagos = [{ persona: 'Total', monto: totalFinal, formaPago: _formaPago }];
     }
 
-    // ── DELEGAR CIERRE AL PEDIDOMANAGER ──
     if (_mesaACerrar.pedidoId) {
       try {
-        // Usar método centralizado que registra en bitácora
         if (typeof PedidoManager !== 'undefined' && PedidoManager.cerrarPedidoMesa) {
           PedidoManager.cerrarPedidoMesa(
             _mesaACerrar.pedidoId,
@@ -143,7 +224,6 @@ const Cobro = (() => {
             0
           );
         } else {
-          // Fallback al método original
           await DB.cerrarPedido(_mesaACerrar.pedidoId, pagos[0].formaPago, pagos[0].monto, 0);
         }
       } catch (e) {
@@ -151,7 +231,6 @@ const Cobro = (() => {
       }
     }
 
-    // Generar tickets
     if (usarSplit) {
       pagos.forEach(pago => {
         const ticketHTML = Tickets.generarCierreParcial(_mesaACerrar, pago);
@@ -162,7 +241,6 @@ const Cobro = (() => {
       Tickets.mostrar(ticketHTML, `Comprobante — Mesa ${_mesaACerrar.numero}`);
     }
 
-    // Liberar mesa (si no fue liberada por el manager)
     if (_mesaACerrar.esVirtual) {
       DB.liberarMesasFusionadas(_mesaACerrar);
     } else {
