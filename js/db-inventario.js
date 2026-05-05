@@ -1,8 +1,8 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-inventario.js (v5 – añade campo valor_unitario
-              en ingredientes para cálculo de inventario)
+   PubPOS — MÓDULO: db-inventario.js (v5.1 – validación de stock)
    Propósito: Gestión de ingredientes, recetas y movimientos de stock.
-   Cambio: Los ingredientes ahora incluyen valor unitario (costo).
+   Nuevo: método validarStockParaItems para verificar disponibilidad
+          antes de enviar un pedido a cocina.
    ================================================================ */
 
 const DBInventario = (function() {
@@ -12,7 +12,7 @@ const DBInventario = (function() {
   module.recetas = [];
   module.movimientos = [];
 
-  // ── NORMALIZACIÓN ─────────────────────────────────────────────
+  // ── NORMALIZACIONES (sin cambios) ──────────────────────────
   module._normalizarIngrediente = function(i) {
     return {
       id: this._validarId(i.id, 'ins'),
@@ -22,7 +22,7 @@ const DBInventario = (function() {
       stock_minimo: this._validarNumero(i.stock_minimo, 0),
       categoria: this._validarString(i.categoria, 'general'),
       ubicacion: this._validarString(i.ubicacion, ''),
-      valor_unitario: this._validarNumero(i.valor_unitario, 0)   // NUEVO
+      valor_unitario: this._validarNumero(i.valor_unitario, 0)
     };
   };
 
@@ -50,7 +50,20 @@ const DBInventario = (function() {
     };
   };
 
-  // ── PERSISTENCIA LOCAL ───────────────────────────────────────
+  /* ── VALIDACIONES AUXILIARES ───────────────────────────── */
+  module._validarId = function(val, prefijo) {
+    if (typeof val === 'string' && val.length > 0) return val;
+    return `${prefijo}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+  };
+  module._validarString = function(val, defecto) {
+    return (typeof val === 'string' && val.trim()) ? val.trim() : defecto;
+  };
+  module._validarNumero = function(val, defecto) {
+    const num = Number(val);
+    return isNaN(num) ? defecto : num;
+  };
+
+  // ── PERSISTENCIA LOCAL (sin cambios) ──────────────────────
   module._cargarIngredientesLocal = function() {
     const raw = localStorage.getItem('pubpos_ingredientes');
     if (raw) {
@@ -85,16 +98,14 @@ const DBInventario = (function() {
     localStorage.setItem('pubpos_ingredientes', JSON.stringify(this.ingredientes));
     EventBus.emit('ingredientes:actualizados', this.ingredientes);
   };
-
   module.saveRecetas = function() {
     localStorage.setItem('pubpos_recetas', JSON.stringify(this.recetas));
   };
-
   module.saveMovimientos = function() {
     localStorage.setItem('pubpos_movimientos', JSON.stringify(this.movimientos));
   };
 
-  // ── CONSULTAS ─────────────────────────────────────────────────
+  // ── CONSULTAS ──────────────────────────────────────────────
   module.getIngredientesDeProducto = function(productoId) {
     const receta = this.recetas.find(r => r.productoId === productoId);
     if (!receta) return [];
@@ -107,7 +118,7 @@ const DBInventario = (function() {
     }).filter(i => i !== undefined);
   };
 
-  // ── DESCONTAR STOCK ──────────────────────────────────────────
+  // ── DESCONTAR STOCK ────────────────────────────────────────
   module.consumirIngredientesDeProducto = async function(productoId, cantidad, motivo = 'Consumo') {
     const receta = this.recetas.find(r => r.productoId === productoId);
     if (!receta) return false;
@@ -144,7 +155,7 @@ const DBInventario = (function() {
     return true;
   };
 
-  // ── AJUSTE MANUAL ────────────────────────────────────────────
+  // ── AJUSTE MANUAL ──────────────────────────────────────────
   module.ajustarStock = function(ingredienteId, cantidadDelta, motivo = 'Ajuste manual') {
     const ingrediente = this.ingredientes.find(i => i.id === ingredienteId);
     if (!ingrediente) return false;
@@ -173,6 +184,59 @@ const DBInventario = (function() {
       });
     }
     return true;
+  };
+
+  // ================================================================
+  // NUEVO MÉTODO: validar stock para un conjunto de ítems
+  // ================================================================
+  /**
+   * Verifica si hay stock suficiente para preparar los ítems.
+   * @param {Array} items - Array de objetos { prodId, nombre, qty }
+   * @returns {Object} { ok: boolean, faltantes: [{ ingrediente, faltante, stockActual, unidad }] }
+   */
+  module.validarStockParaItems = function(items) {
+    const faltantes = [];
+    // Mapa para acumular total necesario de cada ingrediente
+    const totalNecesario = new Map(); // key: ingredienteId, value: { cantidadNecesaria, stockActual, nombre, unidad }
+
+    for (const item of items) {
+      const receta = this.recetas.find(r => r.productoId == item.prodId);
+      if (!receta) continue; // producto sin receta, no podemos validar
+
+      for (const ingReceta of receta.ingredientes) {
+        const ingData = this.ingredientes.find(i => i.id === ingReceta.ingredienteId);
+        if (!ingData) continue;
+
+        const cantidadNecesaria = ingReceta.cantidad * item.qty;
+
+        if (!totalNecesario.has(ingReceta.ingredienteId)) {
+          totalNecesario.set(ingReceta.ingredienteId, {
+            nombre: ingData.nombre,
+            unidad: ingData.unidad,
+            stockActual: ingData.stock,
+            cantidadNecesaria: 0
+          });
+        }
+        totalNecesario.get(ingReceta.ingredienteId).cantidadNecesaria += cantidadNecesaria;
+      }
+    }
+
+    // Verificar cada ingrediente
+    for (const [ingId, datos] of totalNecesario.entries()) {
+      if (datos.stockActual < datos.cantidadNecesaria) {
+        faltantes.push({
+          ingrediente: datos.nombre,
+          faltante: datos.cantidadNecesaria - datos.stockActual,
+          stockActual: datos.stockActual,
+          unidad: datos.unidad
+        });
+      }
+    }
+
+    return {
+      ok: faltantes.length === 0,
+      faltantes
+    };
   };
 
   return module;

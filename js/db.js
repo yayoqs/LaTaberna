@@ -1,7 +1,8 @@
 /* ================================================================
    PubPOS — MÓDULO: db.js (Orquestador)
    Propósito: Reúne todos los submódulos y coordina la inicialización.
-   Cambio: Ahora carga y expone pedidosDelivery para la vista de reparto.
+              Ahora también expone los métodos del PedidoManager para
+              que otros módulos puedan usarlos centralizadamente.
    ================================================================ */
 
 var DB = (function() {
@@ -31,7 +32,7 @@ var DB = (function() {
       this._cargarRecetasLocal();
       this._cargarMovimientosLocal();
       this._cargarSyncQueueLocal();
-      this._cargarPedidosDeliveryLocal();   // NUEVO
+      this._cargarPedidosDeliveryLocal();
 
       await this._fetchProductos();
       this._fetchMozos().catch(e => console.warn("[DB] Mozos remotos no disponibles", e));
@@ -54,7 +55,31 @@ var DB = (function() {
     EventBus.emit('app:error', 'No se pudieron cargar los datos iniciales.');
   };
 
-  // Cerrar pedido de mesa (existente)
+  // ── MÉTODOS DE PEDIDO (DELEGADOS AL PEDIDOMANAGER SI EXISTE) ──
+  combined.crearPedidoMesa = function(numeroMesa, mozo, comensales) {
+    if (typeof PedidoManager !== 'undefined' && PedidoManager.crearPedidoMesa) {
+      return PedidoManager.crearPedidoMesa(numeroMesa, mozo, comensales);
+    }
+    // fallback al método original de core
+    return this.crearPedido(numeroMesa, mozo, comensales);
+  };
+
+  combined.agregarItemAPedido = function(pedidoId, item) {
+    if (typeof PedidoManager !== 'undefined' && PedidoManager.agregarItemAPedido) {
+      return PedidoManager.agregarItemAPedido(pedidoId, item);
+    }
+    return false;
+  };
+
+  combined.cerrarPedidoMesa = function(pedidoId, formaPago, total, descuento) {
+    if (typeof PedidoManager !== 'undefined' && PedidoManager.cerrarPedidoMesa) {
+      return PedidoManager.cerrarPedidoMesa(pedidoId, formaPago, total, descuento);
+    }
+    // fallback al método original de core/orquestador
+    return this.cerrarPedido(pedidoId, formaPago, total, descuento);
+  };
+
+  // Método original de cerrar pedido (core), mantenido para compatibilidad
   combined.cerrarPedido = async function(id, formaPago, total, descuento) {
     const pedido = this.pedidos.find(p => p.id === id);
     if (!pedido) return null;
@@ -93,8 +118,12 @@ var DB = (function() {
     });
   };
 
-  // ── NUEVOS MÉTODOS PARA DELIVERY ──────────────────────────
+  // ── MÉTODOS DE DELIVERY (DELEGADOS AL PEDIDOMANAGER) ──────
   combined.crearPedidoDelivery = function(datos) {
+    if (typeof PedidoManager !== 'undefined' && PedidoManager.crearPedidoDelivery) {
+      return PedidoManager.crearPedidoDelivery(datos);
+    }
+    // fallback
     const nuevo = this._normalizarPedidoDelivery({
       ...datos,
       id: 'deliv_' + Date.now(),
@@ -103,6 +132,13 @@ var DB = (function() {
     this.pedidosDelivery.push(nuevo);
     this.savePedidosDelivery();
     return nuevo;
+  };
+
+  combined.enviarPedidoDeliveryACocina = function(deliveryId) {
+    if (typeof PedidoManager !== 'undefined' && PedidoManager.enviarPedidoDeliveryACocina) {
+      return PedidoManager.enviarPedidoDeliveryACocina(deliveryId);
+    }
+    return false;
   };
 
   combined.actualizarPedidoDelivery = function(id, cambios) {

@@ -1,15 +1,15 @@
 /* ================================================================
-   PubPOS — MÓDULO: pedido.js (v2 – modal de pedido dinámico)
+   PubPOS — MÓDULO: pedido.js (v2.1 – delega en PedidoManager)
    Propósito: Coordinar apertura de mesa, envío de comandas, transferencia.
-   Ahora el modal #modalPedido se crea bajo demanda, eliminando la
-   dependencia de HTML estático.
+              Ahora utiliza PedidoManager para registrar las acciones en
+              la bitácora del turno.
    ================================================================ */
 
 const Pedido = (() => {
 
   /* ── CREACIÓN DINÁMICA DEL MODAL DE PEDIDO ────────────────── */
   function _asegurarModalPedido() {
-    if ($id('modalPedido')) return; // ya existe
+    if ($id('modalPedido')) return;
 
     const modal = document.createElement('div');
     modal.id = 'modalPedido';
@@ -70,26 +70,42 @@ const Pedido = (() => {
 
   /* ── APERTURA DE MESA ─────────────────────────────────────── */
   async function abrirMesa(num) {
-    _asegurarModalPedido();  // ← asegura que el modal existe
+    _asegurarModalPedido();
 
     let mesa = DB.mesas.find(m => m.numero == num);
     if (!mesa) {
       console.error(`[Pedido] Mesa ${num} no encontrada.`);
       return;
     }
+
     if (mesa.estado === 'libre') {
       mesa.abiertaEn = Date.now();
       mesa.mozo = document.getElementById('mozoActivo')?.value || (DB.mozos[0]?.nombre || 'Mozo');
       mesa.comensales = 2;
       mesa.items = [];
       mesa.observaciones = '';
-      try {
-        const nuevoPedido = await DB.crearPedido(num, mesa.mozo, mesa.comensales);
-        mesa.pedidoId = nuevoPedido.id;
-      } catch (e) {
-        console.warn('[Pedido] Error creando pedido en backend, usando ID local.');
-        mesa.pedidoId = 'local_' + Date.now();
+
+      // ── DELEGAR AL PEDIDOMANAGER ──
+      let pedidoId;
+      if (typeof PedidoManager !== 'undefined' && PedidoManager.crearPedidoMesa) {
+        const pedido = PedidoManager.crearPedidoMesa(num, mesa.mozo, mesa.comensales);
+        if (pedido) {
+          pedidoId = pedido.id;
+          mesa.pedidoId = pedidoId;
+        }
       }
+      
+      // Fallback si PedidoManager no está disponible
+      if (!pedidoId) {
+        try {
+          const nuevoPedido = await DB.crearPedido(num, mesa.mozo, mesa.comensales);
+          mesa.pedidoId = nuevoPedido.id;
+        } catch (e) {
+          console.warn('[Pedido] Error creando pedido en backend, usando ID local.');
+          mesa.pedidoId = 'local_' + Date.now();
+        }
+      }
+      
       DB.saveMesas();
     }
 
@@ -133,7 +149,7 @@ const Pedido = (() => {
     EventBus.emit('mesa:cerrada');
   }
 
-  /* ── ENVÍO DE COMANDA ─────────────────────────────────────── */
+  /* ── ENVÍO DE COMANDA (sin cambios en la lógica KDS) ──────── */
   async function enviarComanda(destino) {
     const mesa = Comanda.getMesaActiva();
     if (!mesa) {
@@ -211,7 +227,7 @@ const Pedido = (() => {
     showToast('success', `Comanda enviada → ${destinoLabel}`);
   }
 
-  /* ── TRANSFERIR MESA ──────────────────────────────────────── */
+  /* ── TRANSFERIR MESA (sin cambios) ────────────────────────── */
   function transferirMesa(mesaOrigenNum, mesaDestinoNum) {
     if (!Auth.esAdmin()) {
       showToast('error', 'Solo administradores pueden transferir pedidos entre mesas');

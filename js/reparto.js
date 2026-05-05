@@ -1,7 +1,8 @@
 /* ================================================================
-   PubPOS — MÓDULO: reparto.js (v3.3 – selector con búsqueda y lista libre)
-   Propósito: Gestión de pedidos de envío. El modal permite buscar
-              productos por nombre, la lista de ítems crece sin límite.
+   PubPOS — MÓDULO: reparto.js (v3.5 – delegado a PedidoManager)
+   Propósito: Gestión de pedidos de envío. Ahora utiliza los métodos
+              centralizados del PedidoManager (crearPedidoDelivery,
+              enviarPedidoDeliveryACocina) para registrar en la bitácora.
    ================================================================ */
 const Reparto = (() => {
 
@@ -92,11 +93,13 @@ const Reparto = (() => {
     }).join('');
   }
 
-  /* ── MODAL NUEVO PEDIDO (CON BÚSQUEDA DE PRODUCTOS) ──────── */
+  /* ── MODAL NUEVO PEDIDO (CON BÚSQUEDA) ──────────────────── */
   let _itemsTemporales = [];
+  let _productoSeleccionado = null;
 
   function mostrarModalNuevo() {
     _itemsTemporales = [];
+    _productoSeleccionado = null;
 
     let modal = $id('modalReparto');
     if (!modal) {
@@ -166,9 +169,7 @@ const Reparto = (() => {
     if (modal) modal.style.display = 'none';
   }
 
-  // ── BÚSQUEDA DE PRODUCTOS ─────────────────────────────────
-  let _productoSeleccionado = null; // producto actualmente seleccionado
-
+  // ── BÚSQUEDA Y SELECCIÓN ─────────────────────────────────
   function _filtrarProductos() {
     const input = $id('repBusquedaProducto');
     const resultadoDiv = $id('repResultadosBusqueda');
@@ -202,7 +203,6 @@ const Reparto = (() => {
       </div>
     `).join('');
     resultadoDiv.style.display = 'block';
-    _productoSeleccionado = null; // se selecciona al hacer clic
   }
 
   function _seleccionarProducto(elemento) {
@@ -212,10 +212,8 @@ const Reparto = (() => {
 
     _productoSeleccionado = { id, nombre, precio };
 
-    // Mostrar el nombre en el input de búsqueda y ocultar resultados
     $id('repBusquedaProducto').value = nombre;
     $id('repResultadosBusqueda').style.display = 'none';
-    // Enfocar cantidad para agilizar
     $id('repCantidad').focus();
   }
 
@@ -248,7 +246,6 @@ const Reparto = (() => {
       });
     }
 
-    // Limpiar selección para nuevo producto
     $id('repBusquedaProducto').value = '';
     _productoSeleccionado = null;
     $id('repCantidad').value = 1;
@@ -296,58 +293,99 @@ const Reparto = (() => {
     const total = _itemsTemporales.reduce((sum, it) => sum + it.precio * it.qty, 0);
     if (total <= 0) { showToast('error', 'El total debe ser mayor a 0'); return; }
 
-    const nuevo = DB.crearPedidoDelivery({
-      direccion,
-      telefono,
-      items: _itemsTemporales.map(it => ({ ...it })),
-      total,
-      repartidor,
-      observaciones,
-      estado: 'pendiente'
-    });
+    // ── DELEGAR AL PEDIDOMANAGER ──
+    let nuevo;
+    if (typeof PedidoManager !== 'undefined' && PedidoManager.crearPedidoDelivery) {
+      nuevo = PedidoManager.crearPedidoDelivery({
+        direccion,
+        telefono,
+        items: _itemsTemporales.map(it => ({ ...it })),
+        total,
+        repartidor,
+        observaciones,
+        estado: 'pendiente'
+      });
+    } else {
+      // Fallback original
+      nuevo = DB.crearPedidoDelivery({
+        direccion,
+        telefono,
+        items: _itemsTemporales.map(it => ({ ...it })),
+        total,
+        repartidor,
+        observaciones,
+        estado: 'pendiente'
+      });
+    }
 
     cerrarModalNuevo();
     render();
     showToast('success', `Pedido ${nuevo.id.slice(-6)} creado`);
   }
 
-  /* ── ENVIAR A COCINA ────────────────────────────────────── */
-  function enviarACocina(deliveryId) {
+  /* ── ENVIAR A COCINA (CON VALIDACIÓN Y DELEGACIÓN) ──────── */
+  async function enviarACocina(deliveryId) {
     const pedido = DB.pedidosDelivery.find(p => p.id === deliveryId);
     if (!pedido) {
       showToast('error', 'Pedido no encontrado');
       return;
     }
 
-    const comanda = {
-      id: 'kds_deliv_' + Date.now() + '_' + Math.random().toString(36).substr(2,6),
-      mesa: `Delivery ${deliveryId.slice(-6)}`,
-      mozo: pedido.repartidor || 'Delivery',
-      destino: 'cocina',
-      items: pedido.items.map(it => ({
-        prodId: it.prodId || it.nombre,
-        nombre: it.nombre,
-        precio: it.precio || 0,
-        qty: it.qty,
-        obs: '',
-        enviado: false,
-        enviadoA: null,
-        enviadoTs: null,
-        persona: 'Delivery'
-      })),
-      observaciones: `${pedido.direccion} - ${pedido.telefono}`,
-      estado: 'nueva',
-      ts: Date.now(),
-      deliveryId: deliveryId
-    };
+    // Validar stock de ingredientes (si el método existe)
+    if (typeof DB.validarStockParaItems === 'function') {
+      const validacion = DB.validarStockParaItems(pedido.items);
+      if (!validacion.ok) {
+        const listaFaltantes = validacion.faltantes.map(f =>
+          `${f.ingrediente}: necesita ${f.faltante.toFixed(2)} ${f.unidad} más (stock: ${f.stockActual})`
+        ).join('\n');
 
-    DB.comandas.push(comanda);
-    DB.saveComandas();
-    EventBus.emit('comanda:enviada', comanda);
+        const continuar = confirm(
+          `⚠️ Faltan ingredientes para preparar este pedido:\n\n${listaFaltantes}\n\n¿Enviar a cocina de todas formas?`
+        );
+        if (!continuar) return;
+      }
+    }
 
-    DB.actualizarPedidoDelivery(deliveryId, { estado: 'en_preparacion' });
-    render();
-    showToast('success', 'Pedido enviado a Cocina/Barra');
+    // ── DELEGAR ENVÍO AL PEDIDOMANAGER ──
+    let enviado = false;
+    if (typeof PedidoManager !== 'undefined' && PedidoManager.enviarPedidoDeliveryACocina) {
+      enviado = PedidoManager.enviarPedidoDeliveryACocina(deliveryId);
+    } else {
+      // Fallback: lógica antigua (la que teníamos en v3.4)
+      const comanda = {
+        id: 'kds_deliv_' + Date.now() + '_' + Math.random().toString(36).substr(2,6),
+        mesa: `Delivery ${deliveryId.slice(-6)}`,
+        mozo: pedido.repartidor || 'Delivery',
+        destino: 'cocina',
+        items: pedido.items.map(it => ({
+          prodId: it.prodId || it.nombre,
+          nombre: it.nombre,
+          precio: it.precio || 0,
+          qty: it.qty,
+          obs: '',
+          enviado: false,
+          enviadoA: null,
+          enviadoTs: null,
+          persona: 'Delivery'
+        })),
+        observaciones: `${pedido.direccion} - ${pedido.telefono}`,
+        estado: 'nueva',
+        ts: Date.now(),
+        deliveryId: deliveryId
+      };
+      DB.comandas.push(comanda);
+      DB.saveComandas();
+      EventBus.emit('comanda:enviada', comanda);
+      DB.actualizarPedidoDelivery(deliveryId, { estado: 'en_preparacion' });
+      enviado = true;
+    }
+
+    if (enviado) {
+      render();
+      showToast('success', 'Pedido enviado a Cocina/Barra');
+    } else {
+      showToast('error', 'No se pudo enviar el pedido');
+    }
   }
 
   /* ── CAMBIAR ESTADO ──────────────────────────────────────── */

@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: app.js (v4.6 – añade vista perfil)
+   PubPOS — MÓDULO: app.js (v4.7 – inicializa PedidoManager)
    ================================================================ */
 const App = {
   async init() {
@@ -8,6 +8,15 @@ const App = {
       Auth.init();
       await DB.init();
       if (typeof Config !== 'undefined' && Config.cargar) Config.cargar();
+
+      // Inicializar el sistema de turnos y bitácora
+      if (typeof PedidoManager !== 'undefined') {
+        const turno = PedidoManager.init();
+        console.log(`[App] PedidoManager activo. Turno: ${turno?.id}`);
+      } else {
+        console.warn('[App] PedidoManager no encontrado. Se usará modo sin bitácora.');
+      }
+
       this._iniciarReloj();
       this._initRealVH();
       this._mejorarFocoEnModales();
@@ -135,7 +144,7 @@ const App = {
     if (nombre === 'reparto' && window.Reparto) Reparto.render();
     if (nombre === 'menu' && window.Menu) Menu.render();
     if (nombre === 'eventos' && window.Eventos) Eventos.render();
-    if (nombre === 'perfil' && window.Perfil) Perfil.render();   // ← NUEVO
+    if (nombre === 'perfil' && window.Perfil) Perfil.render();
   },
 
   _suscribirEventos() {
@@ -146,7 +155,7 @@ const App = {
       if (window.Reparto) Reparto.render();
       if (window.Menu) Menu.render();
       if (window.Eventos) Eventos.render();
-      if (window.Perfil) Perfil.render();                        // ← NUEVO
+      if (window.Perfil) Perfil.render();
     });
     EventBus.on('mesas:guardadas', () => { if (window.Mesas) Mesas.render(); });
     EventBus.on('comandas:guardadas', () => { if (window.KDS) KDS.refresh(); });
@@ -167,6 +176,12 @@ const App = {
         badge.textContent = pendientes > 0 ? pendientes : '';
         badge.style.display = pendientes > 0 ? 'inline-block' : 'none';
       }
+    });
+    EventBus.on('turno:iniciado', (turno) => {
+      console.log('[App] Turno iniciado:', turno?.id);
+    });
+    EventBus.on('audit:actualizado', (info) => {
+      console.log(`[App] Bitácora actualizada: ${info.total} registros.`);
     });
   }
 };
