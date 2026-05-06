@@ -1,8 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: reparto.js (v3.7 – DDD para Delivery)
-   Propósito: Gestión de pedidos de envío. Ahora utiliza el servicio
-              de dominio DeliveryService. Mantiene fallback a
-              PedidoManager y DB original por compatibilidad.
+   PubPOS — MÓDULO: reparto.js (v3.7 – DDD para Delivery, completo)
    ================================================================ */
 const Reparto = (() => {
 
@@ -44,7 +41,7 @@ const Reparto = (() => {
     document.body.insertBefore(main, referencia);
   }
 
-  /* ── RENDERIZAR LA TABLA (igual que antes) ──────────────── */
+  /* ── RENDERIZAR LA TABLA ────────────────────────────────── */
   function render() {
     _asegurarVista();
     const tbody = $id('repartoBody');
@@ -92,19 +89,188 @@ const Reparto = (() => {
     }).join('');
   }
 
-  /* ── MODAL NUEVO PEDIDO (con búsqueda) ──────────────────── */
+  /* ── MODAL NUEVO PEDIDO (con búsqueda de productos) ──────── */
   let _itemsTemporales = [];
   let _productoSeleccionado = null;
 
-  function mostrarModalNuevo() { /* ... igual que antes ... */ }
-  function cerrarModalNuevo() { /* ... igual que antes ... */ }
-  function _filtrarProductos() { /* ... igual ... */ }
-  function _seleccionarProducto() { /* ... igual ... */ }
-  function _agregarItemAlPedido() { /* ... igual ... */ }
-  function _quitarItemTemporal() { /* ... igual ... */ }
-  function _renderItemsTemporales() { /* ... igual ... */ }
+  function mostrarModalNuevo() {
+    _itemsTemporales = [];
+    _productoSeleccionado = null;
 
-  /* ── GUARDAR NUEVO PEDIDO (DELEGADO A DELIVERYSERVICE) ──── */
+    let modal = $id('modalReparto');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'modalReparto';
+      modal.className = 'modal-overlay';
+      modal.style.display = 'none';
+      modal.innerHTML = `
+        <div class="modal-small" style="max-width: 520px;">
+          <div class="modal-header">
+            <h3><i class="fas fa-plus"></i> Nuevo Pedido de Delivery</h3>
+            <button class="modal-close" onclick="Reparto.cerrarModalNuevo()"><i class="fas fa-times"></i></button>
+          </div>
+          <div class="modal-small-body">
+            <label>Dirección *</label><input type="text" id="repDireccion" placeholder="Calle, número, depto.">
+            <label>Teléfono</label><input type="text" id="repTelefono" placeholder="+56 9 ...">
+            <label>Productos</label>
+            <div style="position:relative;">
+              <input type="text" id="repBusquedaProducto" placeholder="Buscar producto..." autocomplete="off"
+                     oninput="Reparto._filtrarProductos()" style="width:100%;">
+              <div id="repResultadosBusqueda" style="position:absolute; top:100%; left:0; right:0; background:var(--color-panel); border:1px solid var(--color-border); border-radius:var(--radius-sm); z-index:10; max-height:200px; overflow-y:auto; display:none;">
+              </div>
+            </div>
+            <div style="display:flex; gap:8px; align-items:center; margin-top:8px;">
+              <input type="number" id="repCantidad" value="1" min="1" style="width:70px;" placeholder="Cant."
+                     onkeydown="if(event.key==='Enter'){ event.preventDefault(); Reparto._agregarItemAlPedido(); }">
+              <button class="btn-secondary" onclick="Reparto._agregarItemAlPedido()"><i class="fas fa-plus"></i> Agregar</button>
+            </div>
+            <div id="repItemsLista" style="display:flex; flex-direction:column; gap:6px; margin-top:8px;">
+            </div>
+            <label>Total ($)</label>
+            <input type="number" id="repTotal" step="0.01" value="0" readonly style="font-weight:700; background:var(--color-panel);">
+            <label>Repartidor</label><input type="text" id="repRepartidor" placeholder="Nombre del repartidor">
+            <label>Observaciones</label><input type="text" id="repObservaciones" placeholder="Pago con tarjeta, timbre roto...">
+            <div class="modal-small-footer">
+              <button class="btn-secondary" onclick="Reparto.cerrarModalNuevo()">Cancelar</button>
+              <button class="btn-primary" onclick="Reparto.guardarNuevoPedido()"><i class="fas fa-save"></i> Guardar</button>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+    }
+
+    // Limpiar campos
+    $id('repDireccion').value = '';
+    $id('repTelefono').value = '';
+    $id('repTotal').value = '0';
+    $id('repRepartidor').value = '';
+    $id('repObservaciones').value = '';
+    $id('repBusquedaProducto').value = '';
+    $id('repCantidad').value = 1;
+    $id('repResultadosBusqueda').style.display = 'none';
+
+    _renderItemsTemporales();
+    modal.style.display = 'flex';
+  }
+
+  function cerrarModalNuevo() {
+    const modal = $id('modalReparto');
+    if (modal) modal.style.display = 'none';
+  }
+
+  /* ── BÚSQUEDA DE PRODUCTOS ───────────────────────────────── */
+  function _filtrarProductos() {
+    const input = $id('repBusquedaProducto');
+    const resultadoDiv = $id('repResultadosBusqueda');
+    if (!input || !resultadoDiv) return;
+
+    const termino = input.value.trim().toLowerCase();
+    if (!termino) {
+      resultadoDiv.style.display = 'none';
+      _productoSeleccionado = null;
+      return;
+    }
+
+    const productosFiltrados = DB.productos.filter(p =>
+      p.activo !== false &&
+      p.nombre.toLowerCase().includes(termino)
+    );
+
+    if (productosFiltrados.length === 0) {
+      resultadoDiv.innerHTML = '<div style="padding:8px; color:var(--color-text-muted);">Sin resultados</div>';
+      resultadoDiv.style.display = 'block';
+      _productoSeleccionado = null;
+      return;
+    }
+
+    resultadoDiv.innerHTML = productosFiltrados.map(p => `
+      <div class="resultado-item" data-id="${p.id}" data-nombre="${p.nombre}" data-precio="${p.precio}"
+           style="padding:8px 12px; cursor:pointer; border-bottom:1px solid var(--color-border); transition:var(--t);"
+           onmouseover="this.style.background='var(--color-hover)'" onmouseout="this.style.background=''"
+           onclick="Reparto._seleccionarProducto(this)">
+        <strong>${p.nombre}</strong> <span style="float:right; color:var(--color-accent);">${fmtMoney(p.precio)}</span>
+      </div>
+    `).join('');
+    resultadoDiv.style.display = 'block';
+  }
+
+  function _seleccionarProducto(elemento) {
+    const id = elemento.dataset.id;
+    const nombre = elemento.dataset.nombre;
+    const precio = parseFloat(elemento.dataset.precio);
+
+    _productoSeleccionado = { id, nombre, precio };
+
+    $id('repBusquedaProducto').value = nombre;
+    $id('repResultadosBusqueda').style.display = 'none';
+    $id('repCantidad').focus();
+  }
+
+  /* ── AGREGAR ÍTEM TEMPORAL ───────────────────────────────── */
+  function _agregarItemAlPedido() {
+    if (!_productoSeleccionado) {
+      showToast('warning', 'Selecciona un producto de la lista');
+      return;
+    }
+
+    const cantidad = parseInt($id('repCantidad')?.value) || 1;
+    if (cantidad <= 0) {
+      showToast('warning', 'Cantidad inválida');
+      return;
+    }
+
+    const prodId = _productoSeleccionado.id;
+    const producto = DB.productos.find(p => p.id === prodId);
+    if (!producto) return;
+
+    const existente = _itemsTemporales.find(it => it.prodId === prodId);
+    if (existente) {
+      existente.qty += cantidad;
+    } else {
+      _itemsTemporales.push({
+        prodId: producto.id,
+        nombre: producto.nombre,
+        precio: producto.precio,
+        qty: cantidad
+      });
+    }
+
+    $id('repBusquedaProducto').value = '';
+    _productoSeleccionado = null;
+    $id('repCantidad').value = 1;
+    $id('repBusquedaProducto').focus();
+
+    _renderItemsTemporales();
+  }
+
+  function _quitarItemTemporal(idx) {
+    _itemsTemporales.splice(idx, 1);
+    _renderItemsTemporales();
+  }
+
+  function _renderItemsTemporales() {
+    const container = $id('repItemsLista');
+    if (!container) return;
+
+    if (!_itemsTemporales.length) {
+      container.innerHTML = '<p style="color:var(--color-text-muted); font-size:12px;">Sin productos agregados.</p>';
+      $id('repTotal').value = '0';
+      return;
+    }
+
+    const total = _itemsTemporales.reduce((sum, it) => sum + it.precio * it.qty, 0);
+    $id('repTotal').value = total.toFixed(2);
+
+    container.innerHTML = _itemsTemporales.map((it, idx) => `
+      <div style="display:flex; align-items:center; gap:8px; padding:6px 8px; background:var(--color-panel); border-radius:var(--radius-xs); font-size:12px;">
+        <span style="flex:1;"><strong>${it.qty}x</strong> ${it.nombre}</span>
+        <span style="font-weight:600;">${fmtMoney(it.precio * it.qty)}</span>
+        <button class="btn-icon-sm del" onclick="Reparto._quitarItemTemporal(${idx})"><i class="fas fa-times"></i></button>
+      </div>
+    `).join('');
+  }
+
+  /* ── GUARDAR NUEVO PEDIDO (DDD) ──────────────────────────── */
   async function guardarNuevoPedido() {
     const direccion = $val('repDireccion');
     const telefono = $val('repTelefono');
@@ -141,7 +307,7 @@ const Reparto = (() => {
       }
     }
 
-    // ── 2. Fallback: PedidoManager o DB directa ──
+    // ── 2. Fallback ──
     let nuevo;
     if (typeof PedidoManager !== 'undefined' && PedidoManager.crearPedidoDelivery) {
       nuevo = PedidoManager.crearPedidoDelivery({
@@ -168,7 +334,6 @@ const Reparto = (() => {
       showToast('error', resultado.error);
       return;
     }
-    // Fallback antiguo…
     const pedido = DB.pedidosDelivery.find(p => p.id === deliveryId);
     if (!pedido) { showToast('error', 'Pedido no encontrado'); return; }
     DB.actualizarPedidoDelivery(deliveryId, { estado: 'en_preparacion' });
@@ -184,7 +349,6 @@ const Reparto = (() => {
       showToast('error', resultado.error);
       return;
     }
-    // Fallback antiguo
     DB.actualizarPedidoDelivery(deliveryId, { estado: 'en_camino' });
     render();
     showToast('success', 'Pedido en camino');
@@ -198,7 +362,6 @@ const Reparto = (() => {
       showToast('error', resultado.error);
       return;
     }
-    // Fallback antiguo
     DB.actualizarPedidoDelivery(deliveryId, { estado: 'entregado' });
     render();
     showToast('success', 'Pedido entregado');
@@ -207,7 +370,6 @@ const Reparto = (() => {
   /* ── ELIMINAR PEDIDO ────────────────────────────────────── */
   function eliminarPedido(id) {
     if (!confirm('¿Eliminar este pedido?')) return;
-    // Intentar cancelar con DeliveryService
     if (typeof DeliveryService !== 'undefined' && DeliveryService.cancelar) {
       DeliveryService.cancelar(id).then(res => {
         if (res.exito) { render(); showToast('warning', 'Pedido cancelado'); }
