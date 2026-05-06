@@ -5,7 +5,7 @@ const DBSync = (function() {
   const module = {};
 
   // ⚠️ Reemplaza con tu URL actualizada después de implementar la Fase 2
-  module.urlSheets = "https://script.google.com/macros/s/AKfycbwp-apOBje_T-hPMmWF2DtVfqb7Ec81mMFnlVZfCnj_IO4ren5qk84EDP0K6TdeY8LJ_g/exec";
+  module.urlSheets = "https://script.google.com/macros/s/AKfycbxOtznKKLBnJPMvpChxy6isJwDkvLhuVsc7W3ykyPusqZV3wQZtUllrHcd2xmCL1ypH/exec";
 
   module.syncQueue = [];
 
