@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: bootstrap.js (v1.4 – inyección completa DDD)
+   PubPOS — MÓDULO: bootstrap.js (v1.5 – inyección completa DDD)
    ================================================================ */
 const Bootstrap = (() => {
 
@@ -66,6 +66,28 @@ const Bootstrap = (() => {
       }
     };
 
+    // Repositorio de Inventario (adaptador sobre DB)
+    const inventarioRepo = {
+      async guardarIngrediente(datos) {
+        if (!window.DB || typeof DB.syncGuardarIngrediente !== 'function') {
+          throw new Error('DB.syncGuardarIngrediente no disponible');
+        }
+        // Usamos la misma función que ya sincroniza con Sheets
+        await DB.syncGuardarIngrediente(datos);
+        return datos;
+      },
+      async obtenerPorId(id) {
+        if (!window.DB || !DB.ingredientes) return null;
+        return DB.ingredientes.find(i => i.id == id) || null;
+      },
+      async registrarMovimiento(movimiento) {
+        // Usamos DB.ajustarStock que ya registra movimientos
+        if (typeof DB.ajustarStock === 'function') {
+          DB.ajustarStock(movimiento.ingredienteId, movimiento.cantidad, movimiento.motivo);
+        }
+      }
+    };
+
     // ── 5. Configurar Servicios de Dominio ─────────────────
     if (typeof PedidoService !== 'undefined' && pedidoRepo) {
       PedidoService.configurar(pedidoRepo);
@@ -74,6 +96,10 @@ const Bootstrap = (() => {
     if (typeof DeliveryService !== 'undefined') {
       DeliveryService.configurar(deliveryRepo);
       console.log('[Bootstrap] DeliveryService configurado.');
+    }
+    if (typeof InventarioService !== 'undefined') {
+      InventarioService.configurar(inventarioRepo);
+      console.log('[Bootstrap] InventarioService configurado.');
     }
 
     // ── 6. Iniciar PedidoManager ──────────────────────────

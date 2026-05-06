@@ -1,5 +1,8 @@
 /* ================================================================
-   PubPOS — MÓDULO: despensa.js (v9 – solo inventario, sin recetas)
+   PubPOS — MÓDULO: despensa.js (v10 – DDD para inventario)
+   Propósito: Gestión de inventario (ingredientes, movimientos, alertas).
+              Ahora utiliza InventarioService en lugar de DB directa,
+              obteniendo resultados validados y manejo de errores uniforme.
    ================================================================ */
 
 const Despensa = (() => {
@@ -87,7 +90,7 @@ const Despensa = (() => {
     _renderAlertasStock();
   }
 
-  /* ── RESUMEN SUPERIOR (valor total del inventario) ───────── */
+  /* ── RESUMEN SUPERIOR ───────────────────────────────────── */
   function _renderResumen() {
     const cont = $id('inventarioResumen');
     if (!cont) return;
@@ -255,7 +258,7 @@ const Despensa = (() => {
       </div>`).join('');
   }
 
-  /* ── MODAL INGREDIENTE (con valor unitario) ─────────────── */
+  /* ── MODAL INGREDIENTE ──────────────────────────────────── */
   function mostrarModalIngrediente(ingrediente = null) {
     const esEdicion = !!ingrediente;
     const titulo = esEdicion ? 'Editar Ingrediente' : 'Nuevo Ingrediente';
@@ -298,22 +301,40 @@ const Despensa = (() => {
     document.getElementById('modalIngrediente').style.display = 'none';
   }
 
+  // ── GUARDAR (usa DDD) ──────────────────────────────────
   async function guardarIngrediente() {
     const id = document.getElementById('ingId').value;
     const nombre = document.getElementById('ingNombre').value.trim();
     if (!nombre) { showToast('error', 'Nombre obligatorio'); return; }
-    const ingrediente = {
+
+    const datos = {
       id: id || `ins_${Date.now()}_${Math.random().toString(36).substr(2,6)}`,
       nombre,
-      categoria: document.getElementById('ingCategoria').value,
       stock: parseFloat(document.getElementById('ingStock').value) || 0,
       unidad: document.getElementById('ingUnidad').value.trim() || 'u',
       stock_minimo: parseFloat(document.getElementById('ingStockMin').value) || 0,
+      categoria: document.getElementById('ingCategoria').value,
       ubicacion: document.getElementById('ingUbicacion').value.trim() || '',
       valor_unitario: parseFloat(document.getElementById('ingValorUnitario').value) || 0
     };
+
+    // ── 1. Intentar InventarioService (DDD) ──
+    if (typeof InventarioService !== 'undefined' && InventarioService.guardarIngrediente) {
+      const resultado = await InventarioService.guardarIngrediente(datos);
+      if (resultado.exito) {
+        cerrarModalIngrediente();
+        render();
+        showToast('success', 'Ingrediente guardado');
+        return;
+      } else {
+        showToast('error', resultado.error);
+        console.warn('[Despensa] InventarioService falló, usando fallback…');
+      }
+    }
+
+    // ── 2. Fallback al método antiguo ──
     try {
-      await DB.syncGuardarIngrediente(ingrediente);
+      await DB.syncGuardarIngrediente(datos);
       cerrarModalIngrediente();
       render();
       showToast('success', 'Ingrediente guardado');
@@ -327,6 +348,7 @@ const Despensa = (() => {
     if (ing) mostrarModalIngrediente(ing);
   }
 
+  // ── AJUSTE RÁPIDO (usa DDD) ─────────────────────────────
   async function ajusteRapido(ingredienteId = null) {
     if (!ingredienteId) {
       const nombre = prompt('Ingrediente a ajustar (nombre exacto):');
@@ -337,11 +359,27 @@ const Despensa = (() => {
     }
     const ing = DB.ingredientes.find(i => i.id === ingredienteId);
     if (!ing) return;
+
     const delta = prompt(`Ajustar stock de ${ing.nombre} (actual: ${ing.stock} ${ing.unidad}). Ingresá cantidad (positiva para agregar, negativa para quitar):`);
     if (delta === null) return;
     const cantidad = parseFloat(delta);
     if (isNaN(cantidad)) { showToast('error', 'Cantidad inválida'); return; }
-    const motivo = prompt('Motivo (opcional):') || 'Ajuste manual';
+    const motivo = prompt('Motivo (opcional):') || 'Ajuste rápido';
+
+    // ── 1. Intentar InventarioService (DDD) ──
+    if (typeof InventarioService !== 'undefined' && InventarioService.ajustarStock) {
+      const resultado = await InventarioService.ajustarStock(ingredienteId, cantidad, motivo);
+      if (resultado.exito) {
+        render();
+        showToast('success', `Stock de ${ing.nombre} actualizado`);
+        return;
+      } else {
+        showToast('error', resultado.error);
+        console.warn('[Despensa] Ajuste rápido falló vía DDD, usando DB directa…');
+      }
+    }
+
+    // ── 2. Fallback ──
     DB.ajustarStock(ingredienteId, cantidad, motivo);
     render();
     showToast('success', `Stock de ${ing.nombre} actualizado`);
