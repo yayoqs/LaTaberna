@@ -82,13 +82,8 @@ const Store = (() => {
     };
   }
 
-  /* ── REDUCTOR RAÍZ ────────────────────────────────────────
-     Combina varios sub-reductores. Cada sub-reductor recibe
-     solo la porción del estado que le corresponde y devuelve
-     un nuevo objeto si hay cambios.
-  ─────────────────────────────────────────────────────────── */
+  /* ── REDUCTOR RAÍZ ──────────────────────────────────────── */
   function rootReducer(currentState, action) {
-    // Aplicamos cada sub-reductor en orden
     const newState = { ...currentState };
 
     newState.mesas           = mesasReducer(newState.mesas, action, newState);
@@ -104,13 +99,8 @@ const Store = (() => {
     return newState;
   }
 
-  /* ── SUB-REDUCTORES (simplificados por ahora) ──────────────
-     En una versión futura podrán moverse a sus propios archivos.
-     Por ahora manejan las acciones comunes que ya existen en el
-     EventBus, para que la migración sea progresiva.
-  ─────────────────────────────────────────────────────────── */
+  /* ── SUB-REDUCTORES ──────────────────────────────────────── */
 
-  // Mesas
   function mesasReducer(mesas, action) {
     switch (action.type) {
       case 'MESAS_INICIALIZAR':
@@ -128,7 +118,6 @@ const Store = (() => {
     }
   }
 
-  // Pedidos de mesa
   function pedidosReducer(pedidos, action) {
     switch (action.type) {
       case 'PEDIDOS_INICIALIZAR':
@@ -148,7 +137,6 @@ const Store = (() => {
     }
   }
 
-  // Delivery
   function deliveryReducer(deliveries, action) {
     switch (action.type) {
       case 'DELIVERY_CREADO':
@@ -164,7 +152,6 @@ const Store = (() => {
     }
   }
 
-  // Comandas (KDS)
   function comandasReducer(comandas, action) {
     switch (action.type) {
       case 'COMANDA_AGREGADA':
@@ -178,7 +165,6 @@ const Store = (() => {
     }
   }
 
-  // Productos
   function productosReducer(productos, action) {
     switch (action.type) {
       case 'PRODUCTOS_INICIALIZAR':
@@ -190,7 +176,6 @@ const Store = (() => {
     }
   }
 
-  // Ingredientes
   function ingredientesReducer(ingredientes, action) {
     switch (action.type) {
       case 'INGREDIENTES_INICIALIZAR':
@@ -202,7 +187,6 @@ const Store = (() => {
     }
   }
 
-  // Recetas
   function recetasReducer(recetas, action) {
     switch (action.type) {
       case 'RECETAS_INICIALIZAR':
@@ -214,7 +198,6 @@ const Store = (() => {
     }
   }
 
-  // Mozos
   function mozosReducer(mozos, action) {
     switch (action.type) {
       case 'MOZOS_INICIALIZAR':
@@ -226,7 +209,6 @@ const Store = (() => {
     }
   }
 
-  // Configuración
   function configReducer(config, action) {
     switch (action.type) {
       case 'CONFIG_INICIALIZAR':
