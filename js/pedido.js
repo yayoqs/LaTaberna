@@ -1,11 +1,13 @@
 /* ================================================================
-   PubPOS — MÓDULO: pedido.js (v2.2 – soporte PedidoService)
+   PubPOS — MÓDULO: pedido.js (v2.3 – soporte PedidoService + anti‑doble click)
    Propósito: Coordinar la apertura de mesa, envío de comandas y
-              transferencia. Ahora prefiere PedidoService (DDD) si
-              existe, con fallback a PedidoManager y DB original.
+              transferencia. Ahora evita que la misma mesa se intente
+              abrir dos veces seguidas accidentalmente.
    ================================================================ */
 
 const Pedido = (() => {
+
+  let _mesaAbriendo = null;   // ← evita doble ejecución por doble clic
 
   /* ── CREACIÓN DINÁMICA DEL MODAL DE PEDIDO ────────────────── */
   function _asegurarModalPedido() {
@@ -68,86 +70,95 @@ const Pedido = (() => {
   }
 
 
-  /* ── APERTURA DE MESA ─────────────────────────────────────── */
+  /* ── APERTURA DE MESA (con protección anti‑doble) ────────── */
   async function abrirMesa(num) {
-    _asegurarModalPedido();
+    // ⛔ Evitar doble ejecución accidental
+    if (_mesaAbriendo === num) return;
+    _mesaAbriendo = num;
 
-    let mesa = DB.mesas.find(m => m.numero == num);
-    if (!mesa) {
-      console.error(`[Pedido] Mesa ${num} no encontrada.`);
-      return;
-    }
+    try {
+      _asegurarModalPedido();
 
-    if (mesa.estado === 'libre') {
-      mesa.abiertaEn = Date.now();
-      mesa.mozo = document.getElementById('mozoActivo')?.value || (DB.mozos[0]?.nombre || 'Mozo');
-      mesa.comensales = 2;
-      mesa.items = [];
-      mesa.observaciones = '';
+      let mesa = DB.mesas.find(m => m.numero == num);
+      if (!mesa) {
+        console.error(`[Pedido] Mesa ${num} no encontrada.`);
+        return;
+      }
 
-      // ── PREFERIR PedidoService (DDD) ──
-      let pedidoId = null;
-      if (typeof PedidoService !== 'undefined' && PedidoService.crearPedidoMesa) {
-        try {
-          const pedido = await PedidoService.crearPedidoMesa({
-            numeroMesa: num,
-            mozo: mesa.mozo,
-            comensales: mesa.comensales
-          });
-          if (pedido) {
-            pedidoId = pedido.id;
-            mesa.pedidoId = pedidoId;
+      if (mesa.estado === 'libre') {
+        mesa.abiertaEn = Date.now();
+        mesa.mozo = document.getElementById('mozoActivo')?.value || (DB.mozos[0]?.nombre || 'Mozo');
+        mesa.comensales = 2;
+        mesa.items = [];
+        mesa.observaciones = '';
+
+        // ── PREFERIR PedidoService (DDD) ──
+        let pedidoId = null;
+        if (typeof PedidoService !== 'undefined' && PedidoService.crearPedidoMesa) {
+          try {
+            const pedido = await PedidoService.crearPedidoMesa({
+              numeroMesa: num,
+              mozo: mesa.mozo,
+              comensales: mesa.comensales
+            });
+            if (pedido) {
+              pedidoId = pedido.id;
+              mesa.pedidoId = pedidoId;
+            }
+          } catch (e) {
+            console.warn('[Pedido] Error con PedidoService, intentando PedidoManager:', e);
           }
-        } catch (e) {
-          console.warn('[Pedido] Error con PedidoService, intentando PedidoManager:', e);
         }
-      }
 
-      // ── FALLBACK a PedidoManager ──
-      if (!pedidoId && typeof PedidoManager !== 'undefined' && PedidoManager.crearPedidoMesa) {
-        try {
-          const pedido = PedidoManager.crearPedidoMesa(num, mesa.mozo, mesa.comensales);
-          if (pedido) {
-            pedidoId = pedido.id;
-            mesa.pedidoId = pedidoId;
+        // ── FALLBACK a PedidoManager ──
+        if (!pedidoId && typeof PedidoManager !== 'undefined' && PedidoManager.crearPedidoMesa) {
+          try {
+            const pedido = PedidoManager.crearPedidoMesa(num, mesa.mozo, mesa.comensales);
+            if (pedido) {
+              pedidoId = pedido.id;
+              mesa.pedidoId = pedidoId;
+            }
+          } catch (e) {
+            console.warn('[Pedido] Error con PedidoManager, usando DB directa:', e);
           }
-        } catch (e) {
-          console.warn('[Pedido] Error con PedidoManager, usando DB directa:', e);
+        }
+
+        // ── FALLBACK final a DB.crearPedido ──
+        if (!pedidoId) {
+          try {
+            const nuevoPedido = await DB.crearPedido(num, mesa.mozo, mesa.comensales);
+            mesa.pedidoId = nuevoPedido.id;
+          } catch (e) {
+            console.warn('[Pedido] Error creando pedido en backend, usando ID local.');
+            mesa.pedidoId = 'local_' + Date.now();
+          }
+        }
+
+        DB.saveMesas();
+      }
+
+      const tituloEl = document.getElementById('modalMesaTitulo');
+      const badgeEl = document.getElementById('modalEstadoBadge');
+      if (tituloEl) {
+        if (mesa.esVirtual) {
+          tituloEl.textContent = `Mesas ${mesa.mesasFusionadas.join(', ')}`;
+        } else {
+          tituloEl.textContent = `Mesa ${num}`;
         }
       }
-
-      // ── FALLBACK final a DB.crearPedido ──
-      if (!pedidoId) {
-        try {
-          const nuevoPedido = await DB.crearPedido(num, mesa.mozo, mesa.comensales);
-          mesa.pedidoId = nuevoPedido.id;
-        } catch (e) {
-          console.warn('[Pedido] Error creando pedido en backend, usando ID local.');
-          mesa.pedidoId = 'local_' + Date.now();
-        }
+      if (badgeEl) {
+        badgeEl.textContent = Mesas.labelEstado(mesa.estado);
+        badgeEl.className = `estado-badge ${mesa.estado}`;
       }
 
-      DB.saveMesas();
+      EventBus.emit('mesa:abierta', mesa);
+      if (window.Carta && typeof Carta.render === 'function') Carta.render();
+      const modal = document.getElementById('modalPedido');
+      if (modal) modal.style.display = 'flex';
+    } finally {
+      // Liberar el bloqueo una vez que termine (con éxito o error)
+      _mesaAbriendo = null;
     }
-
-    const tituloEl = document.getElementById('modalMesaTitulo');
-    const badgeEl = document.getElementById('modalEstadoBadge');
-    if (tituloEl) {
-      if (mesa.esVirtual) {
-        tituloEl.textContent = `Mesas ${mesa.mesasFusionadas.join(', ')}`;
-      } else {
-        tituloEl.textContent = `Mesa ${num}`;
-      }
-    }
-    if (badgeEl) {
-      badgeEl.textContent = Mesas.labelEstado(mesa.estado);
-      badgeEl.className = `estado-badge ${mesa.estado}`;
-    }
-
-    EventBus.emit('mesa:abierta', mesa);
-    if (window.Carta && typeof Carta.render === 'function') Carta.render();
-    const modal = document.getElementById('modalPedido');
-    if (modal) modal.style.display = 'flex';
   }
 
   function cerrar() {
