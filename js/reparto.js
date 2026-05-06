@@ -1,8 +1,8 @@
 /* ================================================================
-   PubPOS — MÓDULO: reparto.js (v3.6 – delegado a DeliveryService)
+   PubPOS — MÓDULO: reparto.js (v3.7 – DDD para Delivery)
    Propósito: Gestión de pedidos de envío. Ahora utiliza el servicio
-              de dominio DeliveryService (DDD) cuando está disponible,
-              con fallback a PedidoManager y DB original.
+              de dominio DeliveryService. Mantiene fallback a
+              PedidoManager y DB original por compatibilidad.
    ================================================================ */
 const Reparto = (() => {
 
@@ -44,7 +44,7 @@ const Reparto = (() => {
     document.body.insertBefore(main, referencia);
   }
 
-  /* ── RENDERIZAR LA TABLA (sin cambios en la UI) ─────────── */
+  /* ── RENDERIZAR LA TABLA (igual que antes) ──────────────── */
   function render() {
     _asegurarVista();
     const tbody = $id('repartoBody');
@@ -117,7 +117,7 @@ const Reparto = (() => {
     const total = _itemsTemporales.reduce((sum, it) => sum + it.precio * it.qty, 0);
     if (total <= 0) { showToast('error', 'El total debe ser mayor a 0'); return; }
 
-    // ── Intentar usar DeliveryService (DDD) ──
+    // ── 1. Intentar DeliveryService (DDD) ──
     if (typeof DeliveryService !== 'undefined' && DeliveryService.crearDelivery) {
       const resultado = await DeliveryService.crearDelivery({
         direccion: { calle: direccion, telefono },
@@ -137,11 +137,11 @@ const Reparto = (() => {
         return;
       } else {
         showToast('error', resultado.error);
-        console.warn('[Reparto] DeliveryService falló, intentando fallback...');
+        console.warn('[Reparto] DeliveryService falló, usando fallback…');
       }
     }
 
-    // ── Fallback: usar PedidoManager o DB directa ──
+    // ── 2. Fallback: PedidoManager o DB directa ──
     let nuevo;
     if (typeof PedidoManager !== 'undefined' && PedidoManager.crearPedidoDelivery) {
       nuevo = PedidoManager.crearPedidoDelivery({
@@ -160,60 +160,67 @@ const Reparto = (() => {
     showToast('success', `Pedido ${nuevo.id.slice(-6)} creado`);
   }
 
-  /* ── ENVIAR A COCINA (DELEGADO A DELIVERYSERVICE) ───────── */
+  /* ── ENVIAR A COCINA ────────────────────────────────────── */
   async function enviarACocina(deliveryId) {
     if (typeof DeliveryService !== 'undefined' && DeliveryService.enviarACocina) {
       const resultado = await DeliveryService.enviarACocina(deliveryId);
-      if (resultado.exito) {
-        render();
-        showToast('success', 'Pedido enviado a Cocina/Barra');
-        return;
-      }
+      if (resultado.exito) { render(); showToast('success', 'Pedido enviado a Cocina/Barra'); return; }
       showToast('error', resultado.error);
       return;
     }
-    // Fallback existente...
+    // Fallback antiguo…
+    const pedido = DB.pedidosDelivery.find(p => p.id === deliveryId);
+    if (!pedido) { showToast('error', 'Pedido no encontrado'); return; }
+    DB.actualizarPedidoDelivery(deliveryId, { estado: 'en_preparacion' });
+    render();
+    showToast('success', 'Pedido enviado a Cocina/Barra');
   }
 
-  /* ── DESPACHAR (DELEGADO A DELIVERYSERVICE) ──────────────── */
+  /* ── DESPACHAR ──────────────────────────────────────────── */
   async function despachar(deliveryId) {
     if (typeof DeliveryService !== 'undefined' && DeliveryService.despachar) {
       const resultado = await DeliveryService.despachar(deliveryId);
-      if (resultado.exito) {
-        render();
-        showToast('success', 'Pedido en camino');
-        return;
-      }
+      if (resultado.exito) { render(); showToast('success', 'Pedido en camino'); return; }
       showToast('error', resultado.error);
       return;
     }
-    // Fallback...
+    // Fallback antiguo
+    DB.actualizarPedidoDelivery(deliveryId, { estado: 'en_camino' });
+    render();
+    showToast('success', 'Pedido en camino');
   }
 
-  /* ── CONFIRMAR ENTREGA (DELEGADO A DELIVERYSERVICE) ─────── */
+  /* ── CONFIRMAR ENTREGA ──────────────────────────────────── */
   async function confirmarEntrega(deliveryId) {
     if (typeof DeliveryService !== 'undefined' && DeliveryService.confirmarEntrega) {
       const resultado = await DeliveryService.confirmarEntrega(deliveryId);
-      if (resultado.exito) {
-        render();
-        showToast('success', 'Pedido entregado');
-        return;
-      }
+      if (resultado.exito) { render(); showToast('success', 'Pedido entregado'); return; }
       showToast('error', resultado.error);
       return;
     }
-    // Fallback...
+    // Fallback antiguo
+    DB.actualizarPedidoDelivery(deliveryId, { estado: 'entregado' });
+    render();
+    showToast('success', 'Pedido entregado');
   }
 
-  /* ── ELIMINAR PEDIDO ─────────────────────────────────────── */
+  /* ── ELIMINAR PEDIDO ────────────────────────────────────── */
   function eliminarPedido(id) {
     if (!confirm('¿Eliminar este pedido?')) return;
+    // Intentar cancelar con DeliveryService
+    if (typeof DeliveryService !== 'undefined' && DeliveryService.cancelar) {
+      DeliveryService.cancelar(id).then(res => {
+        if (res.exito) { render(); showToast('warning', 'Pedido cancelado'); }
+        else { showToast('error', res.error); }
+      });
+      return;
+    }
     DB.eliminarPedidoDelivery(id);
     render();
     showToast('warning', 'Pedido eliminado');
   }
 
-  /* ── SUSCRIPCIÓN A EVENTOS ───────────────────────────────── */
+  /* ── SUSCRIPCIÓN A EVENTOS ──────────────────────────────── */
   function _initEventListeners() {
     EventBus.on('db:inicializada', render);
     EventBus.on('pedidosDelivery:guardados', render);

@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: bootstrap.js (v1.3 – inyección completa DDD)
+   PubPOS — MÓDULO: bootstrap.js (v1.4 – inyección completa DDD)
    ================================================================ */
 const Bootstrap = (() => {
 
@@ -45,8 +45,6 @@ const Bootstrap = (() => {
     }
 
     // Repositorio de Delivery (adaptador simple sobre DB)
-    // Como todavía no tenemos DeliveryRepositoryLocal, creamos un objeto
-    // que implemente los métodos que espera DeliveryService usando DB directamente.
     const deliveryRepo = {
       async crearDelivery(datos) {
         if (!window.DB || !DB.crearPedidoDelivery) throw new Error('DB no disponible');
@@ -68,7 +66,7 @@ const Bootstrap = (() => {
       }
     };
 
-    // ── 5. Configurar Servicios de Dominio ────────────────
+    // ── 5. Configurar Servicios de Dominio ─────────────────
     if (typeof PedidoService !== 'undefined' && pedidoRepo) {
       PedidoService.configurar(pedidoRepo);
       console.log('[Bootstrap] PedidoService configurado.');

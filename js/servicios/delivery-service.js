@@ -1,31 +1,36 @@
 /* ================================================================
-   PubPOS — SERVICIO: DeliveryService
+   PubPOS — SERVICIO: DeliveryService (v1.1 – DDD completo)
    Propósito: Coordina el flujo de pedidos de entrega usando el
-              agregado Delivery. Retorna Resultado en cada operación.
+              agregado Delivery y los Value Objects. Retorna Resultado.
    ================================================================ */
 const DeliveryService = (() => {
 
-  let _deliveryRepo = null;   // repositorio (por ahora usamos DB directa)
+  let _deliveryRepo = null;
 
+  /** @param {object} repo - Implementación del repositorio de delivery */
   function configurar(repo) {
     _deliveryRepo = repo;
   }
 
-  // ── CREAR DELIVERY ───────────────────────────────────────
+  /**
+   * Crea un nuevo pedido de delivery.
+   * @param {object} datos - { direccion: {...}, items: [...], repartidor, observaciones }
+   * @returns {Promise<Resultado>}
+   */
   async function crearDelivery({ direccion, items, repartidor, observaciones }) {
-    if (!_deliveryRepo) return Resultado.fallo('Repositorio no configurado');
+    if (!_deliveryRepo) return Resultado.fallo('Repositorio de delivery no configurado');
 
-    // Validar dirección
+    // 1. Validar dirección
     const dir = crearDireccion(
       direccion.calle, direccion.numero, direccion.depto,
       direccion.referencia, direccion.telefono
     );
     if (!dir) return Resultado.fallo('Dirección inválida');
 
-    // Validar ítems
+    // 2. Validar ítems
     if (!items || items.length === 0) return Resultado.fallo('Debe incluir al menos un ítem');
 
-    // Crear agregado
+    // 3. Crear el Agregado Delivery
     let delivery;
     try {
       delivery = new Delivery('deliv_' + Date.now(), dir, repartidor);
@@ -40,7 +45,7 @@ const DeliveryService = (() => {
       return Resultado.fallo(`Error al crear delivery: ${e.message}`);
     }
 
-    // Guardar
+    // 4. Persistir
     try {
       await _deliveryRepo.crearDelivery(delivery.toJSON());
     } catch (e) {
@@ -51,7 +56,11 @@ const DeliveryService = (() => {
     return Resultado.ok(delivery);
   }
 
-  // ── ENVIAR A COCINA ──────────────────────────────────────
+  /**
+   * Envía un pedido a cocina (cambia estado a 'en_preparacion').
+   * @param {string} deliveryId
+   * @returns {Promise<Resultado>}
+   */
   async function enviarACocina(deliveryId) {
     if (!_deliveryRepo) return Resultado.fallo('Repositorio no configurado');
 
@@ -72,16 +81,15 @@ const DeliveryService = (() => {
       return Resultado.fallo(`Error al actualizar delivery: ${e.message}`);
     }
 
-    // Emitir evento para que KDS lo recoja (similar a comanda:enviada)
-    EventBus.emit('delivery:enviado_a_cocina', {
-      deliveryId,
-      items: delivery.items
-    });
-
+    EventBus.emit('delivery:enviado_a_cocina', { deliveryId, items: delivery.items });
     return Resultado.ok(delivery);
   }
 
-  // ── DESPACHAR ────────────────────────────────────────────
+  /**
+   * Despacha el pedido (en camino).
+   * @param {string} deliveryId
+   * @returns {Promise<Resultado>}
+   */
   async function despachar(deliveryId) {
     if (!_deliveryRepo) return Resultado.fallo('Repositorio no configurado');
 
@@ -105,7 +113,11 @@ const DeliveryService = (() => {
     return Resultado.ok(delivery);
   }
 
-  // ── CONFIRMAR ENTREGA ────────────────────────────────────
+  /**
+   * Confirma la entrega del pedido.
+   * @param {string} deliveryId
+   * @returns {Promise<Resultado>}
+   */
   async function confirmarEntrega(deliveryId) {
     if (!_deliveryRepo) return Resultado.fallo('Repositorio no configurado');
 
@@ -129,7 +141,11 @@ const DeliveryService = (() => {
     return Resultado.ok(delivery);
   }
 
-  // ── CANCELAR ─────────────────────────────────────────────
+  /**
+   * Cancela un pedido de delivery.
+   * @param {string} deliveryId
+   * @returns {Promise<Resultado>}
+   */
   async function cancelar(deliveryId) {
     if (!_deliveryRepo) return Resultado.fallo('Repositorio no configurado');
 
@@ -153,21 +169,21 @@ const DeliveryService = (() => {
     return Resultado.ok(delivery);
   }
 
-  // ── UTILIDAD PRIVADA ────────────────────────────────────
+  // ── UTILIDAD PRIVADA ──────────────────────────────────────
   function _reconstruirDelivery(datos) {
     const dir = new Direccion(
-      datos.direccion.calle,
-      datos.direccion.numero,
-      datos.direccion.depto,
-      datos.direccion.referencia,
-      datos.direccion.telefono
+      datos.direccion?.calle || datos.direccion,
+      datos.direccion?.numero || '',
+      datos.direccion?.depto || '',
+      datos.direccion?.referencia || '',
+      datos.direccion?.telefono || ''
     );
     const delivery = new Delivery(datos.id, dir, datos.repartidor);
     (datos.items || []).forEach(it => {
       delivery.agregarItem(it.nombre, crearDinero(it.precio), crearCantidad(it.cantidad));
     });
     delivery.setObservaciones(datos.observaciones);
-    // Forzar estado si es necesario (saltando validaciones de transición)
+    // Forzar estado si es necesario
     if (datos.estado === 'en_preparacion') { delivery.enviarACocina(); }
     if (datos.estado === 'en_camino')       { delivery.enviarACocina(); delivery.despachar(); }
     if (datos.estado === 'entregado')       { delivery.enviarACocina(); delivery.despachar(); delivery.confirmarEntrega(); }
