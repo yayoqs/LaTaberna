@@ -1,8 +1,5 @@
 /* ================================================================
-   PubPOS — SERVICIO: PedidoService (v1.2 – retorna Resultado)
-   Propósito: Coordina el flujo de creación y cierre de pedidos
-              usando objetos de dominio. Ahora cada método devuelve
-              una instancia de Resultado, encapsulando éxito o fallo.
+   PubPOS — SERVICIO: PedidoService (v1.3 – usa PedidoAgregado)
    ================================================================ */
 const PedidoService = (() => {
 
@@ -10,7 +7,6 @@ const PedidoService = (() => {
 
   function configurar(repo) { _pedidoRepo = repo; }
 
-  // ── CREAR PEDIDO DE MESA ──────────────────────────────────
   async function crearPedidoMesa({ numeroMesa, mozo, comensales }) {
     if (!_pedidoRepo) return Resultado.fallo('Repositorio no configurado');
 
@@ -19,7 +15,7 @@ const PedidoService = (() => {
 
     let pedido;
     try {
-      pedido = new Pedido(
+      pedido = new PedidoAgregado(     // ← Renombrado
         'ped_' + Date.now(),
         numeroMesa,
         mozo || 'Sin mozo',
@@ -39,7 +35,6 @@ const PedidoService = (() => {
     return Resultado.ok(pedido);
   }
 
-  // ── AGREGAR ÍTEM ─────────────────────────────────────────
   async function agregarItem(pedidoId, { nombre, precio, cantidad }) {
     if (!_pedidoRepo) return Resultado.fallo('Repositorio no configurado');
 
@@ -73,7 +68,6 @@ const PedidoService = (() => {
     return Resultado.ok(pedido);
   }
 
-  // ── CERRAR PEDIDO ─────────────────────────────────────────
   async function cerrarPedido(pedidoId, { formaPago, totalFinal, descuento = 0 }) {
     if (!_pedidoRepo) return Resultado.fallo('Repositorio no configurado');
 
@@ -115,9 +109,9 @@ const PedidoService = (() => {
     return Resultado.ok(pedido);
   }
 
-  // ── UTILIDADES PRIVADAS ──────────────────────────────────
+  // ── UTILIDAD PRIVADA ──────────────────────────────────
   function _reconstruirPedido(datos) {
-    const pedido = new Pedido(
+    const pedido = new PedidoAgregado(       // ← Renombrado
       datos.id,
       datos.mesa,
       datos.mozo,
