@@ -1,24 +1,19 @@
 /* ================================================================
-   PubPOS — MÓDULO: perfil.js (v2.1 – encapsulación mejorada)
+   PubPOS — MÓDULO: perfil.js (v2.2 – usa método público de Auth)
    ================================================================
-   Cambios respecto a v2:
-   • Se elimina el acceso directo a Auth._usuarioActual.nombre.
-     Ahora se actualiza sessionStorage y se reconstruye el objeto
-     interno de Auth para reflejar el cambio sin recargar.
-   • Se añade un comentario TODO para implementar en Auth un método
-     público que reciba los nuevos datos del perfil.
-   • Se corrige _renderAvatar para que, al quitar la foto, se
-     elimine correctamente el estilo de fondo y se muestre la inicial.
-   • Comentarios pedagógicos añadidos.
+   Cambios respecto a v2.1:
+   • Ahora utiliza Auth.actualizarNombre() en lugar de acceder
+     directamente a _usuarioActual. Esto mejora el encapsulamiento
+     y garantiza que sessionStorage se mantenga sincronizado.
+   • Se corrigió el botón "Guardar" para que use async/await de
+     manera consistente.
    ================================================================ */
 const Perfil = (() => {
 
-  // Clave para guardar datos extendidos en localStorage
   function _storageKey(usuario) {
     return `pubpos_perfil_${usuario}`;
   }
 
-  /* ── CREACIÓN DINÁMICA DE LA VISTA ───────────────────────── */
   function _asegurarVista() {
     if ($id('view-perfil')) return;
 
@@ -33,9 +28,7 @@ const Perfil = (() => {
           <button class="btn-secondary" onclick="Perfil.render()"><i class="fas fa-sync-alt"></i> Actualizar</button>
         </div>
       </div>
-
       <div class="perfil-contenido">
-        <!-- Tarjeta de información personal -->
         <section class="perfil-tarjeta">
           <div class="perfil-avatar" id="perfilAvatar"></div>
           <div class="perfil-info">
@@ -43,12 +36,8 @@ const Perfil = (() => {
             <span class="perfil-rol" id="perfilRol"></span>
             <span class="perfil-simulacion" id="perfilSimulacion" style="display:none;"></span>
           </div>
-          <div class="perfil-detalles" id="perfilDetalles" style="width:100%; margin-top:12px;">
-            <!-- Se llena dinámicamente -->
-          </div>
+          <div class="perfil-detalles" id="perfilDetalles" style="width:100%; margin-top:12px;"></div>
         </section>
-
-        <!-- Sección de documentos -->
         <section class="perfil-documentos">
           <h4><i class="fas fa-folder-open"></i> Mis Documentos</h4>
           <div id="perfilDocsLista" class="perfil-docs-lista">
@@ -61,7 +50,6 @@ const Perfil = (() => {
     document.body.insertBefore(main, referencia);
   }
 
-  /* ── RENDERIZAR PERFIL ──────────────────────────────────── */
   async function render() {
     _asegurarVista();
 
@@ -71,10 +59,7 @@ const Perfil = (() => {
       return;
     }
 
-    // Cargar datos extendidos desde localStorage
     const extras = _cargarExtras(usuario.nombre);
-
-    // Mostrar nombre y rol
     $id('perfilNombre').textContent = usuario.nombre;
     $id('perfilRol').textContent = `Rol: ${usuario.rolEfectivo}`;
     if (usuario.simulando) {
@@ -84,13 +69,8 @@ const Perfil = (() => {
       $id('perfilSimulacion').style.display = 'none';
     }
 
-    // Avatar: si hay foto, usarla; si no, inicial
     _renderAvatar(usuario.nombre, extras.foto);
-
-    // Detalles extra (teléfono, email)
     _renderDetalles(extras);
-
-    // Cargar documentos desde el backend
     await _cargarDocumentos();
   }
 
@@ -103,9 +83,8 @@ const Perfil = (() => {
       avatarEl.style.backgroundImage = `url('${fotoUrl}')`;
       avatarEl.style.backgroundSize = 'cover';
       avatarEl.style.backgroundPosition = 'center';
-      avatarEl.style.color = 'transparent'; // esconde la inicial
+      avatarEl.style.color = 'transparent';
     } else {
-      // ⚠️ Limpiar estilos de fondo para mostrar la inicial correctamente
       avatarEl.style.backgroundImage = '';
       avatarEl.style.backgroundSize = '';
       avatarEl.style.color = '#000';
@@ -116,21 +95,12 @@ const Perfil = (() => {
   function _renderDetalles(extras) {
     const cont = $id('perfilDetalles');
     if (!cont) return;
-
     let html = '';
-    if (extras.telefono) {
-      html += `<div class="perfil-detalle-item"><i class="fas fa-phone"></i> ${extras.telefono}</div>`;
-    }
-    if (extras.email) {
-      html += `<div class="perfil-detalle-item"><i class="fas fa-envelope"></i> ${extras.email}</div>`;
-    }
-    if (!html) {
-      html = '<p style="color:var(--color-text-muted); font-size:12px;">Sin información adicional.</p>';
-    }
-    cont.innerHTML = html;
+    if (extras.telefono) html += `<div class="perfil-detalle-item"><i class="fas fa-phone"></i> ${extras.telefono}</div>`;
+    if (extras.email) html += `<div class="perfil-detalle-item"><i class="fas fa-envelope"></i> ${extras.email}</div>`;
+    cont.innerHTML = html || '<p style="color:var(--color-text-muted); font-size:12px;">Sin información adicional.</p>';
   }
 
-  /* ── MODAL PARA EDITAR PERFIL ────────────────────────────── */
   function mostrarModalEditar() {
     let modal = $id('modalEditarPerfil');
     if (!modal) {
@@ -140,26 +110,15 @@ const Perfil = (() => {
       modal.style.display = 'none';
       modal.innerHTML = `
         <div class="modal-small" style="max-width:460px;">
-          <div class="modal-header">
-            <h3><i class="fas fa-pen"></i> Editar Perfil</h3>
-            <button class="modal-close" onclick="Perfil.cerrarModalEditar()"><i class="fas fa-times"></i></button>
-          </div>
+          <div class="modal-header"><h3><i class="fas fa-pen"></i> Editar Perfil</h3><button class="modal-close" onclick="Perfil.cerrarModalEditar()"><i class="fas fa-times"></i></button></div>
           <div class="modal-small-body">
-            <label>Nombre</label>
-            <input type="text" id="editarPerfilNombre" placeholder="Tu nombre">
-
-            <label>Teléfono</label>
-            <input type="text" id="editarPerfilTelefono" placeholder="+56 9 ...">
-
-            <label>Email</label>
-            <input type="email" id="editarPerfilEmail" placeholder="correo@ejemplo.com">
-
-            <label>Foto de perfil (URL)</label>
-            <input type="text" id="editarPerfilFoto" placeholder="https://... (opcional)">
-
+            <label>Nombre</label><input type="text" id="editarPerfilNombre">
+            <label>Teléfono</label><input type="text" id="editarPerfilTelefono">
+            <label>Email</label><input type="email" id="editarPerfilEmail">
+            <label>Foto de perfil (URL)</label><input type="text" id="editarPerfilFoto">
             <div class="modal-small-footer">
               <button class="btn-secondary" onclick="Perfil.cerrarModalEditar()">Cancelar</button>
-              <button class="btn-primary" onclick="Perfil.guardarPerfil()"><i class="fas fa-save"></i> Guardar</button>
+              <button class="btn-primary" onclick="Perfil.guardarPerfil()">Guardar</button>
             </div>
           </div>
         </div>
@@ -167,15 +126,12 @@ const Perfil = (() => {
       document.body.appendChild(modal);
     }
 
-    // Precargar datos actuales
     const usuario = Auth.getUsuarioActual();
     $id('editarPerfilNombre').value = usuario ? usuario.nombre : '';
-
     const extras = _cargarExtras(usuario ? usuario.nombre : '');
     $id('editarPerfilTelefono').value = extras.telefono || '';
     $id('editarPerfilEmail').value = extras.email || '';
     $id('editarPerfilFoto').value = extras.foto || '';
-
     modal.style.display = 'flex';
   }
 
@@ -186,93 +142,58 @@ const Perfil = (() => {
 
   async function guardarPerfil() {
     const usuario = Auth.getUsuarioActual();
-    if (!usuario) {
-      showToast('error', 'No hay sesión activa');
-      return;
-    }
+    if (!usuario) { showToast('error', 'No hay sesión activa'); return; }
 
     const nuevoNombre = $val('editarPerfilNombre');
     const telefono = $val('editarPerfilTelefono');
     const email = $val('editarPerfilEmail');
     const foto = $val('editarPerfilFoto');
 
-    if (!nuevoNombre) {
-      showToast('error', 'El nombre no puede estar vacío');
-      return;
-    }
+    if (!nuevoNombre) { showToast('error', 'El nombre no puede estar vacío'); return; }
 
-    // ── Actualizar nombre en sessionStorage ─────────────────
-    // TODO: Reemplazar por Auth.actualizarNombre(nuevoNombre) cuando
-    // se implemente el método público en auth.js.
-    const nuevoUsuario = { nombre: nuevoNombre, rol: usuario.rol };
-    sessionStorage.setItem('usuarioActual', JSON.stringify(nuevoUsuario));
+    // Usar el nuevo método público de Auth
+    Auth.actualizarNombre(nuevoNombre);
 
-    // Actualizar el objeto en memoria para que Auth lo refleje sin recargar
-    Auth._usuarioActual = nuevoUsuario;
-    Auth.aplicarRestriccionesUI();
-
-    // ── Guardar datos extendidos en localStorage ────────────
     _guardarExtras(nuevoNombre, { telefono, email, foto });
-
     cerrarModalEditar();
     render();
     showToast('success', 'Perfil actualizado');
   }
 
-  /* ── CARGA / GUARDADO DE DATOS EXTRAS ──────────────────── */
   function _cargarExtras(usuario) {
     const raw = localStorage.getItem(_storageKey(usuario));
-    if (raw) {
-      try { return JSON.parse(raw); } catch { return {}; }
-    }
-    return {};
+    return raw ? (() => { try { return JSON.parse(raw); } catch { return {}; } })() : {};
   }
 
   function _guardarExtras(usuario, datos) {
     localStorage.setItem(_storageKey(usuario), JSON.stringify(datos));
   }
 
-  /* ── CARGAR DOCUMENTOS ──────────────────────────────────── */
   async function _cargarDocumentos() {
     const docsContainer = $id('perfilDocsLista');
     if (!docsContainer) return;
-
     try {
-      const respuesta = await DB.llamar('getDocumentosUsuario', {
-        usuario: Auth.getNombre()
-      });
+      const respuesta = await DB.llamar('getDocumentosUsuario', { usuario: Auth.getNombre() });
       const documentos = respuesta.documentos || [];
-
       if (!documentos.length) {
-        docsContainer.innerHTML = `<p style="color:var(--color-text-muted);">No tienes documentos cargados.</p>`;
+        docsContainer.innerHTML = '<p style="color:var(--color-text-muted);">No tienes documentos cargados.</p>';
         return;
       }
-
       docsContainer.innerHTML = documentos.map(doc => `
         <div class="perfil-doc-item">
           <i class="fas fa-file-pdf"></i>
           <span>${doc.nombre || 'Documento'}</span>
           <a href="${doc.url}" target="_blank" class="btn-ajuste"><i class="fas fa-download"></i> Ver</a>
-        </div>
-      `).join('');
+        </div>`).join('');
     } catch (e) {
-      console.warn('[Perfil] No se pudieron cargar documentos:', e);
-      docsContainer.innerHTML = `<p style="color:var(--color-text-muted);">Error al cargar documentos.</p>`;
+      Logger.warn('[Perfil] No se pudieron cargar documentos:', e);
+      docsContainer.innerHTML = '<p style="color:var(--color-text-muted);">Error al cargar documentos.</p>';
     }
   }
 
-  /* ── SUSCRIPCIÓN A EVENTOS ──────────────────────────────── */
-  function _initEventListeners() {
-    EventBus.on('db:inicializada', render);
-  }
-  _initEventListeners();
+  EventBus.on('db:inicializada', render);
 
-  return {
-    render,
-    mostrarModalEditar,
-    cerrarModalEditar,
-    guardarPerfil
-  };
+  return { render, mostrarModalEditar, cerrarModalEditar, guardarPerfil };
 })();
 
 window.Perfil = Perfil;

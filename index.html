@@ -101,18 +101,52 @@
   <!-- TOAST CONTAINER -->
   <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
-  <!-- SCRIPTS (orden obligatorio) -->
+  <!-- ═══════════════════════════════════════════════════════════
+       SCRIPTS: orden obligatorio
+       ═══════════════════════════════════════════════════════════ -->
   <script src="js/utils.js"></script>
+  <script src="js/lib/logger.js"></script>        <!-- Logger + ErrorHandler -->
   <script src="js/lib/eventBus.js"></script>
+  <script src="js/lib/command-bus.js"></script>
+
+  <!-- Base de datos (core, sync, inventario, fusión) -->
   <script src="js/db-core.js"></script>
   <script src="js/db-sync.js"></script>
   <script src="js/db-inventario.js"></script>
   <script src="js/db-fusion.js"></script>
   <script src="js/db.js"></script>
+
+  <!-- Roles y Autenticación -->
   <script src="js/roles.js"></script>
   <script src="js/auth.js"></script>
 
-  <!-- UI -->
+  <!-- Dominio y Servicios (DDD) -->
+  <script src="js/dominio/resultado.js"></script>
+  <script src="js/dominio/dinero.js"></script>
+  <script src="js/dominio/cantidad.js"></script>
+  <script src="js/dominio/direccion.js"></script>
+  <script src="js/dominio/pedido.js"></script>
+  <script src="js/dominio/delivery.js"></script>
+  <script src="js/dominio/ingrediente.js"></script>
+  <script src="js/servicios/pedido-service.js"></script>
+  <script src="js/servicios/delivery-service.js"></script>
+  <script src="js/servicios/inventario-service.js"></script>
+
+  <!-- Comandos CQRS -->
+  <script src="js/comandos/crear-pedido-mesa.js"></script>
+  <script src="js/comandos/enviar-comanda.js"></script>   <!-- Nuevo -->
+
+  <!-- Repositorios -->
+  <script src="js/repositorios/pedido-repository.js"></script>
+
+  <!-- Store centralizado -->
+  <script src="js/lib/store.js"></script>
+
+  <!-- Managers -->
+  <script src="js/managers/pedido-manager.js"></script>
+  <script src="js/managers/turno-manager.js"></script>
+
+  <!-- UI (vistas) -->
   <script src="js/ui/mesas.js"></script>
   <script src="js/ui/carta.js"></script>
   <script src="js/ui/comanda.js"></script>
@@ -130,27 +164,7 @@
   <script src="js/ui/eventos.js"></script>
   <script src="js/ui/perfil.js"></script>
 
-  <!-- DDD: Dominio y Servicios -->
-  <script src="js/dominio/resultado.js"></script>
-  <script src="js/dominio/dinero.js"></script>
-  <script src="js/dominio/cantidad.js"></script>
-  <script src="js/dominio/direccion.js"></script>
-  <script src="js/dominio/pedido.js"></script>
-  <script src="js/dominio/delivery.js"></script>
-  <script src="js/dominio/ingrediente.js"></script>
-  <script src="js/servicios/pedido-service.js"></script>
-  <script src="js/servicios/delivery-service.js"></script>
-  <script src="js/servicios/inventario-service.js"></script>
-
-  <!-- CQRS -->
-  <script src="js/lib/command-bus.js"></script>
-  <script src="js/comandos/crear-pedido-mesa.js"></script>
-  <script src="js/repositorios/pedido-repository.js"></script>
-
-  <!-- Managers -->
-  <script src="js/managers/pedido-manager.js"></script>
-  <script src="js/managers/turno-manager.js"></script>
-
+  <!-- Bootstrap (inicialización general) -->
   <script src="js/bootstrap.js"></script>
   <script src="js/app.js"></script>
 

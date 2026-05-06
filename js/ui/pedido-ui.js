@@ -1,5 +1,8 @@
 /* ================================================================
-   PubPOS — MÓDULO: pedido-ui.js (v2.8 – botón cerrar robusto)
+   PubPOS — MÓDULO: pedido-ui.js (v3.1 – asegura refresco de mesas)
+   Propósito: Interfaz de usuario para el modal de pedido. Gestiona
+              la apertura y cierre de mesas, el envío de comandas
+              mediante el CommandBus y la transferencia de pedidos.
    ================================================================ */
 const Pedido = (() => {
 
@@ -71,7 +74,7 @@ const Pedido = (() => {
     try {
       _asegurarModalPedido();
       let mesa = DB.mesas.find(m => m.numero == num);
-      if (!mesa) { console.error(`[Pedido] Mesa ${num} no encontrada.`); return; }
+      if (!mesa) { Logger.error(`[Pedido] Mesa ${num} no encontrada.`); return; }
 
       if (mesa.estado === 'libre') {
         mesa.abiertaEn = Date.now();
@@ -85,19 +88,19 @@ const Pedido = (() => {
           try {
             const pedido = await PedidoService.crearPedidoMesa({ numeroMesa: num, mozo: mesa.mozo, comensales: mesa.comensales });
             if (pedido) { pedidoId = pedido.id; mesa.pedidoId = pedidoId; }
-          } catch (e) { console.warn('[Pedido] PedidoService:', e); }
+          } catch (e) { Logger.warn('[Pedido] PedidoService:', e); }
         }
         if (!pedidoId && typeof PedidoManager !== 'undefined' && PedidoManager.crearPedidoMesa) {
           try {
             const pedido = PedidoManager.crearPedidoMesa(num, mesa.mozo, mesa.comensales);
             if (pedido) { pedidoId = pedido.id; mesa.pedidoId = pedidoId; }
-          } catch (e) { console.warn('[Pedido] PedidoManager:', e); }
+          } catch (e) { Logger.warn('[Pedido] PedidoManager:', e); }
         }
         if (!pedidoId) {
           try {
             const nuevoPedido = await DB.crearPedido(num, mesa.mozo, mesa.comensales);
             mesa.pedidoId = nuevoPedido.id;
-          } catch (e) { console.warn('[Pedido] DB:', e); mesa.pedidoId = 'local_' + Date.now(); }
+          } catch (e) { Logger.warn('[Pedido] DB:', e); mesa.pedidoId = 'local_' + Date.now(); }
         }
         DB.saveMesas();
       }
@@ -119,7 +122,6 @@ const Pedido = (() => {
     if (modal) {
       modal.style.display = 'none';
     } else {
-      // Si no existe, intentamos cerrar el overlay que tenga la clase modal-overlay y contenga el modal
       const overlays = document.querySelectorAll('.modal-overlay');
       overlays.forEach(o => { if (o.querySelector('.modal-pedido')) o.style.display = 'none'; });
     }
@@ -135,17 +137,13 @@ const Pedido = (() => {
     EventBus.emit('mesa:cerrada');
   }
 
-  /* ── ENVÍO DE COMANDA ─────────────────────────────────── */
+  /* ── ENVÍO DE COMANDA (USANDO CQRS) ──────────────────── */
   async function enviarComanda() {
     const mesa = Comanda.getMesaActiva();
     if (!mesa) { showToast('warning', 'No hay mesa activa.'); return; }
 
     const pendientes = mesa.items.filter(it => !it.enviado);
     if (!pendientes.length) { showToast('warning', 'No hay ítems nuevos para enviar.'); return; }
-
-    const cocinaItems = pendientes.filter(it => it.destino === 'cocina' || it.destino === 'ambos');
-    const barraItems  = pendientes.filter(it => it.destino === 'barra'  || it.destino === 'ambos');
-    if (!cocinaItems.length && !barraItems.length) { showToast('info', 'No hay ítems para enviar.'); return; }
 
     const mozoSelect = document.getElementById('comandaMozo');
     const comensalesInput = document.getElementById('comandaComensales');
@@ -154,94 +152,71 @@ const Pedido = (() => {
     if (comensalesInput) mesa.comensales = parseInt(comensalesInput.value) || 1;
     if (obsInput) mesa.observaciones = obsInput.value;
 
-    const _crearComanda = (items, destinoKds) => {
-      items.forEach(it => { it.enviado = true; it.enviadoA = destinoKds; it.enviadoTs = Date.now(); });
-      const comanda = {
-        id: 'kds_' + Date.now() + '_' + Math.random().toString(36).substr(2,6),
-        mesa: mesa.numero, mozo: mesa.mozo, destino: destinoKds,
-        items: items.map(it => ({ ...it })),
-        observaciones: mesa.observaciones || '', estado: 'nueva', ts: Date.now()
-      };
-      DB.comandas.push(comanda);
-      DB.saveComandas();
-      EventBus.emit('comanda:enviada', comanda);
-      return comanda;
+    const comando = {
+      type: 'enviarComanda',
+      datos: {
+        mesa,
+        mozo: mesa.mozo,
+        comensales: mesa.comensales,
+        observaciones: mesa.observaciones || '',
+        itemsPendientes: pendientes
+      }
     };
 
-    if (cocinaItems.length && barraItems.length) {
-      const comandaCocina = _crearComanda(cocinaItems, 'cocina');
-      const comandaBarra  = _crearComanda(barraItems,  'barra');
-      Tickets.mostrarDoble(
-        Tickets.generarComanda(comandaCocina, 'cocina'), 'Cocina',
-        { textoEditar: 'Editar', editarCallback: (htmlActual) => {
-            const nota = prompt('Agregar comentario a la comanda de Cocina:', comandaCocina.observaciones || '');
-            if (nota !== null) {
-              comandaCocina.observaciones = nota;
-              const idx = DB.comandas.findIndex(c => c.id === comandaCocina.id);
-              if (idx >= 0) { DB.comandas[idx].observaciones = nota; DB.saveComandas(); }
-              return Tickets.generarComanda(comandaCocina, 'cocina');
-            }
-            return htmlActual;
-          }
-        },
-        Tickets.generarComanda(comandaBarra, 'barra'), 'Barra',
-        { textoEditar: 'Editar', editarCallback: (htmlActual) => {
-            const nota = prompt('Agregar comentario a la comanda de Barra:', comandaBarra.observaciones || '');
-            if (nota !== null) {
-              comandaBarra.observaciones = nota;
-              const idx = DB.comandas.findIndex(c => c.id === comandaBarra.id);
-              if (idx >= 0) { DB.comandas[idx].observaciones = nota; DB.saveComandas(); }
-              return Tickets.generarComanda(comandaBarra, 'barra');
-            }
-            return htmlActual;
-          }
-        }
-      );
-    } else {
-      if (cocinaItems.length) {
-        const comandaCocina = _crearComanda(cocinaItems, 'cocina');
-        Tickets.mostrar(Tickets.generarComanda(comandaCocina, 'cocina'), `Cocina — Mesa ${mesa.numero}`, { textoEditar: 'Editar', editarCallback: (htmlActual) => {
-          const nota = prompt('Agregar comentario a la comanda de Cocina:', comandaCocina.observaciones || '');
-          if (nota !== null) {
-            comandaCocina.observaciones = nota;
-            const idx = DB.comandas.findIndex(c => c.id === comandaCocina.id);
-            if (idx >= 0) { DB.comandas[idx].observaciones = nota; DB.saveComandas(); }
-            return Tickets.generarComanda(comandaCocina, 'cocina');
-          }
-          return htmlActual;
-        }});
-      }
-      if (barraItems.length) {
-        const comandaBarra = _crearComanda(barraItems, 'barra');
-        Tickets.mostrar(Tickets.generarComanda(comandaBarra, 'barra'), `Barra — Mesa ${mesa.numero}`, { textoEditar: 'Editar', editarCallback: (htmlActual) => {
-          const nota = prompt('Agregar comentario a la comanda de Barra:', comandaBarra.observaciones || '');
-          if (nota !== null) {
-            comandaBarra.observaciones = nota;
-            const idx = DB.comandas.findIndex(c => c.id === comandaBarra.id);
-            if (idx >= 0) { DB.comandas[idx].observaciones = nota; DB.saveComandas(); }
-            return Tickets.generarComanda(comandaBarra, 'barra');
-          }
-          return htmlActual;
-        }});
-      }
+    Logger.debug('[Pedido] Ejecutando comando enviarComanda...');
+    const resultado = await CommandBus.ejecutar(comando);
+
+    if (!resultado.exito) {
+      showToast('error', 'Error al enviar comanda: ' + resultado.error);
+      return;
     }
 
-    if (mesa.estado === 'libre') mesa.estado = 'ocupada';
+    const { comandas, ticketsHTML } = resultado.data;
 
-    try {
-      if (mesa.pedidoId) {
-        await DB.actualizarPedido(mesa.pedidoId, {
-          estado: 'en_proceso', items: JSON.stringify(mesa.items),
-          total: calcularTotal(mesa.items), mozo: mesa.mozo,
-          comensales: mesa.comensales, observaciones: mesa.observaciones
-        });
-      }
-    } catch (e) { console.warn('[Pedido] Error actualizando pedido:', e); }
-
-    DB.saveMesas();
-    EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: mesa.estado });
     if (window.Comanda && typeof Comanda.render === 'function') Comanda.render();
     showToast('success', 'Comanda(s) enviada(s)');
+
+    // Mostrar tickets según lo que haya generado el handler
+    if (ticketsHTML.cocina && ticketsHTML.barra) {
+      Tickets.mostrarDoble(
+        ticketsHTML.cocina, 'Cocina',
+        { textoEditar: 'Editar', editarCallback: (html) => _editarComandaCallback(comandas.find(c => c.destino === 'cocina'), html) },
+        ticketsHTML.barra, 'Barra',
+        { textoEditar: 'Editar', editarCallback: (html) => _editarComandaCallback(comandas.find(c => c.destino === 'barra'), html) }
+      );
+    } else if (ticketsHTML.cocina) {
+      Tickets.mostrar(ticketsHTML.cocina, `Cocina — Mesa ${mesa.numero}`, {
+        textoEditar: 'Editar',
+        editarCallback: (html) => _editarComandaCallback(comandas[0], html)
+      });
+    } else if (ticketsHTML.barra) {
+      Tickets.mostrar(ticketsHTML.barra, `Barra — Mesa ${mesa.numero}`, {
+        textoEditar: 'Editar',
+        editarCallback: (html) => _editarComandaCallback(comandas[0], html)
+      });
+    }
+
+    // Forzar renderizado de mesas para reflejar el nuevo estado
+    if (window.Mesas && typeof Mesas.render === 'function') {
+      Mesas.render();
+    }
+
+    EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: mesa.estado });
+  }
+
+  function _editarComandaCallback(comanda, htmlActual) {
+    if (!comanda) return htmlActual;
+    const nota = prompt('Agregar comentario a la comanda:', comanda.observaciones || '');
+    if (nota !== null) {
+      comanda.observaciones = nota;
+      const idx = DB.comandas.findIndex(c => c.id === comanda.id);
+      if (idx >= 0) {
+        DB.comandas[idx].observaciones = nota;
+        DB.saveComandas();
+      }
+      return Tickets.generarComanda(comanda, comanda.destino);
+    }
+    return htmlActual;
   }
 
   /* ── Transferir mesa ───────────────────────────────────── */

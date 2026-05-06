@@ -1,23 +1,12 @@
 /* ================================================================
-   PubPOS — MÓDULO: reparto.js (v3.8 – respuesta a KDS "listo")
-   ================================================================
-   Cambios respecto a v3.7.2:
-   • Se agrega un mapa _deliveryFlags para guardar estados adicionales
-     (ej. listoParaRecoger) sin modificar los objetos originales.
-   • Al recibir el evento 'delivery:listo' desde KDS, se marca
-     internamente ese delivery como listo y se actualiza la tabla.
-     Ahora el repartidor ve un badge "Listo para recoger" y puede
-     despachar directamente.
-   • Se corrige el cierre automático del dropdown de búsqueda de
-     productos cuando se selecciona uno.
-   • Comentarios pedagógicos incluidos.
+   PubPOS — MÓDULO: reparto.js (v3.8.1 – crea comanda en KDS)
+   Propósito: Vista de reparto con gestión de pedidos de delivery,
+              creación de comandas para el monitor de cocina (KDS)
+              y comunicación con DeliveryService cuando está disponible.
    ================================================================ */
 const Reparto = (() => {
-  // Almacena flags temporales (no persistentes) para pedidos,
-  // como si ya están listos para ser recogidos.
   let _deliveryFlags = {};
 
-  // ── CREACIÓN DINÁMICA DE LA VISTA ─────────────────────────
   function _asegurarVista() {
     if ($id('view-reparto')) return;
     const main = document.createElement('main');
@@ -57,20 +46,14 @@ const Reparto = (() => {
       const resumen = items.map(i => `${i.qty}x ${i.nombre}`).join(', ') || '—';
       const badgeClase = { pendiente:'warning', en_preparacion:'info', en_camino:'accent', entregado:'success' }[p.estado] || 'default';
 
-      // ── Indicador extra si KDS marcó como listo ──────────
       const estaListo = _deliveryFlags[p.id]?.listoParaRecoger === true;
-      const estadoMostrado = estaListo && p.estado === 'en_preparacion'
-        ? 'listo'   // mostramos "listo" en lugar de "en_preparacion"
-        : p.estado;
-      const badgeExtra = estaListo && p.estado === 'en_preparacion'
-        ? ' <span class="badge success" style="margin-left:4px;">✓ Listo</span>'
-        : '';
+      const estadoMostrado = estaListo && p.estado === 'en_preparacion' ? 'listo' : p.estado;
+      const badgeExtra = estaListo && p.estado === 'en_preparacion' ? ' <span class="badge success" style="margin-left:4px;">✓ Listo</span>' : '';
 
       let botones = '';
       if (p.estado === 'pendiente') {
         botones += `<button class="btn-ajuste" onclick="Reparto.enviarACocina('${p.id}')"><i class="fas fa-fire-burner"></i> Enviar a Cocina</button>`;
       } else if (p.estado === 'en_preparacion') {
-        // Si ya está listo, mostramos botón para despachar directamente
         botones += `<button class="btn-ajuste" onclick="Reparto.despachar('${p.id}')"><i class="fas fa-motorcycle"></i> ${estaListo ? 'Despachar ahora' : 'En camino'}</button>`;
       } else if (p.estado === 'en_camino') {
         botones += `<button class="btn-ajuste" onclick="Reparto.confirmarEntrega('${p.id}')"><i class="fas fa-check"></i> Entregado</button>`;
@@ -90,7 +73,6 @@ const Reparto = (() => {
     }).join('');
   }
 
-  // ── MODAL NUEVO PEDIDO ──────────────────────────────────
   let _itemsTemporales = [];
   let _productoSeleccionado = null;
 
@@ -132,6 +114,7 @@ const Reparto = (() => {
     _renderItemsTemporales();
     modal.style.display = 'flex';
   }
+
   function cerrarModalNuevo() { const modal=$id('modalReparto'); if(modal) modal.style.display='none'; }
 
   function _filtrarProductos() {
@@ -177,7 +160,6 @@ const Reparto = (() => {
       </div>`).join('');
   }
 
-  // ── GUARDAR NUEVO PEDIDO ────────────────────────────────
   async function guardarNuevoPedido() {
     const dir = $val('repDireccion'), tel = $val('repTelefono'), rep = $val('repRepartidor'), obs = $val('repObservaciones');
     if(!dir) { showToast('error','Dirección obligatoria'); return; }
@@ -212,24 +194,65 @@ const Reparto = (() => {
   async function enviarACocina(deliveryId) {
     if(typeof DeliveryService!=='undefined' && DeliveryService.enviarACocina) {
       const r = await DeliveryService.enviarACocina(deliveryId);
-      if(r.exito) { render(); showToast('success','Enviado a Cocina'); return; }
+      if(r.exito) {
+        _crearComandaParaDelivery(deliveryId);
+        render(); showToast('success','Enviado a Cocina'); return;
+      }
       else showToast('error',r.error);
       return;
     }
     const ped = DB.pedidosDelivery.find(p=>p.id===deliveryId);
     if(!ped) { showToast('error','No encontrado'); return; }
     DB.actualizarPedidoDelivery(deliveryId,{estado:'en_preparacion'});
+    _crearComandaParaDelivery(deliveryId);
     render(); showToast('success','Enviado a Cocina');
   }
+
+  function _crearComandaParaDelivery(deliveryId) {
+    const ped = DB.pedidosDelivery.find(p => p.id === deliveryId);
+    if (!ped) return;
+
+    const destino = 'cocina';
+    const itemsParaComanda = ped.items.map(it => ({
+      prodId: it.prodId || '',
+      nombre: it.nombre,
+      precio: it.precio,
+      qty: it.qty,
+      destino: destino,
+      obs: '',
+      enviado: true,
+      enviadoA: destino,
+      enviadoTs: Date.now()
+    }));
+
+    const comanda = {
+      id: 'kds_deliv_' + deliveryId,
+      mesa: 'Deliv #' + deliveryId.slice(-6),
+      mozo: ped.repartidor || 'Delivery',
+      destino: destino,
+      items: itemsParaComanda,
+      observaciones: ped.observaciones || '',
+      estado: 'nueva',
+      ts: Date.now(),
+      deliveryId: deliveryId
+    };
+
+    if (typeof DB !== 'undefined' && DB.comandas) {
+      DB.comandas.push(comanda);
+      DB.saveComandas();
+    }
+    EventBus.emit('comanda:enviada', comanda);
+    Logger.debug(`[Reparto] Comanda de delivery creada: ${comanda.id}`);
+  }
+
   async function despachar(deliveryId) {
     if(typeof DeliveryService!=='undefined' && DeliveryService.despachar) {
       const r = await DeliveryService.despachar(deliveryId);
-      if(r.exito) { 
-        // Al despachar, quitamos la bandera de listo
+      if(r.exito) {
         delete _deliveryFlags[deliveryId];
-        render(); 
-        showToast('success','En camino'); 
-        return; 
+        render();
+        showToast('success','En camino');
+        return;
       }
       else showToast('error',r.error);
       return;
@@ -238,6 +261,7 @@ const Reparto = (() => {
     delete _deliveryFlags[deliveryId];
     render(); showToast('success','En camino');
   }
+
   async function confirmarEntrega(deliveryId) {
     if(typeof DeliveryService!=='undefined' && DeliveryService.confirmarEntrega) {
       const r = await DeliveryService.confirmarEntrega(deliveryId);
@@ -248,6 +272,7 @@ const Reparto = (() => {
     DB.actualizarPedidoDelivery(deliveryId,{estado:'entregado'});
     render(); showToast('success','Entregado');
   }
+
   function eliminarPedido(id) {
     if(!confirm('¿Eliminar este pedido?')) return;
     if(typeof DeliveryService!=='undefined' && DeliveryService.cancelar) {
@@ -258,38 +283,33 @@ const Reparto = (() => {
     render(); showToast('warning','Eliminado');
   }
 
-  // ── MANEJO DEL EVENTO 'delivery:listo' (ESCUCHA A KDS) ──
   function _onDeliveryListo(data) {
     if (!data || !data.deliveryId) return;
-    // Marcamos internamente que este delivery está listo para recoger
     _deliveryFlags[data.deliveryId] = { listoParaRecoger: true };
-    // Refrescamos la tabla para mostrar el nuevo indicador
     render();
-    // Notificamos al usuario (el toast ya se mostró en KDS, aquí solo log)
-    console.log(`[Reparto] Delivery ${data.deliveryId} marcado como listo.`);
+    Logger.info(`[Reparto] Delivery ${data.deliveryId} marcado como listo.`);
   }
 
   function _initEventListeners() {
     EventBus.on('db:inicializada', render);
     EventBus.on('pedidosDelivery:guardados', render);
-    // 🔔 Escuchamos al KDS cuando una comanda de delivery esté lista
     EventBus.on('delivery:listo', _onDeliveryListo);
   }
   _initEventListeners();
 
-  return { 
-    render, 
-    mostrarModalNuevo, 
-    cerrarModalNuevo, 
-    guardarNuevoPedido, 
-    _agregarItemAlPedido, 
-    _quitarItemTemporal, 
-    _filtrarProductos, 
-    _seleccionarProducto, 
-    enviarACocina, 
-    despachar, 
-    confirmarEntrega, 
-    eliminarPedido 
+  return {
+    render,
+    mostrarModalNuevo,
+    cerrarModalNuevo,
+    guardarNuevoPedido,
+    _agregarItemAlPedido,
+    _quitarItemTemporal,
+    _filtrarProductos,
+    _seleccionarProducto,
+    enviarACocina,
+    despachar,
+    confirmarEntrega,
+    eliminarPedido
   };
 })();
 
