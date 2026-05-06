@@ -1,15 +1,10 @@
 /* ================================================================
-   PubPOS — MÓDULO: pedido.js (v2.3 – soporte PedidoService + anti‑doble click)
-   Propósito: Coordinar la apertura de mesa, envío de comandas y
-              transferencia. Ahora evita que la misma mesa se intente
-              abrir dos veces seguidas accidentalmente.
+   PubPOS — MÓDULO: pedido.js (v2.4 – un solo botón de envío, tickets separados)
    ================================================================ */
-
 const Pedido = (() => {
 
-  let _mesaAbriendo = null;   // ← evita doble ejecución por doble clic
+  let _mesaAbriendo = null;
 
-  /* ── CREACIÓN DINÁMICA DEL MODAL DE PEDIDO ────────────────── */
   function _asegurarModalPedido() {
     if ($id('modalPedido')) return;
 
@@ -53,9 +48,10 @@ const Pedido = (() => {
             <div class="comanda-footer">
               <div class="comanda-total"><span>Subtotal</span><span class="total-monto" id="subtotalDisplay">$0</span></div>
               <div class="comanda-actions">
-                <button class="btn-comanda btn-barra" onclick="Pedido.enviarComanda('barra')"><i class="fas fa-wine-glass"></i> Barra</button>
-                <button class="btn-comanda btn-cocina" onclick="Pedido.enviarComanda('cocina')"><i class="fas fa-fire-burner"></i> Cocina</button>
-                <button class="btn-comanda btn-todo" onclick="Pedido.enviarComanda('todos')"><i class="fas fa-paper-plane"></i> Enviar Todo</button>
+                <!-- ÚNICO BOTÓN DE ENVÍO -->
+                <button class="btn-comanda btn-todo" onclick="Pedido.enviarComanda()" style="grid-column:span 3;">
+                  <i class="fas fa-paper-plane"></i> Enviar Comanda
+                </button>
               </div>
               <div class="comanda-actions-2">
                 <button class="btn-cuenta" onclick="Cuenta.pedirCuenta()" data-rol="mesero,admin,master,caja"><i class="fas fa-file-invoice-dollar"></i> Pedir Cuenta</button>
@@ -69,10 +65,8 @@ const Pedido = (() => {
     document.body.appendChild(modal);
   }
 
-
-  /* ── APERTURA DE MESA (con protección anti‑doble) ────────── */
+  /* ── APERTURA DE MESA ─────────────────────────────────────── */
   async function abrirMesa(num) {
-    // ⛔ Evitar doble ejecución accidental
     if (_mesaAbriendo === num) return;
     _mesaAbriendo = num;
 
@@ -92,7 +86,6 @@ const Pedido = (() => {
         mesa.items = [];
         mesa.observaciones = '';
 
-        // ── PREFERIR PedidoService (DDD) ──
         let pedidoId = null;
         if (typeof PedidoService !== 'undefined' && PedidoService.crearPedidoMesa) {
           try {
@@ -106,11 +99,10 @@ const Pedido = (() => {
               mesa.pedidoId = pedidoId;
             }
           } catch (e) {
-            console.warn('[Pedido] Error con PedidoService, intentando PedidoManager:', e);
+            console.warn('[Pedido] Error con PedidoService:', e);
           }
         }
 
-        // ── FALLBACK a PedidoManager ──
         if (!pedidoId && typeof PedidoManager !== 'undefined' && PedidoManager.crearPedidoMesa) {
           try {
             const pedido = PedidoManager.crearPedidoMesa(num, mesa.mozo, mesa.comensales);
@@ -119,17 +111,16 @@ const Pedido = (() => {
               mesa.pedidoId = pedidoId;
             }
           } catch (e) {
-            console.warn('[Pedido] Error con PedidoManager, usando DB directa:', e);
+            console.warn('[Pedido] Error con PedidoManager:', e);
           }
         }
 
-        // ── FALLBACK final a DB.crearPedido ──
         if (!pedidoId) {
           try {
             const nuevoPedido = await DB.crearPedido(num, mesa.mozo, mesa.comensales);
             mesa.pedidoId = nuevoPedido.id;
           } catch (e) {
-            console.warn('[Pedido] Error creando pedido en backend, usando ID local.');
+            console.warn('[Pedido] Error creando pedido, ID local.');
             mesa.pedidoId = 'local_' + Date.now();
           }
         }
@@ -140,11 +131,9 @@ const Pedido = (() => {
       const tituloEl = document.getElementById('modalMesaTitulo');
       const badgeEl = document.getElementById('modalEstadoBadge');
       if (tituloEl) {
-        if (mesa.esVirtual) {
-          tituloEl.textContent = `Mesas ${mesa.mesasFusionadas.join(', ')}`;
-        } else {
-          tituloEl.textContent = `Mesa ${num}`;
-        }
+        tituloEl.textContent = mesa.esVirtual
+          ? `Mesas ${mesa.mesasFusionadas.join(', ')}`
+          : `Mesa ${num}`;
       }
       if (badgeEl) {
         badgeEl.textContent = Mesas.labelEstado(mesa.estado);
@@ -156,7 +145,6 @@ const Pedido = (() => {
       const modal = document.getElementById('modalPedido');
       if (modal) modal.style.display = 'flex';
     } finally {
-      // Liberar el bloqueo una vez que termine (con éxito o error)
       _mesaAbriendo = null;
     }
   }
@@ -181,29 +169,30 @@ const Pedido = (() => {
     EventBus.emit('mesa:cerrada');
   }
 
-  /* ── ENVÍO DE COMANDA (sin cambios en la lógica KDS) ──────── */
-  async function enviarComanda(destino) {
+  /* ── NUEVO: ENVÍO ÚNICO CON TICKETS SEPARADOS ──────────────── */
+  async function enviarComanda() {
     const mesa = Comanda.getMesaActiva();
     if (!mesa) {
       showToast('warning', 'No hay mesa activa.');
       return;
     }
+
     const pendientes = mesa.items.filter(it => !it.enviado);
     if (!pendientes.length) {
       showToast('warning', 'No hay ítems nuevos para enviar.');
       return;
     }
-    let paraEnviar = pendientes;
-    if (destino === 'barra') {
-      paraEnviar = pendientes.filter(it => it.destino === 'barra' || it.destino === 'ambos');
-    } else if (destino === 'cocina') {
-      paraEnviar = pendientes.filter(it => it.destino === 'cocina' || it.destino === 'ambos');
-    }
-    if (!paraEnviar.length) {
-      showToast('info', 'No hay ítems para ese destino.');
+
+    // Separar por destino
+    const cocinaItems = pendientes.filter(it => it.destino === 'cocina' || it.destino === 'ambos');
+    const barraItems  = pendientes.filter(it => it.destino === 'barra'  || it.destino === 'ambos');
+
+    if (!cocinaItems.length && !barraItems.length) {
+      showToast('info', 'No hay ítems para enviar.');
       return;
     }
 
+    // Actualizar datos de la mesa
     const mozoSelect = document.getElementById('comandaMozo');
     const comensalesInput = document.getElementById('comandaComensales');
     const obsInput = document.getElementById('comandaObs');
@@ -211,26 +200,48 @@ const Pedido = (() => {
     if (comensalesInput) mesa.comensales = parseInt(comensalesInput.value) || 1;
     if (obsInput) mesa.observaciones = obsInput.value;
 
-    paraEnviar.forEach(it => {
-      it.enviado = true;
-      it.enviadoA = destino;
-      it.enviadoTs = Date.now();
-    });
+    // Función auxiliar para crear la comanda y el ticket para un destino concreto
+    const _enviarDestino = (items, destinoLabel, destinoKds) => {
+      items.forEach(it => {
+        it.enviado = true;
+        it.enviadoA = destinoKds;
+        it.enviadoTs = Date.now();
+      });
+
+      const comanda = {
+        id: 'kds_' + Date.now() + '_' + Math.random().toString(36).substr(2,6),
+        mesa: mesa.numero,
+        mozo: mesa.mozo,
+        destino: destinoKds,
+        items: items.map(it => ({ ...it })),
+        observaciones: mesa.observaciones,
+        estado: 'nueva',
+        ts: Date.now()
+      };
+
+      DB.comandas.push(comanda);
+      DB.saveComandas();
+      EventBus.emit('comanda:enviada', comanda);
+
+      Tickets.mostrar(
+        Tickets.generarComanda(comanda, destinoKds),
+        `${destinoLabel} — Mesa ${mesa.numero}`
+      );
+    };
+
+    // Enviar a cocina si hay ítems
+    if (cocinaItems.length) {
+      _enviarDestino(cocinaItems, 'Cocina', 'cocina');
+    }
+
+    // Enviar a barra si hay ítems (ticket separado)
+    if (barraItems.length) {
+      _enviarDestino(barraItems, 'Barra', 'barra');
+    }
+
     if (mesa.estado === 'libre') mesa.estado = 'ocupada';
 
-    const comanda = {
-      id: 'kds_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
-      mesa: mesa.numero,
-      mozo: mesa.mozo,
-      destino: destino === 'todos' ? 'ambos' : destino,
-      items: paraEnviar.map(it => ({ ...it })),
-      observaciones: mesa.observaciones,
-      estado: 'nueva',
-      ts: Date.now()
-    };
-    DB.comandas.push(comanda);
-    DB.saveComandas();
-
+    // Actualizar pedido en backend
     try {
       if (mesa.pedidoId) {
         await DB.actualizarPedido(mesa.pedidoId, {
@@ -248,15 +259,9 @@ const Pedido = (() => {
 
     DB.saveMesas();
     EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: mesa.estado });
-    EventBus.emit('comanda:enviada', comanda);
     if (window.Comanda && typeof Comanda.render === 'function') Comanda.render();
 
-    const destinoLabel = destino === 'todos' ? 'Cocina y Barra' : destino.charAt(0).toUpperCase() + destino.slice(1);
-    Tickets.mostrar(
-      Tickets.generarComanda(comanda, destino === 'todos' ? 'cocina' : destino),
-      `${destinoLabel} — Mesa ${mesa.numero}`
-    );
-    showToast('success', `Comanda enviada → ${destinoLabel}`);
+    showToast('success', 'Comanda(s) enviada(s) correctamente');
   }
 
   /* ── TRANSFERIR MESA (sin cambios) ────────────────────────── */

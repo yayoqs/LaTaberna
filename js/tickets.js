@@ -1,7 +1,8 @@
 /* ================================================================
-   PubPOS — MÓDULO: tickets.js (v3 – modal dinámico)
-   Corrección Fase 1: El modal de ticket ahora se crea bajo demanda,
-   eliminando la dependencia de HTML estático.
+   PubPOS — MÓDULO: tickets.js (v3.1 – confirmación de envío)
+   Propósito: Generación y visualización de tickets. Ahora permite
+              pasar callbacks para "Confirmar Envío" y "Cancelar",
+              mostrando botones adicionales en el modal.
    ================================================================ */
 
 const Tickets = (() => {
@@ -9,10 +10,12 @@ const Tickets = (() => {
   /* ── ESTADO INTERNO ───────────────────────────────────────── */
   let _htmlActual   = '';
   let _tituloActual = '';
+  let _confirmCallback = null;
+  let _cancelCallback  = null;
 
-  /* ── ASEGURAR QUE EL MODAL DE TICKET EXISTA ──────────────── */
+  /* ── ASEGURAR MODAL ──────────────────────────────────────── */
   function _asegurarModalTicket() {
-    if ($id('modalTicket')) return; // ya existe
+    if ($id('modalTicket')) return;
 
     const modal = document.createElement('div');
     modal.id = 'modalTicket';
@@ -29,31 +32,78 @@ const Tickets = (() => {
         <div class="ticket-preview-wrap">
           <div id="ticketContent" class="ticket-80mm"></div>
         </div>
-        <div class="ticket-actions">
-          <button class="btn-secondary" onclick="Tickets.cerrar()">Cerrar</button>
-          <button class="btn-primary" onclick="Tickets.imprimir()"><i class="fas fa-print"></i> Imprimir</button>
+        <div class="ticket-actions" id="ticketActions">
+          <!-- Los botones se dibujan dinámicamente en mostrar() -->
         </div>
       </div>
     `;
     document.body.appendChild(modal);
   }
 
-  /* ── MOSTRAR MODAL DE PREVIEW ─────────────────────────────── */
-  function mostrar(htmlContent, titulo) {
-    _asegurarModalTicket();  // ← garantiza que el modal existe
+  /* ── MOSTRAR MODAL ────────────────────────────────────────── */
+  /**
+   * Muestra un ticket. Acepta opciones para confirmación.
+   * @param {string} htmlContent - Contenido HTML del ticket
+   * @param {string} titulo - Título del modal
+   * @param {object} [opciones] - { confirmCallback, cancelCallback, textoConfirmar, textoCancelar }
+   */
+  function mostrar(htmlContent, titulo, opciones = {}) {
+    _asegurarModalTicket();
 
-    _htmlActual   = htmlContent;
-    _tituloActual = titulo;
+    _htmlActual    = htmlContent;
+    _tituloActual  = titulo;
+    _confirmCallback = opciones.confirmCallback || null;
+    _cancelCallback  = opciones.cancelCallback || null;
+
     $id('ticketModalTitulo').innerHTML = `<i class="fas fa-print" aria-hidden="true"></i> ${titulo}`;
     $id('ticketContent').innerHTML     = htmlContent;
-    $id('modalTicket').style.display   = 'flex';
+
+    // Construir botones
+    const actionsDiv = $id('ticketActions');
+    if (actionsDiv) {
+      let botonesHTML = '';
+
+      if (_confirmCallback) {
+        botonesHTML += `<button class="btn-primary" onclick="Tickets._confirmar()">
+          <i class="fas fa-check"></i> ${opciones.textoConfirmar || 'Confirmar Envío'}
+        </button>`;
+      } else {
+        botonesHTML += `<button class="btn-print" onclick="Tickets.imprimir()">
+          <i class="fas fa-print"></i> Imprimir
+        </button>`;
+      }
+
+      botonesHTML += `<button class="btn-secondary" onclick="Tickets._cancelar()">
+        <i class="fas fa-times"></i> ${opciones.textoCancelar || 'Cerrar'}
+      </button>`;
+
+      actionsDiv.innerHTML = botonesHTML;
+    }
+
+    $id('modalTicket').style.display = 'flex';
   }
 
+  /* ── ACCIONES PÚBLICAS ────────────────────────────────────── */
   function cerrar() {
     const modal = $id('modalTicket');
     if (modal) modal.style.display = 'none';
+    _confirmCallback = null;
+    _cancelCallback  = null;
   }
 
+  function _confirmar() {
+    cerrar();
+    if (typeof _confirmCallback === 'function') {
+      _confirmCallback();
+    }
+  }
+
+  function _cancelar() {
+    cerrar();
+    if (typeof _cancelCallback === 'function') {
+      _cancelCallback();
+    }
+  }
 
   /* ── IMPRIMIR ──────────────────────────────────────────────── */
   function imprimir() {
@@ -120,7 +170,6 @@ const Tickets = (() => {
 </html>`;
   }
 
-
   /* ================================================================
      GENERAR TICKET DE COMANDA (Cocina / Barra)
      ================================================================ */
@@ -163,9 +212,8 @@ const Tickets = (() => {
     `;
   }
 
-
   /* ================================================================
-     GENERAR TICKET DE CUENTA
+     GENERAR TICKET DE CUENTA (sin cambios)
      ================================================================ */
   function generarCuenta(mesa) {
     const cfg      = DB.config;
@@ -203,9 +251,8 @@ const Tickets = (() => {
     `;
   }
 
-
   /* ================================================================
-     GENERAR TICKET DE CIERRE / COBRO
+     GENERAR TICKET DE CIERRE / COBRO (sin cambios)
      ================================================================ */
   function generarCierre(mesa, totalFinal, descuento, formaPago) {
     const cfg      = DB.config;
@@ -250,10 +297,6 @@ const Tickets = (() => {
     `;
   }
 
-
-  /* ================================================================
-     NUEVO: TICKET INDIVIDUAL PARA SPLIT BILL
-     ================================================================ */
   function generarCierreParcial(mesa, pago) {
     const cfg      = DB.config;
     const fecha    = fmtFechaCorta();
@@ -294,10 +337,6 @@ const Tickets = (() => {
     `;
   }
 
-
-  /* ================================================================
-     TICKET DE PRUEBA DE IMPRESORA
-     ================================================================ */
   function testImpresora(tipo) {
     const LABELS = { cocina: '*** COCINA ***', barra: '*** BARRA ***', caja: '*** CAJA ***' };
     const html = `
@@ -318,8 +357,6 @@ const Tickets = (() => {
     mostrar(html, `Prueba — ${tipo.charAt(0).toUpperCase() + tipo.slice(1)}`);
   }
 
-
-  /* ── HELPER PRIVADO ───────────────────────────────────────── */
   function _agruparItems(items) {
     const map = {};
     (items || []).forEach(it => {
@@ -329,17 +366,17 @@ const Tickets = (() => {
     return Object.values(map);
   }
 
-
   /* ── API PÚBLICA ──────────────────────────────────────────── */
   return {
     mostrar,
     cerrar,
     imprimir,
+    _confirmar,
+    _cancelar,
     generarComanda,
     generarCuenta,
     generarCierre,
     generarCierreParcial,
     testImpresora
   };
-
 })();
