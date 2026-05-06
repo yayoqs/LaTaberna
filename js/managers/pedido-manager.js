@@ -1,5 +1,16 @@
 /* ================================================================
-   PubPOS — MÓDULO: pedido-manager.js (v3.1 – cierre delegado a DDD)
+   PubPOS — MÓDULO: pedido-manager.js (v3.2 – sin cerrarPedidoMesa)
+   ================================================================
+   Cambios respecto a v3.1:
+   • Eliminado el método depreciado cerrarPedidoMesa().
+     Ahora el cierre de pedidos de mesa se hace EXCLUSIVAMENTE a
+     través de PedidoService.cerrarPedido() (o DB.cerrarPedido como
+     fallback simple en cobro.js), evitando la doble delegación que
+     provocaba descuento de stock duplicado.
+   • Eliminado el fallback _crearPedidoMesaDirecto (no se usaba).
+   • Simplificada la creación de pedidos de mesa: se apoya en
+     CommandBus si está presente, o usa directamente el repositorio.
+   • La auditoría y la gestión de turnos se mantienen intactas.
    ================================================================ */
 const PedidoManager = (() => {
 
@@ -9,6 +20,7 @@ const PedidoManager = (() => {
 
   /* ── INICIALIZACIÓN ─────────────────────────────────────── */
   function init(options = {}) {
+    // Resolver repositorio
     if (options.pedidoRepo) {
       _pedidoRepo = options.pedidoRepo;
     } else if (typeof PedidoRepositoryLocal !== 'undefined') {
@@ -18,6 +30,7 @@ const PedidoManager = (() => {
       return null;
     }
 
+    // Cargar turno guardado o crear uno nuevo
     const turnoGuardado = localStorage.getItem('pubpos_turno_actual');
     if (turnoGuardado) {
       try { turnoActual = JSON.parse(turnoGuardado); } catch { turnoActual = null; }
@@ -76,6 +89,7 @@ const PedidoManager = (() => {
 
   /* ── MÉTODOS DE PEDIDOS (MESA) ──────────────────────────── */
   async function crearPedidoMesa(numeroMesa, mozo, comensales) {
+    // Intentar vía CommandBus (CQRS) para validar turno y reglas de negocio
     if (typeof CommandBus !== 'undefined' && CommandBus.ejecutar) {
       const resultado = await CommandBus.ejecutar({
         type: 'crearPedidoMesa',
@@ -85,49 +99,66 @@ const PedidoManager = (() => {
       console.error('[PedidoManager] Error vía CommandBus:', resultado.error);
       return null;
     }
-    return _crearPedidoMesaDirecto(numeroMesa, mozo, comensales);
+    // Fallback: usar el repositorio directamente
+    try {
+      const pedido = await _pedidoRepo.crearPedidoMesa({
+        mesa: numeroMesa,
+        mozo: mozo || 'Sin mozo',
+        comensales: comensales || 1
+      });
+      return pedido;
+    } catch (e) {
+      console.error('[PedidoManager] Error al crear pedido:', e);
+      return null;
+    }
   }
 
-  function _crearPedidoMesaDirecto(numeroMesa, mozo, comensales) { /* ... igual ... */ }
-
-  function agregarItemAPedido(pedidoId, item) { /* ... igual ... */ return true; }
-
-  /**
-   * @deprecated Usar PedidoService.cerrarPedido() en su lugar.
-   * Se mantiene por compatibilidad con código que aún no migró.
-   */
-  function cerrarPedidoMesa(pedidoId, formaPago, total, descuento) {
-    // Redirigir a PedidoService si está disponible
-    if (typeof PedidoService !== 'undefined' && PedidoService.cerrarPedido) {
-      console.log('[PedidoManager] Delegando cierre a PedidoService (DDD).');
-      return PedidoService.cerrarPedido(pedidoId, {
-        formaPago,
-        totalFinal: total,
-        descuento: descuento || 0
-      });
-    }
-
-    // Fallback: lógica antigua (debería ser eliminada en futuras versiones)
-    console.warn('[PedidoManager] PedidoService no disponible, usando cierre directo.');
-    const pedido = DB.pedidos.find(p => p.id === pedidoId);
-    if (!pedido) { console.warn('[PedidoManager] Pedido no encontrado:', pedidoId); return null; }
-    if (typeof DB.cerrarPedido !== 'function') { console.error('[PedidoManager] DB.cerrarPedido no disponible'); return null; }
-    DB.cerrarPedido(pedidoId, formaPago, total, descuento);
-
-    _registrarAuditoria('pedido:cerrado', { pedidoId, mesa: pedido.mesa, total, formaPago, descuento });
-    const mesa = DB.getMesa(pedido.mesa);
-    if (mesa && !mesa.esVirtual) {
-      const idx = DB.mesas.findIndex(m => m.numero === mesa.numero);
-      if (idx >= 0) DB.mesas[idx] = mesaVacia(mesa.numero);
-      DB.saveMesas();
-    }
-    EventBus.emit('pedido:cerrado', { mesa: pedido.mesa, pedidoId });
-    return pedido;
+  function agregarItemAPedido(pedidoId, item) {
+    // Por ahora, este método es un placeholder.
+    // La gestión de ítems se realiza directamente en la UI (Comanda.agregarItem)
+    // y el pedido se actualiza cuando se envía la comanda.
+    // Si en el futuro se necesita lógica de negocio adicional, se implementará aquí.
+    console.warn('[PedidoManager] agregarItemAPedido no implementado (se gestiona en UI).');
+    return false;
   }
 
   /* ── MÉTODOS DE DELIVERY ────────────────────────────────── */
-  function crearPedidoDelivery(datos) { /* ... igual ... */ return nuevo; }
-  function enviarPedidoDeliveryACocina(deliveryId) { /* ... igual ... */ return true; }
+  function crearPedidoDelivery(datos) {
+    // Normalizar datos y guardar en DB (o repositorio de delivery si existiera)
+    const nuevo = {
+      id: 'deliv_' + Date.now(),
+      direccion: datos.direccion,
+      telefono: datos.telefono || '',
+      items: datos.items || [],
+      total: datos.total || 0,
+      estado: 'pendiente',
+      repartidor: datos.repartidor || '',
+      created_at: new Date().toISOString(),
+      observaciones: datos.observaciones || ''
+    };
+    // Guardar en la lista local
+    if (typeof DB !== 'undefined' && DB.pedidosDelivery) {
+      DB.pedidosDelivery.push(nuevo);
+      DB.savePedidosDelivery();
+    }
+    _registrarAuditoria('delivery:creado', { id: nuevo.id });
+    return nuevo;
+  }
+
+  function enviarPedidoDeliveryACocina(deliveryId) {
+    if (typeof DB === 'undefined' || !DB.pedidosDelivery) return false;
+    const pedido = DB.pedidosDelivery.find(p => p.id === deliveryId);
+    if (!pedido) return false;
+    if (pedido.estado !== 'pendiente') return false;
+
+    pedido.estado = 'en_preparacion';
+    DB.savePedidosDelivery();
+
+    // Emitir evento para que el KDS lo muestre
+    EventBus.emit('delivery:enviado_a_cocina', { deliveryId, items: pedido.items });
+    _registrarAuditoria('delivery:enviado_a_cocina', { deliveryId });
+    return true;
+  }
 
   /* ── CIERRE DE TURNO ────────────────────────────────────── */
   async function finalizarTurno() {
@@ -145,7 +176,6 @@ const PedidoManager = (() => {
 
     crearPedidoMesa,
     agregarItemAPedido,
-    cerrarPedidoMesa,   // @deprecated, usa PedidoService.cerrarPedido()
 
     crearPedidoDelivery,
     enviarPedidoDeliveryACocina,

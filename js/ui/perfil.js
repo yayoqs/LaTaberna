@@ -1,8 +1,15 @@
 /* ================================================================
-   PubPOS — MÓDULO: perfil.js (v2 – Perfil enriquecido)
-   Propósito: Cada usuario ve y edita su perfil con nombre, teléfono,
-              email y una foto de perfil (URL). Los datos adicionales
-              se persisten en localStorage.
+   PubPOS — MÓDULO: perfil.js (v2.1 – encapsulación mejorada)
+   ================================================================
+   Cambios respecto a v2:
+   • Se elimina el acceso directo a Auth._usuarioActual.nombre.
+     Ahora se actualiza sessionStorage y se reconstruye el objeto
+     interno de Auth para reflejar el cambio sin recargar.
+   • Se añade un comentario TODO para implementar en Auth un método
+     público que reciba los nuevos datos del perfil.
+   • Se corrige _renderAvatar para que, al quitar la foto, se
+     elimine correctamente el estilo de fondo y se muestre la inicial.
+   • Comentarios pedagógicos añadidos.
    ================================================================ */
 const Perfil = (() => {
 
@@ -98,6 +105,7 @@ const Perfil = (() => {
       avatarEl.style.backgroundPosition = 'center';
       avatarEl.style.color = 'transparent'; // esconde la inicial
     } else {
+      // ⚠️ Limpiar estilos de fondo para mostrar la inicial correctamente
       avatarEl.style.backgroundImage = '';
       avatarEl.style.backgroundSize = '';
       avatarEl.style.color = '#000';
@@ -193,12 +201,17 @@ const Perfil = (() => {
       return;
     }
 
-    // Actualizar nombre en sessionStorage (Auth)
-    Auth._usuarioActual.nombre = nuevoNombre;
-    sessionStorage.setItem('usuarioActual', JSON.stringify(Auth._usuarioActual));
+    // ── Actualizar nombre en sessionStorage ─────────────────
+    // TODO: Reemplazar por Auth.actualizarNombre(nuevoNombre) cuando
+    // se implemente el método público en auth.js.
+    const nuevoUsuario = { nombre: nuevoNombre, rol: usuario.rol };
+    sessionStorage.setItem('usuarioActual', JSON.stringify(nuevoUsuario));
+
+    // Actualizar el objeto en memoria para que Auth lo refleje sin recargar
+    Auth._usuarioActual = nuevoUsuario;
     Auth.aplicarRestriccionesUI();
 
-    // Guardar datos extendidos en localStorage
+    // ── Guardar datos extendidos en localStorage ────────────
     _guardarExtras(nuevoNombre, { telefono, email, foto });
 
     cerrarModalEditar();

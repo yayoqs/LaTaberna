@@ -1,9 +1,14 @@
 /* ================================================================
-   PubPOS — MÓDULO: kds.js (v3.1 – comunicación con Reparto)
-   Propósito: Kitchen Display System. Ahora, al marcar una comanda
-              como "lista", si pertenece a un pedido de delivery
-              emite el evento 'delivery:listo' para que Reparto
-              pueda reaccionar.
+   PubPOS — MÓDULO: kds.js (v3.2 – notificación robusta a Reparto)
+   ================================================================
+   Cambios respecto a v3.1:
+   • Al marcar una comanda como "lista", si pertenece a un delivery
+     ahora se emite el evento 'delivery:listo' con el deliveryId y
+     el estado 'listo', para que el módulo Reparto pueda actualizar
+     automáticamente la tabla.
+   • Se añade un comentario pedagógico explicando la integración.
+   • El resto del código permanece igual. La actualización del estado
+     del delivery se implementa en reparto.js (siguiente archivo).
    ================================================================ */
 const KDS = (() => {
   const MINUTOS_URGENTE = 15;
@@ -121,7 +126,12 @@ const KDS = (() => {
       </article>`;
   }
 
-  /* ── CAMBIAR ESTADO (con notificación a Reparto) ──────────── */
+  /* ── CAMBIAR ESTADO (con notificación a Reparto) ────────────
+     Al marcar una comanda como "lista":
+     - Si es de mesa, se actualiza el estado de la mesa a "esperando".
+     - Si es de delivery, se emite el evento 'delivery:listo' con los
+       datos necesarios para que Reparto actualice el estado del pedido.
+  ─────────────────────────────────────────────────────────── */
   function _setEstado(id, estado) {
     const c = DB.comandas.find(x => x.id === id);
     if (!c) return;
@@ -137,9 +147,18 @@ const KDS = (() => {
       }
       EventBus.emit('comanda:lista', { id, mesa: c.mesa });
 
-      // NUEVO: Si la comanda es de delivery, notificar a Reparto
+      // ═══════════════════════════════════════════════════════
+      // ✨ INTEGRACIÓN CON REPARTO
+      // ═══════════════════════════════════════════════════════
+      // Si la comanda pertenece a un delivery, emitimos un evento
+      // específico para que el módulo Reparto reaccione automáticamente
+      // (ver reparto.js para el manejo del evento).
       if (c.deliveryId) {
-        EventBus.emit('delivery:listo', { deliveryId: c.deliveryId, comandaId: id });
+        EventBus.emit('delivery:listo', { 
+          deliveryId: c.deliveryId, 
+          comandaId: id,
+          estado: 'listo'    // ← el nuevo estado que refleja "listo para recoger"
+        });
         console.log(`[KDS] Delivery listo: ${c.deliveryId}`);
       }
     }

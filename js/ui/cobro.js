@@ -1,8 +1,17 @@
 /* ================================================================
-   PubPOS — MÓDULO: cobro.js (v4.3 – cierre vía PedidoService)
-   Propósito: Gestión del cierre de mesa. Ahora intenta usar el
-              servicio de dominio PedidoService para cerrar el pedido
-              con las reglas de negocio encapsuladas.
+   PubPOS — MÓDULO: cobro.js (v4.4 – cierre único, sin doble descuento)
+   ================================================================
+   Cambios respecto a v4.3:
+   • Eliminamos la cadena de delegaciones redundante que provocaba
+     que el stock se descontara dos (¡o tres!) veces al cerrar una mesa.
+   • Ahora usamos SIEMPRE PedidoService.cerrarPedido() como único punto
+     de cierre, porque él es el responsable de aplicar las reglas de
+     negocio y orquestar el descuento de inventario.
+   • Si PedidoService no está disponible, usamos DB.cerrarPedido como
+     fallback SIMPLE, sin pasar por PedidoManager.cerrarPedidoMesa
+     (ese método queda deprecado y se eliminará en el siguiente archivo).
+   • La liberación de la mesa solo ocurre DESPUÉS de que el cierre sea
+     exitoso, y lo hace UNA sola vez.
    ================================================================ */
 const Cobro = (() => {
   let _mesaACerrar = null;
@@ -190,12 +199,29 @@ const Cobro = (() => {
     if (totalEl) totalEl.textContent = `TOTAL A COBRAR: ${fmtMoney(total)}`;
   }
 
+  /* ──────────────────────────────────────────────────────────
+     ✨ NUEVA LÓGICA DE CIERRE (CORREGIDA)
+     ──────────────────────────────────────────────────────────
+     Proceso:
+     1. Determinamos el total final a cobrar.
+     2. Si el pedido existe, delegamos el cierre a PedidoService
+        (el servicio de dominio), que se encarga de:
+        - Validar reglas de negocio
+        - Descontar stock (UNA sola vez)
+        - Marcar el pedido como cerrado
+     3. Si PedidoService no está disponible, usamos directamente
+        DB.cerrarPedido (que también descuenta stock).
+     4. Liberamos la mesa SOLO si el cierre tuvo éxito.
+     5. Emitimos evento y generamos tickets.
+  ─────────────────────────────────────────────────────────── */
   async function confirmarCierre() {
     if (!_mesaACerrar) return;
+
     const ppContainer = document.getElementById('pagosParcialesContainer');
     const usarSplit = ppContainer && ppContainer.style.display !== 'none';
     let pagos = [];
 
+    // ── Calcular montos ──────────────────────────────────
     if (usarSplit) {
       pagos = _pagosParciales.filter(p => p.monto > 0);
       if (pagos.length === 0) {
@@ -216,31 +242,37 @@ const Cobro = (() => {
       pagos = [{ persona: 'Total', monto: totalFinal, formaPago: _formaPago }];
     }
 
-    // ── DELEGAR A PedidoService (DDD) ──
+    let cierreExitoso = false;
+
+    // ── 1. Intentar cerrar con PedidoService (DDD) ──────────
     if (_mesaACerrar.pedidoId) {
       try {
-        let cerrado = false;
         if (typeof PedidoService !== 'undefined' && PedidoService.cerrarPedido) {
+          // El servicio de dominio se encarga de TODO (stock, cierre, eventos)
           await PedidoService.cerrarPedido(_mesaACerrar.pedidoId, {
             formaPago: pagos[0].formaPago,
             totalFinal: pagos[0].monto,
-            descuento: 0
+            descuento: parseFloat(document.getElementById('cierreDescuento')?.value) || 0
           });
-          cerrado = true;
-        } else if (typeof PedidoManager !== 'undefined' && PedidoManager.cerrarPedidoMesa) {
-          PedidoManager.cerrarPedidoMesa(_mesaACerrar.pedidoId, pagos[0].formaPago, pagos[0].monto, 0);
-          cerrado = true;
-        } else {
+          cierreExitoso = true;
+        } else if (typeof DB !== 'undefined' && typeof DB.cerrarPedido === 'function') {
+          // Fallback directo sin pasar por PedidoManager (que está deprecado)
           await DB.cerrarPedido(_mesaACerrar.pedidoId, pagos[0].formaPago, pagos[0].monto, 0);
-          cerrado = true;
+          cierreExitoso = true;
         }
-        if (!cerrado) showToast('error', 'No se pudo cerrar el pedido.');
+
+        if (!cierreExitoso) {
+          showToast('error', 'No se pudo cerrar el pedido. Intenta de nuevo.');
+          return;
+        }
       } catch (e) {
-        console.warn('[Cobro] Error al cerrar pedido:', e);
+        console.error('[Cobro] Error al cerrar pedido:', e);
+        showToast('error', 'Error al procesar el pago: ' + e.message);
+        return;
       }
     }
 
-    // Generar tickets
+    // ── 2. Generar tickets (solo si el pedido se cerró bien) ──
     if (usarSplit) {
       pagos.forEach(pago => {
         const ticketHTML = Tickets.generarCierreParcial(_mesaACerrar, pago);
@@ -251,7 +283,7 @@ const Cobro = (() => {
       Tickets.mostrar(ticketHTML, `Comprobante — Mesa ${_mesaACerrar.numero}`);
     }
 
-    // Liberar mesa
+    // ── 3. Liberar mesa (una sola vez) ──────────────────────
     if (_mesaACerrar.esVirtual) {
       DB.liberarMesasFusionadas(_mesaACerrar);
     } else {
@@ -260,6 +292,7 @@ const Cobro = (() => {
     }
     DB.saveMesas();
     EventBus.emit('pedido:cerrado', { mesa: _mesaACerrar.numero });
+
     cerrarModalCierre();
     if (typeof Pedido !== 'undefined' && Pedido.cerrar) Pedido.cerrar();
     _mesaACerrar = null;

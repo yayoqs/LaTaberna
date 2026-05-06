@@ -1,8 +1,17 @@
 /* ================================================================
-   PubPOS — MÓDULO: caja.js (v3.2 – integración con cierre de turno)
-   Propósito: Resumen del turno y cierre de caja. El botón "Cierre de
-              Caja" ahora invoca el cierre completo del turno (respaldo
-              en Drive + reseteo local) a través de TurnoManager.
+   PubPOS — MÓDULO: caja.js (v3.3 – delegación de cierre unificada)
+   ================================================================
+   Cambios respecto a v3.2:
+   • Eliminada la función local cerrarTurno() que duplicaba la
+     lógica de cierre de turno.
+   • El botón "Cierre de Caja" ahora invoca directamente a
+     App.cerrarTurnoApp(), que contiene la verificación de permisos,
+     la confirmación, la llamada a TurnoManager y los toasts
+     correspondientes.
+   • Esto garantiza que el cierre de turno se comporte igual desde
+     cualquier vista (Caja, Config o la función global).
+   • Se mantiene la suscripción a eventos para refrescar la tabla
+     cuando el turno cambia.
    ================================================================ */
 const Caja = (() => {
 
@@ -17,7 +26,8 @@ const Caja = (() => {
       <div class="view-toolbar">
         <h2><i class="fas fa-cash-register"></i> Caja — Resumen del Turno</h2>
         <div class="toolbar-actions">
-          <button class="btn-primary" onclick="Caja.cerrarTurno()">
+          <!-- ⚡ El botón ahora usa la función unificada de App -->
+          <button class="btn-primary" onclick="App.cerrarTurnoApp()">
             <i class="fas fa-file-alt"></i> Cierre de Caja
           </button>
         </div>
@@ -94,57 +104,16 @@ const Caja = (() => {
       </tr>`;
   }
 
-  /**
-   * Cierra el turno actual desde la vista de Caja.
-   * Delega en TurnoManager a través de App.cerrarTurnoApp().
-   */
-  async function cerrarTurno() {
-    if (typeof TurnoManager === 'undefined') {
-      showToast('error', 'Sistema de turnos no disponible.');
-      return;
-    }
-
-    // Verificar que el usuario tenga permiso (admin/master)
-    if (!Auth.esAdmin() && !Auth.esMaster()) {
-      showToast('error', 'Solo administradores pueden cerrar el turno.');
-      return;
-    }
-
-    // Confirmación de seguridad
-    if (!confirm(
-      '¿Estás seguro de cerrar el turno actual?\n\n' +
-      '• Se guardará un archivo de respaldo en Drive.\n' +
-      '• Se resetearán todas las mesas (quedarán libres).\n' +
-      '• Se eliminarán los pedidos y la cola de sincronización.\n' +
-      '• Se iniciará un nuevo turno limpio.\n\n' +
-      'Esta acción no se puede deshacer.'
-    )) {
-      return;
-    }
-
-    showToast('info', '<i class="fas fa-spinner fa-spin"></i> Cerrando turno...');
-    const resultado = await TurnoManager.cerrarTurno();
-
-    if (resultado.exito) {
-      showToast('success', resultado.mensaje);
-      // Refrescar todas las vistas críticas
-      if (window.Mesas) Mesas.render();
-      if (window.KDS) KDS.refresh();
-      if (window.Reparto) Reparto.render();
-      render(); // refrescar caja
-    } else {
-      showToast('error', resultado.mensaje);
-    }
-  }
-
-  // Suscripción a eventos
+  // ── EVENTOS ──────────────────────────────────────────────
+  // Refrescar cuando cambien los pedidos o el turno
   EventBus.on('pedidos:guardados', render);
   EventBus.on('pedido:cerrado', render);
   EventBus.on('db:inicializada', render);
   EventBus.on('turno:iniciado', render);
   EventBus.on('turno:cerrado', render);
 
-  return { render, cerrarTurno };
+  // API pública: solo render, la acción de cierre se delegó a App.cerrarTurnoApp()
+  return { render };
 })();
 
 window.Caja = Caja;

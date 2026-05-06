@@ -1,8 +1,14 @@
 /* ================================================================
    PubPOS — MÓDULO: db.js (Orquestador)
-   Propósito: Reúne todos los submódulos y coordina la inicialización.
-              Ahora también expone los métodos del PedidoManager para
-              que otros módulos puedan usarlos centralizadamente.
+   Cambios respecto a la versión anterior:
+   • En cerrarPedido() se agregó una validación para evitar el
+     doble descuento de inventario si el pedido ya está cerrado.
+     Esto actúa como red de seguridad, incluso aunque Cobro.js ya
+     unificó el flujo de cierre.
+   • Se mantienen las delegaciones a PedidoManager para crear pedidos
+     de mesa y delivery, pero ahora PedidoManager ya no tiene el
+     método conflictivo cerrarPedidoMesa.
+   • Todo lo demás permanece igual (consultas, guardado, etc.).
    ================================================================ */
 
 var DB = (function() {
@@ -71,19 +77,28 @@ var DB = (function() {
     return false;
   };
 
-  combined.cerrarPedidoMesa = function(pedidoId, formaPago, total, descuento) {
-    if (typeof PedidoManager !== 'undefined' && PedidoManager.cerrarPedidoMesa) {
-      return PedidoManager.cerrarPedidoMesa(pedidoId, formaPago, total, descuento);
-    }
-    // fallback al método original de core/orquestador
-    return this.cerrarPedido(pedidoId, formaPago, total, descuento);
-  };
-
-  // Método original de cerrar pedido (core), mantenido para compatibilidad
+  /* ── CIERRE DE PEDIDO (MEJORADO) ──────────────────────────
+     Ahora valida si el pedido ya está cerrado para que,
+     incluso si se llama varias veces, solo se descuente stock
+     la primera vez. Esto evita inconsistencias en el inventario
+     en caso de un doble envío accidental desde la UI.
+     Sigue siendo el único punto donde se descuenta stock y se
+     sincroniza con Google Sheets.
+  ─────────────────────────────────────────────────────────── */
   combined.cerrarPedido = async function(id, formaPago, total, descuento) {
     const pedido = this.pedidos.find(p => p.id === id);
-    if (!pedido) return null;
+    if (!pedido) {
+      console.warn(`[DB] Pedido ${id} no encontrado.`);
+      return null;
+    }
 
+    // ⛔ Protección contra doble cierre
+    if (pedido.estado === 'cerrada' || pedido.estado === 'cerrado') {
+      console.warn(`[DB] El pedido ${id} ya está cerrado. Se omite descuento de stock.`);
+      return pedido; // Retornamos el pedido tal cual, sin modificar nada.
+    }
+
+    // ── Descontar stock localmente (recetas) ──────────────
     try {
       const items = JSON.parse(pedido.items || '[]');
       for (const item of items) {
@@ -93,6 +108,7 @@ var DB = (function() {
       console.warn("[DB] Error descontando stock local:", e);
     }
 
+    // ── Sincronizar con Google Sheets ─────────────────────
     try {
       const items = JSON.parse(pedido.items || '[]');
       await fetch(this.urlSheets, {
@@ -111,6 +127,7 @@ var DB = (function() {
       });
     }
 
+    // ── Actualizar estado del pedido ──────────────────────
     return this.actualizarPedido(id, {
       estado: 'cerrada',
       total,
