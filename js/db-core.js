@@ -1,8 +1,11 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-core.js (v2.5 – carga mesas desde localStorage)
-   Propósito: Núcleo de base de datos. Ahora carga las mesas guardadas
-              antes de inicializar, para que sobrevivan a un F5.
+   PubPOS — MÓDULO: db-core.js (v2.5 – persistencia de mesas)
+   Propósito: Núcleo de base de datos: mesas, pedidos, comandas,
+              mozos, configuración y pedidos de delivery.
+              Ahora carga las mesas desde localStorage para que
+              sobrevivan a una recarga (F5).
    ================================================================ */
+
 const DBCore = (function() {
   const module = {};
 
@@ -14,21 +17,85 @@ const DBCore = (function() {
   module.mozos = [];
   module.pedidosDelivery = [];
 
-  /* ── NORMALIZACIONES ──────────────────────────────────── */
-  module._normalizarProducto = function(p) { /* ... igual ... */ };
-  module._normalizarMesa = function(m) { /* ... igual ... */ };
-  module._normalizarMozo = function(m) { /* ... igual ... */ };
-  module._normalizarPedidoDelivery = function(pd) { /* ... igual ... */ };
+  /* ── NORMALIZACIONES ─────────────────────────────────────── */
+  module._normalizarProducto = function(p) {
+    return {
+      id: this._validarId(p.id, 'prod'),
+      nombre: this._validarString(p.nombre, 'Sin nombre'),
+      precio: this._validarNumero(p.precio, 0),
+      categoria: this._validarString(p.categoria, 'General'),
+      destino: this._validarDestino(p.destino),
+      descripcion: this._validarString(p.descripcion, ''),
+      activo: this._validarBooleano(p.activo, true),
+      imagen: this._validarString(p.imagen, '')
+    };
+  };
 
-  /* ── VALIDACIONES ────────────────────────────────────── */
-  module._validarId = function(val, prefijo) { /* ... */ };
-  module._validarString = function(val, defecto) { /* ... */ };
-  module._validarNumero = function(val, defecto) { /* ... */ };
-  module._validarBooleano = function(val, defecto) { /* ... */ };
-  module._validarDestino = function(val) { /* ... */ };
-  module._validarEstadoMesa = function(val) { /* ... */ };
+  module._normalizarMesa = function(m) {
+    return {
+      numero: this._validarNumero(m.numero, 0),
+      estado: this._validarEstadoMesa(m.estado),
+      pedidoId: m.pedidoId || null,
+      items: Array.isArray(m.items) ? m.items : [],
+      mozo: this._validarString(m.mozo, ''),
+      comensales: this._validarNumero(m.comensales, 1),
+      abiertaEn: m.abiertaEn || null,
+      observaciones: this._validarString(m.observaciones, ''),
+      mesasFusionadas: m.mesasFusionadas || null,
+      esVirtual: m.esVirtual || false,
+      zona: this._validarString(m.zona, (this.config.zonas && this.config.zonas[0]?.nombre) || 'salon')
+    };
+  };
 
-  /* ── PERSISTENCIA LOCAL ──────────────────────────────── */
+  module._normalizarMozo = function(m) {
+    return {
+      id: this._validarId(m.id, 'mozo'),
+      nombre: this._validarString(m.nombre, 'Sin nombre'),
+      activo: this._validarBooleano(m.activo, true)
+    };
+  };
+
+  module._normalizarPedidoDelivery = function(pd) {
+    return {
+      id: this._validarId(pd.id, 'deliv'),
+      direccion: this._validarString(pd.direccion, 'Sin dirección'),
+      telefono: this._validarString(pd.telefono, ''),
+      items: Array.isArray(pd.items) ? pd.items : [],
+      total: this._validarNumero(pd.total, 0),
+      estado: ['pendiente','en_preparacion','en_camino','entregado'].includes(pd.estado) ? pd.estado : 'pendiente',
+      repartidor: this._validarString(pd.repartidor, ''),
+      created_at: pd.created_at || new Date().toISOString(),
+      observaciones: this._validarString(pd.observaciones, '')
+    };
+  };
+
+  /* ── VALIDACIONES BÁSICAS ────────────────────────────────── */
+  module._validarId = function(val, prefijo) {
+    if (typeof val === 'string' && val.length > 0) return val;
+    return `${prefijo}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+  };
+  module._validarString = function(val, defecto) {
+    return (typeof val === 'string' && val.trim()) ? val.trim() : defecto;
+  };
+  module._validarNumero = function(val, defecto) {
+    const num = Number(val);
+    return isNaN(num) ? defecto : num;
+  };
+  module._validarBooleano = function(val, defecto) {
+    if (typeof val === 'boolean') return val;
+    if (typeof val === 'string') return val.toLowerCase() === 'true' || val === '1';
+    return defecto;
+  };
+  module._validarDestino = function(val) {
+    const destinos = ['cocina', 'barra', 'ambos'];
+    return destinos.includes(val) ? val : 'cocina';
+  };
+  module._validarEstadoMesa = function(val) {
+    const estados = ['libre', 'ocupada', 'esperando', 'cuenta', 'fusionada'];
+    return estados.includes(val) ? val : 'libre';
+  };
+
+  /* ── PERSISTENCIA LOCAL ──────────────────────────────────── */
   module._cargarConfigLocal = function() {
     const raw = localStorage.getItem('pubpos_config');
     if (raw) {
@@ -135,15 +202,16 @@ const DBCore = (function() {
     this.saveMesas();
   };
 
-  // ── Resto de funciones (sin cambios) ──────────────────
   module._cargarComandasLocal = function() {
     const raw = localStorage.getItem('pubpos_comandas');
     this.comandas = raw ? JSON.parse(raw) : [];
   };
+
   module._cargarPedidosLocal = function() {
     const raw = localStorage.getItem('pubpos_pedidos');
     this.pedidos = raw ? JSON.parse(raw) : [];
   };
+
   module._cargarMozosLocal = function() {
     const raw = localStorage.getItem('pubpos_mozos');
     if (raw) {
@@ -158,6 +226,7 @@ const DBCore = (function() {
       this.saveMozos();
     }
   };
+
   module._cargarPedidosDeliveryLocal = function() {
     const raw = localStorage.getItem('pubpos_pedidos_delivery');
     if (raw) {
@@ -167,6 +236,7 @@ const DBCore = (function() {
     }
   };
 
+  /* ── GUARDADO ────────────────────────────────────────────── */
   module.saveConfig = function() { localStorage.setItem('pubpos_config', JSON.stringify(this.config)); };
   module.saveMesas = function() {
     localStorage.setItem('pubpos_mesas', JSON.stringify(this.mesas));
@@ -186,6 +256,7 @@ const DBCore = (function() {
     EventBus.emit('pedidosDelivery:guardados', this.pedidosDelivery);
   };
 
+  /* ── GESTIÓN DE PEDIDOS (mesa) ───────────────────────────── */
   module.crearPedido = async function(mesa, mozo, comensales) {
     const nuevo = {
       id: 'ped_' + Date.now(),
@@ -209,8 +280,13 @@ const DBCore = (function() {
     return this.pedidos[idx];
   };
 
-  module.fetchTodosPedidos = async function() { return this.pedidos; };
-  module.getMesa = function(num) { return this.mesas.find(m => m.numero == num); };
+  module.fetchTodosPedidos = async function() {
+    return this.pedidos;
+  };
+
+  module.getMesa = function(num) {
+    return this.mesas.find(m => m.numero == num);
+  };
 
   return module;
 })();
