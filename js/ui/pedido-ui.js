@@ -1,9 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: pedido.js (v2.7 – modal dual para cocina y barra)
-   Propósito: Coordinar la apertura de mesa, envío de comandas y
-              transferencia. Ahora, al enviar una comanda con ítems
-              para cocina y barra, muestra un solo modal con dos
-              columnas independientes.
+   PubPOS — MÓDULO: pedido-ui.js (v2.8 – botón cerrar robusto)
    ================================================================ */
 const Pedido = (() => {
 
@@ -68,7 +64,7 @@ const Pedido = (() => {
     document.body.appendChild(modal);
   }
 
-  /* ── APERTURA DE MESA (sin cambios) ──────────────────────── */
+  /* ── APERTURA DE MESA ──────────────────────────────────── */
   async function abrirMesa(num) {
     if (_mesaAbriendo === num) return;
     _mesaAbriendo = num;
@@ -118,9 +114,28 @@ const Pedido = (() => {
     } finally { _mesaAbriendo = null; }
   }
 
-  function cerrar() { /* ... igual ... */ }
+  function cerrar() {
+    const modal = document.getElementById('modalPedido');
+    if (modal) {
+      modal.style.display = 'none';
+    } else {
+      // Si no existe, intentamos cerrar el overlay que tenga la clase modal-overlay y contenga el modal
+      const overlays = document.querySelectorAll('.modal-overlay');
+      overlays.forEach(o => { if (o.querySelector('.modal-pedido')) o.style.display = 'none'; });
+    }
 
-  /* ── ENVÍO DE COMANDA (MODAL DUAL CUANDO CORRESPONDE) ────── */
+    const mesa = Comanda.getMesaActiva();
+    if (mesa && mesa.estado === 'libre' && (!mesa.items || mesa.items.length === 0)) {
+      if (mesa.esVirtual) { DB.liberarMesasFusionadas(mesa); }
+      else {
+        const idx = DB.mesas.findIndex(m => m.numero === mesa.numero);
+        if (idx >= 0) { DB.mesas[idx] = mesaVacia(mesa.numero); DB.saveMesas(); EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: 'libre' }); Mesas.render(); }
+      }
+    }
+    EventBus.emit('mesa:cerrada');
+  }
+
+  /* ── ENVÍO DE COMANDA ─────────────────────────────────── */
   async function enviarComanda() {
     const mesa = Comanda.getMesaActiva();
     if (!mesa) { showToast('warning', 'No hay mesa activa.'); return; }
@@ -132,7 +147,6 @@ const Pedido = (() => {
     const barraItems  = pendientes.filter(it => it.destino === 'barra'  || it.destino === 'ambos');
     if (!cocinaItems.length && !barraItems.length) { showToast('info', 'No hay ítems para enviar.'); return; }
 
-    // Actualizar datos de la mesa
     const mozoSelect = document.getElementById('comandaMozo');
     const comensalesInput = document.getElementById('comandaComensales');
     const obsInput = document.getElementById('comandaObs');
@@ -155,16 +169,11 @@ const Pedido = (() => {
     };
 
     if (cocinaItems.length && barraItems.length) {
-      // ── MODAL DUAL ──
       const comandaCocina = _crearComanda(cocinaItems, 'cocina');
       const comandaBarra  = _crearComanda(barraItems,  'barra');
-
       Tickets.mostrarDoble(
-        Tickets.generarComanda(comandaCocina, 'cocina'),
-        'Cocina',
-        {
-          textoEditar: 'Editar',
-          editarCallback: (htmlActual) => {
+        Tickets.generarComanda(comandaCocina, 'cocina'), 'Cocina',
+        { textoEditar: 'Editar', editarCallback: (htmlActual) => {
             const nota = prompt('Agregar comentario a la comanda de Cocina:', comandaCocina.observaciones || '');
             if (nota !== null) {
               comandaCocina.observaciones = nota;
@@ -175,11 +184,8 @@ const Pedido = (() => {
             return htmlActual;
           }
         },
-        Tickets.generarComanda(comandaBarra, 'barra'),
-        'Barra',
-        {
-          textoEditar: 'Editar',
-          editarCallback: (htmlActual) => {
+        Tickets.generarComanda(comandaBarra, 'barra'), 'Barra',
+        { textoEditar: 'Editar', editarCallback: (htmlActual) => {
             const nota = prompt('Agregar comentario a la comanda de Barra:', comandaBarra.observaciones || '');
             if (nota !== null) {
               comandaBarra.observaciones = nota;
@@ -192,46 +198,31 @@ const Pedido = (() => {
         }
       );
     } else {
-      // ── MODAL SIMPLE ──
       if (cocinaItems.length) {
         const comandaCocina = _crearComanda(cocinaItems, 'cocina');
-        Tickets.mostrar(
-          Tickets.generarComanda(comandaCocina, 'cocina'),
-          `Cocina — Mesa ${mesa.numero}`,
-          {
-            textoEditar: 'Editar',
-            editarCallback: (htmlActual) => {
-              const nota = prompt('Agregar comentario a la comanda de Cocina:', comandaCocina.observaciones || '');
-              if (nota !== null) {
-                comandaCocina.observaciones = nota;
-                const idx = DB.comandas.findIndex(c => c.id === comandaCocina.id);
-                if (idx >= 0) { DB.comandas[idx].observaciones = nota; DB.saveComandas(); }
-                return Tickets.generarComanda(comandaCocina, 'cocina');
-              }
-              return htmlActual;
-            }
+        Tickets.mostrar(Tickets.generarComanda(comandaCocina, 'cocina'), `Cocina — Mesa ${mesa.numero}`, { textoEditar: 'Editar', editarCallback: (htmlActual) => {
+          const nota = prompt('Agregar comentario a la comanda de Cocina:', comandaCocina.observaciones || '');
+          if (nota !== null) {
+            comandaCocina.observaciones = nota;
+            const idx = DB.comandas.findIndex(c => c.id === comandaCocina.id);
+            if (idx >= 0) { DB.comandas[idx].observaciones = nota; DB.saveComandas(); }
+            return Tickets.generarComanda(comandaCocina, 'cocina');
           }
-        );
+          return htmlActual;
+        }});
       }
       if (barraItems.length) {
         const comandaBarra = _crearComanda(barraItems, 'barra');
-        Tickets.mostrar(
-          Tickets.generarComanda(comandaBarra, 'barra'),
-          `Barra — Mesa ${mesa.numero}`,
-          {
-            textoEditar: 'Editar',
-            editarCallback: (htmlActual) => {
-              const nota = prompt('Agregar comentario a la comanda de Barra:', comandaBarra.observaciones || '');
-              if (nota !== null) {
-                comandaBarra.observaciones = nota;
-                const idx = DB.comandas.findIndex(c => c.id === comandaBarra.id);
-                if (idx >= 0) { DB.comandas[idx].observaciones = nota; DB.saveComandas(); }
-                return Tickets.generarComanda(comandaBarra, 'barra');
-              }
-              return htmlActual;
-            }
+        Tickets.mostrar(Tickets.generarComanda(comandaBarra, 'barra'), `Barra — Mesa ${mesa.numero}`, { textoEditar: 'Editar', editarCallback: (htmlActual) => {
+          const nota = prompt('Agregar comentario a la comanda de Barra:', comandaBarra.observaciones || '');
+          if (nota !== null) {
+            comandaBarra.observaciones = nota;
+            const idx = DB.comandas.findIndex(c => c.id === comandaBarra.id);
+            if (idx >= 0) { DB.comandas[idx].observaciones = nota; DB.saveComandas(); }
+            return Tickets.generarComanda(comandaBarra, 'barra');
           }
-        );
+          return htmlActual;
+        }});
       }
     }
 
@@ -253,9 +244,50 @@ const Pedido = (() => {
     showToast('success', 'Comanda(s) enviada(s)');
   }
 
-  /* ── TRANSFERIR MESA (sin cambios) ────────────────────────── */
-  function transferirMesa(mesaOrigenNum, mesaDestinoNum) { /* ... igual ... */ }
-  function mostrarSelectorTransferencia() { /* ... igual ... */ }
+  /* ── Transferir mesa ───────────────────────────────────── */
+  function transferirMesa(mesaOrigenNum, mesaDestinoNum) {
+    if (!Auth.esAdmin()) { showToast('error', 'Solo administradores pueden transferir pedidos entre mesas'); return false; }
+    const mesaOrigen = DB.getMesa(mesaOrigenNum), mesaDestino = DB.getMesa(mesaDestinoNum);
+    if (!mesaOrigen || !mesaDestino) { showToast('error', 'Una de las mesas no existe.'); return false; }
+    if (mesaDestino.estado !== 'libre') { showToast('error', `La mesa ${mesaDestinoNum} no está libre.`); return false; }
+    if (mesaOrigen.esVirtual || mesaDestino.esVirtual) { showToast('error', 'No se puede transferir desde/hacia una mesa fusionada.'); return false; }
+
+    mesaDestino.estado = mesaOrigen.estado; mesaDestino.pedidoId = mesaOrigen.pedidoId;
+    mesaDestino.items = mesaOrigen.items; mesaDestino.mozo = mesaOrigen.mozo;
+    mesaDestino.comensales = mesaOrigen.comensales; mesaDestino.abiertaEn = mesaOrigen.abiertaEn;
+    mesaDestino.observaciones = mesaOrigen.observaciones; mesaDestino.total = mesaOrigen.total;
+
+    if (mesaDestino.pedidoId) {
+      const pedido = DB.pedidos.find(p => p.id === mesaDestino.pedidoId);
+      if (pedido) { pedido.mesa = mesaDestinoNum; DB.savePedidos(); }
+    }
+    const idxOrigen = DB.mesas.findIndex(m => m.numero === mesaOrigenNum);
+    if (idxOrigen >= 0) DB.mesas[idxOrigen] = mesaVacia(mesaOrigenNum);
+    DB.saveMesas();
+    EventBus.emit('mesa:actualizada', { mesa: mesaOrigenNum, estado: 'libre' });
+    EventBus.emit('mesa:actualizada', { mesa: mesaDestinoNum, estado: mesaDestino.estado });
+    if (window.Mesas) Mesas.render();
+    const mesaActiva = Comanda.getMesaActiva();
+    if (mesaActiva && mesaActiva.numero === mesaOrigenNum) abrirMesa(mesaDestinoNum);
+    showToast('success', `Pedido transferido de Mesa ${mesaOrigenNum} a Mesa ${mesaDestinoNum}`);
+    return true;
+  }
+
+  function mostrarSelectorTransferencia() {
+    const mesaActual = Comanda.getMesaActiva();
+    if (!mesaActual) { showToast('warning', 'No hay mesa activa.'); return; }
+    if (!Auth.esAdmin()) { showToast('error', 'Solo administradores pueden transferir mesas.'); return; }
+    if (mesaActual.esVirtual) { showToast('info', 'No se puede transferir una mesa fusionada.'); return; }
+    const mesasLibres = DB.mesas.filter(m => m.estado === 'libre' && !m.esVirtual && m.numero !== mesaActual.numero);
+    if (!mesasLibres.length) { showToast('info', 'No hay mesas libres para transferir.'); return; }
+    const opciones = mesasLibres.map(m => m.numero).join(', ');
+    const destino = prompt(`Mesas libres: ${opciones}\nIngresá el número de mesa destino:`);
+    if (destino) {
+      const numDestino = parseInt(destino);
+      if (!isNaN(numDestino)) transferirMesa(mesaActual.numero, numDestino);
+      else showToast('error', 'Número de mesa inválido.');
+    }
+  }
 
   function pedirCuenta() { if (window.Cuenta && typeof Cuenta.pedirCuenta === 'function') Cuenta.pedirCuenta(); }
   function cerrarMesa() { if (window.Cobro && typeof Cobro.abrirModalCierre === 'function') Cobro.abrirModalCierre(); }

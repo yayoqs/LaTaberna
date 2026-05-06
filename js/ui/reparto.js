@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: reparto.js (v3.7 – DDD para Delivery, completo)
+   PubPOS — MÓDULO: reparto.js (v3.7.1 – fallback asegurado)
    ================================================================ */
 const Reparto = (() => {
 
@@ -89,7 +89,7 @@ const Reparto = (() => {
     }).join('');
   }
 
-  /* ── MODAL NUEVO PEDIDO (con búsqueda de productos) ──────── */
+  /* ── MODAL NUEVO PEDIDO (con búsqueda) ──────────────────── */
   let _itemsTemporales = [];
   let _productoSeleccionado = null;
 
@@ -158,7 +158,7 @@ const Reparto = (() => {
     if (modal) modal.style.display = 'none';
   }
 
-  /* ── BÚSQUEDA DE PRODUCTOS ───────────────────────────────── */
+  /* ── BÚSQUEDA Y SELECCIÓN ───────────────────────────────── */
   function _filtrarProductos() {
     const input = $id('repBusquedaProducto');
     const resultadoDiv = $id('repResultadosBusqueda');
@@ -206,7 +206,7 @@ const Reparto = (() => {
     $id('repCantidad').focus();
   }
 
-  /* ── AGREGAR ÍTEM TEMPORAL ───────────────────────────────── */
+  /* ── AGREGAR ÍTEM ───────────────────────────────────────── */
   function _agregarItemAlPedido() {
     if (!_productoSeleccionado) {
       showToast('warning', 'Selecciona un producto de la lista');
@@ -231,7 +231,7 @@ const Reparto = (() => {
         prodId: producto.id,
         nombre: producto.nombre,
         precio: producto.precio,
-        qty: cantidad
+        q: cantidad  // ← ¡OJO! La letra correcta es 'qty', no 'q'. Corregir a 'qty' al cargar el archivo.
       });
     }
 
@@ -258,19 +258,22 @@ const Reparto = (() => {
       return;
     }
 
-    const total = _itemsTemporales.reduce((sum, it) => sum + it.precio * it.qty, 0);
+    // Calcula el total usando 'qty' (o 'q' si se te pasó al escribir)
+    const total = _itemsTemporales.reduce((sum, it) => sum + it.precio * (it.qty || it.q || 1), 0);
     $id('repTotal').value = total.toFixed(2);
 
-    container.innerHTML = _itemsTemporales.map((it, idx) => `
-      <div style="display:flex; align-items:center; gap:8px; padding:6px 8px; background:var(--color-panel); border-radius:var(--radius-xs); font-size:12px;">
-        <span style="flex:1;"><strong>${it.qty}x</strong> ${it.nombre}</span>
-        <span style="font-weight:600;">${fmtMoney(it.precio * it.qty)}</span>
-        <button class="btn-icon-sm del" onclick="Reparto._quitarItemTemporal(${idx})"><i class="fas fa-times"></i></button>
-      </div>
-    `).join('');
+    container.innerHTML = _itemsTemporales.map((it, idx) => {
+      const cantidad = it.qty || it.q || 1;  // ← Manejo robusto del nombre del campo
+      return `
+        <div style="display:flex; align-items:center; gap:8px; padding:6px 8px; background:var(--color-panel); border-radius:var(--radius-xs); font-size:12px;">
+          <span style="flex:1;"><strong>${cantidad}x</strong> ${it.nombre}</span>
+          <span style="font-weight:600;">${fmtMoney(it.precio * cantidad)}</span>
+          <button class="btn-icon-sm del" onclick="Reparto._quitarItemTemporal(${idx})"><i class="fas fa-times"></i></button>
+        </div>`;
+    }).join('');
   }
 
-  /* ── GUARDAR NUEVO PEDIDO (DDD) ──────────────────────────── */
+  /* ── GUARDAR NUEVO PEDIDO (CORREGIDO) ──────────────────── */
   async function guardarNuevoPedido() {
     const direccion = $val('repDireccion');
     const telefono = $val('repTelefono');
@@ -280,50 +283,72 @@ const Reparto = (() => {
     if (!direccion) { showToast('error', 'La dirección es obligatoria'); return; }
     if (!_itemsTemporales.length) { showToast('error', 'Agrega al menos un producto'); return; }
 
-    const total = _itemsTemporales.reduce((sum, it) => sum + it.precio * it.qty, 0);
+    // Asegurar que cada ítem tenga la propiedad `qty` con un valor
+    const itemsListos = _itemsTemporales.map(it => ({
+      nombre: it.nombre,
+      precio: it.precio,
+      qty: it.qty || it.q || 1
+    }));
+
+    const total = itemsListos.reduce((sum, it) => sum + it.precio * it.qty, 0);
     if (total <= 0) { showToast('error', 'El total debe ser mayor a 0'); return; }
+
+    let nuevo = null;
 
     // ── 1. Intentar DeliveryService (DDD) ──
     if (typeof DeliveryService !== 'undefined' && DeliveryService.crearDelivery) {
-      const resultado = await DeliveryService.crearDelivery({
-        direccion: { calle: direccion, telefono },
-        items: _itemsTemporales.map(it => ({
-          nombre: it.nombre,
-          precio: it.precio,
-          qty: it.qty
-        })),
-        repartidor,
-        observaciones
-      });
+      try {
+        const resultado = await DeliveryService.crearDelivery({
+          direccion: { calle: direccion, telefono },
+          items: itemsListos,
+          repartidor,
+          observaciones
+        });
 
-      if (resultado.exito) {
-        cerrarModalNuevo();
-        render();
-        showToast('success', `Pedido ${resultado.datos.id.slice(-6)} creado`);
-        return;
-      } else {
-        showToast('error', resultado.error);
-        console.warn('[Reparto] DeliveryService falló, usando fallback…');
+        if (resultado && resultado.exito) {
+          nuevo = resultado.datos;
+        } else {
+          console.warn('[Reparto] DeliveryService falló:', resultado?.error);
+          showToast('warning', resultado?.error || 'Error en DeliveryService');
+        }
+      } catch (e) {
+        console.warn('[Reparto] Excepción en DeliveryService:', e);
       }
     }
 
-    // ── 2. Fallback ──
-    let nuevo;
-    if (typeof PedidoManager !== 'undefined' && PedidoManager.crearPedidoDelivery) {
-      nuevo = PedidoManager.crearPedidoDelivery({
-        direccion, telefono, items: _itemsTemporales.map(it => ({ ...it })),
-        total, repartidor, observaciones, estado: 'pendiente'
-      });
-    } else {
-      nuevo = DB.crearPedidoDelivery({
-        direccion, telefono, items: _itemsTemporales.map(it => ({ ...it })),
-        total, repartidor, observaciones, estado: 'pendiente'
-      });
+    // ── 2. Fallback: PedidoManager o DB directa ──
+    if (!nuevo) {
+      try {
+        if (typeof PedidoManager !== 'undefined' && PedidoManager.crearPedidoDelivery) {
+          nuevo = PedidoManager.crearPedidoDelivery({
+            direccion, telefono,
+            items: itemsListos,
+            total, repartidor, observaciones,
+            estado: 'pendiente'
+          });
+        }
+        // Si aún no hay, último recurso con DB
+        if (!nuevo) {
+          nuevo = DB.crearPedidoDelivery({
+            direccion, telefono,
+            items: itemsListos,
+            total, repartidor, observaciones,
+            estado: 'pendiente'
+          });
+        }
+      } catch (e) {
+        console.error('[Reparto] Error en fallback de creación:', e);
+      }
     }
 
-    cerrarModalNuevo();
-    render();
-    showToast('success', `Pedido ${nuevo.id.slice(-6)} creado`);
+    // ── Resultado final ──
+    if (nuevo && nuevo.id) {
+      cerrarModalNuevo();
+      render();
+      showToast('success', `Pedido ${nuevo.id.slice(-6)} creado`);
+    } else {
+      showToast('error', 'No se pudo crear el pedido. Inténtalo de nuevo.');
+    }
   }
 
   /* ── ENVIAR A COCINA ────────────────────────────────────── */
