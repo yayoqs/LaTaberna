@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-core.js (v3.2.1 – filtrado de pedidos delivery corruptos)
+   PubPOS — MÓDULO: db-core.js (v3.2.2 – fix: payload de comanda individual)
    ================================================================ */
 const DBCore = (function() {
   const module = {};
@@ -217,10 +217,9 @@ const DBCore = (function() {
     const raw = localStorage.getItem('pubpos_pedidos_delivery');
     if (raw) {
       try {
-        // Normalizamos y luego filtramos cualquier objeto sin id (corrupto)
         this.pedidosDelivery = JSON.parse(raw)
           .map(pd => this._normalizarPedidoDelivery(pd))
-          .filter(pd => pd && pd.id);  // ← protección contra datos corruptos
+          .filter(pd => pd && pd.id);
       } catch (e) {
         this.pedidosDelivery = [];
       }
@@ -249,7 +248,8 @@ const DBCore = (function() {
     localStorage.setItem('pubpos_comandas', JSON.stringify(this.comandas));
     EventBus.emit('comandas:guardadas', this.comandas);
     if (typeof Store !== 'undefined') {
-      Store.dispatch({ type: 'COMANDA_AGREGADA', payload: this.comandas });
+      // Despachar el array completo para que el reductor lo tome como inicialización
+      Store.dispatch({ type: 'COMANDA_AGREGADA', payload: [...this.comandas] });
     }
   };
 

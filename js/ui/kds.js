@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: kds.js (v4.1 – defensivo ante comandas sin items)
+   PubPOS — MÓDULO: kds.js (v4.2 – solo Store, sin duplicados)
    ================================================================ */
 const KDS = (() => {
   const MINUTOS_URGENTE = 15;
@@ -71,7 +71,6 @@ const KDS = (() => {
     const esDelivery = !!c.deliveryId;
     const etiquetaDelivery = esDelivery ? `<span class="kds-destino-tag" style="background:rgba(34,197,94,.2);color:var(--color-success);">Delivery</span>` : '';
 
-    // items ya está garantizado como array gracias al filtro, pero reforzamos
     const items = c.items || [];
     const itemsHTML = items.map(it => {
       const receta = DB.recetas?.find(r => r.productoId == it.prodId);
@@ -165,6 +164,7 @@ const KDS = (() => {
       }
     });
 
+    // Render inicial
     EventBus.on('db:inicializada', () => {
       setTimeout(refresh, 100);
     });

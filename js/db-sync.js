@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-sync.js (v5.1 – log de respuesta)
+   PubPOS — MÓDULO: db-sync.js (v5.2 – fetch pedidos desde Sheets)
    ================================================================ */
 window.DBSync = (function() {
   const module = {};
@@ -68,12 +68,10 @@ window.DBSync = (function() {
     const data = { action, ...payload };
     const param = encodeURIComponent(JSON.stringify(data));
     const url = `${this.urlSheets}?json=${param}`;
-    console.log(`[DB Sync] GET write -> ${url.substring(0, 150)}...`);
     const res = await fetch(url, { mode: 'cors' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const respData = await res.json();
     if (respData.error) throw new Error(respData.error);
-    console.log(`[DB Sync] "${action}" completado con éxito.`);
     return respData;
   };
 
@@ -159,6 +157,55 @@ window.DBSync = (function() {
     }
   };
 
+  /** NUEVO: descarga los pedidos desde Sheets y actualiza el estado de las mesas */
+  module._fetchPedidos = async function() {
+    try {
+      const res = await fetch(`${this.urlSheets}?action=getPedidos`, { mode: 'cors' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (data && Array.isArray(data.pedidos)) {
+        const pedidosRemotos = data.pedidos.map(p => ({
+          id: p.id || '',
+          mesa: parseInt(p.mesa) || 0,
+          mozo: p.mozo || 'Sin mozo',
+          comensales: parseInt(p.comensales) || 1,
+          estado: p.estado || 'abierta',
+          items: p.items || '[]',
+          total: parseFloat(p.total) || 0,
+          created_at: p.created_at || new Date().toISOString(),
+          updated_at: p.updated_at || new Date().toISOString()
+        })).filter(p => p.id && p.mesa);
+
+        window.DB.pedidos = pedidosRemotos;
+        window.DB.savePedidos(); // actualiza Store
+
+        // Actualizar mesas con los pedidos activos
+        pedidosRemotos.forEach(pedido => {
+          if (pedido.estado === 'abierta' || pedido.estado === 'en_proceso') {
+            const mesa = window.DB.getMesa(pedido.mesa);
+            if (mesa) {
+              mesa.estado = pedido.estado === 'abierta' ? 'ocupada' : 'esperando';
+              mesa.pedidoId = pedido.id;
+              mesa.mozo = pedido.mozo;
+              mesa.comensales = pedido.comensales;
+              mesa.abiertaEn = pedido.created_at;
+              try {
+                mesa.items = JSON.parse(pedido.items || '[]');
+              } catch (e) {
+                mesa.items = [];
+              }
+              mesa.total = pedido.total;
+            }
+          }
+        });
+        window.DB.saveMesas(); // actualiza Store
+        Logger.info(`[DB Sync] ${pedidosRemotos.length} pedidos sincronizados desde Sheets.`);
+      }
+    } catch (e) {
+      Logger.warn("[DB Sync] Error obteniendo pedidos, se mantiene estado local.", e.message);
+    }
+  };
+
   module.sincronizarTodo = async function() {
     showToast('info', 'Sincronizando...');
     try {
@@ -166,7 +213,8 @@ window.DBSync = (function() {
         this._fetchProductos(),
         this._fetchMozos(),
         this._fetchIngredientes(),
-        this._fetchRecetas()
+        this._fetchRecetas(),
+        this._fetchPedidos()
       ]);
       await this._procesarSyncQueue();
       showToast('success', 'Datos sincronizados');
@@ -219,7 +267,6 @@ window.DBSync = (function() {
   module.syncGuardarPedido = async function(pedido) {
     try {
       const respuesta = await this._sendDataViaGet('guardarPedido', { pedido });
-      // 🔍 Mostrar la respuesta completa del backend
       console.log('🛰️ [DB Sync] Respuesta de guardarPedido:', JSON.stringify(respuesta, null, 2));
     } catch (e) {
       Logger.warn('[DB Sync] Offline, pedido encolado.');
@@ -269,11 +316,8 @@ window.DBSync = (function() {
     }
   };
 
-  module.getPendingSyncCount = function() {
-    return this.syncQueue.length;
-  };
+  module.getPendingSyncCount = function() { return this.syncQueue.length; };
 
-  // ── MÉTODO GENÉRICO ──────────────────────────────────────
   module.llamar = async function(action, payload) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);

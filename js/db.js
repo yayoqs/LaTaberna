@@ -1,14 +1,6 @@
 /* ================================================================
-   PubPOS — MÓDULO: db.js (Orquestador v2.3 – serializar items)
-   ================================================================
-   Cambios:
-   - En cerrarPedido, antes de llamar a syncGuardarPedido, se
-     serializa "items" a JSON string si es un array.
-   - Se añaden explícitamente los campos requeridos por el backend
-     (id, mesa, estado, items, total, mozo, etc.) para evitar
-     discrepancias.
+   PubPOS — MÓDULO: db.js (Orquestador v2.4 – fetch pedidos al iniciar)
    ================================================================ */
-
 var DB = (function() {
   const core = DBCore;
   const sync = window.DBSync;
@@ -42,6 +34,7 @@ var DB = (function() {
       this._fetchMozos().catch(e => console.warn("[DB] Mozos remotos no disponibles", e));
       this._fetchIngredientes().catch(e => console.warn("[DB] Ingredientes remotos no disponibles", e));
       this._fetchRecetas().catch(e => console.warn("[DB] Recetas remotas no disponibles", e));
+      this._fetchPedidos().catch(e => console.warn("[DB] Pedidos remotos no disponibles", e));
 
       await this._procesarSyncQueue();
 
@@ -86,7 +79,6 @@ var DB = (function() {
       return pedido;
     }
 
-    // ── Descontar stock local ──────────────────────────────
     try {
       const items = JSON.parse(pedido.items || '[]');
       for (const item of items) {
@@ -96,7 +88,6 @@ var DB = (function() {
       console.warn("[DB] Error descontando stock local:", e);
     }
 
-    // ── Descuento de stock online (encola si falla) ────────
     try {
       const items = JSON.parse(pedido.items || '[]');
       await fetch(this.urlSheets, {
@@ -115,16 +106,13 @@ var DB = (function() {
       });
     }
 
-    // ── Actualizar estado local ────────────────────────────
     const pedidoActualizado = this.actualizarPedido(id, {
       estado: 'cerrada',
       total,
       updated_at: new Date().toISOString()
     });
 
-    // ── Sincronizar estado con Sheets ──────────────────────
     if (pedidoActualizado) {
-      // Preparar objeto con los campos exactos que espera el backend
       const pedidoParaSync = {
         id: pedidoActualizado.id,
         mesa: pedidoActualizado.mesa,
@@ -133,7 +121,7 @@ var DB = (function() {
         estado: pedidoActualizado.estado,
         items: Array.isArray(pedidoActualizado.items) 
                  ? JSON.stringify(pedidoActualizado.items) 
-                 : pedidoActualizado.items,   // asegurar string JSON
+                 : pedidoActualizado.items,
         total: pedidoActualizado.total,
         created_at: pedidoActualizado.created_at,
         updated_at: pedidoActualizado.updated_at
