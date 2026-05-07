@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-core.js (v3.2.2 – fix: payload de comanda individual)
+   PubPOS — MÓDULO: db-core.js (v3.2.3 – sin despacho Store en saveComandas)
    ================================================================ */
 const DBCore = (function() {
   const module = {};
@@ -247,10 +247,7 @@ const DBCore = (function() {
   module.saveComandas = function() {
     localStorage.setItem('pubpos_comandas', JSON.stringify(this.comandas));
     EventBus.emit('comandas:guardadas', this.comandas);
-    if (typeof Store !== 'undefined') {
-      // Despachar el array completo para que el reductor lo tome como inicialización
-      Store.dispatch({ type: 'COMANDA_AGREGADA', payload: [...this.comandas] });
-    }
+    // Ya no despachamos COMANDA_AGREGADA aquí; se hace en el comando enviarComanda
   };
 
   module.savePedidos = function() {
