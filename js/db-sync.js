@@ -1,166 +1,189 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-sync.js (v4.1 – método llamar con timeout)
-   Propósito: Sincronización bidireccional con Google Sheets.
-              Incluye manejo de cola offline y método 'llamar' con
-              timeout para evitar bloqueos prolongados.
+   PubPOS — MÓDULO: db.js (Orquestador v2.1 – sincronizar cierre)
+   ================================================================
+   Cambios respecto a v2.0 (protección doble cierre):
+   • Ahora, al cerrar un pedido, se envía el pedido actualizado a
+     Google Sheets mediante syncGuardarPedido. Esto asegura que
+     el estado 'cerrada' se refleje en la hoja de cálculo y no
+     solo en localStorage.
+   • Si la sincronización falla, se encola para el siguiente
+     reintento.
+   • Se mantiene la protección contra doble cierre de stock.
    ================================================================ */
-const DBSync = (function() {
-  const module = {};
 
-  module.urlSheets = "https://script.google.com/macros/s/AKfycbxOtznKKLBnJPMvpChxy6isJwDkvLhuVsc7W3ykyPusqZV3wQZtUllrHcd2xmCL1ypH/exec";
+var DB = (function() {
+  const core = DBCore;
+  const sync = DBSync;
+  const inventario = DBInventario;
+  const fusion = DBFusion;
 
-  module.syncQueue = [];
-
-  module._cargarSyncQueueLocal = function() {
-    const raw = localStorage.getItem('pubpos_sync_queue');
-    this.syncQueue = raw ? JSON.parse(raw) : [];
+  const combined = {
+    ...core,
+    ...sync,
+    ...inventario,
+    ...fusion
   };
 
-  module._saveSyncQueue = function() {
-    localStorage.setItem('pubpos_sync_queue', JSON.stringify(this.syncQueue));
-    EventBus.emit('sync:colaActualizada', this.syncQueue.length);
-  };
+  combined.urlSheets = sync.urlSheets;
 
-  module._encolarOperacion = function(action, payload) {
-    this.syncQueue.push({
-      id: `sync_${Date.now()}_${Math.random().toString(36)}`,
-      action,
-      payload,
-      intentos: 0,
-      creado: new Date().toISOString()
-    });
-    this._saveSyncQueue();
-    Logger.info(`[DB Sync] Operación "${action}" encolada.`);
-  };
-
-  module._procesarSyncQueue = async function() {
-    if (this.syncQueue.length === 0) return;
-    Logger.info(`[DB Sync] Procesando cola (${this.syncQueue.length} operaciones)...`);
-    const queueCopy = [...this.syncQueue];
-    this.syncQueue = [];
-    this._saveSyncQueue();
-
-    let exitos = 0, fallos = 0;
-    for (const item of queueCopy) {
-      try {
-        await this._sendDataViaGet(item.action, item.payload);
-        exitos++;
-      } catch (e) {
-        Logger.warn(`[DB Sync] Falló "${item.action}", re-encolando.`, e);
-        item.intentos++;
-        if (item.intentos < 5) {
-          this.syncQueue.push(item);
-        } else {
-          Logger.error(`[DB Sync] Descartando "${item.action}" tras 5 intentos.`);
-        }
-        fallos++;
-      }
-    }
-    this._saveSyncQueue();
-    if (exitos > 0 && fallos === 0) {
-      showToast('success', `<i class="fas fa-check-circle"></i> ${exitos} operaciones sincronizadas.`);
-    } else if (exitos > 0 && fallos > 0) {
-      showToast('warning', `<i class="fas fa-exclamation-triangle"></i> ${exitos} enviadas, ${fallos} pendientes.`);
-    } else if (exitos === 0 && fallos > 0) {
-      showToast('error', `<i class="fas fa-exclamation-circle"></i> No se pudo conectar. Se reintentará automáticamente.`);
-    }
-    EventBus.emit('sync:colaActualizada', this.syncQueue.length);
-  };
-
-  module._sendDataViaGet = async function(action, payload) {
-    const data = { action, ...payload };
-    const param = encodeURIComponent(JSON.stringify(data));
-    const url = `${this.urlSheets}?json=${param}`;
-    const res = await fetch(url, { mode: 'cors' });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const respData = await res.json();
-    if (respData.error) throw new Error(respData.error);
-    return respData;
-  };
-
-  module._fetchProductos = async function() {
+  combined.init = async function() {
     try {
-      const res = await fetch(`${this.urlSheets}?action=getProductos`, { mode: 'cors' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      if (data && Array.isArray(data.productos)) {
-        this.productos = data.productos.map(p => this._normalizarProducto(p));
-        localStorage.setItem('pubpos_cache_prod', JSON.stringify(this.productos));
-        EventBus.emit('productos:cargados', this.productos);
-        const conImagen = this.productos.filter(p => p.imagen && p.imagen.trim() !== '').length;
-        Logger.info(`[DB Sync] ${this.productos.length} productos sincronizados (${conImagen} con imagen).`);
-      }
-    } catch (e) {
-      Logger.warn("[DB Sync] Error obteniendo productos, usando caché local.", e.message);
-      const cache = localStorage.getItem('pubpos_cache_prod');
-      this.productos = cache ? JSON.parse(cache).map(p => this._normalizarProducto(p)) : [];
-    }
-  };
+      console.log("[DB] Iniciando carga de datos...");
+      this._cargarConfigLocal();
+      this._inicializarMesas();
+      this._cargarComandasLocal();
+      this._cargarPedidosLocal();
+      this._cargarMozosLocal();
+      this._cargarIngredientesLocal();
+      this._cargarRecetasLocal();
+      this._cargarMovimientosLocal();
+      this._cargarSyncQueueLocal();
+      this._cargarPedidosDeliveryLocal();
 
-  module._fetchMozos = async function() { /* similar con Logger */ };
-  module._fetchIngredientes = async function() { /* similar con Logger */ };
-  module._fetchRecetas = async function() { /* similar con Logger */ };
+      await this._fetchProductos();
+      this._fetchMozos().catch(e => console.warn("[DB] Mozos remotos no disponibles", e));
+      this._fetchIngredientes().catch(e => console.warn("[DB] Ingredientes remotos no disponibles", e));
+      this._fetchRecetas().catch(e => console.warn("[DB] Recetas remotas no disponibles", e));
 
-  module.sincronizarTodo = async function() {
-    showToast('info', 'Sincronizando...');
-    try {
-      await Promise.all([
-        this._fetchProductos(),
-        this._fetchMozos(),
-        this._fetchIngredientes(),
-        this._fetchRecetas()
-      ]);
       await this._procesarSyncQueue();
-      showToast('success', 'Datos sincronizados');
-      EventBus.emit('sincronizacion:completada');
+
+      console.log("[DB] Inicialización completada.");
+      EventBus.emit('db:inicializada');
+      return true;
     } catch (e) {
-      showToast('error', '<i class="fas fa-exclamation-circle"></i> Error de conexión');
+      console.error("[DB] Error crítico en init:", e);
+      this._mostrarErrorCarga();
+      return false;
     }
   };
 
-  module.syncGuardarProducto = async function(producto) {
-    const idx = this.productos.findIndex(p => p.id == producto.id);
-    if (idx >= 0) this.productos[idx] = producto;
-    else this.productos.push(producto);
-    localStorage.setItem('pubpos_cache_prod', JSON.stringify(this.productos));
-    EventBus.emit('productos:cargados', this.productos);
-    try {
-      await this._sendDataViaGet('guardarProducto', { producto });
-    } catch (e) {
-      Logger.warn('[DB Sync] Error, encolando:', e);
-      this._encolarOperacion('guardarProducto', { producto });
-    }
+  combined._mostrarErrorCarga = function() {
+    EventBus.emit('app:error', 'No se pudieron cargar los datos iniciales.');
   };
 
-  // ... resto de syncGuardar/Eliminar igual ...
+  // ── MÉTODOS DE PEDIDO (DELEGADOS AL PEDIDOMANAGER SI EXISTE) ──
+  combined.crearPedidoMesa = function(numeroMesa, mozo, comensales) {
+    if (typeof PedidoManager !== 'undefined' && PedidoManager.crearPedidoMesa) {
+      return PedidoManager.crearPedidoMesa(numeroMesa, mozo, comensales);
+    }
+    // fallback al método original de core
+    return this.crearPedido(numeroMesa, mozo, comensales);
+  };
 
-  module.llamar = async function(action, payload) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+  combined.agregarItemAPedido = function(pedidoId, item) {
+    if (typeof PedidoManager !== 'undefined' && PedidoManager.agregarItemAPedido) {
+      return PedidoManager.agregarItemAPedido(pedidoId, item);
+    }
+    return false;
+  };
+
+  /* ── CIERRE DE PEDIDO (MEJORADO) ──────────────────────────
+     Ahora, después de actualizar el pedido localmente, se
+     sincroniza el estado con Google Sheets.
+     Si la red falla, la actualización se encola automáticamente
+     para reintento (ver db-sync.js).
+  ─────────────────────────────────────────────────────────── */
+  combined.cerrarPedido = async function(id, formaPago, total, descuento) {
+    const pedido = this.pedidos.find(p => p.id === id);
+    if (!pedido) {
+      console.warn(`[DB] Pedido ${id} no encontrado.`);
+      return null;
+    }
+
+    // ⛔ Protección contra doble cierre
+    if (pedido.estado === 'cerrada' || pedido.estado === 'cerrado') {
+      console.warn(`[DB] El pedido ${id} ya está cerrado. Se omite descuento de stock.`);
+      return pedido;
+    }
+
+    // ── Descontar stock localmente (recetas) ──────────────
     try {
-      const data = { action, ...payload };
-      const param = encodeURIComponent(JSON.stringify(data));
-      const url = `${this.urlSheets}?json=${param}`;
-      Logger.debug(`[DB Sync] Llamada genérica -> ${action}`);
-      const res = await fetch(url, { signal: controller.signal, mode: 'cors' });
-      clearTimeout(timeoutId);
-      if (!res.ok) throw new Error(`Error del servidor: ${res.status}`);
-      const respData = await res.json();
-      if (respData.error) throw new Error(respData.error);
-      Logger.info(`[DB Sync] "${action}" completado con éxito.`);
-      return respData;
-    } catch (e) {
-      clearTimeout(timeoutId);
-      if (e.name === 'AbortError') {
-        throw new Error('La solicitud tardó demasiado y fue cancelada.');
+      const items = JSON.parse(pedido.items || '[]');
+      for (const item of items) {
+        await this.consumirIngredientesDeProducto(item.prodId, item.qty, `Venta Mesa ${pedido.mesa}`);
       }
-      throw e;
+    } catch (e) {
+      console.warn("[DB] Error descontando stock local:", e);
     }
+
+    // ── Sincronizar descuento de stock con Sheets ─────────
+    try {
+      const items = JSON.parse(pedido.items || '[]');
+      await fetch(this.urlSheets, {
+        method: 'POST',
+        mode: 'cors',
+        headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({
+          action: 'procesarVenta',
+          items: items.map(it => ({ productoId: it.prodId, cantidad: it.qty }))
+        })
+      });
+    } catch (e) {
+      console.warn("[DB] No se pudo descontar stock online, encolando.");
+      this._encolarOperacion('procesarVenta', {
+        items: JSON.parse(pedido.items || '[]').map(it => ({ productoId: it.prodId, cantidad: it.qty }))
+      });
+    }
+
+    // ── Actualizar estado del pedido ──────────────────────
+    const pedidoActualizado = this.actualizarPedido(id, {
+      estado: 'cerrada',
+      total,
+      updated_at: new Date().toISOString()
+    });
+
+    // ── Sincronizar estado del pedido con Sheets ─────────
+    if (pedidoActualizado) {
+      try {
+        await this.syncGuardarPedido(pedidoActualizado);
+        console.log(`[DB] Pedido ${id} sincronizado con Sheets como cerrado.`);
+      } catch (e) {
+        console.warn(`[DB] Error al sincronizar cierre del pedido ${id}. Encolando.`);
+        this._encolarOperacion('guardarPedido', { pedido: pedidoActualizado });
+      }
+    }
+
+    return pedidoActualizado;
   };
 
-  module.getPendingSyncCount = function() {
-    return this.syncQueue.length;
+  // ── MÉTODOS DE DELIVERY (DELEGADOS AL PEDIDOMANAGER) ──────
+  combined.crearPedidoDelivery = function(datos) {
+    if (typeof PedidoManager !== 'undefined' && PedidoManager.crearPedidoDelivery) {
+      return PedidoManager.crearPedidoDelivery(datos);
+    }
+    // fallback
+    const nuevo = this._normalizarPedidoDelivery({
+      ...datos,
+      id: 'deliv_' + Date.now(),
+      created_at: new Date().toISOString()
+    });
+    this.pedidosDelivery.push(nuevo);
+    this.savePedidosDelivery();
+    return nuevo;
   };
 
-  return module;
+  combined.enviarPedidoDeliveryACocina = function(deliveryId) {
+    if (typeof PedidoManager !== 'undefined' && PedidoManager.enviarPedidoDeliveryACocina) {
+      return PedidoManager.enviarPedidoDeliveryACocina(deliveryId);
+    }
+    return false;
+  };
+
+  combined.actualizarPedidoDelivery = function(id, cambios) {
+    const idx = this.pedidosDelivery.findIndex(p => p.id === id);
+    if (idx >= 0) {
+      this.pedidosDelivery[idx] = { ...this.pedidosDelivery[idx], ...cambios };
+      this.savePedidosDelivery();
+    }
+    return this.pedidosDelivery[idx] || null;
+  };
+
+  combined.eliminarPedidoDelivery = function(id) {
+    this.pedidosDelivery = this.pedidosDelivery.filter(p => p.id !== id);
+    this.savePedidosDelivery();
+  };
+
+  return combined;
 })();
+
+window.DB = DB;
