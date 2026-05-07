@@ -1,9 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: tickets.js (v4.1 – fixes de undefined y defaults)
-   Propósito: Renderizado de tickets y gestión de modales de impresión.
-              Ahora todos los generadores usan valores por defecto para
-              evitar que aparezca "undefined" en los comprobantes.
-              También se asegura que los parámetros numéricos sean válidos.
+   PubPOS — MÓDULO: tickets.js (v4.2 – soporte onPrint)
    ================================================================ */
 const Tickets = (() => {
 
@@ -11,12 +7,6 @@ const Tickets = (() => {
      RENDERER: genera HTML de tickets (puro, sin interacción con DOM)
      ═══════════════════════════════════════════════════════════ */
   const Renderer = {
-    /**
-     * Genera el HTML de una comanda para cocina o barra.
-     * @param {object} comanda - { id, mesa, mozo, destino, items, observaciones, ts }
-     * @param {'cocina'|'barra'} destino - destino para filtrar items
-     * @returns {string} HTML del ticket
-     */
     generarComanda(comanda, destino) {
       const hora  = fmtHoraCorta(Date.now());
       const fecha = fmtFechaCorta();
@@ -48,12 +38,6 @@ const Tickets = (() => {
       `;
     },
 
-    /**
-     * Genera el HTML de una pre‑cuenta (cuenta sin pago).
-     * @param {object} mesa - datos de la mesa
-     * @param {object} config - configuración del local { nombreLocal, direccion, cuit, pieTicket }
-     * @returns {string} HTML del ticket
-     */
     generarCuenta(mesa, config) {
       const cfg = config || {};
       const fecha = fmtFechaCorta();
@@ -82,15 +66,6 @@ const Tickets = (() => {
       `;
     },
 
-    /**
-     * Genera el HTML de un comprobante de cierre de mesa.
-     * @param {object} mesa - datos de la mesa
-     * @param {number} totalFinal - monto total cobrado
-     * @param {number} descuento - porcentaje de descuento aplicado
-     * @param {string} formaPago - método de pago
-     * @param {object} config - configuración del local
-     * @returns {string} HTML del ticket
-     */
     generarCierre(mesa, totalFinal, descuento, formaPago, config) {
       const cfg = config || {};
       const fecha = fmtFechaCorta();
@@ -123,13 +98,6 @@ const Tickets = (() => {
       `;
     },
 
-    /**
-     * Genera el HTML de un comprobante parcial (split bill).
-     * @param {object} mesa - datos de la mesa
-     * @param {object} pago - { persona, monto, formaPago }
-     * @param {object} config - configuración del local
-     * @returns {string} HTML del ticket
-     */
     generarCierreParcial(mesa, pago, config) {
       const cfg = config || {};
       const fecha = fmtFechaCorta();
@@ -160,12 +128,6 @@ const Tickets = (() => {
   const Modal = {
     _modals: [],
 
-    /**
-     * Muestra un ticket en un modal con opciones (editar, imprimir).
-     * @param {string} htmlContent - HTML del ticket
-     * @param {string} titulo - título de la ventana
-     * @param {object} [opciones] - { textoEditar, editarCallback }
-     */
     mostrar(htmlContent, titulo, opciones = {}) {
       const modalId = 'ticket-modal-' + Date.now() + '-' + Math.random().toString(36).substr(2,6);
       const modal = document.createElement('div');
@@ -197,9 +159,6 @@ const Tickets = (() => {
       this._vincularEventos(modalId, opciones);
     },
 
-    /**
-     * Muestra dos tickets lado a lado (ej. cocina + barra) con edición independiente.
-     */
     mostrarDoble(htmlIzquierda, tituloIzquierda, opcionesIzquierda, htmlDerecha, tituloDerecha, opcionesDerecha) {
       const modalId = 'ticket-dual-' + Date.now() + '-' + Math.random().toString(36).substr(2,6);
       const modal = document.createElement('div');
@@ -254,7 +213,6 @@ const Tickets = (() => {
       };
     },
 
-    /** Cierra el último modal abierto */
     cerrar() {
       if (this._modals.length > 0) {
         const lastId = this._modals[this._modals.length - 1];
@@ -263,7 +221,6 @@ const Tickets = (() => {
       }
     },
 
-    /* ── INTERNOS ────────────────────────────────────────── */
     _construirBotones(prefix, opciones = {}) {
       let html = '';
       if (typeof opciones.editarCallback === 'function') {
@@ -286,10 +243,15 @@ const Tickets = (() => {
       }
 
       if (printBtn) {
-        printBtn.onclick = () => {
+        printBtn.onclick = async () => {
+          if (typeof opciones.onPrint === 'function') {
+            await opciones.onPrint();
+          }
           const contentDiv = document.getElementById(`${prefix}-content`);
           if (!contentDiv) return;
           _imprimirEnVentana(contentDiv.innerHTML, 'Comanda');
+          const overlay = document.getElementById(prefix);
+          if (overlay) overlay.style.display = 'none';
         };
       }
 
@@ -309,8 +271,6 @@ const Tickets = (() => {
   /* ═══════════════════════════════════════════════════════════
      FUNCIONES AUXILIARES (privadas)
      ═══════════════════════════════════════════════════════════ */
-
-  /** Agrupa ítems por nombre para el ticket */
   function _agruparItems(items) {
     const map = {};
     (items || []).forEach(it => {
@@ -320,7 +280,6 @@ const Tickets = (() => {
     return Object.values(map);
   }
 
-  /** Abre una ventana nueva y dispara la impresión del ticket */
   function _imprimirEnVentana(contenido, titulo) {
     const win = window.open('', '_blank', 'width=420,height=680');
     if (!win) {
@@ -345,22 +304,17 @@ const Tickets = (() => {
   }
 
   /* ═══════════════════════════════════════════════════════════
-     API PÚBLICA (compatibilidad hacia atrás)
+     API PÚBLICA
      ═══════════════════════════════════════════════════════════ */
   return {
-    // Renderer (puro)
     generarComanda: Renderer.generarComanda.bind(Renderer),
     generarCuenta: (mesa) => Renderer.generarCuenta(mesa, DB.config),
     generarCierre: (mesa, totalFinal, descuento, formaPago) => Renderer.generarCierre(mesa, totalFinal, descuento, formaPago, DB.config),
     generarCierreParcial: (mesa, pago) => Renderer.generarCierreParcial(mesa, pago, DB.config),
-
-    // Modal (UI)
     mostrar: Modal.mostrar.bind(Modal),
     mostrarDoble: Modal.mostrarDoble.bind(Modal),
     cerrar: Modal.cerrar.bind(Modal),
-
-    // Mantenido por compatibilidad (obsoleto, no usado)
-    imprimir: () => Logger.warn('[Tickets] imprimir() obsoleto, usa los botones de cada modal.')
+    imprimir: () => Logger.warn('[Tickets] imprimir() obsoleto')
   };
 })();
 

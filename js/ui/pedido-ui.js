@@ -1,16 +1,11 @@
 /* ================================================================
-   PubPOS — MÓDULO: pedido-ui.js (v4.0 – modal de apertura previo)
-   Propósito: Interfaz de usuario para el modal de pedido. Ahora
-              incluye un paso intermedio al abrir una mesa libre:
-              un modal de apertura donde se definen comensales y
-              nombres de personas (opcional). Luego se crea el
-              pedido mediante CommandBus y se accede al pedido.
+   PubPOS — MÓDULO: pedido-ui.js (v5.0 – revisión antes de enviar)
    ================================================================ */
 const Pedido = (() => {
 
   let _mesaAbriendo = null;
 
-  /* ── MODAL DE PEDIDO (el grande, con carta y comanda) ───── */
+  /* ── MODAL DE PEDIDO ────────────────────────────────────── */
   function _asegurarModalPedido() {
     if ($id('modalPedido')) return;
 
@@ -54,8 +49,8 @@ const Pedido = (() => {
             <div class="comanda-footer">
               <div class="comanda-total"><span>Subtotal</span><span class="total-monto" id="subtotalDisplay">$0</span></div>
               <div class="comanda-actions">
-                <button class="btn-comanda btn-todo" onclick="Pedido.enviarComanda()" style="grid-column:span 3;">
-                  <i class="fas fa-paper-plane"></i> Enviar Comanda
+                <button class="btn-comanda btn-todo" onclick="Pedido.revisarComanda()" style="grid-column:span 3;">
+                  <i class="fas fa-check-double"></i> Revisar Comandas
                 </button>
               </div>
               <div class="comanda-actions-2">
@@ -70,7 +65,7 @@ const Pedido = (() => {
     document.body.appendChild(modal);
   }
 
-  /* ── MODAL DE APERTURA (nuevo) ────────────────────────── */
+  /* ── MODAL DE APERTURA ─────────────────────────────────── */
   function _mostrarModalApertura(mesa) {
     let modal = $id('modalAperturaMesa');
     if (modal) modal.remove();
@@ -168,7 +163,6 @@ const Pedido = (() => {
     _abrirModalPedido(mesa);
   }
 
-  /* ── ABRIR MODAL DE PEDIDO CON LOS DATOS DE LA MESA ──────── */
   function _abrirModalPedido(mesa) {
     _asegurarModalPedido();
 
@@ -189,7 +183,6 @@ const Pedido = (() => {
     if (modal) modal.style.display = 'flex';
   }
 
-  /* ── ENTRY POINT: Evento mesa:seleccionada ──────────────── */
   async function abrirMesa(num) {
     if (_mesaAbriendo === num) return;
     _mesaAbriendo = num;
@@ -213,7 +206,6 @@ const Pedido = (() => {
     }
   }
 
-  /* ── CIERRE DEL MODAL DE PEDIDO ──────────────────────────── */
   function cerrar() {
     const modal = document.getElementById('modalPedido');
     if (modal) {
@@ -225,28 +217,22 @@ const Pedido = (() => {
 
     const mesa = Comanda.getMesaActiva();
     if (mesa && mesa.estado === 'libre' && (!mesa.items || mesa.items.length === 0)) {
-      if (mesa.esVirtual) {
-        DB.liberarMesasFusionadas(mesa);
-      } else {
+      if (mesa.esVirtual) { DB.liberarMesasFusionadas(mesa); }
+      else {
         const idx = DB.mesas.findIndex(m => m.numero === mesa.numero);
-        if (idx >= 0) {
-          DB.mesas[idx] = mesaVacia(mesa.numero);
-          DB.saveMesas();
-          EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: 'libre' });
-          Mesas.render();
-        }
+        if (idx >= 0) { DB.mesas[idx] = mesaVacia(mesa.numero); DB.saveMesas(); EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: 'libre' }); Mesas.render(); }
       }
     }
     EventBus.emit('mesa:cerrada');
   }
 
-  /* ── ENVÍO DE COMANDA ────────────────────────────────────── */
-  async function enviarComanda() {
+  /* ── REVISAR COMANDA ──────────────────────────────────── */
+  async function revisarComanda() {
     const mesa = Comanda.getMesaActiva();
     if (!mesa) { showToast('warning', 'No hay mesa activa.'); return; }
 
     const pendientes = mesa.items.filter(it => !it.enviado);
-    if (!pendientes.length) { showToast('warning', 'No hay ítems nuevos para enviar.'); return; }
+    if (!pendientes.length) { showToast('warning', 'No hay ítems nuevos para revisar.'); return; }
 
     const mozoSelect = document.getElementById('comandaMozo');
     const comensalesInput = document.getElementById('comandaComensales');
@@ -255,54 +241,81 @@ const Pedido = (() => {
     if (comensalesInput) mesa.comensales = parseInt(comensalesInput.value) || 1;
     if (obsInput) mesa.observaciones = obsInput.value;
 
-    const comando = {
-      type: 'enviarComanda',
-      datos: {
-        mesa,
-        mozo: mesa.mozo,
-        comensales: mesa.comensales,
-        observaciones: mesa.observaciones || '',
-        itemsPendientes: pendientes
+    const cocinaItems = pendientes.filter(it => it.destino === 'cocina' || it.destino === 'ambos');
+    const barraItems  = pendientes.filter(it => it.destino === 'barra'  || it.destino === 'ambos');
+
+    const comandaTemp = (items, destino) => ({
+      id: 'temp_' + Date.now(),
+      mesa: mesa.numero,
+      mozo: mesa.mozo,
+      destino: destino,
+      items: items,
+      observaciones: mesa.observaciones || '',
+      estado: 'nueva',
+      ts: Date.now()
+    });
+
+    const onPrint = async (comandaEditada) => {
+      if (comandaEditada && comandaEditada.observaciones !== undefined) {
+        mesa.observaciones = comandaEditada.observaciones;
+      }
+      try {
+        const resultado = await CommandBus.ejecutar({
+          type: 'enviarComanda',
+          datos: {
+            mesa,
+            mozo: mesa.mozo,
+            comensales: mesa.comensales,
+            observaciones: mesa.observaciones || '',
+            itemsPendientes: pendientes
+          }
+        });
+        if (!resultado.exito) {
+          showToast('error', 'Error al enviar comanda: ' + resultado.error);
+          return;
+        }
+        showToast('success', 'Comanda(s) enviada(s)');
+        if (window.Comanda && typeof Comanda.render === 'function') Comanda.render();
+        if (window.Mesas && typeof Mesas.render === 'function') Mesas.render();
+        EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: mesa.estado });
+      } catch (e) {
+        Logger.error('[Pedido] Error al enviar comanda desde revisión:', e);
+        showToast('error', 'Error al enviar comanda.');
       }
     };
 
-    Logger.debug('[Pedido] Ejecutando comando enviarComanda...');
-    const resultado = await CommandBus.ejecutar(comando);
-
-    if (!resultado.exito) {
-      showToast('error', 'Error al enviar comanda: ' + resultado.error);
-      return;
-    }
-
-    const { comandas, ticketsHTML } = resultado.data;
-
-    if (window.Comanda && typeof Comanda.render === 'function') Comanda.render();
-    showToast('success', 'Comanda(s) enviada(s)');
-
-    if (ticketsHTML.cocina && ticketsHTML.barra) {
+    if (cocinaItems.length && barraItems.length) {
+      const comCocina = comandaTemp(cocinaItems, 'cocina');
+      const comBarra  = comandaTemp(barraItems,  'barra');
       Tickets.mostrarDoble(
-        ticketsHTML.cocina, 'Cocina',
-        { textoEditar: 'Editar', editarCallback: (html) => _editarComandaCallback(comandas.find(c => c.destino === 'cocina'), html) },
-        ticketsHTML.barra, 'Barra',
-        { textoEditar: 'Editar', editarCallback: (html) => _editarComandaCallback(comandas.find(c => c.destino === 'barra'), html) }
+        Tickets.generarComanda(comCocina, 'cocina'), 'Cocina',
+        {
+          textoEditar: 'Editar',
+          editarCallback: (html) => _editarComandaCallback(comCocina, html),
+          onPrint: () => onPrint(comCocina)
+        },
+        Tickets.generarComanda(comBarra, 'barra'), 'Barra',
+        {
+          textoEditar: 'Editar',
+          editarCallback: (html) => _editarComandaCallback(comBarra, html),
+          onPrint: () => onPrint(comBarra)
+        }
       );
-    } else if (ticketsHTML.cocina) {
-      Tickets.mostrar(ticketsHTML.cocina, `Cocina — Mesa ${mesa.numero}`, {
+    } else if (cocinaItems.length) {
+      const comCocina = comandaTemp(cocinaItems, 'cocina');
+      Tickets.mostrar(Tickets.generarComanda(comCocina, 'cocina'), `Cocina — Mesa ${mesa.numero}`, {
         textoEditar: 'Editar',
-        editarCallback: (html) => _editarComandaCallback(comandas[0], html)
+        editarCallback: (html) => _editarComandaCallback(comCocina, html),
+        onPrint: () => onPrint(comCocina)
       });
-    } else if (ticketsHTML.barra) {
-      Tickets.mostrar(ticketsHTML.barra, `Barra — Mesa ${mesa.numero}`, {
+    } else if (barraItems.length) {
+      const comBarra = comandaTemp(barraItems, 'barra');
+      Tickets.mostrar(Tickets.generarComanda(comBarra, 'barra'), `Barra — Mesa ${mesa.numero}`, {
         textoEditar: 'Editar',
-        editarCallback: (html) => _editarComandaCallback(comandas[0], html)
+        editarCallback: (html) => _editarComandaCallback(comBarra, html),
+        onPrint: () => onPrint(comBarra)
       });
     }
-
-    if (window.Mesas && typeof Mesas.render === 'function') {
-      Mesas.render();
-    }
-
-    EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: mesa.estado });
   }
 
   function _editarComandaCallback(comanda, htmlActual) {
@@ -310,17 +323,11 @@ const Pedido = (() => {
     const nota = prompt('Agregar comentario a la comanda:', comanda.observaciones || '');
     if (nota !== null) {
       comanda.observaciones = nota;
-      const idx = DB.comandas.findIndex(c => c.id === comanda.id);
-      if (idx >= 0) {
-        DB.comandas[idx].observaciones = nota;
-        DB.saveComandas();
-      }
       return Tickets.generarComanda(comanda, comanda.destino);
     }
     return htmlActual;
   }
 
-  /* ── TRANSFERIR MESA ─────────────────────────────────────── */
   function transferirMesa(mesaOrigenNum, mesaDestinoNum) {
     if (!Auth.esAdmin()) { showToast('error', 'Solo administradores pueden transferir pedidos entre mesas'); return false; }
     const mesaOrigen = DB.getMesa(mesaOrigenNum), mesaDestino = DB.getMesa(mesaDestinoNum);
@@ -377,7 +384,7 @@ const Pedido = (() => {
   return {
     abrirMesa,
     cerrar,
-    enviarComanda,
+    revisarComanda,
     transferirMesa,
     mostrarSelectorTransferencia,
     pedirCuenta,
