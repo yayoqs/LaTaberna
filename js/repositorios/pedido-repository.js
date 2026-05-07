@@ -1,75 +1,55 @@
 /* ================================================================
-   PubPOS — MÓDULO: pedido-repository.js
-   Propósito: Define el puerto (interfaz) para la persistencia de
-              pedidos y una implementación local que guarda en
-              localStorage y sincroniza con Google Sheets.
+   PubPOS — REPOSITORIO: pedido-repository.js (v1.1 – normalizado)
+   Propósito: Adaptador local que persiste pedidos en localStorage
+              y los sincroniza con Google Sheets.
+              Ahora se asegura de que el objeto enviado esté completo
+              y con el formato que el backend espera (items como string).
    ================================================================ */
 
-/**
- * Puerto (interfaz) del Repositorio de Pedidos.
- * Define los métodos que cualquier adaptador debe implementar.
- */
 const PedidoRepository = {
-  /**
-   * Crea un nuevo pedido de mesa.
-   * @param {object} datos - { mesa, mozo, comensales, items?, total? }
-   * @returns {Promise<object>} El pedido creado.
-   */
-  async crearPedidoMesa(datos) {
-    throw new Error('Método no implementado');
-  },
-
-  /**
-   * Obtiene un pedido por su ID.
-   * @param {string} id
-   * @returns {Promise<object|null>}
-   */
-  async obtenerPorId(id) {
-    throw new Error('Método no implementado');
-  },
-
-  /**
-   * Cierra un pedido (actualiza estado y guarda pago).
-   * @param {string} id
-   * @param {object} datosCierre - { formaPago, total, descuento }
-   * @returns {Promise<object>}
-   */
-  async cerrarPedido(id, datosCierre) {
-    throw new Error('Método no implementado');
-  },
-
-  /**
-   * Obtiene todos los pedidos del turno actual.
-   * @returns {Promise<Array>}
-   */
-  async obtenerTodos() {
-    throw new Error('Método no implementado');
-  }
+  async crearPedidoMesa(datos) { throw new Error('No implementado'); },
+  async obtenerPorId(id)   { throw new Error('No implementado'); },
+  async cerrarPedido(id, datosCierre) { throw new Error('No implementado'); },
+  async obtenerTodos()     { throw new Error('No implementado'); }
 };
 
-/* ── ADAPTADOR LOCAL (localStorage + Sync) ────────────────── */
 const PedidoRepositoryLocal = (() => {
-  // Implementa la interfaz PedidoRepository usando DB (core + sync)
 
   async function crearPedidoMesa(datos) {
     if (!window.DB || !DB.crearPedido) {
       throw new Error('DB.core no disponible');
     }
 
-    // Crear en localStorage (core)
-    const pedido = DB.crearPedido(datos.mesa, datos.mozo, datos.comensales);
-    if (!pedido) {
-      throw new Error('No se pudo crear el pedido localmente');
-    }
+    // 1. Guardar en localStorage
+    const pedidoLocal = DB.crearPedido(datos.mesa, datos.mozo, datos.comensales);
+    if (!pedidoLocal) throw new Error('No se pudo crear el pedido localmente');
 
-    // Sincronizar con Google Sheets (si está disponible)
+    // 2. Normalizar objeto para Sheets
+    const pedidoParaSync = {
+      id:          pedidoLocal.id,
+      mesa:        pedidoLocal.mesa,
+      mozo:        pedidoLocal.mozo || 'Sin mozo',
+      comensales:  pedidoLocal.comensales || 1,
+      estado:      pedidoLocal.estado || 'abierta',
+      items:       Array.isArray(pedidoLocal.items)
+                     ? JSON.stringify(pedidoLocal.items)
+                     : (pedidoLocal.items || '[]'),
+      total:       pedidoLocal.total || 0,
+      created_at:  pedidoLocal.created_at,
+      updated_at:  pedidoLocal.created_at  // recién creado
+    };
+
+    // 3. Sincronizar con Google Sheets (con manejo de error)
     if (typeof DB.syncGuardarPedido === 'function') {
-      DB.syncGuardarPedido(pedido).catch(err => {
-        console.warn('[PedidoRepo] No se pudo sincronizar con Sheets:', err);
-      });
+      try {
+        await DB.syncGuardarPedido(pedidoParaSync);
+      } catch (e) {
+        console.warn('[PedidoRepo] Error al sincronizar con Sheets (encolado):', e);
+        // La cola offline se encarga de reintentar
+      }
     }
 
-    return pedido;
+    return pedidoLocal;
   }
 
   async function obtenerPorId(id) {
@@ -81,15 +61,11 @@ const PedidoRepositoryLocal = (() => {
     if (!window.DB || typeof DB.cerrarPedido !== 'function') {
       throw new Error('DB.cerrarPedido no disponible');
     }
-
     const pedido = DB.pedidos.find(p => p.id === id);
-    if (!pedido) {
-      throw new Error('Pedido no encontrado');
-    }
+    if (!pedido) throw new Error('Pedido no encontrado');
 
-    // Llamar al método del orquestador que descuenta stock, sincroniza, etc.
     await DB.cerrarPedido(id, datosCierre.formaPago, datosCierre.total, datosCierre.descuento || 0);
-    return DB.pedidos.find(p => p.id === id); // retorna el pedido actualizado
+    return DB.pedidos.find(p => p.id === id);
   }
 
   async function obtenerTodos() {

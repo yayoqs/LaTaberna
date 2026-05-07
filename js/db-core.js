@@ -1,9 +1,7 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-core.js (v2.5 – persistencia de mesas)
-   Propósito: Núcleo de base de datos: mesas, pedidos, comandas,
-              mozos, configuración y pedidos de delivery.
-              Ahora carga las mesas desde localStorage para que
-              sobrevivan a una recarga (F5).
+   PubPOS — MÓDULO: db-core.js (v3.1 – serialización forzada de items)
+   Propósito: Asegurar que los items siempre se guarden como string JSON
+              y que el pedido tenga todos los campos esperados por Sheets.
    ================================================================ */
 
 const DBCore = (function() {
@@ -122,28 +120,20 @@ const DBCore = (function() {
     }
   };
 
-  // 🆕 Carga las mesas desde localStorage antes de inicializar
   module._cargarMesasLocal = function() {
     const raw = localStorage.getItem('pubpos_mesas');
     if (raw) {
-      try {
-        this.mesas = JSON.parse(raw).map(m => this._normalizarMesa(m));
-      } catch (e) {
-        this.mesas = [];
-      }
+      try { this.mesas = JSON.parse(raw).map(m => this._normalizarMesa(m)); } catch { this.mesas = []; }
     } else {
       this.mesas = [];
     }
   };
 
   module._inicializarMesas = function() {
-    // Primero cargar las mesas que ya estaban guardadas
     this._cargarMesasLocal();
-
     const zonas = this.config.zonas || [{ nombre: 'salon', cantidad: 12 }];
 
     if (this.mesas.length === 0) {
-      // Sin mesas guardadas, crear desde cero
       let numero = 1;
       const nuevas = [];
       zonas.forEach(zona => {
@@ -154,7 +144,6 @@ const DBCore = (function() {
       });
       this.mesas = nuevas;
     } else {
-      // Ya hay mesas (guardadas), ajustar cantidades por zona sin perder estado
       const mesasReales = this.mesas.filter(m => !m.esVirtual);
       const porZona = {};
       zonas.forEach(z => { porZona[z.nombre] = { deseado: z.cantidad, actuales: [], libres: [] }; });
@@ -262,9 +251,10 @@ const DBCore = (function() {
       id: 'ped_' + Date.now(),
       mesa, mozo, comensales,
       estado: 'abierta',
-      items: '[]',
+      items: '[]',   // <-- siempre string JSON
       total: 0,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
     };
     this.pedidos.push(nuevo);
     this.savePedidos();
@@ -274,6 +264,10 @@ const DBCore = (function() {
   module.actualizarPedido = async function(id, cambios) {
     const idx = this.pedidos.findIndex(p => p.id === id);
     if (idx >= 0) {
+      // Si los items vienen como array, los serializamos a string
+      if (cambios.items && Array.isArray(cambios.items)) {
+        cambios.items = JSON.stringify(cambios.items);
+      }
       this.pedidos[idx] = { ...this.pedidos[idx], ...cambios };
       this.savePedidos();
     }
