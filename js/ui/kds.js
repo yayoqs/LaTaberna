@@ -1,17 +1,10 @@
 /* ================================================================
-   PubPOS — MÓDULO: kds.js (v4.0 – reactivo al Store)
-   ================================================================
-   Cambios:
-   • Obtiene las comandas desde Store.getState().comandas.
-   • Se suscribe al Store para re-renderizar cuando cambian las comandas.
-   • _setEstado despacha COMANDA_ACTUALIZADA para que el Store actualice
-     la comanda y persista. La UI se refresca automáticamente.
+   PubPOS — MÓDULO: kds.js (v4.1 – defensivo ante comandas sin items)
    ================================================================ */
 const KDS = (() => {
   const MINUTOS_URGENTE = 15;
   const MINUTOS_OCULTAR_LISTA = 10;
 
-  /* ── CREACIÓN DINÁMICA DE LA VISTA ───────────────────────── */
   function _asegurarVista() {
     if ($id('view-cocina')) return;
 
@@ -33,7 +26,6 @@ const KDS = (() => {
     document.body.insertBefore(main, referencia);
   }
 
-  /* ── REFRESCAR VISTA ───────────────────────────────────── */
   function refresh() {
     _asegurarVista();
     const cont = $id('cocinaKDS');
@@ -42,10 +34,12 @@ const KDS = (() => {
     const ahora = Date.now();
     const rol = Auth.getRol();
 
-    // Obtener comandas del Store
     let comandas = Store.getState().comandas || [];
 
-    // Filtrar las que ya expiraron (listas hace más de MINUTOS_OCULTAR_LISTA)
+    // Filtrar comandas que no tengan items (protección)
+    comandas = comandas.filter(c => c && Array.isArray(c.items));
+
+    // Filtrar las que ya expiraron
     comandas = comandas.filter(c => {
       if (c.estado === 'lista') {
         return (ahora - c.ts) < MINUTOS_OCULTAR_LISTA * 60 * 1000;
@@ -77,7 +71,9 @@ const KDS = (() => {
     const esDelivery = !!c.deliveryId;
     const etiquetaDelivery = esDelivery ? `<span class="kds-destino-tag" style="background:rgba(34,197,94,.2);color:var(--color-success);">Delivery</span>` : '';
 
-    const itemsHTML = c.items.map(it => {
+    // items ya está garantizado como array gracias al filtro, pero reforzamos
+    const items = c.items || [];
+    const itemsHTML = items.map(it => {
       const receta = DB.recetas?.find(r => r.productoId == it.prodId);
       let recetaHTML = '';
       if (receta && receta.ingredientes && receta.ingredientes.length) {
@@ -124,20 +120,16 @@ const KDS = (() => {
       </article>`;
   }
 
-  /* ── CAMBIAR ESTADO (despacha al Store) ────────────────── */
   function _setEstado(id, estado) {
-    // Buscar la comanda actual en el Store
     const comandas = Store.getState().comandas || [];
     const c = comandas.find(x => x.id === id);
     if (!c) return;
 
-    // Despachar acción para que el Store (y DB) actualicen el estado
     Store.dispatch({
       type: 'COMANDA_ACTUALIZADA',
       payload: { id, cambios: { estado } }
     });
 
-    // Efectos secundarios: actualizar mesa y notificar a reparto
     if (estado === 'lista') {
       const mesa = DB.getMesa(c.mesa);
       if (mesa && mesa.estado === 'ocupada') {
@@ -153,12 +145,10 @@ const KDS = (() => {
           comandaId: id,
           estado: 'listo'
         });
-        console.log(`[KDS] Delivery listo: ${c.deliveryId}`);
+        Logger.info(`[KDS] Delivery listo: ${c.deliveryId}`);
       }
     }
 
-    // Persistir en DB (la acción del Store ya debería hacerlo, 
-    // pero mantenemos la persistencia explícita por seguridad)
     const idx = DB.comandas.findIndex(x => x.id === id);
     if (idx >= 0) {
       DB.comandas[idx].estado = estado;
@@ -168,7 +158,6 @@ const KDS = (() => {
     showToast('success', `<i class="fas fa-check"></i> ${c.mesa} → ${estado === 'lista' ? 'LISTA ✓' : 'En proceso'}`);
   }
 
-  /* ── SUSCRIPCIÓN AL STORE ──────────────────────────────── */
   function _initListeners() {
     Store.subscribe((state, action) => {
       if (action.type.startsWith('COMANDA')) {
@@ -176,7 +165,6 @@ const KDS = (() => {
       }
     });
 
-    // Render inicial cuando la vista se active o la BD esté lista
     EventBus.on('db:inicializada', () => {
       setTimeout(refresh, 100);
     });
