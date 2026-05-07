@@ -1,13 +1,11 @@
 /* ================================================================
-   PubPOS — COMANDO: crear-pedido-mesa.js (v2.2 – unificado CQRS)
-   Propósito: Handler del comando 'crearPedidoMesa'. Crea un pedido
-              de mesa en estado 'abierta' usando exclusivamente el
-              repositorio y el agregado PedidoAgregado. Ya no se
-              disparan sincronizaciones extras aquí, porque el
-              repositorio es el responsable de persistir en Sheets.
+   PubPOS — COMANDO: crear-pedido-mesa.js (v2.3 – repo por defecto)
+   ================================================================
+   Cambio clave: si el comando no incluye un repositorio en "datos",
+   se usa automáticamente PedidoRepositoryLocal. Esto evita que la
+   UI tenga que conocer detalles de infraestructura.
    ================================================================ */
 
-// Constructor de comando (para que la UI pueda fabricarlo)
 function crearComandoPedidoMesa(datos) {
   return {
     type: 'crearPedidoMesa',
@@ -19,11 +17,10 @@ function crearComandoPedidoMesa(datos) {
   };
 }
 
-// Handler registrado en el CommandBus
 async function handleCrearPedidoMesa(comando) {
   const { numeroMesa, mozo, comensales, repo } = comando.datos;
 
-  // Validaciones de turno y mesa (sin cambios)
+  // Validaciones de turno y mesa
   if (typeof PedidoManager === 'undefined' || !PedidoManager.getTurnoActual) {
     throw new Error('Sistema de turnos no disponible');
   }
@@ -45,7 +42,10 @@ async function handleCrearPedidoMesa(comando) {
   mesa.mozo = mozo;
   mesa.comensales = comensales;
 
-  if (!repo || typeof repo.crearPedidoMesa !== 'function') {
+  // ── Resolver repositorio ──────────────────────────
+  // Si el comando no trae un repo explícito, usamos el adaptador local por defecto.
+  const repoUsado = repo || (typeof PedidoRepositoryLocal !== 'undefined' ? PedidoRepositoryLocal : null);
+  if (!repoUsado || typeof repoUsado.crearPedidoMesa !== 'function') {
     throw new Error('Repositorio de pedidos no disponible');
   }
 
@@ -55,15 +55,14 @@ async function handleCrearPedidoMesa(comando) {
     const cant = crearCantidad(comensales || 1);
     const agregado = new PedidoAgregado('ped_' + Date.now(), numeroMesa, mozo || 'Sin mozo', cant);
     pedido = agregado.toJSON();
-    // Aseguramos campos obligatorios para el backend
     pedido.estado = 'abierta';
-    pedido.items = '[]';               // string JSON vacío
+    pedido.items = '[]';
     pedido.total = 0;
     pedido.created_at = new Date().toISOString();
     pedido.updated_at = pedido.created_at;
 
-    // El repositorio se encarga de guardar localmente y sincronizar con Sheets
-    repo.crearPedidoMesa(pedido);
+    // Persistencia (local + Sheets) delegada al repositorio
+    repoUsado.crearPedidoMesa(pedido);
   } catch (e) {
     throw new Error('Error al crear pedido: ' + e.message);
   }
@@ -71,7 +70,6 @@ async function handleCrearPedidoMesa(comando) {
   if (!pedido) throw new Error('No se pudo crear el pedido');
   mesa.pedidoId = pedido.id;
 
-  // Registramos auditoría si está disponible
   if (typeof PedidoManager.registrar === 'function') {
     PedidoManager.registrar('mesa:abierta', {
       mesa: numeroMesa,
@@ -81,15 +79,12 @@ async function handleCrearPedidoMesa(comando) {
     });
   }
 
-  // Notificamos a otros módulos
   EventBus.emit('mesa:actualizada', { mesa: numeroMesa, estado: 'ocupada' });
   EventBus.emit('pedido:creado', pedido);
 
   return pedido;
 }
 
-// Registro en el bus
 CommandBus.registrar('crearPedidoMesa', handleCrearPedidoMesa);
 
-// Exponer fábrica global
 window.crearComandoPedidoMesa = crearComandoPedidoMesa;
