@@ -1,18 +1,16 @@
 /* ================================================================
-   PubPOS — MÓDULO: pedido-ui.js (v3.2.1 – unificado con CQRS)
-   Cambios:
-   - En abrirMesa, se eliminaron los fallbacks a PedidoManager y
-     DB.crearPedido. Ahora solo se usa el CommandBus (CQRS) que
-     a su vez invoca el repositorio. Si el comando falla, se muestra
-     un error y no se generan pedidos basura.
-   - Se mantiene el resto de la funcionalidad (comandas, cierre, etc.).
-   - Todos los onClick usan prefijo explícito (Pedido.cerrar, etc.)
-     para evitar ReferenceError.
+   PubPOS — MÓDULO: pedido-ui.js (v4.0 – modal de apertura previo)
+   Propósito: Interfaz de usuario para el modal de pedido. Ahora
+              incluye un paso intermedio al abrir una mesa libre:
+              un modal de apertura donde se definen comensales y
+              nombres de personas (opcional). Luego se crea el
+              pedido mediante CommandBus y se accede al pedido.
    ================================================================ */
 const Pedido = (() => {
 
   let _mesaAbriendo = null;
 
+  /* ── MODAL DE PEDIDO (el grande, con carta y comanda) ───── */
   function _asegurarModalPedido() {
     if ($id('modalPedido')) return;
 
@@ -72,53 +70,150 @@ const Pedido = (() => {
     document.body.appendChild(modal);
   }
 
+  /* ── MODAL DE APERTURA (nuevo) ────────────────────────── */
+  function _mostrarModalApertura(mesa) {
+    let modal = $id('modalAperturaMesa');
+    if (modal) modal.remove();
+
+    modal = document.createElement('div');
+    modal.id = 'modalAperturaMesa';
+    modal.className = 'modal-overlay';
+    modal.style.display = 'flex';
+    modal.setAttribute('role', 'dialog');
+    modal.setAttribute('aria-modal', 'true');
+
+    const numMesa = mesa.numero;
+    modal.innerHTML = `
+      <div class="modal-small" style="max-width:400px;">
+        <div class="modal-header">
+          <h3><i class="fas fa-chair"></i> Abrir Mesa ${numMesa}</h3>
+          <button class="modal-close" onclick="Pedido._cancelarApertura()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-small-body">
+          <label for="aperturaComensales">Comensales</label>
+          <input type="number" id="aperturaComensales" value="2" min="1" max="20" step="1">
+
+          <label for="aperturaPersonas">
+            Nombres o apodos (opcional)
+            <span style="font-weight:normal;font-size:11px;color:var(--color-text-muted);">Separados por coma o uno por línea</span>
+          </label>
+          <textarea id="aperturaPersonas" rows="3" placeholder="Ej: Juan, María, Pedro"></textarea>
+
+          <div class="modal-small-footer">
+            <button class="btn-secondary" onclick="Pedido._cancelarApertura()">Cancelar</button>
+            <button class="btn-primary" onclick="Pedido._confirmarApertura(${numMesa})">
+              <i class="fas fa-check-circle"></i> Abrir Mesa
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    setTimeout(() => $id('aperturaComensales')?.focus(), 100);
+  }
+
+  function _cancelarApertura() {
+    const modal = $id('modalAperturaMesa');
+    if (modal) modal.remove();
+    _mesaAbriendo = null;
+  }
+
+  async function _confirmarApertura(num) {
+    const comensales = parseInt($id('aperturaComensales')?.value) || 2;
+    const personasRaw = $id('aperturaPersonas')?.value || '';
+    
+    const personas = personasRaw
+      .split(/[,\n]/)
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+
+    _cancelarApertura();
+
+    const mesa = DB.mesas.find(m => m.numero == num);
+    if (!mesa) {
+      showToast('error', 'Mesa no encontrada');
+      return;
+    }
+
+    mesa.comensales = comensales;
+    mesa.personas = personas;
+    mesa.personaActiva = personas.length > 0 ? personas[0] : 'General';
+
+    const comando = {
+      type: 'crearPedidoMesa',
+      datos: {
+        numeroMesa: num,
+        mozo: mesa.mozo || (DB.mozos[0]?.nombre || 'Mozo'),
+        comensales: comensales
+      }
+    };
+
+    Logger.debug('[Pedido] Ejecutando comando crearPedidoMesa...');
+    const resultado = await CommandBus.ejecutar(comando);
+
+    if (!resultado.exito || !resultado.data) {
+      Logger.error('[Pedido] El comando crearPedidoMesa falló:', resultado.error);
+      showToast('error', 'No se pudo abrir la mesa. Intente de nuevo.');
+      return;
+    }
+
+    mesa.pedidoId = resultado.data.id;
+    mesa.estado = 'ocupada';
+    mesa.abiertaEn = Date.now();
+    mesa.items = [];
+    mesa.observaciones = '';
+    DB.saveMesas();
+
+    _abrirModalPedido(mesa);
+  }
+
+  /* ── ABRIR MODAL DE PEDIDO CON LOS DATOS DE LA MESA ──────── */
+  function _abrirModalPedido(mesa) {
+    _asegurarModalPedido();
+
+    const tituloEl = document.getElementById('modalMesaTitulo');
+    const badgeEl = document.getElementById('modalEstadoBadge');
+    if (tituloEl) tituloEl.textContent = mesa.esVirtual 
+      ? `Mesas ${mesa.mesasFusionadas.join(', ')}` 
+      : `Mesa ${mesa.numero}`;
+    if (badgeEl) {
+      badgeEl.textContent = Mesas.labelEstado(mesa.estado);
+      badgeEl.className = `estado-badge ${mesa.estado}`;
+    }
+
+    EventBus.emit('mesa:abierta', mesa);
+    if (window.Carta && typeof Carta.render === 'function') Carta.render();
+    
+    const modal = document.getElementById('modalPedido');
+    if (modal) modal.style.display = 'flex';
+  }
+
+  /* ── ENTRY POINT: Evento mesa:seleccionada ──────────────── */
   async function abrirMesa(num) {
     if (_mesaAbriendo === num) return;
     _mesaAbriendo = num;
+
     try {
-      _asegurarModalPedido();
-      let mesa = DB.mesas.find(m => m.numero == num);
-      if (!mesa) { Logger.error(`[Pedido] Mesa ${num} no encontrada.`); return; }
-
-      if (mesa.estado === 'libre') {
-        mesa.abiertaEn = Date.now();
-        mesa.mozo = document.getElementById('mozoActivo')?.value || (DB.mozos[0]?.nombre || 'Mozo');
-        mesa.comensales = 2;
-        mesa.items = [];
-        mesa.observaciones = '';
-
-        // ── UNICO PUNTO DE CREACIÓN (CQRS) ────────────────
-        const comando = {
-          type: 'crearPedidoMesa',
-          datos: {
-            numeroMesa: num,
-            mozo: mesa.mozo,
-            comensales: mesa.comensales
-          }
-        };
-        const resultado = await CommandBus.ejecutar(comando);
-        if (resultado.exito && resultado.data) {
-          mesa.pedidoId = resultado.data.id;
-        } else {
-          Logger.error('[Pedido] El comando crearPedidoMesa falló:', resultado.error);
-          showToast('error', 'No se pudo abrir la mesa. Intente de nuevo.');
-          return;
-        }
-        DB.saveMesas();
+      const mesa = DB.mesas.find(m => m.numero == num);
+      if (!mesa) {
+        Logger.error(`[Pedido] Mesa ${num} no encontrada.`);
+        return;
       }
 
-      const tituloEl = document.getElementById('modalMesaTitulo');
-      const badgeEl = document.getElementById('modalEstadoBadge');
-      if (tituloEl) tituloEl.textContent = mesa.esVirtual ? `Mesas ${mesa.mesasFusionadas.join(', ')}` : `Mesa ${num}`;
-      if (badgeEl) { badgeEl.textContent = Mesas.labelEstado(mesa.estado); badgeEl.className = `estado-badge ${mesa.estado}`; }
-
-      EventBus.emit('mesa:abierta', mesa);
-      if (window.Carta && typeof Carta.render === 'function') Carta.render();
-      const modal = document.getElementById('modalPedido');
-      if (modal) modal.style.display = 'flex';
-    } finally { _mesaAbriendo = null; }
+      if (mesa.estado === 'libre') {
+        mesa.mozo = document.getElementById('mozoActivo')?.value 
+                    || (DB.mozos[0]?.nombre || 'Mozo');
+        _mostrarModalApertura(mesa);
+      } else {
+        _abrirModalPedido(mesa);
+      }
+    } finally {
+      _mesaAbriendo = null;
+    }
   }
 
+  /* ── CIERRE DEL MODAL DE PEDIDO ──────────────────────────── */
   function cerrar() {
     const modal = document.getElementById('modalPedido');
     if (modal) {
@@ -130,15 +225,22 @@ const Pedido = (() => {
 
     const mesa = Comanda.getMesaActiva();
     if (mesa && mesa.estado === 'libre' && (!mesa.items || mesa.items.length === 0)) {
-      if (mesa.esVirtual) { DB.liberarMesasFusionadas(mesa); }
-      else {
+      if (mesa.esVirtual) {
+        DB.liberarMesasFusionadas(mesa);
+      } else {
         const idx = DB.mesas.findIndex(m => m.numero === mesa.numero);
-        if (idx >= 0) { DB.mesas[idx] = mesaVacia(mesa.numero); DB.saveMesas(); EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: 'libre' }); Mesas.render(); }
+        if (idx >= 0) {
+          DB.mesas[idx] = mesaVacia(mesa.numero);
+          DB.saveMesas();
+          EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: 'libre' });
+          Mesas.render();
+        }
       }
     }
     EventBus.emit('mesa:cerrada');
   }
 
+  /* ── ENVÍO DE COMANDA ────────────────────────────────────── */
   async function enviarComanda() {
     const mesa = Comanda.getMesaActiva();
     if (!mesa) { showToast('warning', 'No hay mesa activa.'); return; }
@@ -218,6 +320,7 @@ const Pedido = (() => {
     return htmlActual;
   }
 
+  /* ── TRANSFERIR MESA ─────────────────────────────────────── */
   function transferirMesa(mesaOrigenNum, mesaDestinoNum) {
     if (!Auth.esAdmin()) { showToast('error', 'Solo administradores pueden transferir pedidos entre mesas'); return false; }
     const mesaOrigen = DB.getMesa(mesaOrigenNum), mesaDestino = DB.getMesa(mesaDestinoNum);
@@ -272,9 +375,19 @@ const Pedido = (() => {
   EventBus.on('mesa:seleccionada', abrirMesa);
 
   return {
-    abrirMesa, cerrar, enviarComanda, transferirMesa,
-    mostrarSelectorTransferencia, pedirCuenta, cerrarMesa,
-    _setCat, filtrarProductos, actualizarObsGeneral, _agregarItem
+    abrirMesa,
+    cerrar,
+    enviarComanda,
+    transferirMesa,
+    mostrarSelectorTransferencia,
+    pedirCuenta,
+    cerrarMesa,
+    _setCat,
+    filtrarProductos,
+    actualizarObsGeneral,
+    _agregarItem,
+    _confirmarApertura,
+    _cancelarApertura
   };
 })();
 
