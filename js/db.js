@@ -1,19 +1,16 @@
 /* ================================================================
-   PubPOS — MÓDULO: db.js (Orquestador v2.1 – sincronizar cierre)
+   PubPOS — MÓDULO: db.js (Orquestador v2.2 – usa window.DBSync)
    ================================================================
-   Cambios respecto a v2.0 (protección doble cierre):
-   • Ahora, al cerrar un pedido, se envía el pedido actualizado a
-     Google Sheets mediante syncGuardarPedido. Esto asegura que
-     el estado 'cerrada' se refleje en la hoja de cálculo y no
-     solo en localStorage.
-   • Si la sincronización falla, se encola para el siguiente
-     reintento.
-   • Se mantiene la protección contra doble cierre de stock.
+   Cambios:
+   - Ahora se utiliza window.DBSync para garantizar que el módulo
+     de sincronización esté disponible aunque el scope falle.
+   - Se mantienen las delegaciones y la sincronización del cierre
+     de pedidos agregada en v2.1.
    ================================================================ */
 
 var DB = (function() {
   const core = DBCore;
-  const sync = DBSync;
+  const sync = window.DBSync;  // <-- uso explícito de la variable global
   const inventario = DBInventario;
   const fusion = DBFusion;
 
@@ -61,12 +58,11 @@ var DB = (function() {
     EventBus.emit('app:error', 'No se pudieron cargar los datos iniciales.');
   };
 
-  // ── MÉTODOS DE PEDIDO (DELEGADOS AL PEDIDOMANAGER SI EXISTE) ──
+  // ── MÉTODOS DE PEDIDO (DELEGADOS) ─────────────────────
   combined.crearPedidoMesa = function(numeroMesa, mozo, comensales) {
     if (typeof PedidoManager !== 'undefined' && PedidoManager.crearPedidoMesa) {
       return PedidoManager.crearPedidoMesa(numeroMesa, mozo, comensales);
     }
-    // fallback al método original de core
     return this.crearPedido(numeroMesa, mozo, comensales);
   };
 
@@ -77,12 +73,6 @@ var DB = (function() {
     return false;
   };
 
-  /* ── CIERRE DE PEDIDO (MEJORADO) ──────────────────────────
-     Ahora, después de actualizar el pedido localmente, se
-     sincroniza el estado con Google Sheets.
-     Si la red falla, la actualización se encola automáticamente
-     para reintento (ver db-sync.js).
-  ─────────────────────────────────────────────────────────── */
   combined.cerrarPedido = async function(id, formaPago, total, descuento) {
     const pedido = this.pedidos.find(p => p.id === id);
     if (!pedido) {
@@ -90,13 +80,11 @@ var DB = (function() {
       return null;
     }
 
-    // ⛔ Protección contra doble cierre
     if (pedido.estado === 'cerrada' || pedido.estado === 'cerrado') {
-      console.warn(`[DB] El pedido ${id} ya está cerrado. Se omite descuento de stock.`);
+      console.warn(`[DB] El pedido ${id} ya está cerrado.`);
       return pedido;
     }
 
-    // ── Descontar stock localmente (recetas) ──────────────
     try {
       const items = JSON.parse(pedido.items || '[]');
       for (const item of items) {
@@ -106,7 +94,6 @@ var DB = (function() {
       console.warn("[DB] Error descontando stock local:", e);
     }
 
-    // ── Sincronizar descuento de stock con Sheets ─────────
     try {
       const items = JSON.parse(pedido.items || '[]');
       await fetch(this.urlSheets, {
@@ -125,14 +112,12 @@ var DB = (function() {
       });
     }
 
-    // ── Actualizar estado del pedido ──────────────────────
     const pedidoActualizado = this.actualizarPedido(id, {
       estado: 'cerrada',
       total,
       updated_at: new Date().toISOString()
     });
 
-    // ── Sincronizar estado del pedido con Sheets ─────────
     if (pedidoActualizado) {
       try {
         await this.syncGuardarPedido(pedidoActualizado);
@@ -146,12 +131,11 @@ var DB = (function() {
     return pedidoActualizado;
   };
 
-  // ── MÉTODOS DE DELIVERY (DELEGADOS AL PEDIDOMANAGER) ──────
+  // ── MÉTODOS DE DELIVERY ────────────────────────────────
   combined.crearPedidoDelivery = function(datos) {
     if (typeof PedidoManager !== 'undefined' && PedidoManager.crearPedidoDelivery) {
       return PedidoManager.crearPedidoDelivery(datos);
     }
-    // fallback
     const nuevo = this._normalizarPedidoDelivery({
       ...datos,
       id: 'deliv_' + Date.now(),
