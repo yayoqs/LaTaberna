@@ -1,11 +1,6 @@
 /* ================================================================
-   PubPOS — REPOSITORIO: pedido-repository.js (v1.2 – creación unificada)
-   ================================================================
-   El repositorio ahora es el único responsable de crear el pedido
-   (usando el agregado para validar reglas) y de sincronizarlo con
-   Sheets. Si la sincronización falla, muestra un toast al usuario.
+   PubPOS — REPOSITORIO: pedido-repository.js (v1.3 – debug)
    ================================================================ */
-
 const PedidoRepository = {
   async crearPedidoMesa(datos) { throw new Error('No implementado'); },
   async obtenerPorId(id)   { throw new Error('No implementado'); },
@@ -45,7 +40,7 @@ const PedidoRepositoryLocal = (() => {
     );
     if (!pedidoLocal) throw new Error('No se pudo crear el pedido localmente');
 
-    // 3. Normalizar objeto para Sheets (usando el mismo id generado por DB.crearPedido)
+    // 3. Normalizar objeto para Sheets
     const pedidoParaSync = {
       id:          pedidoLocal.id,
       mesa:        pedidoLocal.mesa,
@@ -60,6 +55,9 @@ const PedidoRepositoryLocal = (() => {
       updated_at:  pedidoLocal.created_at
     };
 
+    // 🔍 DEBUG: mostrar el objeto que se enviará a Sheets
+    console.log('🛰️ [PedidoRepo] Objeto enviado a Sheets:', JSON.stringify(pedidoParaSync, null, 2));
+
     // 4. Sincronizar con Google Sheets
     if (typeof DB.syncGuardarPedido === 'function') {
       try {
@@ -67,11 +65,11 @@ const PedidoRepositoryLocal = (() => {
         Logger.info('[PedidoRepo] Pedido sincronizado con Sheets.');
       } catch (e) {
         Logger.warn('[PedidoRepo] Error al sincronizar con Sheets. Encolado.', e);
-        showToast('warning', 'Sin conexión. El pedido se guardó localmente y se enviará cuando vuelva la conexión.');
+        showToast('warning', 'Sin conexión. El pedido se guardó localmente.');
       }
     } else {
-      Logger.warn('[PedidoRepo] DB.syncGuardarPedido no disponible. El pedido solo quedó en localStorage.');
-      showToast('warning', 'Pedido guardado solo localmente (falta módulo de sincronización).');
+      Logger.warn('[PedidoRepo] DB.syncGuardarPedido no disponible.');
+      showToast('warning', 'Falta módulo de sincronización.');
     }
 
     return pedidoLocal;
