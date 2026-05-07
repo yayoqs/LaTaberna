@@ -1,14 +1,11 @@
 /* ================================================================
-   PubPOS — MÓDULO: kds.js (v3.2 – notificación robusta a Reparto)
+   PubPOS — MÓDULO: kds.js (v4.0 – reactivo al Store)
    ================================================================
-   Cambios respecto a v3.1:
-   • Al marcar una comanda como "lista", si pertenece a un delivery
-     ahora se emite el evento 'delivery:listo' con el deliveryId y
-     el estado 'listo', para que el módulo Reparto pueda actualizar
-     automáticamente la tabla.
-   • Se añade un comentario pedagógico explicando la integración.
-   • El resto del código permanece igual. La actualización del estado
-     del delivery se implementa en reparto.js (siguiente archivo).
+   Cambios:
+   • Obtiene las comandas desde Store.getState().comandas.
+   • Se suscribe al Store para re-renderizar cuando cambian las comandas.
+   • _setEstado despacha COMANDA_ACTUALIZADA para que el Store actualice
+     la comanda y persista. La UI se refresca automáticamente.
    ================================================================ */
 const KDS = (() => {
   const MINUTOS_URGENTE = 15;
@@ -36,6 +33,7 @@ const KDS = (() => {
     document.body.insertBefore(main, referencia);
   }
 
+  /* ── REFRESCAR VISTA ───────────────────────────────────── */
   function refresh() {
     _asegurarVista();
     const cont = $id('cocinaKDS');
@@ -44,29 +42,30 @@ const KDS = (() => {
     const ahora = Date.now();
     const rol = Auth.getRol();
 
-    let comandasFiltradas = DB.comandas.filter(c => {
+    // Obtener comandas del Store
+    let comandas = Store.getState().comandas || [];
+
+    // Filtrar las que ya expiraron (listas hace más de MINUTOS_OCULTAR_LISTA)
+    comandas = comandas.filter(c => {
       if (c.estado === 'lista') {
         return (ahora - c.ts) < MINUTOS_OCULTAR_LISTA * 60 * 1000;
       }
       return true;
     });
 
+    // Filtrar por rol
     if (rol === 'cocina') {
-      comandasFiltradas = comandasFiltradas.filter(c => 
-        c.destino === 'cocina' || c.destino === 'ambos'
-      );
+      comandas = comandas.filter(c => c.destino === 'cocina' || c.destino === 'ambos');
     } else if (rol === 'barra') {
-      comandasFiltradas = comandasFiltradas.filter(c => 
-        c.destino === 'barra' || c.destino === 'ambos'
-      );
+      comandas = comandas.filter(c => c.destino === 'barra' || c.destino === 'ambos');
     }
 
-    if (!comandasFiltradas.length) {
+    if (!comandas.length) {
       cont.innerHTML = `<div class="kds-empty"><i class="fas fa-check-circle"></i><p class="kds-empty-title">Todo en orden</p><p>No hay comandas pendientes</p></div>`;
       return;
     }
 
-    cont.innerHTML = comandasFiltradas.map(_htmlKdsCard).join('');
+    cont.innerHTML = comandas.map(_htmlKdsCard).join('');
   }
 
   function _htmlKdsCard(c) {
@@ -75,7 +74,6 @@ const KDS = (() => {
     const tiempoTxt = minutos === 0 ? 'Ahora' : `Hace ${minutos} min`;
     const destLabel = { cocina: 'Cocina', barra: 'Barra', ambos: 'Cocina + Barra' }[c.destino] || c.destino;
     const destCss = c.destino === 'barra' ? 'barra' : 'cocina';
-    // Mostrar etiqueta si es delivery
     const esDelivery = !!c.deliveryId;
     const etiquetaDelivery = esDelivery ? `<span class="kds-destino-tag" style="background:rgba(34,197,94,.2);color:var(--color-success);">Delivery</span>` : '';
 
@@ -126,19 +124,21 @@ const KDS = (() => {
       </article>`;
   }
 
-  /* ── CAMBIAR ESTADO (con notificación a Reparto) ────────────
-     Al marcar una comanda como "lista":
-     - Si es de mesa, se actualiza el estado de la mesa a "esperando".
-     - Si es de delivery, se emite el evento 'delivery:listo' con los
-       datos necesarios para que Reparto actualice el estado del pedido.
-  ─────────────────────────────────────────────────────────── */
+  /* ── CAMBIAR ESTADO (despacha al Store) ────────────────── */
   function _setEstado(id, estado) {
-    const c = DB.comandas.find(x => x.id === id);
+    // Buscar la comanda actual en el Store
+    const comandas = Store.getState().comandas || [];
+    const c = comandas.find(x => x.id === id);
     if (!c) return;
-    c.estado = estado;
 
+    // Despachar acción para que el Store (y DB) actualicen el estado
+    Store.dispatch({
+      type: 'COMANDA_ACTUALIZADA',
+      payload: { id, cambios: { estado } }
+    });
+
+    // Efectos secundarios: actualizar mesa y notificar a reparto
     if (estado === 'lista') {
-      // Si es una comanda de mesa normal
       const mesa = DB.getMesa(c.mesa);
       if (mesa && mesa.estado === 'ocupada') {
         mesa.estado = 'esperando';
@@ -147,33 +147,45 @@ const KDS = (() => {
       }
       EventBus.emit('comanda:lista', { id, mesa: c.mesa });
 
-      // ═══════════════════════════════════════════════════════
-      // ✨ INTEGRACIÓN CON REPARTO
-      // ═══════════════════════════════════════════════════════
-      // Si la comanda pertenece a un delivery, emitimos un evento
-      // específico para que el módulo Reparto reaccione automáticamente
-      // (ver reparto.js para el manejo del evento).
       if (c.deliveryId) {
-        EventBus.emit('delivery:listo', { 
-          deliveryId: c.deliveryId, 
+        EventBus.emit('delivery:listo', {
+          deliveryId: c.deliveryId,
           comandaId: id,
-          estado: 'listo'    // ← el nuevo estado que refleja "listo para recoger"
+          estado: 'listo'
         });
         console.log(`[KDS] Delivery listo: ${c.deliveryId}`);
       }
     }
 
-    DB.saveComandas();
-    refresh();
-    showToast('success', `<i class="fas fa-check"></i> Mesa ${c.mesa} → ${estado === 'lista' ? 'LISTA ✓' : 'En proceso'}`);
+    // Persistir en DB (la acción del Store ya debería hacerlo, 
+    // pero mantenemos la persistencia explícita por seguridad)
+    const idx = DB.comandas.findIndex(x => x.id === id);
+    if (idx >= 0) {
+      DB.comandas[idx].estado = estado;
+      DB.saveComandas();
+    }
+
+    showToast('success', `<i class="fas fa-check"></i> ${c.mesa} → ${estado === 'lista' ? 'LISTA ✓' : 'En proceso'}`);
   }
 
-  function _initEventListeners() {
-    EventBus.on('comandas:guardadas', refresh);
-    EventBus.on('comanda:enviada', refresh);
-    EventBus.on('db:inicializada', refresh);
+  /* ── SUSCRIPCIÓN AL STORE ──────────────────────────────── */
+  function _initListeners() {
+    Store.subscribe((state, action) => {
+      if (action.type.startsWith('COMANDA')) {
+        refresh();
+      }
+    });
+
+    // Render inicial cuando la vista se active o la BD esté lista
+    EventBus.on('db:inicializada', () => {
+      setTimeout(refresh, 100);
+    });
+    EventBus.on('vista:cambiada', (vista) => {
+      if (vista === 'cocina') refresh();
+    });
   }
-  _initEventListeners();
+
+  _initListeners();
 
   return { refresh, _setEstado };
 })();

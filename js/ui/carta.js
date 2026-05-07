@@ -1,10 +1,9 @@
 /* ================================================================
-   PubPOS — MÓDULO: carta.js
-   Propósito: Gestión de la interfaz de carta de productos (búsqueda,
-              filtros por categoría y renderizado de tarjetas).
-   Dependencias: DB, EventBus, utils.js
+   PubPOS — MÓDULO: carta.js (v2 – reactivo al Store)
+   Propósito: Carta de productos dentro del modal de pedido.
+              Ahora obtiene los productos del Store y se re-renderiza
+              automáticamente cuando cambian.
    ================================================================ */
-
 const Carta = (() => {
   let _categoriaActiva = 'Todos';
   let _terminoBusqueda = '';
@@ -18,8 +17,9 @@ const Carta = (() => {
     const container = $id('categoriasTabs');
     if (!container) return;
 
+    const productos = Store.getState().productos || [];
     const categorias = ['Todos', ...new Set(
-      DB.productos.filter(p => p.activo !== false).map(p => p.categoria)
+      productos.filter(p => p.activo !== false).map(p => p.categoria)
     )].filter(Boolean);
 
     container.innerHTML = categorias
@@ -43,7 +43,7 @@ const Carta = (() => {
     const cont = $id('cartaProductos');
     if (!cont) return;
 
-    let productosFiltrados = DB.productos.filter(p => p.activo !== false);
+    let productosFiltrados = (Store.getState().productos || []).filter(p => p.activo !== false);
 
     if (_categoriaActiva !== 'Todos') {
       productosFiltrados = productosFiltrados.filter(p => p.categoria === _categoriaActiva);
@@ -83,13 +83,27 @@ const Carta = (() => {
   }
 
   function seleccionarProducto(prodId) {
-    const producto = DB.productos.find(p => p.id === prodId);
+    const producto = (Store.getState().productos || []).find(p => p.id === prodId);
     if (producto) {
       EventBus.emit('producto:seleccionado', producto);
     }
   }
 
-  EventBus.on('productos:cargados', render);
+  /* ── SUSCRIPCIÓN AL STORE ──────────────────────────────── */
+  function _initListeners() {
+    Store.subscribe((state, action) => {
+      if (action.type.startsWith('PRODUCTO')) {
+        render();
+      }
+    });
+
+    // Render inicial cuando la vista de pedido esté activa
+    EventBus.on('vista:cambiada', (vista) => {
+      if (vista === 'mesas') render(); // se usa dentro del modal de pedido
+    });
+  }
+
+  _initListeners();
 
   return {
     render,

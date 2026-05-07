@@ -1,8 +1,10 @@
 /* ================================================================
-   PubPOS — MÓDULO: despensa.js (v10 – DDD para inventario)
-   Propósito: Gestión de inventario (ingredientes, movimientos, alertas).
-              Ahora utiliza InventarioService en lugar de DB directa,
-              obteniendo resultados validados y manejo de errores uniforme.
+   PubPOS — MÓDULO: despensa.js (v11 – reactivo al Store)
+   ================================================================
+   Cambios:
+   • Obtiene ingredientes y movimientos del Store.
+   • Se suscribe al Store para re-renderizar automáticamente.
+   • Eliminadas las suscripciones manuales a EventBus.
    ================================================================ */
 
 const Despensa = (() => {
@@ -44,7 +46,6 @@ const Despensa = (() => {
         </div>
       </div>
 
-      <!-- RESUMEN DE INVENTARIO -->
       <div class="inventario-resumen" id="inventarioResumen"></div>
 
       <div class="despensa-grid">
@@ -95,7 +96,7 @@ const Despensa = (() => {
     const cont = $id('inventarioResumen');
     if (!cont) return;
 
-    const ingredientes = DB.ingredientes || [];
+    const ingredientes = Store.getState().ingredientes || [];
     const totalItems = ingredientes.length;
     const bajoMin = ingredientes.filter(i => i.stock <= i.stock_minimo).length;
     const valorTotal = ingredientes.reduce((sum, i) => sum + (i.stock * (i.valor_unitario || 0)), 0);
@@ -128,7 +129,7 @@ const Despensa = (() => {
     const tbody = document.getElementById('ingredientesBody');
     if (!tbody) return;
 
-    let ingredientes = DB.ingredientes || [];
+    let ingredientes = Store.getState().ingredientes || [];
     const rol = Auth.getRol();
 
     if (rol === 'cocina') {
@@ -220,7 +221,7 @@ const Despensa = (() => {
   function _renderMovimientos() {
     const cont = document.getElementById('movimientosList');
     if (!cont) return;
-    const movs = DB.movimientos || [];
+    const movs = Store.getState().movimientos || DB.movimientos || [];
     const recientes = [...movs].reverse().slice(0, 10);
     if (!recientes.length) {
       cont.innerHTML = `<p style="color:var(--color-text-muted);">Sin movimientos</p>`;
@@ -245,7 +246,8 @@ const Despensa = (() => {
   function _renderAlertasStock() {
     const cont = document.getElementById('alertasStockList');
     if (!cont) return;
-    const criticos = DB.ingredientes.filter(i => i.stock <= i.stock_minimo);
+    const ingredientes = Store.getState().ingredientes || [];
+    const criticos = ingredientes.filter(i => i.stock <= i.stock_minimo);
     if (!criticos.length) {
       cont.innerHTML = `<p style="color:var(--color-text-muted);"><i class="fas fa-check-circle"></i> Todo en orden</p>`;
       return;
@@ -301,7 +303,6 @@ const Despensa = (() => {
     document.getElementById('modalIngrediente').style.display = 'none';
   }
 
-  // ── GUARDAR (usa DDD) ──────────────────────────────────
   async function guardarIngrediente() {
     const id = document.getElementById('ingId').value;
     const nombre = document.getElementById('ingNombre').value.trim();
@@ -318,12 +319,11 @@ const Despensa = (() => {
       valor_unitario: parseFloat(document.getElementById('ingValorUnitario').value) || 0
     };
 
-    // ── 1. Intentar InventarioService (DDD) ──
     if (typeof InventarioService !== 'undefined' && InventarioService.guardarIngrediente) {
       const resultado = await InventarioService.guardarIngrediente(datos);
       if (resultado.exito) {
         cerrarModalIngrediente();
-        render();
+        // El Store se actualizará automáticamente vía DB.saveIngredientes()
         showToast('success', 'Ingrediente guardado');
         return;
       } else {
@@ -332,11 +332,10 @@ const Despensa = (() => {
       }
     }
 
-    // ── 2. Fallback al método antiguo ──
     try {
       await DB.syncGuardarIngrediente(datos);
       cerrarModalIngrediente();
-      render();
+      // El Store se actualizará automáticamente
       showToast('success', 'Ingrediente guardado');
     } catch (e) {
       showToast('error', 'Error al guardar ingrediente');
@@ -348,7 +347,6 @@ const Despensa = (() => {
     if (ing) mostrarModalIngrediente(ing);
   }
 
-  // ── AJUSTE RÁPIDO (usa DDD) ─────────────────────────────
   async function ajusteRapido(ingredienteId = null) {
     if (!ingredienteId) {
       const nombre = prompt('Ingrediente a ajustar (nombre exacto):');
@@ -366,11 +364,10 @@ const Despensa = (() => {
     if (isNaN(cantidad)) { showToast('error', 'Cantidad inválida'); return; }
     const motivo = prompt('Motivo (opcional):') || 'Ajuste rápido';
 
-    // ── 1. Intentar InventarioService (DDD) ──
     if (typeof InventarioService !== 'undefined' && InventarioService.ajustarStock) {
       const resultado = await InventarioService.ajustarStock(ingredienteId, cantidad, motivo);
       if (resultado.exito) {
-        render();
+        // El Store se actualizará automáticamente
         showToast('success', `Stock de ${ing.nombre} actualizado`);
         return;
       } else {
@@ -379,9 +376,8 @@ const Despensa = (() => {
       }
     }
 
-    // ── 2. Fallback ──
     DB.ajustarStock(ingredienteId, cantidad, motivo);
-    render();
+    // El Store se actualizará automáticamente
     showToast('success', `Stock de ${ing.nombre} actualizado`);
   }
 
@@ -400,15 +396,24 @@ const Despensa = (() => {
     URL.revokeObjectURL(url);
   }
 
-  function _initEventListeners() {
-    EventBus.on('db:inicializada', render);
-    EventBus.on('ingredientes:actualizados', render);
-    EventBus.on('inventario:actualizado', render);
-    EventBus.on('inventario:stock_bajo', (data) => {
-      showToast('warning', `Stock bajo: ${data.ingrediente} (${data.stock} ${data.unidad})`);
+  /* ── SUSCRIPCIÓN AL STORE ──────────────────────────────── */
+  function _initListeners() {
+    Store.subscribe((state, action) => {
+      // Re-renderizar cuando cambien ingredientes o movimientos
+      if (action.type.startsWith('INGREDIENTE') || action.type.startsWith('INGREDIENTES') || action.type.startsWith('MOVIMIENTO')) {
+        render();
+      }
+    });
+
+    EventBus.on('db:inicializada', () => {
+      setTimeout(render, 100);
+    });
+    EventBus.on('vista:cambiada', (vista) => {
+      if (vista === 'despensa') render();
     });
   }
-  _initEventListeners();
+
+  _initListeners();
 
   return {
     render,

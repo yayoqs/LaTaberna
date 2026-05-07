@@ -1,8 +1,10 @@
 /* ================================================================
-   PubPOS — MÓDULO: reparto.js (v3.8.1 – crea comanda en KDS)
-   Propósito: Vista de reparto con gestión de pedidos de delivery,
-              creación de comandas para el monitor de cocina (KDS)
-              y comunicación con DeliveryService cuando está disponible.
+   PubPOS — MÓDULO: reparto.js (v4.0 – reactivo al Store)
+   ================================================================
+   Cambios:
+   • Obtiene pedidosDelivery del Store.
+   • Se suscribe al Store y re-renderiza automáticamente.
+   • Eliminadas las suscripciones manuales a EventBus para esta vista.
    ================================================================ */
 const Reparto = (() => {
   let _deliveryFlags = {};
@@ -35,7 +37,7 @@ const Reparto = (() => {
   function render() {
     _asegurarVista();
     const tbody = $id('repartoBody'); if (!tbody) return;
-    const pedidos = DB.pedidosDelivery || [];
+    const pedidos = Store.getState().pedidosDelivery || [];
     if (!pedidos.length) {
       tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--color-text-muted);">No hay pedidos de delivery.</td></tr>`;
       return;
@@ -146,7 +148,9 @@ const Reparto = (() => {
     $id('repBusquedaProducto').value=''; _productoSeleccionado=null; $id('repCantidad').value=1; $id('repBusquedaProducto').focus();
     _renderItemsTemporales();
   }
+
   function _quitarItemTemporal(idx) { _itemsTemporales.splice(idx,1); _renderItemsTemporales(); }
+
   function _renderItemsTemporales() {
     const container=$id('repItemsLista'); if(!container) return;
     if(!_itemsTemporales.length) { container.innerHTML='<p style="color:var(--color-text-muted);font-size:12px;">Sin productos agregados.</p>'; $id('repTotal').value='0'; return; }
@@ -184,7 +188,8 @@ const Reparto = (() => {
     }
 
     if(nuevo && nuevo.id) {
-      cerrarModalNuevo(); render();
+      cerrarModalNuevo();
+      // El Store se actualizará automáticamente vía DB.savePedidosDelivery()
       showToast('success', `Pedido ${nuevo.id.slice(-6)} creado`);
     } else {
       showToast('error', 'No se pudo crear el pedido. Intenta de nuevo.');
@@ -196,7 +201,8 @@ const Reparto = (() => {
       const r = await DeliveryService.enviarACocina(deliveryId);
       if(r.exito) {
         _crearComandaParaDelivery(deliveryId);
-        render(); showToast('success','Enviado a Cocina'); return;
+        // El Store se actualizará automáticamente
+        showToast('success','Enviado a Cocina'); return;
       }
       else showToast('error',r.error);
       return;
@@ -205,7 +211,7 @@ const Reparto = (() => {
     if(!ped) { showToast('error','No encontrado'); return; }
     DB.actualizarPedidoDelivery(deliveryId,{estado:'en_preparacion'});
     _crearComandaParaDelivery(deliveryId);
-    render(); showToast('success','Enviado a Cocina');
+    showToast('success','Enviado a Cocina');
   }
 
   function _crearComandaParaDelivery(deliveryId) {
@@ -240,6 +246,7 @@ const Reparto = (() => {
     if (typeof DB !== 'undefined' && DB.comandas) {
       DB.comandas.push(comanda);
       DB.saveComandas();
+      // El Store se actualizará vía DB.saveComandas()
     }
     EventBus.emit('comanda:enviada', comanda);
     Logger.debug(`[Reparto] Comanda de delivery creada: ${comanda.id}`);
@@ -250,7 +257,7 @@ const Reparto = (() => {
       const r = await DeliveryService.despachar(deliveryId);
       if(r.exito) {
         delete _deliveryFlags[deliveryId];
-        render();
+        DB.actualizarPedidoDelivery(deliveryId,{estado:'en_camino'}); // actualiza Store vía DB
         showToast('success','En camino');
         return;
       }
@@ -259,43 +266,58 @@ const Reparto = (() => {
     }
     DB.actualizarPedidoDelivery(deliveryId,{estado:'en_camino'});
     delete _deliveryFlags[deliveryId];
-    render(); showToast('success','En camino');
+    showToast('success','En camino');
   }
 
   async function confirmarEntrega(deliveryId) {
     if(typeof DeliveryService!=='undefined' && DeliveryService.confirmarEntrega) {
       const r = await DeliveryService.confirmarEntrega(deliveryId);
-      if(r.exito) { render(); showToast('success','Entregado'); return; }
+      if(r.exito) {
+        DB.actualizarPedidoDelivery(deliveryId,{estado:'entregado'});
+        showToast('success','Entregado'); return;
+      }
       else showToast('error',r.error);
       return;
     }
     DB.actualizarPedidoDelivery(deliveryId,{estado:'entregado'});
-    render(); showToast('success','Entregado');
+    showToast('success','Entregado');
   }
 
   function eliminarPedido(id) {
     if(!confirm('¿Eliminar este pedido?')) return;
     if(typeof DeliveryService!=='undefined' && DeliveryService.cancelar) {
-      DeliveryService.cancelar(id).then(r=>{ if(r.exito){ render(); showToast('warning','Cancelado'); } else showToast('error',r.error); });
+      DeliveryService.cancelar(id).then(r=>{ if(r.exito){ DB.eliminarPedidoDelivery(id); showToast('warning','Cancelado'); } else showToast('error',r.error); });
       return;
     }
     DB.eliminarPedidoDelivery(id);
-    render(); showToast('warning','Eliminado');
+    showToast('warning','Eliminado');
   }
 
   function _onDeliveryListo(data) {
     if (!data || !data.deliveryId) return;
     _deliveryFlags[data.deliveryId] = { listoParaRecoger: true };
-    render();
+    // El render se disparará automáticamente por el Store cuando cambie el estado
     Logger.info(`[Reparto] Delivery ${data.deliveryId} marcado como listo.`);
   }
 
-  function _initEventListeners() {
-    EventBus.on('db:inicializada', render);
-    EventBus.on('pedidosDelivery:guardados', render);
+  /* ── SUSCRIPCIÓN AL STORE ──────────────────────────────── */
+  function _initListeners() {
+    Store.subscribe((state, action) => {
+      if (action.type.startsWith('DELIVERY') || action.type.startsWith('PEDIDOSDELIVERY')) {
+        render();
+      }
+    });
+
+    EventBus.on('db:inicializada', () => {
+      setTimeout(render, 100);
+    });
+    EventBus.on('vista:cambiada', (vista) => {
+      if (vista === 'reparto') render();
+    });
     EventBus.on('delivery:listo', _onDeliveryListo);
   }
-  _initEventListeners();
+
+  _initListeners();
 
   return {
     render,

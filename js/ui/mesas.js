@@ -1,7 +1,9 @@
 /* ================================================================
-   PubPOS — MÓDULO: mesas.js (v5 – vista autogenerada)
+   PubPOS — MÓDULO: mesas.js (v6 – reactivo al Store)
    Propósito: Mapa de mesas con zonas dinámicas y colores. Ahora
-              genera #view-mesas para eliminar HTML estático.
+              obtiene los datos del Store y se suscribe a cambios
+              en la porción 'mesas' para re-renderizar automáticamente.
+              También despacha acciones al Store para modificaciones.
    ================================================================ */
 const Mesas = (() => {
 
@@ -33,7 +35,7 @@ const Mesas = (() => {
 
     const main = document.createElement('main');
     main.id = 'view-mesas';
-    main.className = 'view active'; // será la vista por defecto
+    main.className = 'view active';
     main.innerHTML = `
       <div class="view-toolbar">
         <h2><i class="fas fa-grip"></i> Salón — Mapa de Mesas</h2>
@@ -69,12 +71,13 @@ const Mesas = (() => {
     _renderGrid();
   }
 
-  /* ── BOTONES DE ZONA (DINÁMICOS) ─────────────────────────── */
+  /* ── BOTONES DE ZONA ─────────────────────────────────────── */
   function _renderZoneButtons() {
     const container = document.getElementById('zonaButtonsContainer');
     if (!container) return;
 
-    const zonas = DB.config.zonas || [];
+    // Obtenemos zonas desde el Store (o DB.config si el Store no está disponible)
+    const zonas = (Store.getState().config && Store.getState().config.zonas) || DB.config.zonas || [];
     let html = `
       <button class="nav-btn zona-btn ${_zonaActiva === 'todas' ? 'active' : ''}" 
               data-zona="todas" onclick="Mesas.setZona('todas')">
@@ -94,7 +97,7 @@ const Mesas = (() => {
 
   /* ── COLOR DE ZONA ───────────────────────────────────────── */
   function _getZonaColor(zonaNombre) {
-    const zonas = DB.config.zonas || [];
+    const zonas = (Store.getState().config && Store.getState().config.zonas) || DB.config.zonas || [];
     const idx = zonas.findIndex(z => z.nombre === zonaNombre);
     return ZONA_COLORS[idx >= 0 ? idx % ZONA_COLORS.length : 0];
   }
@@ -111,12 +114,15 @@ const Mesas = (() => {
     const grid = $id('mesasGrid');
     if (!grid) return;
 
-    if (typeof DB === 'undefined' || !DB.mesas) {
+    // Obtenemos las mesas del Store
+    const mesas = Store.getState().mesas;
+    if (!mesas || mesas.length === 0) {
+      // Si el Store aún no tiene datos, esperamos un momento y reintentamos
       setTimeout(_renderGrid, 200);
       return;
     }
 
-    let mesasVisibles = DB.mesas.filter(m => m.estado !== 'fusionada');
+    let mesasVisibles = mesas.filter(m => m.estado !== 'fusionada');
     if (_zonaActiva !== 'todas') {
       mesasVisibles = mesasVisibles.filter(m => m.zona === _zonaActiva);
     }
@@ -213,6 +219,7 @@ const Mesas = (() => {
     const mozo = $id('mozoActivo')?.value || 'Mozo';
     const mesaVirtual = DB.fusionarMesas(numeros, mozo);
     if (mesaVirtual) {
+      // DB.fusionarMesas ya llama a DB.saveMesas() que despacha al Store
       showToast('success', `Mesas ${numeros.join(', ')} fusionadas.`);
       toggleModoFusion();
       EventBus.emit('mesa:seleccionada', mesaVirtual.numero);
@@ -225,12 +232,18 @@ const Mesas = (() => {
   function agregarMesa() {
     if (typeof DB === 'undefined') return;
     const zona = _zonaActiva !== 'todas' ? _zonaActiva : (DB.config.zonas[0]?.nombre || 'salon');
-    const maxNum = DB.mesas.reduce((max, m) => Math.max(max, m.numero || 0), 0);
+    const mesas = Store.getState().mesas;
+    const maxNum = mesas.reduce((max, m) => Math.max(max, m.numero || 0), 0);
     const nuevoNum = maxNum + 1;
 
-    DB.mesas.push({ ...mesaVacia(nuevoNum, zona) });
+    const nuevaMesa = { ...mesaVacia(nuevoNum, zona) };
+
+    // Despachar acción al Store
+    Store.dispatch({ type: 'MESA_AGREGAR', payload: nuevaMesa });
+
+    // Persistir en DB (esto también actualizará el Store internamente)
+    DB.mesas.push(nuevaMesa);
     DB.saveMesas();
-    _renderGrid();
     showToast('success', `Mesa ${nuevoNum} agregada (${zona})`);
   }
 
@@ -238,16 +251,28 @@ const Mesas = (() => {
     return LABELS[estado] || estado;
   }
 
-  /* ── SUSCRIPCIÓN A EVENTOS ───────────────────────────────── */
-  function _initEventListeners() {
-    EventBus.on('mesas:guardadas', render);
-    EventBus.on('db:inicializada', render);
-    EventBus.on('config:guardada', render);
-    EventBus.on('mesa:actualizada', render);
-    EventBus.on('comanda:lista', () => render());
+  /* ── SUSCRIPCIÓN AL STORE ───────────────────────────────── */
+  function _initListeners() {
+    // Suscribirse a cambios en el Store
+    Store.subscribe((state, action) => {
+      // Solo re-renderizar si la acción afecta a las mesas
+      if (action.type.startsWith('MESA') || action.type.startsWith('MESAS')) {
+        _renderGrid();
+      }
+      // Si cambió la configuración (zonas), refrescar botones
+      if (action.type === 'CONFIG_INICIALIZAR') {
+        _renderZoneButtons();
+      }
+    });
+
+    // Render inicial cuando la BD esté lista
+    EventBus.on('db:inicializada', () => {
+      // Le damos un pequeño margen para que el Store se haya poblado
+      setTimeout(render, 100);
+    });
   }
 
-  _initEventListeners();
+  _initListeners();
 
   return {
     render,
@@ -258,7 +283,6 @@ const Mesas = (() => {
     fusionarMesasSeleccionadas,
     setZona
   };
-
 })();
 
 window.Mesas = Mesas;

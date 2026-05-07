@@ -1,7 +1,8 @@
 /* ================================================================
-   PubPOS — MÓDULO: recetas.js (v4 – autónomo con modal de receta)
-   Propósito: Vista de recetario. Ahora incluye el modal de creación
-              y edición de recetas, sin depender de Despensa.
+   PubPOS — MÓDULO: recetas.js (v5 – reactivo al Store)
+   Propósito: Vista de recetario. Ahora obtiene productos y recetas
+              del Store y se re-renderiza automáticamente al cambiar
+              esos datos. Incluye modal de creación/edición de recetas.
    ================================================================ */
 
 const Recetas = (() => {
@@ -38,8 +39,9 @@ const Recetas = (() => {
     const grid = $id('recetasGrid');
     if (!grid) return;
 
+    const state = Store.getState();
     const rol = Auth.getRol();
-    let productos = DB.productos.filter(p => p.activo !== false);
+    let productos = (state.productos || []).filter(p => p.activo !== false);
 
     // Filtrar por destino según el rol
     if (rol === 'cocina') {
@@ -49,8 +51,9 @@ const Recetas = (() => {
     }
 
     // Solo productos con receta
+    const recetas = state.recetas || [];
     productos = productos.filter(prod => {
-      const receta = DB.recetas.find(r => r.productoId == prod.id);
+      const receta = recetas.find(r => r.productoId == prod.id);
       return receta && receta.ingredientes && receta.ingredientes.length > 0;
     });
 
@@ -66,10 +69,10 @@ const Recetas = (() => {
     }
 
     // Orden alfabético
-    productos.sort((a,b) => a.nombre.localeCompare(b.nombre));
+    productos.sort((a, b) => a.nombre.localeCompare(b.nombre));
 
     grid.innerHTML = productos.map(prod => {
-      const receta = DB.recetas.find(r => r.productoId == prod.id);
+      const receta = recetas.find(r => r.productoId == prod.id);
       const numIng = receta ? receta.ingredientes.length : 0;
       const inicial = prod.nombre.charAt(0).toUpperCase();
       const color = _getColorFromName(prod.nombre);
@@ -115,16 +118,16 @@ const Recetas = (() => {
 
   /* ── MOSTRAR DETALLE DE RECETA (MODAL) ───────────────────── */
   function mostrarDetalle(prodId) {
-    const producto = DB.productos.find(p => p.id == prodId);
+    const state = Store.getState();
+    const producto = (state.productos || []).find(p => p.id == prodId);
     if (!producto) return;
 
-    const receta = DB.recetas.find(r => r.productoId == prodId);
+    const receta = (state.recetas || []).find(r => r.productoId == prodId);
     if (!receta) {
       showToast('error', 'No hay receta asignada a este producto');
       return;
     }
 
-    // Construir modal si no existe
     let modal = $id('modalRecetaDetalle');
     if (!modal) {
       modal = document.createElement('div');
@@ -150,13 +153,12 @@ const Recetas = (() => {
       document.body.appendChild(modal);
     }
 
-    // Título
     $id('detalleTitulo').innerHTML = `<i class="fas fa-utensils"></i> ${producto.nombre}`;
 
     // Ingredientes
     let htmlIng = '<h4><i class="fas fa-list-ul"></i> Ingredientes</h4><ul class="receta-ingredientes-lista">';
     receta.ingredientes.forEach(ing => {
-      const ingData = DB.ingredientes.find(i => i.id == ing.ingredienteId);
+      const ingData = (state.ingredientes || []).find(i => i.id == ing.ingredienteId);
       if (ingData) {
         const suficiente = ingData.stock >= ing.cantidad;
         const claseStock = suficiente ? 'stock-suficiente' : 'stock-insuficiente';
@@ -203,7 +205,7 @@ const Recetas = (() => {
     Recetas.mostrarModalReceta(prodId);
   }
 
-  /* ── MODAL DE CREACIÓN/EDICIÓN DE RECETA (antes estaba en Despensa) ── */
+  /* ── MODAL DE CREACIÓN/EDICIÓN DE RECETA ──────────────────── */
   function _asegurarModalReceta() {
     if ($id('modalReceta')) return;
 
@@ -233,10 +235,11 @@ const Recetas = (() => {
   function mostrarModalReceta(productoId = null) {
     _asegurarModalReceta();
 
+    const state = Store.getState();
     const selProd = document.getElementById('recProductoId');
-    selProd.innerHTML = DB.productos.filter(p => p.activo !== false).map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
+    selProd.innerHTML = (state.productos || []).filter(p => p.activo !== false).map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
     const selIng = document.getElementById('recIngredienteId');
-    selIng.innerHTML = '<option value="">— Ninguno —</option>' + DB.ingredientes.map(i => `<option value="${i.id}">${i.nombre} (${i.unidad})</option>`).join('');
+    selIng.innerHTML = '<option value="">— Ninguno —</option>' + (state.ingredientes || []).map(i => `<option value="${i.id}">${i.nombre} (${i.unidad})</option>`).join('');
 
     document.getElementById('recCantidad').value = '';
     const recInst = document.getElementById('recInstrucciones');
@@ -244,7 +247,7 @@ const Recetas = (() => {
 
     if (productoId) {
       selProd.value = productoId;
-      const receta = DB.recetas.find(r => r.productoId == productoId);
+      const receta = (state.recetas || []).find(r => r.productoId == productoId);
       if (receta && recInst) recInst.value = receta.instrucciones || '';
       _mostrarRecetaActual();
     } else {
@@ -260,8 +263,9 @@ const Recetas = (() => {
   }
 
   function _mostrarRecetaActual() {
+    const state = Store.getState();
     const productoId = document.getElementById('recProductoId').value;
-    const receta = DB.recetas.find(r => r.productoId == productoId);
+    const receta = (state.recetas || []).find(r => r.productoId == productoId);
     const div = document.getElementById('recetaActual');
     const recInst = document.getElementById('recInstrucciones');
 
@@ -274,7 +278,7 @@ const Recetas = (() => {
     if (receta && receta.ingredientes.length) {
       let html = '<strong>Ingredientes asignados:</strong><ul>';
       receta.ingredientes.forEach(ing => {
-        const nombreIng = DB.ingredientes.find(i => i.id == ing.ingredienteId)?.nombre || ing.ingredienteId;
+        const nombreIng = (state.ingredientes || []).find(i => i.id == ing.ingredienteId)?.nombre || ing.ingredienteId;
         html += `<li>${nombreIng}: ${ing.cantidad} <button class="btn-icon-sm" onclick="Recetas._quitarIngrediente('${receta.productoId}', '${ing.ingredienteId}')"><i class="fas fa-trash"></i></button></li>`;
       });
       html += '</ul>';
@@ -295,7 +299,6 @@ const Recetas = (() => {
     const cantidad = parseFloat(document.getElementById('recCantidad').value);
     const instrucciones = document.getElementById('recInstrucciones')?.value?.trim() || '';
 
-    // Si se ingresaron ingrediente y cantidad válidos, los sincronizamos
     if (insumoId && !isNaN(cantidad) && cantidad > 0) {
       const receta = {
         id: `rec_${Date.now()}_${Math.random().toString(36).substr(2,4)}`,
@@ -312,7 +315,6 @@ const Recetas = (() => {
       }
     }
 
-    // Siempre actualizamos las instrucciones en la receta local
     if (instrucciones) {
       const recetaLocal = DB.recetas.find(r => r.productoId == productoId);
       if (recetaLocal) {
@@ -330,7 +332,7 @@ const Recetas = (() => {
     }
 
     cerrarModalReceta();
-    render();
+    // El Store se actualizará automáticamente vía DB.saveRecetas()
     showToast('success', 'Receta actualizada');
   }
 
@@ -344,13 +346,24 @@ const Recetas = (() => {
     }
   }
 
-  /* ── SUSCRIPCIÓN A EVENTOS ───────────────────────────────── */
-  function _initEventListeners() {
-    EventBus.on('db:inicializada', render);
-    EventBus.on('productos:cargados', render);
-    EventBus.on('recetas:actualizadas', render);
+  /* ── SUSCRIPCIÓN AL STORE ───────────────────────────────── */
+  function _initListeners() {
+    Store.subscribe((state, action) => {
+      // Re-renderizar cuando cambien productos o recetas
+      if (action.type.startsWith('PRODUCTO') || action.type.startsWith('RECETA')) {
+        render();
+      }
+    });
+
+    EventBus.on('db:inicializada', () => {
+      setTimeout(render, 100);
+    });
+    EventBus.on('vista:cambiada', (vista) => {
+      if (vista === 'recetas') render();
+    });
   }
-  _initEventListeners();
+
+  _initListeners();
 
   return {
     render,

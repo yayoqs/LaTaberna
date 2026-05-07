@@ -1,5 +1,7 @@
 /* ================================================================
-   PubPOS — MÓDULO: menu.js (v1.2 – imágenes desde Sheets o placeholder)
+   PubPOS — MÓDULO: menu.js (v2.0 – reactivo al Store)
+   Propósito: Vista de menú digital. Ahora obtiene los productos del
+              Store y se re-renderiza automáticamente cuando cambian.
    ================================================================ */
 const Menu = (() => {
 
@@ -39,8 +41,9 @@ const Menu = (() => {
     const container = $id('menuCategorias');
     if (!container) return;
 
+    const productos = Store.getState().productos || [];
     const categorias = ['Todas', ...new Set(
-      DB.productos.filter(p => p.activo !== false).map(p => p.categoria)
+      productos.filter(p => p.activo !== false).map(p => p.categoria)
     )].filter(Boolean);
 
     container.innerHTML = categorias.map(cat => `
@@ -61,12 +64,12 @@ const Menu = (() => {
     _renderProductos();
   }
 
-  /* ── RENDERIZAR PRODUCTOS (con soporte para imagen de Sheets) ── */
   function _renderProductos() {
     const grid = $id('menuGrid');
     if (!grid) return;
 
-    let productos = DB.productos.filter(p => p.activo !== false);
+    let productos = (Store.getState().productos || []).filter(p => p.activo !== false);
+
     if (_categoriaActiva !== 'Todas') {
       productos = productos.filter(p => p.categoria === _categoriaActiva);
     }
@@ -87,7 +90,6 @@ const Menu = (() => {
 
     grid.innerHTML = productos.map(prod => {
       const desc = prod.descripcion || 'Consulta a nuestro personal para más detalles.';
-      // Si hay imagen real, se usará como background; si no, se usará un color
       const tieneImagen = prod.imagen && prod.imagen.trim() !== '';
       const estiloImagen = tieneImagen
         ? `background-image: url('${prod.imagen}');`
@@ -111,7 +113,6 @@ const Menu = (() => {
     }).join('');
   }
 
-  /* ── COLOR POR NOMBRE ──────────────────────────────────── */
   function _getColorFromName(nombre) {
     let hash = 0;
     for (let i = 0; i < nombre.length; i++) {
@@ -122,9 +123,9 @@ const Menu = (() => {
     return `hsl(${h}, 55%, 45%)`;
   }
 
-  /* ── MOSTRAR DETALLE ───────────────────────────────────── */
   function mostrarDetalle(prodId) {
-    const producto = DB.productos.find(p => p.id == prodId);
+    const state = Store.getState();
+    const producto = (state.productos || []).find(p => p.id == prodId);
     if (!producto) return;
 
     let modal = $id('modalMenuDetalle');
@@ -168,11 +169,10 @@ const Menu = (() => {
     $id('menuDetalleDesc').textContent = producto.descripcion || 'Sin descripción disponible.';
     $id('menuDetallePrecio').innerHTML = `<span class="precio-etiqueta">${fmtMoney(producto.precio)}</span>`;
 
-    // Ingredientes principales si hay receta
-    const receta = DB.recetas.find(r => r.productoId == prodId);
+    const receta = (state.recetas || []).find(r => r.productoId == prodId);
     if (receta && receta.ingredientes.length) {
       const nombres = receta.ingredientes.map(ing => {
-        const ingData = DB.ingredientes.find(i => i.id == ing.ingredienteId);
+        const ingData = (state.ingredientes || []).find(i => i.id == ing.ingredienteId);
         return ingData ? ingData.nombre : ing.ingredienteId;
       }).join(', ');
       $id('menuDetalleExtra').innerHTML = `<p style="font-size:12px;color:var(--color-text-muted);margin-top:12px;"><strong>Ingredientes principales:</strong> ${nombres}</p>`;
@@ -188,11 +188,23 @@ const Menu = (() => {
     if (modal) modal.style.display = 'none';
   }
 
-  function _initEventListeners() {
-    EventBus.on('db:inicializada', render);
-    EventBus.on('productos:cargados', render);
+  /* ── SUSCRIPCIÓN AL STORE ──────────────────────────────── */
+  function _initListeners() {
+    Store.subscribe((state, action) => {
+      if (action.type.startsWith('PRODUCTO')) {
+        render();
+      }
+    });
+
+    EventBus.on('db:inicializada', () => {
+      setTimeout(render, 100);
+    });
+    EventBus.on('vista:cambiada', (vista) => {
+      if (vista === 'menu') render();
+    });
   }
-  _initEventListeners();
+
+  _initListeners();
 
   return {
     render,

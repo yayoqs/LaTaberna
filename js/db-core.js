@@ -1,7 +1,7 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-core.js (v3.1 – serialización forzada de items)
-   Propósito: Asegurar que los items siempre se guarden como string JSON
-              y que el pedido tenga todos los campos esperados por Sheets.
+   PubPOS — MÓDULO: db-core.js (v3.2 – notificación al Store)
+   Propósito: Ídem anterior, pero ahora savePedidos, saveMesas, etc.
+              despachan acciones al Store centralizado.
    ================================================================ */
 
 const DBCore = (function() {
@@ -225,24 +225,51 @@ const DBCore = (function() {
     }
   };
 
-  /* ── GUARDADO ────────────────────────────────────────────── */
-  module.saveConfig = function() { localStorage.setItem('pubpos_config', JSON.stringify(this.config)); };
+  /* ── GUARDADO (CON NOTIFICACIÓN AL STORE) ────────────────── */
+  module.saveConfig = function() {
+    localStorage.setItem('pubpos_config', JSON.stringify(this.config));
+    if (typeof Store !== 'undefined') {
+      Store.dispatch({ type: 'CONFIG_INICIALIZAR', payload: this.config });
+    }
+  };
+
   module.saveMesas = function() {
     localStorage.setItem('pubpos_mesas', JSON.stringify(this.mesas));
     EventBus.emit('mesas:guardadas', this.mesas);
+    if (typeof Store !== 'undefined') {
+      Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: this.mesas });
+    }
   };
+
   module.saveComandas = function() {
     localStorage.setItem('pubpos_comandas', JSON.stringify(this.comandas));
     EventBus.emit('comandas:guardadas', this.comandas);
+    if (typeof Store !== 'undefined') {
+      Store.dispatch({ type: 'COMANDA_AGREGADA', payload: this.comandas });
+    }
   };
+
   module.savePedidos = function() {
     localStorage.setItem('pubpos_pedidos', JSON.stringify(this.pedidos));
     EventBus.emit('pedidos:guardados', this.pedidos);
+    if (typeof Store !== 'undefined') {
+      Store.dispatch({ type: 'PEDIDOS_INICIALIZAR', payload: this.pedidos });
+    }
   };
-  module.saveMozos = function() { localStorage.setItem('pubpos_mozos', JSON.stringify(this.mozos)); };
+
+  module.saveMozos = function() {
+    localStorage.setItem('pubpos_mozos', JSON.stringify(this.mozos));
+    if (typeof Store !== 'undefined') {
+      Store.dispatch({ type: 'MOZOS_INICIALIZAR', payload: this.mozos });
+    }
+  };
+
   module.savePedidosDelivery = function() {
     localStorage.setItem('pubpos_pedidos_delivery', JSON.stringify(this.pedidosDelivery));
     EventBus.emit('pedidosDelivery:guardados', this.pedidosDelivery);
+    if (typeof Store !== 'undefined') {
+      Store.dispatch({ type: 'PEDIDOSDELIVERY_INICIALIZAR', payload: this.pedidosDelivery });
+    }
   };
 
   /* ── GESTIÓN DE PEDIDOS (mesa) ───────────────────────────── */
@@ -251,7 +278,7 @@ const DBCore = (function() {
       id: 'ped_' + Date.now(),
       mesa, mozo, comensales,
       estado: 'abierta',
-      items: '[]',   // <-- siempre string JSON
+      items: '[]',
       total: 0,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
@@ -264,7 +291,6 @@ const DBCore = (function() {
   module.actualizarPedido = async function(id, cambios) {
     const idx = this.pedidos.findIndex(p => p.id === id);
     if (idx >= 0) {
-      // Si los items vienen como array, los serializamos a string
       if (cambios.items && Array.isArray(cambios.items)) {
         cambios.items = JSON.stringify(cambios.items);
       }

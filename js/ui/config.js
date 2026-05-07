@@ -1,9 +1,10 @@
 /* ================================================================
-   PubPOS — MÓDULO: config.js (v2.6 – añade campo imagen en modal)
+   PubPOS — MÓDULO: config.js (v3 – reactivo al Store)
+   Propósito: Vista de configuración (productos, mozos, zonas).
+              Ahora lee del Store y persiste cambios a través de DB,
+              que a su vez actualiza el Store automáticamente.
    ================================================================ */
 const Config = (() => {
-  const CATEGORIAS = ['Bebidas','Cervezas','Cocteles','Vinos','Entradas','Comidas','Postres'];
-
   function _asegurarVista() {
     if ($id('view-config')) return;
 
@@ -46,7 +47,6 @@ const Config = (() => {
             <button class="btn-primary" onclick="Config.guardar()"><i class="fas fa-save"></i> Guardar</button>
           </div>
         </section>
-        <!-- Sección Mozos -->
         <section class="config-card">
           <h3><i class="fas fa-user-tie"></i> Mozos</h3>
           <div class="local-config">
@@ -65,27 +65,29 @@ const Config = (() => {
 
   function cargar() {
     _asegurarVista();
-    const cfg = DB.config;
-    if (cfg.cantidadMesas && !cfg.zonas) {
-      cfg.zonas = [
-        { nombre: 'salon',   cantidad: cfg.cantidadMesas },
+    const config = Store.getState().config || DB.config || {};
+    if (config.cantidadMesas && !config.zonas) {
+      config.zonas = [
+        { nombre: 'salon',   cantidad: config.cantidadMesas },
         { nombre: 'terraza', cantidad: 0 }
       ];
-      delete cfg.cantidadMesas;
-      DB.saveConfig();
+      delete config.cantidadMesas;
+      DB.saveConfig(); // persiste y actualiza Store
     }
-    $id('cfgNombreLocal').value = cfg.nombreLocal || '';
-    $id('cfgDireccion').value = cfg.direccion || '';
-    $id('cfgCuit').value = cfg.cuit || '';
-    $id('cfgPie').value = cfg.pieTicket || '';
+    $id('cfgNombreLocal').value = config.nombreLocal || '';
+    $id('cfgDireccion').value = config.direccion || '';
+    $id('cfgCuit').value = config.cuit || '';
+    $id('cfgPie').value = config.pieTicket || '';
     _renderZonas();
     renderMozos();
+    renderProductos();
   }
 
   function _renderZonas() {
     const container = $id('zonasContainer');
     if (!container) return;
-    const zonas = DB.config.zonas || [];
+    const config = Store.getState().config || {};
+    const zonas = config.zonas || [];
     container.innerHTML = zonas.map((z, idx) => `
       <div style="display:flex; align-items:center; gap:8px;">
         <input type="text" value="${z.nombre}" placeholder="Nombre zona" 
@@ -98,33 +100,39 @@ const Config = (() => {
   }
 
   function _updateZona(idx, campo, valor) {
-    if (!DB.config.zonas) return;
-    if (campo === 'cantidad') DB.config.zonas[idx].cantidad = parseInt(valor) || 0;
-    else DB.config.zonas[idx].nombre = valor.trim() || `zona_${idx+1}`;
+    const config = Store.getState().config || {};
+    if (!config.zonas) return;
+    if (campo === 'cantidad') config.zonas[idx].cantidad = parseInt(valor) || 0;
+    else config.zonas[idx].nombre = valor.trim() || `zona_${idx+1}`;
+    // No persistimos aún, solo modificamos en memoria; se guardará al hacer clic en "Guardar"
   }
 
   function agregarZona() {
-    if (!DB.config.zonas) DB.config.zonas = [];
+    const config = Store.getState().config || {};
+    if (!config.zonas) config.zonas = [];
     const nombre = prompt('Nombre de la nueva zona (ej: Terraza, Patio, VIP):');
     if (!nombre) return;
     const cantidad = parseInt(prompt('Cantidad de mesas inicial:') || '0');
     if (isNaN(cantidad)) return;
-    DB.config.zonas.push({ nombre: nombre.trim(), cantidad });
+    config.zonas.push({ nombre: nombre.trim(), cantidad });
     _renderZonas();
   }
 
   function eliminarZona(idx) {
-    if (!DB.config.zonas || DB.config.zonas.length <= 1) { showToast('error', 'Debe existir al menos una zona.'); return; }
-    if (!confirm(`¿Eliminar la zona "${DB.config.zonas[idx].nombre}"?`)) return;
-    DB.config.zonas.splice(idx, 1);
+    const config = Store.getState().config || {};
+    if (!config.zonas || config.zonas.length <= 1) { showToast('error', 'Debe existir al menos una zona.'); return; }
+    if (!confirm(`¿Eliminar la zona "${config.zonas[idx].nombre}"?`)) return;
+    config.zonas.splice(idx, 1);
     _renderZonas();
   }
 
   function guardar() {
     const zonasContainer = $id('zonasContainer');
+    let config = Store.getState().config || {};
+
     if (zonasContainer) {
       const filas = zonasContainer.querySelectorAll('div');
-      DB.config.zonas = Array.from(filas).map(fila => {
+      config.zonas = Array.from(filas).map(fila => {
         const inputs = fila.querySelectorAll('input');
         return {
           nombre: inputs[0]?.value || 'sin_nombre',
@@ -132,15 +140,18 @@ const Config = (() => {
         };
       });
     }
-    DB.config = {
-      ...DB.config,
+    config = {
+      ...config,
       nombreLocal: $val('cfgNombreLocal'),
       direccion: $val('cfgDireccion'),
       cuit: $val('cfgCuit'),
       pieTicket: $val('cfgPie'),
-      zonas: DB.config.zonas || [{ nombre: 'salon', cantidad: 12 }]
+      zonas: config.zonas || [{ nombre: 'salon', cantidad: 12 }]
     };
-    delete DB.config.cantidadMesas;
+    delete config.cantidadMesas;
+
+    // Persistir en DB (esto actualizará el Store automáticamente)
+    DB.config = config;
     DB._inicializarMesas();
     DB.saveConfig();
     DB.saveMesas();
@@ -148,12 +159,11 @@ const Config = (() => {
     showToast('success', '<i class="fas fa-check-circle"></i> Configuración guardada');
   }
 
-  // ── PRODUCTOS ────────────────────────────────────────────
   function renderProductos() {
     _asegurarVista();
     const cont = $id('productosLista');
     if (!cont) return;
-    const todos = DB.productos;
+    const todos = Store.getState().productos || [];
     if (!todos.length) {
       cont.innerHTML = `<p style="text-align:center;padding:20px;">No hay productos</p>`;
       return;
@@ -238,12 +248,13 @@ const Config = (() => {
       return;
     }
     cerrarModalProducto();
+    // El Store se actualizará automáticamente vía DB.syncGuardarProducto -> DB.save
     renderProductos();
     if (typeof Pedido !== 'undefined' && Pedido._setCat) Pedido._setCat('Todos');
   }
 
   async function _editarProducto(id) {
-    const prod = DB.productos.find(p => p.id === id);
+    const prod = (Store.getState().productos || []).find(p => p.id === id);
     if (prod) abrirModalProducto(prod);
   }
 
@@ -257,11 +268,10 @@ const Config = (() => {
     }
   }
 
-  // ── MOZOS ────────────────────────────────────────────────
   function renderMozos() {
     const container = $id('mozosLista');
     if (!container) return;
-    const mozos = DB.mozos || [];
+    const mozos = Store.getState().mozos || [];
     container.innerHTML = mozos.map((m, idx) => `
       <div style="display:flex; align-items:center; gap:8px;">
         <span style="flex:1;">${m.nombre}</span>
@@ -279,7 +289,7 @@ const Config = (() => {
     DB.mozos.push({ id: 'mozo_' + Date.now(), nombre, activo: true });
     DB.saveMozos();
     $id('nuevoMozoNombre').value = '';
-    renderMozos();
+    // El Store se actualizará automáticamente
     showToast('success', 'Mozo añadido');
   }
 
@@ -287,17 +297,49 @@ const Config = (() => {
     if (!confirm('¿Eliminar mozo?')) return;
     DB.mozos.splice(idx, 1);
     DB.saveMozos();
-    renderMozos();
+    // El Store se actualizará automáticamente
     showToast('warning', 'Mozo eliminado');
   }
 
-  // ── API PÚBLICA ──────────────────────────────────────────
+  /* ── SUSCRIPCIÓN AL STORE ──────────────────────────────── */
+  function _initListeners() {
+    Store.subscribe((state, action) => {
+      // Re-renderizar productos si cambian
+      if (action.type.startsWith('PRODUCTO')) {
+        renderProductos();
+      }
+      // Re-renderizar mozos si cambian
+      if (action.type.startsWith('MOZO')) {
+        renderMozos();
+      }
+      // Re-renderizar zonas si cambia la configuración
+      if (action.type === 'CONFIG_INICIALIZAR') {
+        _renderZonas();
+      }
+    });
+
+    EventBus.on('vista:cambiada', (vista) => {
+      if (vista === 'config') cargar();
+    });
+  }
+
+  _initListeners();
+
   return {
-    cargar, guardar, renderProductos,
-    abrirModalProducto, cerrarModalProducto, guardarProducto,
-    _editarProducto, _eliminarProducto,
-    renderMozos, agregarMozo, eliminarMozo,
-    agregarZona, eliminarZona, _updateZona
+    cargar,
+    guardar,
+    renderProductos,
+    abrirModalProducto,
+    cerrarModalProducto,
+    guardarProducto,
+    _editarProducto,
+    _eliminarProducto,
+    renderMozos,
+    agregarMozo,
+    eliminarMozo,
+    agregarZona,
+    eliminarZona,
+    _updateZona
   };
 })();
 

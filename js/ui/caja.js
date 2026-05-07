@@ -1,17 +1,12 @@
 /* ================================================================
-   PubPOS — MÓDULO: caja.js (v3.3 – delegación de cierre unificada)
+   PubPOS — MÓDULO: caja.js (v4.0 – reactivo al Store)
    ================================================================
-   Cambios respecto a v3.2:
-   • Eliminada la función local cerrarTurno() que duplicaba la
-     lógica de cierre de turno.
-   • El botón "Cierre de Caja" ahora invoca directamente a
-     App.cerrarTurnoApp(), que contiene la verificación de permisos,
-     la confirmación, la llamada a TurnoManager y los toasts
-     correspondientes.
-   • Esto garantiza que el cierre de turno se comporte igual desde
-     cualquier vista (Caja, Config o la función global).
-   • Se mantiene la suscripción a eventos para refrescar la tabla
-     cuando el turno cambia.
+   Cambios:
+   • Eliminadas las llamadas a DB.fetchTodosPedidos() y las
+     suscripciones individuales a EventBus.
+   • Ahora se suscribe a Store y vuelve a renderizar cada vez que
+     cambian los pedidos.
+   • El botón de cierre de turno sigue usando App.cerrarTurnoApp().
    ================================================================ */
 const Caja = (() => {
 
@@ -26,7 +21,6 @@ const Caja = (() => {
       <div class="view-toolbar">
         <h2><i class="fas fa-cash-register"></i> Caja — Resumen del Turno</h2>
         <div class="toolbar-actions">
-          <!-- ⚡ El botón ahora usa la función unificada de App -->
           <button class="btn-primary" onclick="App.cerrarTurnoApp()">
             <i class="fas fa-file-alt"></i> Cierre de Caja
           </button>
@@ -46,29 +40,24 @@ const Caja = (() => {
     document.body.insertBefore(main, referencia);
   }
 
-  async function render() {
+  /* ── RENDER ────────────────────────────────────────────── */
+  function render() {
     _asegurarVista();
     const statsEl = $id('cajaStats');
     const bodyEl = $id('cajaBody');
     if (!statsEl || !bodyEl) return;
 
-    try {
-      const todos = await DB.fetchTodosPedidos();
-      const cerrados = todos.filter(p => p.estado === 'cerrada');
-      const abiertos = todos.filter(p => p.estado !== 'cerrada' && p.estado !== 'cancelada');
+    const pedidos = Store.getState().pedidos;
+    const cerrados = pedidos.filter(p => p.estado === 'cerrada');
+    const abiertos = pedidos.filter(p => p.estado !== 'cerrada' && p.estado !== 'cancelada');
 
-      const totalVentas = cerrados.reduce((s, p) => s + (p.total || 0), 0);
-      const promedio = cerrados.length ? totalVentas / cerrados.length : 0;
+    const totalVentas = cerrados.reduce((s, p) => s + (p.total || 0), 0);
+    const promedio = cerrados.length ? totalVentas / cerrados.length : 0;
 
-      statsEl.innerHTML = _htmlStats(totalVentas, cerrados.length, promedio, abiertos.length);
-      bodyEl.innerHTML = todos.length
-        ? todos.map(_htmlFila).join('')
-        : `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--color-text-muted)">No hay registros en este turno</td></tr>`;
-
-    } catch (e) {
-      statsEl.innerHTML = `<div style="grid-column:1/-1;color:var(--color-text-muted);padding:20px"><i class="fas fa-exclamation-circle"></i> Error cargando datos de caja</div>`;
-      console.warn('[Caja] Error:', e);
-    }
+    statsEl.innerHTML = _htmlStats(totalVentas, cerrados.length, promedio, abiertos.length);
+    bodyEl.innerHTML = pedidos.length
+      ? pedidos.map(_htmlFila).join('')
+      : `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--color-text-muted)">No hay registros en este turno</td></tr>`;
   }
 
   function _htmlStats(totalVentas, cerradas, promedio, abiertas) {
@@ -104,15 +93,24 @@ const Caja = (() => {
       </tr>`;
   }
 
-  // ── EVENTOS ──────────────────────────────────────────────
-  // Refrescar cuando cambien los pedidos o el turno
-  EventBus.on('pedidos:guardados', render);
-  EventBus.on('pedido:cerrado', render);
-  EventBus.on('db:inicializada', render);
-  EventBus.on('turno:iniciado', render);
-  EventBus.on('turno:cerrado', render);
+  /* ── SUSCRIPCIÓN AL STORE ──────────────────────────────── */
+  function _initListeners() {
+    // Solo reaccionar si cambian los pedidos en el Store
+    Store.subscribe((state, action) => {
+      // Solo re-renderizar si la acción afecta a los pedidos
+      if (action.type.startsWith('PEDIDOS') || action.type.startsWith('PEDIDO')) {
+        render();
+      }
+    });
 
-  // API pública: solo render, la acción de cierre se delegó a App.cerrarTurnoApp()
+    // La primera vez que la vista se activa, forzamos render
+    EventBus.on('db:inicializada', render);
+    EventBus.on('vista:cambiada', (vista) => {
+      if (vista === 'caja') render();
+    });
+  }
+  _initListeners();
+
   return { render };
 })();
 

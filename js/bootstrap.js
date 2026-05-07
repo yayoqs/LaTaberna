@@ -1,21 +1,18 @@
 /* ================================================================
-   PubPOS — MÓDULO: bootstrap.js (v1.6 – Logger integrado)
+   PubPOS — MÓDULO: bootstrap.js (v1.7 – integración Store)
    ================================================================
    Cambios:
-   • Eliminado _instalarManejadorErrores() porque ErrorHandler ya
-     se encarga desde logger.js.
-   • Reemplazados todos los console.log/error/warn por Logger.info,
-     Logger.error, etc., para aprovechar el sistema centralizado.
-   • Agregado Logger.setLevel('DEBUG') explícito para desarrollo.
+   • Después de inicializar DB, cargamos los datos iniciales en el
+     Store para que las vistas reactivas tengan acceso inmediato.
+   • Se despachan acciones MESAS_INICIALIZAR, PEDIDOS_INICIALIZAR, etc.
    ================================================================ */
 const Bootstrap = (() => {
 
   async function arrancar() {
-    // Configurar Logger (en producción se puede cambiar a 'WARN')
     Logger.setLevel('DEBUG');
     Logger.info('[Bootstrap] Iniciando aplicación...');
 
-    // ── 1. Autenticación (crítica) ─────────────────────────
+    // ── 1. Autenticación ──────────────────────────────────
     try {
       Auth.init();
       Logger.info('[Bootstrap] Auth listo.');
@@ -25,7 +22,7 @@ const Bootstrap = (() => {
       return;
     }
 
-    // ── 2. Base de datos (crítica) ─────────────────────────
+    // ── 2. Base de datos ──────────────────────────────────
     try {
       await DB.init();
       Logger.info('[Bootstrap] DB lista.');
@@ -35,14 +32,28 @@ const Bootstrap = (() => {
       return;
     }
 
-    // ── 3. Configuración (no crítica) ──────────────────────
+    // ── 3. Poblar el Store con los datos iniciales ────────
+    if (typeof Store !== 'undefined') {
+      Store.dispatch({ type: 'MESAS_INICIALIZAR',      payload: DB.mesas || [] });
+      Store.dispatch({ type: 'PEDIDOS_INICIALIZAR',    payload: DB.pedidos || [] });
+      Store.dispatch({ type: 'PRODUCTOS_INICIALIZAR',  payload: DB.productos || [] });
+      Store.dispatch({ type: 'INGREDIENTES_INICIALIZAR', payload: DB.ingredientes || [] });
+      Store.dispatch({ type: 'RECETAS_INICIALIZAR',    payload: DB.recetas || [] });
+      Store.dispatch({ type: 'MOZOS_INICIALIZAR',       payload: DB.mozos || [] });
+      Store.dispatch({ type: 'CONFIG_INICIALIZAR',      payload: DB.config || {} });
+      // Delivery: se cargará cuando se obtenga de DB
+      Store.dispatch({ type: 'DELIVERY_CREADO', payload: DB.pedidosDelivery || [] });
+      Logger.info('[Bootstrap] Store poblado con datos iniciales.');
+    }
+
+    // ── 4. Configuración ──────────────────────────────────
     try {
       if (typeof Config !== 'undefined' && Config.cargar) Config.cargar();
     } catch (e) {
       Logger.warn('[Bootstrap] Config no disponible:', e);
     }
 
-    // ── 4. Inyección de dependencias (REPOSITORIOS) ────────
+    // ── 5. Inyección de dependencias (REPOSITORIOS) ──────
     let pedidoRepo;
     if (typeof PedidoRepositoryLocal !== 'undefined') {
       pedidoRepo = PedidoRepositoryLocal;
@@ -51,7 +62,6 @@ const Bootstrap = (() => {
       Logger.warn('[Bootstrap] PedidoRepositoryLocal no encontrado.');
     }
 
-    // Repositorio de Delivery (adaptador simple sobre DB)
     const deliveryRepo = {
       async crearDelivery(datos) {
         if (!window.DB || !DB.crearPedidoDelivery) throw new Error('DB no disponible');
@@ -73,7 +83,6 @@ const Bootstrap = (() => {
       }
     };
 
-    // Repositorio de Inventario (adaptador sobre DB)
     const inventarioRepo = {
       async guardarIngrediente(datos) {
         if (!window.DB || typeof DB.syncGuardarIngrediente !== 'function') {
@@ -93,7 +102,7 @@ const Bootstrap = (() => {
       }
     };
 
-    // ── 5. Configurar Servicios de Dominio ─────────────────
+    // ── 6. Configurar Servicios de Dominio ────────────────
     if (typeof PedidoService !== 'undefined' && pedidoRepo) {
       PedidoService.configurar(pedidoRepo);
       Logger.info('[Bootstrap] PedidoService configurado.');
@@ -107,7 +116,7 @@ const Bootstrap = (() => {
       Logger.info('[Bootstrap] InventarioService configurado.');
     }
 
-    // ── 6. Iniciar PedidoManager ──────────────────────────
+    // ── 7. Iniciar PedidoManager ──────────────────────────
     try {
       if (typeof PedidoManager !== 'undefined') {
         const turno = PedidoManager.init({ pedidoRepo });
@@ -117,18 +126,18 @@ const Bootstrap = (() => {
       Logger.error('[Bootstrap] Error al iniciar PedidoManager:', e);
     }
 
-    // ── 7. TurnoManager ───────────────────────────────────
+    // ── 8. TurnoManager ───────────────────────────────────
     if (typeof TurnoManager === 'undefined') {
       Logger.warn('[Bootstrap] TurnoManager no encontrado.');
     }
 
-    // ── 8. Inicializar UI ─────────────────────────────────
+    // ── 9. Inicializar UI ─────────────────────────────────
     if (typeof App !== 'undefined' && App.init) {
       App.init();
       Logger.info('[Bootstrap] UI iniciada.');
     }
 
-    // ── 9. Mostrar vista inicial ──────────────────────────
+    // ── 10. Mostrar vista inicial ─────────────────────────
     try {
       if (Auth.getRol()) {
         const vistaDefecto = Auth.getDefaultView();
