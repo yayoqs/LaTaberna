@@ -1,9 +1,6 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-core.js (v3.2 – notificación al Store)
-   Propósito: Ídem anterior, pero ahora savePedidos, saveMesas, etc.
-              despachan acciones al Store centralizado.
+   PubPOS — MÓDULO: db-core.js (v3.2.1 – filtrado de pedidos delivery corruptos)
    ================================================================ */
-
 const DBCore = (function() {
   const module = {};
 
@@ -219,7 +216,14 @@ const DBCore = (function() {
   module._cargarPedidosDeliveryLocal = function() {
     const raw = localStorage.getItem('pubpos_pedidos_delivery');
     if (raw) {
-      this.pedidosDelivery = JSON.parse(raw).map(pd => this._normalizarPedidoDelivery(pd));
+      try {
+        // Normalizamos y luego filtramos cualquier objeto sin id (corrupto)
+        this.pedidosDelivery = JSON.parse(raw)
+          .map(pd => this._normalizarPedidoDelivery(pd))
+          .filter(pd => pd && pd.id);  // ← protección contra datos corruptos
+      } catch (e) {
+        this.pedidosDelivery = [];
+      }
     } else {
       this.pedidosDelivery = [];
     }

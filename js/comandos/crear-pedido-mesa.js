@@ -1,9 +1,8 @@
 /* ================================================================
-   PubPOS — COMANDO: crear-pedido-mesa.js (v2.4 – delegación total al repo)
+   PubPOS — COMANDO: crear-pedido-mesa.js (v2.5 – usa Deps)
    ================================================================
-   El handler ya no construye el agregado. Solo valida turno y mesa,
-   y luego invoca al repositorio para que cree y persista el pedido.
-   El repositorio es responsable de normalizar los datos para Sheets.
+   Cambio: ahora obtiene el repositorio desde Deps.obtener('pedidoRepo')
+           en lugar de esperar que venga en el comando.
    ================================================================ */
 
 function crearComandoPedidoMesa(datos) {
@@ -20,7 +19,6 @@ function crearComandoPedidoMesa(datos) {
 async function handleCrearPedidoMesa(comando) {
   const { numeroMesa, mozo, comensales } = comando.datos;
 
-  // Validaciones de turno
   if (typeof PedidoManager === 'undefined' || !PedidoManager.getTurnoActual) {
     throw new Error('Sistema de turnos no disponible');
   }
@@ -29,7 +27,6 @@ async function handleCrearPedidoMesa(comando) {
     throw new Error('No hay turno abierto para crear pedidos');
   }
 
-  // Validación de mesa
   if (typeof DB === 'undefined' || !DB.getMesa) {
     throw new Error('Base de datos no disponible');
   }
@@ -37,20 +34,19 @@ async function handleCrearPedidoMesa(comando) {
   if (!mesa) throw new Error(`La mesa ${numeroMesa} no existe`);
   if (mesa.estado !== 'libre') throw new Error(`La mesa ${numeroMesa} no está libre`);
 
-  // Resolver repositorio
-  const repo = comando.datos.repo || 
-               (typeof PedidoRepositoryLocal !== 'undefined' ? PedidoRepositoryLocal : null);
-  if (!repo || typeof repo.crearPedidoMesa !== 'function') {
-    throw new Error('Repositorio de pedidos no disponible');
+  // Resolver repositorio desde el contenedor
+  let repo;
+  try {
+    repo = Deps.obtener('pedidoRepo');
+  } catch (e) {
+    throw new Error('Repositorio de pedidos no disponible: ' + e.message);
   }
 
-  // Actualizar la mesa en memoria (el repositorio también lo hará, pero así reflejamos el cambio inmediato)
   mesa.estado = 'ocupada';
   mesa.abiertaEn = Date.now();
   mesa.mozo = mozo;
   mesa.comensales = comensales;
 
-  // Delegar creación y persistencia al repositorio
   let pedido;
   try {
     pedido = await repo.crearPedidoMesa({
@@ -65,7 +61,6 @@ async function handleCrearPedidoMesa(comando) {
   if (!pedido) throw new Error('No se pudo crear el pedido');
   mesa.pedidoId = pedido.id;
 
-  // Auditoría
   if (typeof PedidoManager.registrar === 'function') {
     PedidoManager.registrar('mesa:abierta', {
       mesa: numeroMesa,

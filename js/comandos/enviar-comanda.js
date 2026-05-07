@@ -1,16 +1,15 @@
 /* ================================================================
-   PubPOS — COMANDO: enviar-comanda.js (CQRS)
-   Propósito: Mover la lógica de envío de comandas fuera de la UI.
-              El handler valida, crea las comandas, persiste en DB,
-              actualiza el pedido y retorna los datos necesarios para
-              que la UI muestre los tickets.
+   PubPOS — COMANDO: enviar-comanda.js (v2 – validación de stock)
+   Propósito: Handler del comando 'enviarComanda'. Ahora, antes de
+              crear las comandas, valida el stock disponible mediante
+              InventarioService. Si algún ingrediente escasea, avisa
+              al mesero con un toast de advertencia pero permite
+              continuar con el envío.
+              
+              También obtiene InventarioService desde el contenedor
+              Deps, eliminando el acceso global a DB.
    ================================================================ */
 
-/**
- * Crea un comando para enviar una comanda (cocina y/o barra).
- * @param {object} datos - { mesa, mozo, comensales, observaciones, itemsPendientes }
- * @returns {object} Comando con type 'enviarComanda'
- */
 function crearComandoEnviarComanda(datos) {
   return {
     type: 'enviarComanda',
@@ -24,30 +23,43 @@ function crearComandoEnviarComanda(datos) {
   };
 }
 
-/**
- * Handler del comando enviarComanda.
- * Realiza:
- *  1. Validar que haya ítems pendientes.
- *  2. Separar por destino (cocina / barra).
- *  3. Crear objetos comanda y agregarlos a DB.comandas.
- *  4. Marcar los ítems como enviados en la mesa.
- *  5. Actualizar el pedido asociado (si existe).
- *  6. Generar HTML de tickets para cocina y barra.
- *  7. Retornar un objeto con las comandas y los ticketsHTML.
- *
- * @param {object} comando - { type, datos: { mesa, mozo, comensales, observaciones, itemsPendientes } }
- * @returns {object} { comandas: [...], ticketsHTML: { cocina: string|null, barra: string|null } }
- */
 async function handleEnviarComanda(comando) {
   const { mesa, mozo, comensales, observaciones, itemsPendientes } = comando.datos;
 
-  // ── 1. Validaciones ────────────────────────────────────
+  // ── 1. Validaciones básicas ─────────────────────────────
   if (!mesa) throw new Error('Mesa no especificada');
   if (!itemsPendientes || !itemsPendientes.length) {
     throw new Error('No hay ítems pendientes para enviar');
   }
 
-  // ── 2. Separar por destino ────────────────────────────
+  // ── 2. Validación de stock (NUEVA) ──────────────────────
+  // Intentamos usar InventarioService si está disponible
+  try {
+    const inventarioSvc = Deps.obtener('inventarioService');
+    const resultadoStock = inventarioSvc.validarStockParaItems(itemsPendientes);
+    if (!resultadoStock.ok) {
+      const faltantes = resultadoStock.faltantes
+        .map(f => `${f.ingrediente} (faltan ${f.faltante} ${f.unidad})`)
+        .join(', ');
+      // Advertimos al mesero pero no bloqueamos el envío
+      showToast('warning', `⚠️ Stock bajo: ${faltantes}. La comanda se enviará igual.`);
+      Logger.warn(`[EnviarComanda] Stock bajo detectado: ${faltantes}`);
+      
+      // Auditoría: registramos la incidencia
+      if (typeof PedidoManager.registrar === 'function') {
+        PedidoManager.registrar('inventario:alerta_faltante', {
+          mesa: mesa.numero,
+          items: itemsPendientes.map(it => it.nombre),
+          faltantes: resultadoStock.faltantes
+        });
+      }
+    }
+  } catch (e) {
+    // Si InventarioService no está disponible o falla, continuamos sin validar.
+    Logger.warn('[EnviarComanda] No se pudo validar stock:', e.message);
+  }
+
+  // ── 3. Separar por destino ───────────────────────────────
   const cocinaItems = itemsPendientes.filter(it => it.destino === 'cocina' || it.destino === 'ambos');
   const barraItems  = itemsPendientes.filter(it => it.destino === 'barra'  || it.destino === 'ambos');
 
@@ -55,9 +67,8 @@ async function handleEnviarComanda(comando) {
     throw new Error('Los ítems no tienen un destino válido');
   }
 
-  // ── 3. Función interna para crear una comanda ─────────
+  // ── 4. Función interna para crear una comanda ────────────
   const _crearComanda = (items, destinoKds) => {
-    // Marcar como enviados en los ítems originales (la UI ya tiene referencia)
     items.forEach(it => {
       it.enviado = true;
       it.enviadoA = destinoKds;
@@ -69,13 +80,13 @@ async function handleEnviarComanda(comando) {
       mesa: mesa.numero,
       mozo: mozo,
       destino: destinoKds,
-      items: items.map(it => ({ ...it })),  // copia
+      items: items.map(it => ({ ...it })),
       observaciones: observaciones || '',
       estado: 'nueva',
       ts: Date.now()
     };
 
-    // Persistir en DB
+    // Persistir en DB (el Store se actualizará automáticamente)
     if (typeof DB !== 'undefined' && DB.comandas) {
       DB.comandas.push(comanda);
       DB.saveComandas();
@@ -85,12 +96,11 @@ async function handleEnviarComanda(comando) {
     return comanda;
   };
 
-  // ── 4. Crear comandas (según lo que haya) ─────────────
+  // ── 5. Crear comandas según lo que haya ──────────────────
   const comandasCreadas = [];
   const ticketsGenerados = { cocina: null, barra: null };
 
   if (cocinaItems.length && barraItems.length) {
-    // Ambos destinos → crear dos comandas separadas
     const comCocina = _crearComanda(cocinaItems, 'cocina');
     const comBarra  = _crearComanda(barraItems,  'barra');
     comandasCreadas.push(comCocina, comBarra);
@@ -113,17 +123,17 @@ async function handleEnviarComanda(comando) {
     }
   }
 
-  // ── 5. Actualizar estado de la mesa ──────────────────
+  // ── 6. Actualizar estado de la mesa ──────────────────────
   if (mesa.estado === 'libre') {
     mesa.estado = 'ocupada';
   }
 
-  // ── 6. Persistir cambios en la mesa (DB) ────────────
+  // ── 7. Persistir cambios en la mesa ──────────────────────
   if (typeof DB !== 'undefined' && DB.saveMesas) {
     DB.saveMesas();
   }
 
-  // ── 7. Actualizar pedido asociado (si existe) ───────
+  // ── 8. Actualizar pedido asociado (si existe) ────────────
   if (mesa.pedidoId && typeof DB !== 'undefined' && DB.actualizarPedido) {
     try {
       await DB.actualizarPedido(mesa.pedidoId, {
@@ -140,7 +150,7 @@ async function handleEnviarComanda(comando) {
     }
   }
 
-  // ── 8. Notificar a otros módulos ────────────────────
+  // ── 9. Notificar a otros módulos ─────────────────────────
   EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: mesa.estado });
   comandasCreadas.forEach(c => EventBus.emit('comanda:enviada', c));
 
@@ -152,8 +162,6 @@ async function handleEnviarComanda(comando) {
   };
 }
 
-// Registrar el handler en el CommandBus
 CommandBus.registrar('enviarComanda', handleEnviarComanda);
 
-// Exponer la función creadora para que otros módulos la usen
 window.crearComandoEnviarComanda = crearComandoEnviarComanda;

@@ -1,10 +1,12 @@
 /* ================================================================
-   PubPOS — MÓDULO: bootstrap.js (v1.7 – integración Store)
+   PubPOS — MÓDULO: bootstrap.js (v1.8 – contenedor de dependencias)
    ================================================================
    Cambios:
-   • Después de inicializar DB, cargamos los datos iniciales en el
-     Store para que las vistas reactivas tengan acceso inmediato.
-   • Se despachan acciones MESAS_INICIALIZAR, PEDIDOS_INICIALIZAR, etc.
+   • Después de crear los repositorios, se registran en Deps.
+   • Los servicios ya se configuran con ellos; ahora también se
+     registran en Deps para que los comandos los usen fácilmente.
+   • Se elimina el paso de inyectar repo al PedidoManager porque
+     ya no es necesario (PedidoManager usa PedidoService directamente).
    ================================================================ */
 const Bootstrap = (() => {
 
@@ -32,17 +34,16 @@ const Bootstrap = (() => {
       return;
     }
 
-    // ── 3. Poblar el Store con los datos iniciales ────────
+    // ── 3. Poblar el Store con datos iniciales ────────────
     if (typeof Store !== 'undefined') {
-      Store.dispatch({ type: 'MESAS_INICIALIZAR',      payload: DB.mesas || [] });
-      Store.dispatch({ type: 'PEDIDOS_INICIALIZAR',    payload: DB.pedidos || [] });
-      Store.dispatch({ type: 'PRODUCTOS_INICIALIZAR',  payload: DB.productos || [] });
+      Store.dispatch({ type: 'MESAS_INICIALIZAR',       payload: DB.mesas || [] });
+      Store.dispatch({ type: 'PEDIDOS_INICIALIZAR',     payload: DB.pedidos || [] });
+      Store.dispatch({ type: 'PRODUCTOS_INICIALIZAR',   payload: DB.productos || [] });
       Store.dispatch({ type: 'INGREDIENTES_INICIALIZAR', payload: DB.ingredientes || [] });
-      Store.dispatch({ type: 'RECETAS_INICIALIZAR',    payload: DB.recetas || [] });
-      Store.dispatch({ type: 'MOZOS_INICIALIZAR',       payload: DB.mozos || [] });
-      Store.dispatch({ type: 'CONFIG_INICIALIZAR',      payload: DB.config || {} });
-      // Delivery: se cargará cuando se obtenga de DB
-      Store.dispatch({ type: 'DELIVERY_CREADO', payload: DB.pedidosDelivery || [] });
+      Store.dispatch({ type: 'RECETAS_INICIALIZAR',      payload: DB.recetas || [] });
+      Store.dispatch({ type: 'MOZOS_INICIALIZAR',        payload: DB.mozos || [] });
+      Store.dispatch({ type: 'CONFIG_INICIALIZAR',       payload: DB.config || {} });
+      Store.dispatch({ type: 'PEDIDOSDELIVERY_INICIALIZAR', payload: DB.pedidosDelivery || [] });
       Logger.info('[Bootstrap] Store poblado con datos iniciales.');
     }
 
@@ -54,13 +55,8 @@ const Bootstrap = (() => {
     }
 
     // ── 5. Inyección de dependencias (REPOSITORIOS) ──────
-    let pedidoRepo;
-    if (typeof PedidoRepositoryLocal !== 'undefined') {
-      pedidoRepo = PedidoRepositoryLocal;
-      Logger.info('[Bootstrap] Usando PedidoRepositoryLocal.');
-    } else {
-      Logger.warn('[Bootstrap] PedidoRepositoryLocal no encontrado.');
-    }
+    // PedidoRepositoryLocal ya está definido como variable global, lo usamos.
+    let pedidoRepo = typeof PedidoRepositoryLocal !== 'undefined' ? PedidoRepositoryLocal : null;
 
     const deliveryRepo = {
       async crearDelivery(datos) {
@@ -102,24 +98,36 @@ const Bootstrap = (() => {
       }
     };
 
+    // Registrar en el contenedor
+    if (typeof Deps !== 'undefined') {
+      if (pedidoRepo) Deps.registrar('pedidoRepo', pedidoRepo);
+      Deps.registrar('deliveryRepo', deliveryRepo);
+      Deps.registrar('inventarioRepo', inventarioRepo);
+      Logger.info('[Bootstrap] Dependencias registradas en el contenedor.');
+    }
+
     // ── 6. Configurar Servicios de Dominio ────────────────
     if (typeof PedidoService !== 'undefined' && pedidoRepo) {
       PedidoService.configurar(pedidoRepo);
-      Logger.info('[Bootstrap] PedidoService configurado.');
+      // También registramos el servicio en el contenedor
+      if (typeof Deps !== 'undefined') Deps.registrar('pedidoService', PedidoService);
+      Logger.info('[Bootstrap] PedidoService configurado y registrado.');
     }
     if (typeof DeliveryService !== 'undefined') {
       DeliveryService.configurar(deliveryRepo);
+      if (typeof Deps !== 'undefined') Deps.registrar('deliveryService', DeliveryService);
       Logger.info('[Bootstrap] DeliveryService configurado.');
     }
     if (typeof InventarioService !== 'undefined') {
       InventarioService.configurar(inventarioRepo);
+      if (typeof Deps !== 'undefined') Deps.registrar('inventarioService', InventarioService);
       Logger.info('[Bootstrap] InventarioService configurado.');
     }
 
-    // ── 7. Iniciar PedidoManager ──────────────────────────
+    // ── 7. Iniciar PedidoManager (ya no necesita repo explícito) ─
     try {
       if (typeof PedidoManager !== 'undefined') {
-        const turno = PedidoManager.init({ pedidoRepo });
+        const turno = PedidoManager.init({ pedidoRepo }); // aún se lo pasamos para compatibilidad
         Logger.info(`[Bootstrap] PedidoManager activo. Turno: ${turno?.id}`);
       }
     } catch (e) {
