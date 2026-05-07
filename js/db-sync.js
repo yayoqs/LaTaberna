@@ -1,14 +1,10 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-sync.js (v5.0 – ventana global explícita)
-   Propósito: Sincronización con Google Sheets, cola offline y
-              método genérico de llamada.
-              Ahora asigna la variable global window.DBSync para
-              evitar problemas de inicialización.
+   PubPOS — MÓDULO: db-sync.js (v5.1 – log de respuesta)
    ================================================================ */
 window.DBSync = (function() {
   const module = {};
 
-  module.urlSheets = "https://script.google.com/macros/s/AKfycby7VMa6xdaz6unhHqgLJ0eyyS-P51IAIz8FmuTGd5Tp75asksJ1HKV6QanHn5lFTEtOvQ/exec";
+  module.urlSheets = "https://script.google.com/macros/s/AKfycbxOtznKKLBnJPMvpChxy6isJwDkvLhuVsc7W3ykyPusqZV3wQZtUllrHcd2xmCL1ypH/exec";
 
   module.syncQueue = [];
 
@@ -222,7 +218,9 @@ window.DBSync = (function() {
 
   module.syncGuardarPedido = async function(pedido) {
     try {
-      await this._sendDataViaGet('guardarPedido', { pedido });
+      const respuesta = await this._sendDataViaGet('guardarPedido', { pedido });
+      // 🔍 Mostrar la respuesta completa del backend
+      console.log('🛰️ [DB Sync] Respuesta de guardarPedido:', JSON.stringify(respuesta, null, 2));
     } catch (e) {
       Logger.warn('[DB Sync] Offline, pedido encolado.');
       this._encolarOperacion('guardarPedido', { pedido });

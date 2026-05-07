@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — REPOSITORIO: pedido-repository.js (v1.3 – debug)
+   PubPOS — REPOSITORIO: pedido-repository.js (v1.4 – await faltante)
    ================================================================ */
 const PedidoRepository = {
   async crearPedidoMesa(datos) { throw new Error('No implementado'); },
@@ -32,8 +32,8 @@ const PedidoRepositoryLocal = (() => {
 
     const pedidoJSON = agregado.toJSON();
 
-    // 2. Crear pedido en localStorage (DB.core)
-    const pedidoLocal = DB.crearPedido(
+    // 2. Crear pedido en localStorage (DB.core) ← ¡AGREGAR await!
+    const pedidoLocal = await DB.crearPedido(
       pedidoJSON.mesa,
       pedidoJSON.mozo,
       pedidoJSON.comensales
@@ -55,7 +55,6 @@ const PedidoRepositoryLocal = (() => {
       updated_at:  pedidoLocal.created_at
     };
 
-    // 🔍 DEBUG: mostrar el objeto que se enviará a Sheets
     console.log('🛰️ [PedidoRepo] Objeto enviado a Sheets:', JSON.stringify(pedidoParaSync, null, 2));
 
     // 4. Sincronizar con Google Sheets
