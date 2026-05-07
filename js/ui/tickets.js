@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: tickets.js (v4.2 – soporte onPrint)
+   PubPOS — MÓDULO: tickets.js (v4.3 – botón imprimir dinámico)
    ================================================================ */
 const Tickets = (() => {
 
@@ -226,7 +226,10 @@ const Tickets = (() => {
       if (typeof opciones.editarCallback === 'function') {
         html += `<button class="btn-secondary" id="${prefix}-editar"><i class="fas fa-pen"></i> ${opciones.textoEditar || 'Editar'}</button>`;
       }
-      html += `<button class="btn-print" id="${prefix}-imprimir"><i class="fas fa-print"></i> Imprimir</button>`;
+      // Botón imprimir dinámico: acepta textoImprimir y callback onImprimir
+      const textoImprimir = opciones.textoImprimir || 'Imprimir';
+      const claseImprimir = opciones.claseImprimir || 'btn-print';
+      html += `<button class="${claseImprimir}" id="${prefix}-imprimir"><i class="fas fa-print"></i> ${textoImprimir}</button>`;
       return html;
     },
 
@@ -244,14 +247,23 @@ const Tickets = (() => {
 
       if (printBtn) {
         printBtn.onclick = async () => {
-          if (typeof opciones.onPrint === 'function') {
-            await opciones.onPrint();
+          // Ejecutar el callback onImprimir si existe (puede devolver false para abortar)
+          let debeImprimir = true;
+          if (typeof opciones.onImprimir === 'function') {
+            debeImprimir = await opciones.onImprimir();
           }
-          const contentDiv = document.getElementById(`${prefix}-content`);
-          if (!contentDiv) return;
-          _imprimirEnVentana(contentDiv.innerHTML, 'Comanda');
-          const overlay = document.getElementById(prefix);
-          if (overlay) overlay.style.display = 'none';
+          if (debeImprimir) {
+            const contentDiv = document.getElementById(`${prefix}-content`);
+            if (!contentDiv) return;
+            // Si es reimpresión, añadimos la marca
+            let html = contentDiv.innerHTML;
+            if (opciones.esReimpresion) {
+              html = `<div class="t-center t-small" style="color:red;margin-bottom:8px;">*** REIMPRESO ***</div>` + html;
+            }
+            _imprimirEnVentana(html, 'Comanda');
+            const overlay = document.getElementById(prefix);
+            if (overlay) overlay.style.display = 'none';
+          }
         };
       }
 

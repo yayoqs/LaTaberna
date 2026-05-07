@@ -1,9 +1,11 @@
 /* ================================================================
-   PubPOS — MÓDULO: pedido-ui.js (v5.0 – revisión antes de enviar)
+   PubPOS — MÓDULO: pedido-ui.js (v5.1 – botón dual Imprimir/Reimprimir)
    ================================================================ */
 const Pedido = (() => {
 
   let _mesaAbriendo = null;
+  // Registro de comandas ya enviadas (tempId -> true)
+  const _comandasEnviadas = {};
 
   /* ── MODAL DE PEDIDO ────────────────────────────────────── */
   function _asegurarModalPedido() {
@@ -226,7 +228,7 @@ const Pedido = (() => {
     EventBus.emit('mesa:cerrada');
   }
 
-  /* ── REVISAR COMANDA ──────────────────────────────────── */
+  /* ── REVISAR COMANDA (con botón dual) ──────────────────── */
   async function revisarComanda() {
     const mesa = Comanda.getMesaActiva();
     if (!mesa) { showToast('warning', 'No hay mesa activa.'); return; }
@@ -244,6 +246,51 @@ const Pedido = (() => {
     const cocinaItems = pendientes.filter(it => it.destino === 'cocina' || it.destino === 'ambos');
     const barraItems  = pendientes.filter(it => it.destino === 'barra'  || it.destino === 'ambos');
 
+    const _crearOpciones = (comandaTemp) => {
+      const tempId = comandaTemp.id;
+      const yaEnviada = !!_comandasEnviadas[tempId];
+      return {
+        textoEditar: 'Editar',
+        editarCallback: (html) => _editarComandaCallback(comandaTemp, html),
+        textoImprimir: yaEnviada ? 'Reimprimir' : 'Enviar e Imprimir',
+        claseImprimir: yaEnviada ? 'btn-secondary' : 'btn-print',
+        esReimpresion: yaEnviada,
+        onImprimir: async () => {
+          if (!yaEnviada) {
+            // Primera vez: enviar comanda
+            try {
+              const resultado = await CommandBus.ejecutar({
+                type: 'enviarComanda',
+                datos: {
+                  mesa,
+                  mozo: mesa.mozo,
+                  comensales: mesa.comensales,
+                  observaciones: mesa.observaciones || '',
+                  itemsPendientes: pendientes
+                }
+              });
+              if (!resultado.exito) {
+                showToast('error', 'Error al enviar comanda: ' + resultado.error);
+                return false; // no imprimir
+              }
+              _comandasEnviadas[tempId] = true;
+              showToast('success', 'Comanda(s) enviada(s)');
+              if (window.Comanda && typeof Comanda.render === 'function') Comanda.render();
+              if (window.Mesas && typeof Mesas.render === 'function') Mesas.render();
+              EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: mesa.estado });
+              return true; // imprimir
+            } catch (e) {
+              Logger.error('[Pedido] Error al enviar comanda:', e);
+              showToast('error', 'Error al enviar comanda.');
+              return false;
+            }
+          }
+          // Reimpresión: solo imprime
+          return true;
+        }
+      };
+    };
+
     const comandaTemp = (items, destino) => ({
       id: 'temp_' + Date.now(),
       mesa: mesa.numero,
@@ -255,66 +302,21 @@ const Pedido = (() => {
       ts: Date.now()
     });
 
-    const onPrint = async (comandaEditada) => {
-      if (comandaEditada && comandaEditada.observaciones !== undefined) {
-        mesa.observaciones = comandaEditada.observaciones;
-      }
-      try {
-        const resultado = await CommandBus.ejecutar({
-          type: 'enviarComanda',
-          datos: {
-            mesa,
-            mozo: mesa.mozo,
-            comensales: mesa.comensales,
-            observaciones: mesa.observaciones || '',
-            itemsPendientes: pendientes
-          }
-        });
-        if (!resultado.exito) {
-          showToast('error', 'Error al enviar comanda: ' + resultado.error);
-          return;
-        }
-        showToast('success', 'Comanda(s) enviada(s)');
-        if (window.Comanda && typeof Comanda.render === 'function') Comanda.render();
-        if (window.Mesas && typeof Mesas.render === 'function') Mesas.render();
-        EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: mesa.estado });
-      } catch (e) {
-        Logger.error('[Pedido] Error al enviar comanda desde revisión:', e);
-        showToast('error', 'Error al enviar comanda.');
-      }
-    };
-
     if (cocinaItems.length && barraItems.length) {
       const comCocina = comandaTemp(cocinaItems, 'cocina');
       const comBarra  = comandaTemp(barraItems,  'barra');
       Tickets.mostrarDoble(
         Tickets.generarComanda(comCocina, 'cocina'), 'Cocina',
-        {
-          textoEditar: 'Editar',
-          editarCallback: (html) => _editarComandaCallback(comCocina, html),
-          onPrint: () => onPrint(comCocina)
-        },
+        _crearOpciones(comCocina),
         Tickets.generarComanda(comBarra, 'barra'), 'Barra',
-        {
-          textoEditar: 'Editar',
-          editarCallback: (html) => _editarComandaCallback(comBarra, html),
-          onPrint: () => onPrint(comBarra)
-        }
+        _crearOpciones(comBarra)
       );
     } else if (cocinaItems.length) {
       const comCocina = comandaTemp(cocinaItems, 'cocina');
-      Tickets.mostrar(Tickets.generarComanda(comCocina, 'cocina'), `Cocina — Mesa ${mesa.numero}`, {
-        textoEditar: 'Editar',
-        editarCallback: (html) => _editarComandaCallback(comCocina, html),
-        onPrint: () => onPrint(comCocina)
-      });
+      Tickets.mostrar(Tickets.generarComanda(comCocina, 'cocina'), `Cocina — Mesa ${mesa.numero}`, _crearOpciones(comCocina));
     } else if (barraItems.length) {
       const comBarra = comandaTemp(barraItems, 'barra');
-      Tickets.mostrar(Tickets.generarComanda(comBarra, 'barra'), `Barra — Mesa ${mesa.numero}`, {
-        textoEditar: 'Editar',
-        editarCallback: (html) => _editarComandaCallback(comBarra, html),
-        onPrint: () => onPrint(comBarra)
-      });
+      Tickets.mostrar(Tickets.generarComanda(comBarra, 'barra'), `Barra — Mesa ${mesa.numero}`, _crearOpciones(comBarra));
     }
   }
 
@@ -328,6 +330,7 @@ const Pedido = (() => {
     return htmlActual;
   }
 
+  /* ── Transferir mesa ─────────────────────────────────── */
   function transferirMesa(mesaOrigenNum, mesaDestinoNum) {
     if (!Auth.esAdmin()) { showToast('error', 'Solo administradores pueden transferir pedidos entre mesas'); return false; }
     const mesaOrigen = DB.getMesa(mesaOrigenNum), mesaDestino = DB.getMesa(mesaDestinoNum);
