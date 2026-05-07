@@ -1,16 +1,17 @@
 /* ================================================================
-   PubPOS — MÓDULO: db.js (Orquestador v2.2 – usa window.DBSync)
+   PubPOS — MÓDULO: db.js (Orquestador v2.3 – serializar items)
    ================================================================
    Cambios:
-   - Ahora se utiliza window.DBSync para garantizar que el módulo
-     de sincronización esté disponible aunque el scope falle.
-   - Se mantienen las delegaciones y la sincronización del cierre
-     de pedidos agregada en v2.1.
+   - En cerrarPedido, antes de llamar a syncGuardarPedido, se
+     serializa "items" a JSON string si es un array.
+   - Se añaden explícitamente los campos requeridos por el backend
+     (id, mesa, estado, items, total, mozo, etc.) para evitar
+     discrepancias.
    ================================================================ */
 
 var DB = (function() {
   const core = DBCore;
-  const sync = window.DBSync;  // <-- uso explícito de la variable global
+  const sync = window.DBSync;
   const inventario = DBInventario;
   const fusion = DBFusion;
 
@@ -58,7 +59,7 @@ var DB = (function() {
     EventBus.emit('app:error', 'No se pudieron cargar los datos iniciales.');
   };
 
-  // ── MÉTODOS DE PEDIDO (DELEGADOS) ─────────────────────
+  // ── MÉTODOS DE PEDIDO ──────────────────────────────────
   combined.crearPedidoMesa = function(numeroMesa, mozo, comensales) {
     if (typeof PedidoManager !== 'undefined' && PedidoManager.crearPedidoMesa) {
       return PedidoManager.crearPedidoMesa(numeroMesa, mozo, comensales);
@@ -85,6 +86,7 @@ var DB = (function() {
       return pedido;
     }
 
+    // ── Descontar stock local ──────────────────────────────
     try {
       const items = JSON.parse(pedido.items || '[]');
       for (const item of items) {
@@ -94,6 +96,7 @@ var DB = (function() {
       console.warn("[DB] Error descontando stock local:", e);
     }
 
+    // ── Descuento de stock online (encola si falla) ────────
     try {
       const items = JSON.parse(pedido.items || '[]');
       await fetch(this.urlSheets, {
@@ -112,19 +115,36 @@ var DB = (function() {
       });
     }
 
+    // ── Actualizar estado local ────────────────────────────
     const pedidoActualizado = this.actualizarPedido(id, {
       estado: 'cerrada',
       total,
       updated_at: new Date().toISOString()
     });
 
+    // ── Sincronizar estado con Sheets ──────────────────────
     if (pedidoActualizado) {
+      // Preparar objeto con los campos exactos que espera el backend
+      const pedidoParaSync = {
+        id: pedidoActualizado.id,
+        mesa: pedidoActualizado.mesa,
+        mozo: pedidoActualizado.mozo || 'Sin mozo',
+        comensales: pedidoActualizado.comensales || 1,
+        estado: pedidoActualizado.estado,
+        items: Array.isArray(pedidoActualizado.items) 
+                 ? JSON.stringify(pedidoActualizado.items) 
+                 : pedidoActualizado.items,   // asegurar string JSON
+        total: pedidoActualizado.total,
+        created_at: pedidoActualizado.created_at,
+        updated_at: pedidoActualizado.updated_at
+      };
+
       try {
-        await this.syncGuardarPedido(pedidoActualizado);
+        await this.syncGuardarPedido(pedidoParaSync);
         console.log(`[DB] Pedido ${id} sincronizado con Sheets como cerrado.`);
       } catch (e) {
         console.warn(`[DB] Error al sincronizar cierre del pedido ${id}. Encolando.`);
-        this._encolarOperacion('guardarPedido', { pedido: pedidoActualizado });
+        this._encolarOperacion('guardarPedido', { pedido: pedidoParaSync });
       }
     }
 
