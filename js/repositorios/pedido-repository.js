@@ -1,9 +1,9 @@
 /* ================================================================
-   PubPOS — REPOSITORIO: pedido-repository.js (v1.1 – normalizado)
-   Propósito: Adaptador local que persiste pedidos en localStorage
-              y los sincroniza con Google Sheets.
-              Ahora se asegura de que el objeto enviado esté completo
-              y con el formato que el backend espera (items como string).
+   PubPOS — REPOSITORIO: pedido-repository.js (v1.2 – creación unificada)
+   ================================================================
+   El repositorio ahora es el único responsable de crear el pedido
+   (usando el agregado para validar reglas) y de sincronizarlo con
+   Sheets. Si la sincronización falla, muestra un toast al usuario.
    ================================================================ */
 
 const PedidoRepository = {
@@ -20,11 +20,32 @@ const PedidoRepositoryLocal = (() => {
       throw new Error('DB.core no disponible');
     }
 
-    // 1. Guardar en localStorage
-    const pedidoLocal = DB.crearPedido(datos.mesa, datos.mozo, datos.comensales);
+    // 1. Validar reglas de negocio con el agregado
+    let agregado;
+    try {
+      const comensalesCant = crearCantidad(datos.comensales || 1);
+      if (!comensalesCant) throw new Error('Comensales inválidos');
+      agregado = new PedidoAgregado(
+        'ped_' + Date.now(),
+        datos.mesa,
+        datos.mozo || 'Sin mozo',
+        comensalesCant
+      );
+    } catch (e) {
+      throw new Error('Reglas de negocio: ' + e.message);
+    }
+
+    const pedidoJSON = agregado.toJSON();
+
+    // 2. Crear pedido en localStorage (DB.core)
+    const pedidoLocal = DB.crearPedido(
+      pedidoJSON.mesa,
+      pedidoJSON.mozo,
+      pedidoJSON.comensales
+    );
     if (!pedidoLocal) throw new Error('No se pudo crear el pedido localmente');
 
-    // 2. Normalizar objeto para Sheets
+    // 3. Normalizar objeto para Sheets (usando el mismo id generado por DB.crearPedido)
     const pedidoParaSync = {
       id:          pedidoLocal.id,
       mesa:        pedidoLocal.mesa,
@@ -36,17 +57,21 @@ const PedidoRepositoryLocal = (() => {
                      : (pedidoLocal.items || '[]'),
       total:       pedidoLocal.total || 0,
       created_at:  pedidoLocal.created_at,
-      updated_at:  pedidoLocal.created_at  // recién creado
+      updated_at:  pedidoLocal.created_at
     };
 
-    // 3. Sincronizar con Google Sheets (con manejo de error)
+    // 4. Sincronizar con Google Sheets
     if (typeof DB.syncGuardarPedido === 'function') {
       try {
         await DB.syncGuardarPedido(pedidoParaSync);
+        Logger.info('[PedidoRepo] Pedido sincronizado con Sheets.');
       } catch (e) {
-        console.warn('[PedidoRepo] Error al sincronizar con Sheets (encolado):', e);
-        // La cola offline se encarga de reintentar
+        Logger.warn('[PedidoRepo] Error al sincronizar con Sheets. Encolado.', e);
+        showToast('warning', 'Sin conexión. El pedido se guardó localmente y se enviará cuando vuelva la conexión.');
       }
+    } else {
+      Logger.warn('[PedidoRepo] DB.syncGuardarPedido no disponible. El pedido solo quedó en localStorage.');
+      showToast('warning', 'Pedido guardado solo localmente (falta módulo de sincronización).');
     }
 
     return pedidoLocal;
