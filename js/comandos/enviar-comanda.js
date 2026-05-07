@@ -1,13 +1,5 @@
 /* ================================================================
-   PubPOS — COMANDO: enviar-comanda.js (v2 – validación de stock)
-   Propósito: Handler del comando 'enviarComanda'. Ahora, antes de
-              crear las comandas, valida el stock disponible mediante
-              InventarioService. Si algún ingrediente escasea, avisa
-              al mesero con un toast de advertencia pero permite
-              continuar con el envío.
-              
-              También obtiene InventarioService desde el contenedor
-              Deps, eliminando el acceso global a DB.
+   PubPOS — COMANDO: enviar-comanda.js (v2.1 – sync pedido a Sheets)
    ================================================================ */
 
 function crearComandoEnviarComanda(datos) {
@@ -18,7 +10,7 @@ function crearComandoEnviarComanda(datos) {
       mozo: datos.mozo,
       comensales: datos.comensales,
       observaciones: datos.observaciones || '',
-      itemsPendientes: datos.itemsPendientes  // array de ítems no enviados
+      itemsPendientes: datos.itemsPendientes
     }
   };
 }
@@ -32,8 +24,7 @@ async function handleEnviarComanda(comando) {
     throw new Error('No hay ítems pendientes para enviar');
   }
 
-  // ── 2. Validación de stock (NUEVA) ──────────────────────
-  // Intentamos usar InventarioService si está disponible
+  // ── 2. Validación de stock ──────────────────────────────
   try {
     const inventarioSvc = Deps.obtener('inventarioService');
     const resultadoStock = inventarioSvc.validarStockParaItems(itemsPendientes);
@@ -41,11 +32,8 @@ async function handleEnviarComanda(comando) {
       const faltantes = resultadoStock.faltantes
         .map(f => `${f.ingrediente} (faltan ${f.faltante} ${f.unidad})`)
         .join(', ');
-      // Advertimos al mesero pero no bloqueamos el envío
       showToast('warning', `⚠️ Stock bajo: ${faltantes}. La comanda se enviará igual.`);
       Logger.warn(`[EnviarComanda] Stock bajo detectado: ${faltantes}`);
-      
-      // Auditoría: registramos la incidencia
       if (typeof PedidoManager.registrar === 'function') {
         PedidoManager.registrar('inventario:alerta_faltante', {
           mesa: mesa.numero,
@@ -55,14 +43,12 @@ async function handleEnviarComanda(comando) {
       }
     }
   } catch (e) {
-    // Si InventarioService no está disponible o falla, continuamos sin validar.
     Logger.warn('[EnviarComanda] No se pudo validar stock:', e.message);
   }
 
   // ── 3. Separar por destino ───────────────────────────────
   const cocinaItems = itemsPendientes.filter(it => it.destino === 'cocina' || it.destino === 'ambos');
   const barraItems  = itemsPendientes.filter(it => it.destino === 'barra'  || it.destino === 'ambos');
-
   if (!cocinaItems.length && !barraItems.length) {
     throw new Error('Los ítems no tienen un destino válido');
   }
@@ -86,17 +72,14 @@ async function handleEnviarComanda(comando) {
       ts: Date.now()
     };
 
-    // Persistir en DB (el Store se actualizará automáticamente)
     if (typeof DB !== 'undefined' && DB.comandas) {
       DB.comandas.push(comanda);
-      DB.saveComandas();
     }
-
     Logger.debug(`[EnviarComanda] Comanda creada para ${destinoKds}`, comanda);
     return comanda;
   };
 
-  // ── 5. Crear comandas según lo que haya ──────────────────
+  // ── 5. Crear comandas (según lo que haya) ──────────────────
   const comandasCreadas = [];
   const ticketsGenerados = { cocina: null, barra: null };
 
@@ -127,16 +110,14 @@ async function handleEnviarComanda(comando) {
   if (mesa.estado === 'libre') {
     mesa.estado = 'ocupada';
   }
-
-  // ── 7. Persistir cambios en la mesa ──────────────────────
   if (typeof DB !== 'undefined' && DB.saveMesas) {
     DB.saveMesas();
   }
 
-  // ── 8. Actualizar pedido asociado (si existe) ────────────
+  // ── 7. Actualizar pedido asociado (y sincronizar con Sheets) ──
   if (mesa.pedidoId && typeof DB !== 'undefined' && DB.actualizarPedido) {
     try {
-      await DB.actualizarPedido(mesa.pedidoId, {
+      const pedidoActualizado = await DB.actualizarPedido(mesa.pedidoId, {
         estado: 'en_proceso',
         items: JSON.stringify(mesa.items),
         total: calcularTotal(mesa.items),
@@ -144,15 +125,40 @@ async function handleEnviarComanda(comando) {
         comensales: mesa.comensales,
         observaciones: mesa.observaciones
       });
-      Logger.debug(`[EnviarComanda] Pedido ${mesa.pedidoId} actualizado.`);
+      Logger.debug(`[EnviarComanda] Pedido ${mesa.pedidoId} actualizado localmente.`);
+
+      // Sincronizar el pedido actualizado con Google Sheets
+      if (pedidoActualizado && typeof DB.syncGuardarPedido === 'function') {
+        try {
+          // Aseguramos que items sea string
+          const pedidoParaSync = {
+            ...pedidoActualizado,
+            items: Array.isArray(pedidoActualizado.items)
+              ? JSON.stringify(pedidoActualizado.items)
+              : pedidoActualizado.items
+          };
+          await DB.syncGuardarPedido(pedidoParaSync);
+          Logger.info(`[EnviarComanda] Pedido ${mesa.pedidoId} sincronizado con Sheets.`);
+        } catch (syncError) {
+          Logger.warn(`[EnviarComanda] Error al sincronizar pedido con Sheets. Encolado.`, syncError);
+          if (typeof DB._encolarOperacion === 'function') {
+            DB._encolarOperacion('guardarPedido', { pedido: pedidoActualizado });
+          }
+          showToast('warning', 'Comanda enviada, pero no se pudo actualizar la hoja de cálculo. Se reintentará.');
+        }
+      }
     } catch (e) {
       Logger.warn('[EnviarComanda] No se pudo actualizar pedido:', e);
     }
   }
 
-  // ── 9. Notificar a otros módulos ─────────────────────────
-  EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: mesa.estado });
+  // ── 8. Persistir comandas y notificar ────────────────────
+  if (typeof DB !== 'undefined' && DB.saveComandas) {
+    DB.saveComandas(); // dispara Store y EventBus
+  }
+
   comandasCreadas.forEach(c => EventBus.emit('comanda:enviada', c));
+  EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: mesa.estado });
 
   Logger.info(`[EnviarComanda] ${comandasCreadas.length} comanda(s) enviada(s).`);
 
