@@ -1,13 +1,11 @@
 /* ================================================================
-   PubPOS — MÓDULO: pedido-ui.js (v5.1 – botón dual Imprimir/Reimprimir)
+   PubPOS — MÓDULO: pedido-ui.js (v5.2 – modal no se cierra solo)
    ================================================================ */
 const Pedido = (() => {
 
   let _mesaAbriendo = null;
-  // Registro de comandas ya enviadas (tempId -> true)
   const _comandasEnviadas = {};
 
-  /* ── MODAL DE PEDIDO ────────────────────────────────────── */
   function _asegurarModalPedido() {
     if ($id('modalPedido')) return;
 
@@ -67,7 +65,7 @@ const Pedido = (() => {
     document.body.appendChild(modal);
   }
 
-  /* ── MODAL DE APERTURA ─────────────────────────────────── */
+  /* ── MODAL DE APERTURA (sin cambios) ───────────────────── */
   function _mostrarModalApertura(mesa) {
     let modal = $id('modalAperturaMesa');
     if (modal) modal.remove();
@@ -89,13 +87,11 @@ const Pedido = (() => {
         <div class="modal-small-body">
           <label for="aperturaComensales">Comensales</label>
           <input type="number" id="aperturaComensales" value="2" min="1" max="20" step="1">
-
           <label for="aperturaPersonas">
             Nombres o apodos (opcional)
             <span style="font-weight:normal;font-size:11px;color:var(--color-text-muted);">Separados por coma o uno por línea</span>
           </label>
           <textarea id="aperturaPersonas" rows="3" placeholder="Ej: Juan, María, Pedro"></textarea>
-
           <div class="modal-small-footer">
             <button class="btn-secondary" onclick="Pedido._cancelarApertura()">Cancelar</button>
             <button class="btn-primary" onclick="Pedido._confirmarApertura(${numMesa})">
@@ -106,7 +102,6 @@ const Pedido = (() => {
       </div>
     `;
     document.body.appendChild(modal);
-
     setTimeout(() => $id('aperturaComensales')?.focus(), 100);
   }
 
@@ -119,19 +114,11 @@ const Pedido = (() => {
   async function _confirmarApertura(num) {
     const comensales = parseInt($id('aperturaComensales')?.value) || 2;
     const personasRaw = $id('aperturaPersonas')?.value || '';
-    
-    const personas = personasRaw
-      .split(/[,\n]/)
-      .map(s => s.trim())
-      .filter(s => s.length > 0);
-
+    const personas = personasRaw.split(/[,\n]/).map(s => s.trim()).filter(s => s.length > 0);
     _cancelarApertura();
 
     const mesa = DB.mesas.find(m => m.numero == num);
-    if (!mesa) {
-      showToast('error', 'Mesa no encontrada');
-      return;
-    }
+    if (!mesa) { showToast('error', 'Mesa no encontrada'); return; }
 
     mesa.comensales = comensales;
     mesa.personas = personas;
@@ -170,9 +157,7 @@ const Pedido = (() => {
 
     const tituloEl = document.getElementById('modalMesaTitulo');
     const badgeEl = document.getElementById('modalEstadoBadge');
-    if (tituloEl) tituloEl.textContent = mesa.esVirtual 
-      ? `Mesas ${mesa.mesasFusionadas.join(', ')}` 
-      : `Mesa ${mesa.numero}`;
+    if (tituloEl) tituloEl.textContent = mesa.esVirtual ? `Mesas ${mesa.mesasFusionadas.join(', ')}` : `Mesa ${mesa.numero}`;
     if (badgeEl) {
       badgeEl.textContent = Mesas.labelEstado(mesa.estado);
       badgeEl.className = `estado-badge ${mesa.estado}`;
@@ -180,7 +165,6 @@ const Pedido = (() => {
 
     EventBus.emit('mesa:abierta', mesa);
     if (window.Carta && typeof Carta.render === 'function') Carta.render();
-    
     const modal = document.getElementById('modalPedido');
     if (modal) modal.style.display = 'flex';
   }
@@ -191,14 +175,10 @@ const Pedido = (() => {
 
     try {
       const mesa = DB.mesas.find(m => m.numero == num);
-      if (!mesa) {
-        Logger.error(`[Pedido] Mesa ${num} no encontrada.`);
-        return;
-      }
+      if (!mesa) { Logger.error(`[Pedido] Mesa ${num} no encontrada.`); return; }
 
       if (mesa.estado === 'libre') {
-        mesa.mozo = document.getElementById('mozoActivo')?.value 
-                    || (DB.mozos[0]?.nombre || 'Mozo');
+        mesa.mozo = document.getElementById('mozoActivo')?.value || (DB.mozos[0]?.nombre || 'Mozo');
         _mostrarModalApertura(mesa);
       } else {
         _abrirModalPedido(mesa);
@@ -228,7 +208,7 @@ const Pedido = (() => {
     EventBus.emit('mesa:cerrada');
   }
 
-  /* ── REVISAR COMANDA (con botón dual) ──────────────────── */
+  /* ── REVISAR COMANDA (con botón que cambia y modal persistente) ── */
   async function revisarComanda() {
     const mesa = Comanda.getMesaActiva();
     if (!mesa) { showToast('warning', 'No hay mesa activa.'); return; }
@@ -246,7 +226,7 @@ const Pedido = (() => {
     const cocinaItems = pendientes.filter(it => it.destino === 'cocina' || it.destino === 'ambos');
     const barraItems  = pendientes.filter(it => it.destino === 'barra'  || it.destino === 'ambos');
 
-    const _crearOpciones = (comandaTemp) => {
+    const _crearOpciones = (comandaTemp, modalId) => {
       const tempId = comandaTemp.id;
       const yaEnviada = !!_comandasEnviadas[tempId];
       return {
@@ -257,7 +237,6 @@ const Pedido = (() => {
         esReimpresion: yaEnviada,
         onImprimir: async () => {
           if (!yaEnviada) {
-            // Primera vez: enviar comanda
             try {
               const resultado = await CommandBus.ejecutar({
                 type: 'enviarComanda',
@@ -271,21 +250,28 @@ const Pedido = (() => {
               });
               if (!resultado.exito) {
                 showToast('error', 'Error al enviar comanda: ' + resultado.error);
-                return false; // no imprimir
+                return false;
               }
               _comandasEnviadas[tempId] = true;
               showToast('success', 'Comanda(s) enviada(s)');
               if (window.Comanda && typeof Comanda.render === 'function') Comanda.render();
               if (window.Mesas && typeof Mesas.render === 'function') Mesas.render();
               EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: mesa.estado });
-              return true; // imprimir
+
+              // Cambiar el botón dinámicamente sin cerrar el modal
+              const btnImprimir = document.getElementById(`${modalId}-imprimir`);
+              if (btnImprimir) {
+                btnImprimir.textContent = 'Reimprimir';
+                btnImprimir.className = 'btn-secondary';
+              }
+              return false; // no queremos que se cierre el modal ni se imprima automáticamente
             } catch (e) {
               Logger.error('[Pedido] Error al enviar comanda:', e);
               showToast('error', 'Error al enviar comanda.');
               return false;
             }
           }
-          // Reimpresión: solo imprime
+          // Reimpresión: permite imprimir, no cierra el modal
           return true;
         }
       };
@@ -307,16 +293,16 @@ const Pedido = (() => {
       const comBarra  = comandaTemp(barraItems,  'barra');
       Tickets.mostrarDoble(
         Tickets.generarComanda(comCocina, 'cocina'), 'Cocina',
-        _crearOpciones(comCocina),
+        _crearOpciones(comCocina, 'ticket-dual-izq'),
         Tickets.generarComanda(comBarra, 'barra'), 'Barra',
-        _crearOpciones(comBarra)
+        _crearOpciones(comBarra, 'ticket-dual-der')
       );
     } else if (cocinaItems.length) {
       const comCocina = comandaTemp(cocinaItems, 'cocina');
-      Tickets.mostrar(Tickets.generarComanda(comCocina, 'cocina'), `Cocina — Mesa ${mesa.numero}`, _crearOpciones(comCocina));
+      Tickets.mostrar(Tickets.generarComanda(comCocina, 'cocina'), `Cocina — Mesa ${mesa.numero}`, _crearOpciones(comCocina, 'ticket-modal'));
     } else if (barraItems.length) {
       const comBarra = comandaTemp(barraItems, 'barra');
-      Tickets.mostrar(Tickets.generarComanda(comBarra, 'barra'), `Barra — Mesa ${mesa.numero}`, _crearOpciones(comBarra));
+      Tickets.mostrar(Tickets.generarComanda(comBarra, 'barra'), `Barra — Mesa ${mesa.numero}`, _crearOpciones(comBarra, 'ticket-modal'));
     }
   }
 
@@ -330,7 +316,6 @@ const Pedido = (() => {
     return htmlActual;
   }
 
-  /* ── Transferir mesa ─────────────────────────────────── */
   function transferirMesa(mesaOrigenNum, mesaDestinoNum) {
     if (!Auth.esAdmin()) { showToast('error', 'Solo administradores pueden transferir pedidos entre mesas'); return false; }
     const mesaOrigen = DB.getMesa(mesaOrigenNum), mesaDestino = DB.getMesa(mesaDestinoNum);
@@ -385,19 +370,10 @@ const Pedido = (() => {
   EventBus.on('mesa:seleccionada', abrirMesa);
 
   return {
-    abrirMesa,
-    cerrar,
-    revisarComanda,
-    transferirMesa,
-    mostrarSelectorTransferencia,
-    pedirCuenta,
-    cerrarMesa,
-    _setCat,
-    filtrarProductos,
-    actualizarObsGeneral,
-    _agregarItem,
-    _confirmarApertura,
-    _cancelarApertura
+    abrirMesa, cerrar, revisarComanda, transferirMesa,
+    mostrarSelectorTransferencia, pedirCuenta, cerrarMesa,
+    _setCat, filtrarProductos, actualizarObsGeneral, _agregarItem,
+    _confirmarApertura, _cancelarApertura
   };
 })();
 

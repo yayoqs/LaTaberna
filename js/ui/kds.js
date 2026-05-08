@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: kds.js (v4.2 – solo Store, sin duplicados)
+   PubPOS — MÓDULO: kds.js (v4.3 – escucha también EventBus)
    ================================================================ */
 const KDS = (() => {
   const MINUTOS_URGENTE = 15;
@@ -36,7 +36,7 @@ const KDS = (() => {
 
     let comandas = Store.getState().comandas || [];
 
-    // Filtrar comandas que no tengan items (protección)
+    // Filtrar comandas que no tengan items
     comandas = comandas.filter(c => c && Array.isArray(c.items));
 
     // Filtrar las que ya expiraron
@@ -53,6 +53,8 @@ const KDS = (() => {
     } else if (rol === 'barra') {
       comandas = comandas.filter(c => c.destino === 'barra' || c.destino === 'ambos');
     }
+
+    Logger.debug(`[KDS] ${comandas.length} comandas activas en Store.`);
 
     if (!comandas.length) {
       cont.innerHTML = `<div class="kds-empty"><i class="fas fa-check-circle"></i><p class="kds-empty-title">Todo en orden</p><p>No hay comandas pendientes</p></div>`;
@@ -124,10 +126,7 @@ const KDS = (() => {
     const c = comandas.find(x => x.id === id);
     if (!c) return;
 
-    Store.dispatch({
-      type: 'COMANDA_ACTUALIZADA',
-      payload: { id, cambios: { estado } }
-    });
+    Store.dispatch({ type: 'COMANDA_ACTUALIZADA', payload: { id, cambios: { estado } } });
 
     if (estado === 'lista') {
       const mesa = DB.getMesa(c.mesa);
@@ -139,11 +138,7 @@ const KDS = (() => {
       EventBus.emit('comanda:lista', { id, mesa: c.mesa });
 
       if (c.deliveryId) {
-        EventBus.emit('delivery:listo', {
-          deliveryId: c.deliveryId,
-          comandaId: id,
-          estado: 'listo'
-        });
+        EventBus.emit('delivery:listo', { deliveryId: c.deliveryId, comandaId: id, estado: 'listo' });
         Logger.info(`[KDS] Delivery listo: ${c.deliveryId}`);
       }
     }
@@ -160,11 +155,16 @@ const KDS = (() => {
   function _initListeners() {
     Store.subscribe((state, action) => {
       if (action.type.startsWith('COMANDA')) {
+        Logger.debug('[KDS] Cambio detectado en Store, refrescando...');
         refresh();
       }
     });
 
-    // Render inicial
+    EventBus.on('comanda:enviada', (comanda) => {
+      Logger.debug(`[KDS] Evento comanda:enviada recibido: ${comanda.id}`);
+      refresh();
+    });
+
     EventBus.on('db:inicializada', () => {
       setTimeout(refresh, 100);
     });
