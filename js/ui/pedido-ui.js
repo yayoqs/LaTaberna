@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: pedido-ui.js (v5.2 – modal no se cierra solo)
+   PubPOS — MÓDULO: pedido-ui.js (v5.3 – reimprimir comandas enviadas)
    ================================================================ */
 const Pedido = (() => {
 
@@ -208,14 +208,30 @@ const Pedido = (() => {
     EventBus.emit('mesa:cerrada');
   }
 
-  /* ── REVISAR COMANDA (con botón que cambia y modal persistente) ── */
+  /* ── REVISAR COMANDA (permite reimprimir aunque no haya pendientes) ── */
   async function revisarComanda() {
     const mesa = Comanda.getMesaActiva();
     if (!mesa) { showToast('warning', 'No hay mesa activa.'); return; }
 
     const pendientes = mesa.items.filter(it => !it.enviado);
-    if (!pendientes.length) { showToast('warning', 'No hay ítems nuevos para revisar.'); return; }
 
+    // Si hay ítems pendientes, los mostramos para enviar
+    if (pendientes.length > 0) {
+      _mostrarRevisarPendientes(mesa, pendientes);
+      return;
+    }
+
+    // Si todos están enviados, buscamos comandas existentes para reimprimir
+    const comandasMesa = DB.comandas.filter(c => c.mesa == mesa.numero || c.mesa == String(mesa.numero));
+    if (comandasMesa.length > 0) {
+      _mostrarReimprimir(comandasMesa);
+      return;
+    }
+
+    showToast('warning', 'No hay comandas para revisar. Envía nuevos ítems primero.');
+  }
+
+  function _mostrarRevisarPendientes(mesa, pendientes) {
     const mozoSelect = document.getElementById('comandaMozo');
     const comensalesInput = document.getElementById('comandaComensales');
     const obsInput = document.getElementById('comandaObs');
@@ -226,7 +242,7 @@ const Pedido = (() => {
     const cocinaItems = pendientes.filter(it => it.destino === 'cocina' || it.destino === 'ambos');
     const barraItems  = pendientes.filter(it => it.destino === 'barra'  || it.destino === 'ambos');
 
-    const _crearOpciones = (comandaTemp, modalId) => {
+    const _crearOpciones = (comandaTemp) => {
       const tempId = comandaTemp.id;
       const yaEnviada = !!_comandasEnviadas[tempId];
       return {
@@ -257,21 +273,13 @@ const Pedido = (() => {
               if (window.Comanda && typeof Comanda.render === 'function') Comanda.render();
               if (window.Mesas && typeof Mesas.render === 'function') Mesas.render();
               EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: mesa.estado });
-
-              // Cambiar el botón dinámicamente sin cerrar el modal
-              const btnImprimir = document.getElementById(`${modalId}-imprimir`);
-              if (btnImprimir) {
-                btnImprimir.textContent = 'Reimprimir';
-                btnImprimir.className = 'btn-secondary';
-              }
-              return false; // no queremos que se cierre el modal ni se imprima automáticamente
+              return true;
             } catch (e) {
               Logger.error('[Pedido] Error al enviar comanda:', e);
               showToast('error', 'Error al enviar comanda.');
               return false;
             }
           }
-          // Reimpresión: permite imprimir, no cierra el modal
           return true;
         }
       };
@@ -293,17 +301,34 @@ const Pedido = (() => {
       const comBarra  = comandaTemp(barraItems,  'barra');
       Tickets.mostrarDoble(
         Tickets.generarComanda(comCocina, 'cocina'), 'Cocina',
-        _crearOpciones(comCocina, 'ticket-dual-izq'),
+        _crearOpciones(comCocina),
         Tickets.generarComanda(comBarra, 'barra'), 'Barra',
-        _crearOpciones(comBarra, 'ticket-dual-der')
+        _crearOpciones(comBarra)
       );
     } else if (cocinaItems.length) {
       const comCocina = comandaTemp(cocinaItems, 'cocina');
-      Tickets.mostrar(Tickets.generarComanda(comCocina, 'cocina'), `Cocina — Mesa ${mesa.numero}`, _crearOpciones(comCocina, 'ticket-modal'));
+      Tickets.mostrar(Tickets.generarComanda(comCocina, 'cocina'), `Cocina — Mesa ${mesa.numero}`, _crearOpciones(comCocina));
     } else if (barraItems.length) {
       const comBarra = comandaTemp(barraItems, 'barra');
-      Tickets.mostrar(Tickets.generarComanda(comBarra, 'barra'), `Barra — Mesa ${mesa.numero}`, _crearOpciones(comBarra, 'ticket-modal'));
+      Tickets.mostrar(Tickets.generarComanda(comBarra, 'barra'), `Barra — Mesa ${mesa.numero}`, _crearOpciones(comBarra));
     }
+  }
+
+  function _mostrarReimprimir(comandas) {
+    comandas.forEach(comanda => {
+      Tickets.mostrar(
+        Tickets.generarComanda(comanda, comanda.destino),
+        `${comanda.destino === 'cocina' ? 'Cocina' : 'Barra'} — Mesa ${comanda.mesa}`,
+        {
+          textoEditar: 'Editar',
+          editarCallback: (html) => _editarComandaCallback(comanda, html),
+          textoImprimir: 'Reimprimir',
+          claseImprimir: 'btn-secondary',
+          esReimpresion: true,
+          onImprimir: () => true
+        }
+      );
+    });
   }
 
   function _editarComandaCallback(comanda, htmlActual) {

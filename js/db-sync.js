@@ -1,11 +1,11 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-sync.js (v5.2 – fetch pedidos desde Sheets)
+   PubPOS — MÓDULO: db-sync.js (v5.3 – reconstruye comandas)
    ================================================================ */
 window.DBSync = (function() {
   const module = {};
 
   module.urlSheets = "https://script.google.com/macros/s/AKfycbzbLLE-lJJRyeHpLTxyvtI7hganGCLHOd9EJJmNqAQBPUz22KfFBW_JZIpX1kq7t7tZcQ/exec";
-
+  
   module.syncQueue = [];
 
   module._cargarSyncQueueLocal = function() {
@@ -75,7 +75,6 @@ window.DBSync = (function() {
     return respData;
   };
 
-  // ── LECTURAS ────────────────────────────────────────────
   module._fetchProductos = async function() {
     try {
       const res = await fetch(`${this.urlSheets}?action=getProductos`, { mode: 'cors' });
@@ -157,7 +156,6 @@ window.DBSync = (function() {
     }
   };
 
-  /** NUEVO: descarga los pedidos desde Sheets y actualiza el estado de las mesas */
   module._fetchPedidos = async function() {
     try {
       const res = await fetch(`${this.urlSheets}?action=getPedidos`, { mode: 'cors' });
@@ -177,9 +175,10 @@ window.DBSync = (function() {
         })).filter(p => p.id && p.mesa);
 
         window.DB.pedidos = pedidosRemotos;
-        window.DB.savePedidos(); // actualiza Store
+        window.DB.savePedidos();
 
-        // Actualizar mesas con los pedidos activos
+        // Reconstruir comandas en KDS a partir de los pedidos activos
+        window.DB.comandas = [];
         pedidosRemotos.forEach(pedido => {
           if (pedido.estado === 'abierta' || pedido.estado === 'en_proceso') {
             const mesa = window.DB.getMesa(pedido.mesa);
@@ -195,11 +194,38 @@ window.DBSync = (function() {
                 mesa.items = [];
               }
               mesa.total = pedido.total;
+
+              // Crear comanda para KDS con los items del pedido
+              const itemsComanda = mesa.items.map(it => ({
+                prodId: it.prodId || '',
+                nombre: it.nombre,
+                precio: it.precio,
+                qty: it.qty,
+                destino: it.destino || 'cocina',
+                obs: it.obs || '',
+                enviado: true,
+                enviadoA: it.destino || 'cocina',
+                enviadoTs: pedido.updated_at || Date.now()
+              }));
+
+              if (itemsComanda.length > 0) {
+                window.DB.comandas.push({
+                  id: 'kds_restored_' + pedido.id,
+                  mesa: pedido.mesa,
+                  mozo: pedido.mozo,
+                  destino: 'cocina',
+                  items: itemsComanda,
+                  observaciones: '',
+                  estado: 'nueva',
+                  ts: Date.now()
+                });
+              }
             }
           }
         });
-        window.DB.saveMesas(); // actualiza Store
-        Logger.info(`[DB Sync] ${pedidosRemotos.length} pedidos sincronizados desde Sheets.`);
+        window.DB.saveMesas();
+        window.DB.saveComandas();
+        Logger.info(`[DB Sync] ${pedidosRemotos.length} pedidos sincronizados y comandas reconstruidas.`);
       }
     } catch (e) {
       Logger.warn("[DB Sync] Error obteniendo pedidos, se mantiene estado local.", e.message);
@@ -224,7 +250,6 @@ window.DBSync = (function() {
     }
   };
 
-  // ── ESCRITURAS ────────────────────────────────────────────
   module.syncGuardarProducto = async function(producto) {
     const idx = this.productos.findIndex(p => p.id == producto.id);
     if (idx >= 0) this.productos[idx] = producto;
