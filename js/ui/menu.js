@@ -1,7 +1,7 @@
 /* ================================================================
-   PubPOS — MÓDULO: menu.js (v2.0 – reactivo al Store)
-   Propósito: Vista de menú digital. Ahora obtiene los productos del
-              Store y se re-renderiza automáticamente cuando cambian.
+   PubPOS — MÓDULO: menu.js (v2.1 – JSDoc completo)
+   Propósito: Vista de menú digital. Obtiene los productos del Store
+              y se re-renderiza automáticamente cuando cambian.
    ================================================================ */
 const Menu = (() => {
 
@@ -31,6 +31,7 @@ const Menu = (() => {
     document.body.insertBefore(main, referencia);
   }
 
+  /** Renderiza las categorías y la grilla de productos */
   function render() {
     _asegurarVista();
     _renderCategorias();
@@ -52,6 +53,7 @@ const Menu = (() => {
     `).join('');
   }
 
+  /** @param {string} cat */
   function setCategoria(cat) {
     _categoriaActiva = cat;
     _terminoBusqueda = $id('menuSearch')?.value?.trim() || '';
@@ -59,6 +61,7 @@ const Menu = (() => {
     _renderCategorias();
   }
 
+  /** Filtra productos por el término de búsqueda */
   function filtrar() {
     _terminoBusqueda = $id('menuSearch')?.value?.trim() || '';
     _renderProductos();
@@ -123,6 +126,7 @@ const Menu = (() => {
     return `hsl(${h}, 55%, 45%)`;
   }
 
+  /** Muestra el modal de detalle de un producto */
   function mostrarDetalle(prodId) {
     const state = Store.getState();
     const producto = (state.productos || []).find(p => p.id == prodId);

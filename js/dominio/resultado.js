@@ -17,22 +17,34 @@ class Resultado {
     Object.freeze(this);
   }
 
+  /** @returns {boolean} */
   get exito() { return this._exito; }
+  /** @returns {*} */
   get datos() { return this._datos; }
+  /** @returns {string|null} */
   get error() { return this._error; }
 
-  // ── Factory methods ──────────────────────────────────────
+  /**
+   * Crea un Resultado exitoso.
+   * @param {*} datos
+   * @returns {Resultado}
+   */
   static ok(datos) {
     return new Resultado(true, datos, null);
   }
 
+  /**
+   * Crea un Resultado fallido.
+   * @param {string} error
+   * @returns {Resultado}
+   */
   static fallo(error) {
     return new Resultado(false, null, error);
   }
 
-  // ── Utilidades ───────────────────────────────────────────
   /**
-   * Ejecuta una función solo si el resultado es exitoso.
+   * Encadena operaciones: si el resultado es exitoso, ejecuta la función;
+   * si es fallido, retorna el mismo resultado sin ejecutar nada.
    * @param {function} fn - Recibe los datos y debe devolver un nuevo Resultado
    * @returns {Resultado}
    */
@@ -45,6 +57,7 @@ class Resultado {
     }
   }
 
+  /** @returns {string} */
   toString() {
     return this._exito ? `Éxito: ${JSON.stringify(this._datos)}` : `Error: ${this._error}`;
   }

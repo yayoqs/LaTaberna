@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: comanda.js
+   PubPOS — MÓDULO: comanda.js (v2 – JSDoc completo)
    Propósito: Gestión de la comanda actual, incluyendo asignación
               de ítems a personas (split bill).
    ================================================================ */
@@ -7,6 +7,10 @@
 const Comanda = (() => {
   let _mesaActiva = null;
 
+  /**
+   * Establece la mesa activa y sincroniza la UI.
+   * @param {object} mesa
+   */
   function setMesaActiva(mesa) {
     _mesaActiva = mesa;
     _render();
@@ -57,12 +61,17 @@ const Comanda = (() => {
     `;
   }
 
+  /**
+   * Cambia la persona activa para asignar ítems en split bill.
+   * @param {string} nombre
+   */
   function setPersonaActiva(nombre) {
     if (_mesaActiva) {
       _mesaActiva.personaActiva = nombre;
     }
   }
 
+  /** Agrega una nueva persona a la mesa */
   function agregarPersona() {
     const nombre = prompt('Nombre de la persona:');
     if (!nombre) return;
@@ -74,6 +83,10 @@ const Comanda = (() => {
     _renderSelectorPersona();
   }
 
+  /**
+   * Agrega un producto a la comanda.
+   * @param {object} producto
+   */
   function agregarItem(producto) {
     if (!_mesaActiva) return;
     const persona = _mesaActiva.personaActiva || 'General';
@@ -98,6 +111,11 @@ const Comanda = (() => {
     _guardarYRenderizar();
   }
 
+  /**
+   * Cambia la cantidad de un ítem.
+   * @param {number} idx - Índice del ítem
+   * @param {number} delta - Incremento (+1 o -1)
+   */
   function cambiarCantidad(idx, delta) {
     if (!_mesaActiva) return;
     const item = _mesaActiva.items[idx];
@@ -110,12 +128,18 @@ const Comanda = (() => {
     _guardarYRenderizar();
   }
 
+  /**
+   * Establece la observación de un ítem.
+   * @param {number} idx
+   * @param {string} valor
+   */
   function setObservacion(idx, valor) {
     if (_mesaActiva?.items[idx]) {
       _mesaActiva.items[idx].obs = valor;
     }
   }
 
+  /** Elimina un ítem de la comanda */
   function quitarItem(idx) {
     if (!_mesaActiva) return;
     const item = _mesaActiva.items[idx];
@@ -127,6 +151,7 @@ const Comanda = (() => {
     _guardarYRenderizar();
   }
 
+  /** @param {string} mozo */
   function setMozo(mozo) {
     if (_mesaActiva) {
       _mesaActiva.mozo = mozo;
@@ -134,6 +159,7 @@ const Comanda = (() => {
     }
   }
 
+  /** @param {number} cant */
   function setComensales(cant) {
     if (_mesaActiva) {
       _mesaActiva.comensales = parseInt(cant) || 1;
@@ -141,6 +167,7 @@ const Comanda = (() => {
     }
   }
 
+  /** @param {string} obs */
   function setObservacionGeneral(obs) {
     if (_mesaActiva) {
       _mesaActiva.observaciones = obs;
@@ -156,6 +183,11 @@ const Comanda = (() => {
     if (typeof actualizarTotalCierre === 'function') {
       actualizarTotalCierre();
     }
+  }
+
+  /** Renderiza la lista de ítems de la comanda */
+  function render() {
+    _render();
   }
 
   function _render() {
@@ -220,7 +252,7 @@ const Comanda = (() => {
     cambiarCantidad,
     setObservacion,
     quitarItem,
-    render: _render,
+    render,
     getMesaActiva: () => _mesaActiva
   };
 })();

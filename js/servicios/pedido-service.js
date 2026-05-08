@@ -1,12 +1,18 @@
 /* ================================================================
-   PubPOS — SERVICIO: PedidoService (v1.3 – usa PedidoAgregado)
+   PubPOS — SERVICIO: PedidoService (v1.4 – logging unificado + JSDoc)
    ================================================================ */
 const PedidoService = (() => {
 
   let _pedidoRepo = null;
 
+  /** @param {object} repo – repositorio con crearPedidoMesa, cerrarPedido, etc. */
   function configurar(repo) { _pedidoRepo = repo; }
 
+  /**
+   * Crea un pedido de mesa usando el agregado PedidoAgregado.
+   * @param {{ numeroMesa: number, mozo: string, comensales: number }} datos
+   * @returns {Promise<Resultado>}
+   */
   async function crearPedidoMesa({ numeroMesa, mozo, comensales }) {
     if (!_pedidoRepo) return Resultado.fallo('Repositorio no configurado');
 
@@ -15,7 +21,7 @@ const PedidoService = (() => {
 
     let pedido;
     try {
-      pedido = new PedidoAgregado(     // ← Renombrado
+      pedido = new PedidoAgregado(
         'ped_' + Date.now(),
         numeroMesa,
         mozo || 'Sin mozo',
@@ -35,6 +41,12 @@ const PedidoService = (() => {
     return Resultado.ok(pedido);
   }
 
+  /**
+   * Agrega un ítem a un pedido existente.
+   * @param {string} pedidoId
+   * @param {{ nombre: string, precio: number, cantidad: number }} datos
+   * @returns {Promise<Resultado>}
+   */
   async function agregarItem(pedidoId, { nombre, precio, cantidad }) {
     if (!_pedidoRepo) return Resultado.fallo('Repositorio no configurado');
 
@@ -68,6 +80,12 @@ const PedidoService = (() => {
     return Resultado.ok(pedido);
   }
 
+  /**
+   * Cierra un pedido: aplica descuento, cierra el agregado y persiste.
+   * @param {string} pedidoId
+   * @param {{ formaPago: string, totalFinal: number, descuento?: number }} datos
+   * @returns {Promise<Resultado>}
+   */
   async function cerrarPedido(pedidoId, { formaPago, totalFinal, descuento = 0 }) {
     if (!_pedidoRepo) return Resultado.fallo('Repositorio no configurado');
 
@@ -109,9 +127,9 @@ const PedidoService = (() => {
     return Resultado.ok(pedido);
   }
 
-  // ── UTILIDAD PRIVADA ──────────────────────────────────
+  /** @private Reconstruye un PedidoAgregado desde datos planos */
   function _reconstruirPedido(datos) {
-    const pedido = new PedidoAgregado(       // ← Renombrado
+    const pedido = new PedidoAgregado(
       datos.id,
       datos.mesa,
       datos.mozo,

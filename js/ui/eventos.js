@@ -1,11 +1,10 @@
 /* ================================================================
-   PubPOS — MÓDULO: eventos.js (Fase 2)
+   PubPOS — MÓDULO: eventos.js (v1.1 – logging unificado + JSDoc)
    Propósito: Gestión de eventos. Crear evento genera carpeta en
               Drive con presupuesto y menú automáticos.
    ================================================================ */
 const Eventos = (() => {
 
-  /* ── CREACIÓN DINÁMICA DE LA VISTA ───────────────────────── */
   function _asegurarVista() {
     if ($id('view-eventos')) return;
 
@@ -36,14 +35,15 @@ const Eventos = (() => {
     document.body.insertBefore(main, referencia);
   }
 
-  /* ── RENDERIZAR LISTA ────────────────────────────────────── */
+  /**
+   * Obtiene los eventos desde el backend y los muestra en la tabla.
+   */
   async function render() {
     _asegurarVista();
     const tbody = $id('eventosBody');
     if (!tbody) return;
 
     try {
-      // Obtener eventos desde el backend (lectura GET)
       const resp = await fetch(`${DB.urlSheets}?action=getEventos`, { mode: 'cors' });
       const data = await resp.json();
       const eventos = data.eventos || [];
@@ -53,7 +53,6 @@ const Eventos = (() => {
         return;
       }
 
-      // Ordenar por fecha descendente
       eventos.sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
 
       tbody.innerHTML = eventos.map(ev => `
@@ -69,12 +68,11 @@ const Eventos = (() => {
         </tr>
       `).join('');
     } catch (e) {
-      console.error('[Eventos] Error cargando:', e);
+      Logger.error('[Eventos] Error cargando:', e);
       tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;">Error al cargar eventos</td></tr>`;
     }
   }
 
-  /* ── FORMULARIO (MODAL) ───────────────────────────────────── */
   function mostrarFormulario() {
     let modal = $id('modalEvento');
     if (!modal) {
@@ -116,7 +114,9 @@ const Eventos = (() => {
     if (modal) modal.style.display = 'none';
   }
 
-  /* ── GUARDAR EVENTO (LLAMA AL BACKEND) ──────────────────── */
+  /**
+   * Guarda un nuevo evento llamando al backend para crear carpeta en Drive.
+   */
   async function guardarEvento() {
     const fecha = $val('evtFecha');
     const tipo = $val('evtTipo');
@@ -151,12 +151,11 @@ const Eventos = (() => {
         render();
       }
     } catch (e) {
-      console.error('[Eventos] Error guardando:', e);
+      Logger.error('[Eventos] Error guardando:', e);
       showToast('error', 'Error al crear el evento');
     }
   }
 
-  /* ── SUSCRIBIR A EVENTOS DEL SISTEMA ───────────────────── */
   function _initEventListeners() {
     EventBus.on('db:inicializada', render);
   }

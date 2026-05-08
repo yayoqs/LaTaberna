@@ -1,36 +1,31 @@
 /* ================================================================
-   PubPOS — SERVICIO: DeliveryService (v1.1 – DDD completo)
-   Propósito: Coordina el flujo de pedidos de entrega usando el
-              agregado Delivery y los Value Objects. Retorna Resultado.
+   PubPOS — SERVICIO: DeliveryService (v1.2 – logging + JSDoc)
    ================================================================ */
 const DeliveryService = (() => {
 
   let _deliveryRepo = null;
 
-  /** @param {object} repo - Implementación del repositorio de delivery */
+  /** @param {object} repo – repositorio de delivery */
   function configurar(repo) {
     _deliveryRepo = repo;
   }
 
   /**
    * Crea un nuevo pedido de delivery.
-   * @param {object} datos - { direccion: {...}, items: [...], repartidor, observaciones }
+   * @param {{ direccion: object, items: Array, repartidor: string, observaciones: string }} datos
    * @returns {Promise<Resultado>}
    */
   async function crearDelivery({ direccion, items, repartidor, observaciones }) {
     if (!_deliveryRepo) return Resultado.fallo('Repositorio de delivery no configurado');
 
-    // 1. Validar dirección
     const dir = crearDireccion(
       direccion.calle, direccion.numero, direccion.depto,
       direccion.referencia, direccion.telefono
     );
     if (!dir) return Resultado.fallo('Dirección inválida');
 
-    // 2. Validar ítems
     if (!items || items.length === 0) return Resultado.fallo('Debe incluir al menos un ítem');
 
-    // 3. Crear el Agregado Delivery
     let delivery;
     try {
       delivery = new Delivery('deliv_' + Date.now(), dir, repartidor);
@@ -45,7 +40,6 @@ const DeliveryService = (() => {
       return Resultado.fallo(`Error al crear delivery: ${e.message}`);
     }
 
-    // 4. Persistir
     try {
       await _deliveryRepo.crearDelivery(delivery.toJSON());
     } catch (e) {
@@ -57,7 +51,7 @@ const DeliveryService = (() => {
   }
 
   /**
-   * Envía un pedido a cocina (cambia estado a 'en_preparacion').
+   * Envía un pedido de delivery a cocina.
    * @param {string} deliveryId
    * @returns {Promise<Resultado>}
    */
@@ -86,7 +80,7 @@ const DeliveryService = (() => {
   }
 
   /**
-   * Despacha el pedido (en camino).
+   * Despacha el pedido (estado 'en camino').
    * @param {string} deliveryId
    * @returns {Promise<Resultado>}
    */
@@ -169,7 +163,7 @@ const DeliveryService = (() => {
     return Resultado.ok(delivery);
   }
 
-  // ── UTILIDAD PRIVADA ──────────────────────────────────────
+  /** @private Reconstruye un Delivery desde datos planos */
   function _reconstruirDelivery(datos) {
     const dir = new Direccion(
       datos.direccion?.calle || datos.direccion,
@@ -183,7 +177,6 @@ const DeliveryService = (() => {
       delivery.agregarItem(it.nombre, crearDinero(it.precio), crearCantidad(it.cantidad));
     });
     delivery.setObservaciones(datos.observaciones);
-    // Forzar estado si es necesario
     if (datos.estado === 'en_preparacion') { delivery.enviarACocina(); }
     if (datos.estado === 'en_camino')       { delivery.enviarACocina(); delivery.despachar(); }
     if (datos.estado === 'entregado')       { delivery.enviarACocina(); delivery.despachar(); delivery.confirmarEntrega(); }

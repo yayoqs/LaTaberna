@@ -1,15 +1,9 @@
 /* ================================================================
-   PubPOS — MÓDULO: perfil.js (v2.2 – usa método público de Auth)
-   ================================================================
-   Cambios respecto a v2.1:
-   • Ahora utiliza Auth.actualizarNombre() en lugar de acceder
-     directamente a _usuarioActual. Esto mejora el encapsulamiento
-     y garantiza que sessionStorage se mantenga sincronizado.
-   • Se corrigió el botón "Guardar" para que use async/await de
-     manera consistente.
+   PubPOS — MÓDULO: perfil.js (v2.3 – logging unificado + JSDoc)
    ================================================================ */
 const Perfil = (() => {
 
+  /** Clave en localStorage para datos extendidos del usuario */
   function _storageKey(usuario) {
     return `pubpos_perfil_${usuario}`;
   }
@@ -50,6 +44,7 @@ const Perfil = (() => {
     document.body.insertBefore(main, referencia);
   }
 
+  /** Carga y muestra los datos del perfil y los documentos. */
   async function render() {
     _asegurarVista();
 
@@ -140,6 +135,7 @@ const Perfil = (() => {
     if (modal) modal.style.display = 'none';
   }
 
+  /** Guarda los datos editados del perfil. */
   async function guardarPerfil() {
     const usuario = Auth.getUsuarioActual();
     if (!usuario) { showToast('error', 'No hay sesión activa'); return; }
@@ -151,7 +147,6 @@ const Perfil = (() => {
 
     if (!nuevoNombre) { showToast('error', 'El nombre no puede estar vacío'); return; }
 
-    // Usar el nuevo método público de Auth
     Auth.actualizarNombre(nuevoNombre);
 
     _guardarExtras(nuevoNombre, { telefono, email, foto });

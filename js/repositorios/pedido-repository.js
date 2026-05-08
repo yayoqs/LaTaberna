@@ -1,46 +1,38 @@
 /* ================================================================
-   PubPOS — REPOSITORIO: pedido-repository.js (v1.4 – await faltante)
+   PubPOS — REPOSITORIO: pedido-repository.js (v1.5 – JSDoc completo)
+   Propósito: Adaptador local que persiste pedidos en localStorage
+              y los sincroniza con Google Sheets.
    ================================================================ */
+
+/**
+ * Interfaz del repositorio de pedidos.
+ */
 const PedidoRepository = {
+  /** @param {object} datos */
   async crearPedidoMesa(datos) { throw new Error('No implementado'); },
-  async obtenerPorId(id)   { throw new Error('No implementado'); },
+  /** @param {string} id */
+  async obtenerPorId(id) { throw new Error('No implementado'); },
+  /** @param {string} id @param {object} datosCierre */
   async cerrarPedido(id, datosCierre) { throw new Error('No implementado'); },
-  async obtenerTodos()     { throw new Error('No implementado'); }
+  /** Obtiene todos los pedidos del turno */
+  async obtenerTodos() { throw new Error('No implementado'); }
 };
 
 const PedidoRepositoryLocal = (() => {
 
+  /**
+   * Crea un pedido de mesa y lo sincroniza con Sheets.
+   * @param {object} datos - { mesa, mozo, comensales }
+   * @returns {Promise<object>} El pedido creado
+   */
   async function crearPedidoMesa(datos) {
     if (!window.DB || !DB.crearPedido) {
       throw new Error('DB.core no disponible');
     }
 
-    // 1. Validar reglas de negocio con el agregado
-    let agregado;
-    try {
-      const comensalesCant = crearCantidad(datos.comensales || 1);
-      if (!comensalesCant) throw new Error('Comensales inválidos');
-      agregado = new PedidoAgregado(
-        'ped_' + Date.now(),
-        datos.mesa,
-        datos.mozo || 'Sin mozo',
-        comensalesCant
-      );
-    } catch (e) {
-      throw new Error('Reglas de negocio: ' + e.message);
-    }
-
-    const pedidoJSON = agregado.toJSON();
-
-    // 2. Crear pedido en localStorage (DB.core) ← ¡AGREGAR await!
-    const pedidoLocal = await DB.crearPedido(
-      pedidoJSON.mesa,
-      pedidoJSON.mozo,
-      pedidoJSON.comensales
-    );
+    const pedidoLocal = await DB.crearPedido(datos.mesa, datos.mozo, datos.comensales);
     if (!pedidoLocal) throw new Error('No se pudo crear el pedido localmente');
 
-    // 3. Normalizar objeto para Sheets
     const pedidoParaSync = {
       id:          pedidoLocal.id,
       mesa:        pedidoLocal.mesa,
@@ -55,30 +47,36 @@ const PedidoRepositoryLocal = (() => {
       updated_at:  pedidoLocal.created_at
     };
 
-    console.log('🛰️ [PedidoRepo] Objeto enviado a Sheets:', JSON.stringify(pedidoParaSync, null, 2));
-
-    // 4. Sincronizar con Google Sheets
     if (typeof DB.syncGuardarPedido === 'function') {
       try {
         await DB.syncGuardarPedido(pedidoParaSync);
         Logger.info('[PedidoRepo] Pedido sincronizado con Sheets.');
       } catch (e) {
         Logger.warn('[PedidoRepo] Error al sincronizar con Sheets. Encolado.', e);
-        showToast('warning', 'Sin conexión. El pedido se guardó localmente.');
       }
     } else {
       Logger.warn('[PedidoRepo] DB.syncGuardarPedido no disponible.');
-      showToast('warning', 'Falta módulo de sincronización.');
     }
 
     return pedidoLocal;
   }
 
+  /**
+   * Obtiene un pedido por su ID.
+   * @param {string} id
+   * @returns {Promise<object|null>}
+   */
   async function obtenerPorId(id) {
     if (!window.DB || !DB.pedidos) return null;
     return DB.pedidos.find(p => p.id === id) || null;
   }
 
+  /**
+   * Cierra un pedido (delega en DB.cerrarPedido).
+   * @param {string} id
+   * @param {object} datosCierre
+   * @returns {Promise<object>}
+   */
   async function cerrarPedido(id, datosCierre) {
     if (!window.DB || typeof DB.cerrarPedido !== 'function') {
       throw new Error('DB.cerrarPedido no disponible');
@@ -90,6 +88,10 @@ const PedidoRepositoryLocal = (() => {
     return DB.pedidos.find(p => p.id === id);
   }
 
+  /**
+   * Obtiene todos los pedidos del turno.
+   * @returns {Promise<Array>}
+   */
   async function obtenerTodos() {
     if (!window.DB || !DB.pedidos) return [];
     return DB.pedidos;

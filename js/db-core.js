@@ -1,5 +1,8 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-core.js (v3.2.3 – sin despacho Store en saveComandas)
+   PubPOS — MÓDULO: db-core.js (v3.2.5 – un solo mozo por defecto)
+   Propósito: Núcleo de base de datos: mesas, pedidos, comandas,
+              mozos, configuración y pedidos de delivery.
+              Ahora solo incluye un mozo "Trini" por defecto.
    ================================================================ */
 const DBCore = (function() {
   const module = {};
@@ -204,10 +207,7 @@ const DBCore = (function() {
       this.mozos = JSON.parse(raw).map(m => this._normalizarMozo(m));
     } else {
       this.mozos = [
-        { id: 'mozo_1', nombre: 'Carlos', activo: true },
-        { id: 'mozo_2', nombre: 'Ana', activo: true },
-        { id: 'mozo_3', nombre: 'Luis', activo: true },
-        { id: 'mozo_4', nombre: 'María', activo: true }
+        { id: 'mozo_1', nombre: 'Trini', activo: true }
       ];
       this.saveMozos();
     }
@@ -247,7 +247,6 @@ const DBCore = (function() {
   module.saveComandas = function() {
     localStorage.setItem('pubpos_comandas', JSON.stringify(this.comandas));
     EventBus.emit('comandas:guardadas', this.comandas);
-    // Ya no despachamos COMANDA_AGREGADA aquí; se hace en el comando enviarComanda
   };
 
   module.savePedidos = function() {

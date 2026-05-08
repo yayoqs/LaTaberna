@@ -1,10 +1,12 @@
 /* ================================================================
-   PubPOS — COMANDO: crear-pedido-mesa.js (v2.5 – usa Deps)
-   ================================================================
-   Cambio: ahora obtiene el repositorio desde Deps.obtener('pedidoRepo')
-           en lugar de esperar que venga en el comando.
+   PubPOS — COMANDO: crear-pedido-mesa.js (v2.6 – logging + JSDoc)
    ================================================================ */
 
+/**
+ * Construye un comando para abrir una mesa.
+ * @param {{ numeroMesa: number, mozo: string, comensales: number }} datos
+ * @returns {{ type: string, datos: object }}
+ */
 function crearComandoPedidoMesa(datos) {
   return {
     type: 'crearPedidoMesa',
@@ -16,6 +18,12 @@ function crearComandoPedidoMesa(datos) {
   };
 }
 
+/**
+ * Handler del comando 'crearPedidoMesa'.
+ * Valida turno y mesa, crea el pedido y lo persiste.
+ * @param {object} comando - { type, datos: { numeroMesa, mozo, comensales } }
+ * @returns {Promise<object>} El pedido creado
+ */
 async function handleCrearPedidoMesa(comando) {
   const { numeroMesa, mozo, comensales } = comando.datos;
 
@@ -34,7 +42,6 @@ async function handleCrearPedidoMesa(comando) {
   if (!mesa) throw new Error(`La mesa ${numeroMesa} no existe`);
   if (mesa.estado !== 'libre') throw new Error(`La mesa ${numeroMesa} no está libre`);
 
-  // Resolver repositorio desde el contenedor
   let repo;
   try {
     repo = Deps.obtener('pedidoRepo');
@@ -77,5 +84,4 @@ async function handleCrearPedidoMesa(comando) {
 }
 
 CommandBus.registrar('crearPedidoMesa', handleCrearPedidoMesa);
-
 window.crearComandoPedidoMesa = crearComandoPedidoMesa;

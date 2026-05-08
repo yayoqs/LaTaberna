@@ -1,10 +1,7 @@
 /* ================================================================
-   PubPOS — MÓDULO: despensa.js (v11 – reactivo al Store)
-   ================================================================
-   Cambios:
-   • Obtiene ingredientes y movimientos del Store.
-   • Se suscribe al Store para re-renderizar automáticamente.
-   • Eliminadas las suscripciones manuales a EventBus.
+   PubPOS — MÓDULO: despensa.js (v11.1 – JSDoc completo)
+   Propósito: Gestión de inventario (ingredientes, movimientos, alertas).
+              Obtiene los datos del Store y se re‑renderiza automáticamente.
    ================================================================ */
 
 const Despensa = (() => {
@@ -40,14 +37,9 @@ const Despensa = (() => {
           <button class="btn-secondary" onclick="Despensa.exportarIngredientes()">
             <i class="fas fa-download"></i> Exportar
           </button>
-          <button class="btn-secondary" onclick="Despensa.render()">
-            <i class="fas fa-sync-alt"></i> Refrescar
-          </button>
         </div>
       </div>
-
       <div class="inventario-resumen" id="inventarioResumen"></div>
-
       <div class="despensa-grid">
         <div class="despensa-main">
           <table class="ingredientes-table" id="ingredientesTable">
@@ -82,7 +74,7 @@ const Despensa = (() => {
     document.body.insertBefore(main, referencia);
   }
 
-  /* ── RENDER PRINCIPAL ───────────────────────────────────── */
+  /** Renderiza toda la vista de inventario */
   function render() {
     _asegurarVista();
     _renderResumen();
@@ -91,7 +83,6 @@ const Despensa = (() => {
     _renderAlertasStock();
   }
 
-  /* ── RESUMEN SUPERIOR ───────────────────────────────────── */
   function _renderResumen() {
     const cont = $id('inventarioResumen');
     if (!cont) return;
@@ -110,7 +101,7 @@ const Despensa = (() => {
     `;
   }
 
-  /* ── FILTROS ────────────────────────────────────────────── */
+  /** @param {string} cat */
   function filtrarPorCategoria(cat) {
     _categoriaFiltro = cat;
     _renderTablaIngredientes();
@@ -124,7 +115,6 @@ const Despensa = (() => {
     _renderResumen();
   }
 
-  /* ── TABLA DE INGREDIENTES ─────────────────────────────── */
   function _renderTablaIngredientes() {
     const tbody = document.getElementById('ingredientesBody');
     if (!tbody) return;
@@ -207,6 +197,7 @@ const Despensa = (() => {
     }).join('');
   }
 
+  /** Ordena la tabla por la columna indicada */
   function ordenarTabla(columna) {
     if (_ordenColumna === columna) {
       _ordenDireccion *= -1;
@@ -217,7 +208,6 @@ const Despensa = (() => {
     _renderTablaIngredientes();
   }
 
-  /* ── MOVIMIENTOS ────────────────────────────────────────── */
   function _renderMovimientos() {
     const cont = document.getElementById('movimientosList');
     if (!cont) return;
@@ -303,6 +293,7 @@ const Despensa = (() => {
     document.getElementById('modalIngrediente').style.display = 'none';
   }
 
+  /** Guarda el ingrediente (usa InventarioService si está disponible) */
   async function guardarIngrediente() {
     const id = document.getElementById('ingId').value;
     const nombre = document.getElementById('ingNombre').value.trim();
@@ -323,19 +314,16 @@ const Despensa = (() => {
       const resultado = await InventarioService.guardarIngrediente(datos);
       if (resultado.exito) {
         cerrarModalIngrediente();
-        // El Store se actualizará automáticamente vía DB.saveIngredientes()
         showToast('success', 'Ingrediente guardado');
         return;
       } else {
         showToast('error', resultado.error);
-        console.warn('[Despensa] InventarioService falló, usando fallback…');
       }
     }
 
     try {
       await DB.syncGuardarIngrediente(datos);
       cerrarModalIngrediente();
-      // El Store se actualizará automáticamente
       showToast('success', 'Ingrediente guardado');
     } catch (e) {
       showToast('error', 'Error al guardar ingrediente');
@@ -347,6 +335,7 @@ const Despensa = (() => {
     if (ing) mostrarModalIngrediente(ing);
   }
 
+  /** Realiza un ajuste rápido de stock */
   async function ajusteRapido(ingredienteId = null) {
     if (!ingredienteId) {
       const nombre = prompt('Ingrediente a ajustar (nombre exacto):');
@@ -367,20 +356,18 @@ const Despensa = (() => {
     if (typeof InventarioService !== 'undefined' && InventarioService.ajustarStock) {
       const resultado = await InventarioService.ajustarStock(ingredienteId, cantidad, motivo);
       if (resultado.exito) {
-        // El Store se actualizará automáticamente
         showToast('success', `Stock de ${ing.nombre} actualizado`);
         return;
       } else {
         showToast('error', resultado.error);
-        console.warn('[Despensa] Ajuste rápido falló vía DDD, usando DB directa…');
       }
     }
 
     DB.ajustarStock(ingredienteId, cantidad, motivo);
-    // El Store se actualizará automáticamente
     showToast('success', `Stock de ${ing.nombre} actualizado`);
   }
 
+  /** Exporta los ingredientes a CSV */
   function exportarIngredientes() {
     const ing = DB.ingredientes || [];
     let csv = 'Nombre,Categoría,Stock,Unidad,Stock Mínimo,Ubicación,Valor Unitario,Valor Total\n';
@@ -396,11 +383,9 @@ const Despensa = (() => {
     URL.revokeObjectURL(url);
   }
 
-  /* ── SUSCRIPCIÓN AL STORE ──────────────────────────────── */
   function _initListeners() {
     Store.subscribe((state, action) => {
-      // Re-renderizar cuando cambien ingredientes o movimientos
-      if (action.type.startsWith('INGREDIENTE') || action.type.startsWith('INGREDIENTES') || action.type.startsWith('MOVIMIENTO')) {
+      if (action.type.startsWith('INGREDIENTE') || action.type.startsWith('MOVIMIENTO')) {
         render();
       }
     });

@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: db.js (Orquestador v2.4 – fetch pedidos al iniciar)
+   PubPOS — MÓDULO: db.js (Orquestador v2.5 – logging unificado + JSDoc)
    ================================================================ */
 var DB = (function() {
   const core = DBCore;
@@ -16,9 +16,14 @@ var DB = (function() {
 
   combined.urlSheets = sync.urlSheets;
 
+  /**
+   * Inicializa la base de datos: carga configuración, mesas, pedidos
+   * locales y luego sincroniza con Google Sheets.
+   * @returns {Promise<boolean>} true si la inicialización fue exitosa
+   */
   combined.init = async function() {
     try {
-      console.log("[DB] Iniciando carga de datos...");
+      Logger.info("[DB] Iniciando carga de datos...");
       this._cargarConfigLocal();
       this._inicializarMesas();
       this._cargarComandasLocal();
@@ -31,18 +36,18 @@ var DB = (function() {
       this._cargarPedidosDeliveryLocal();
 
       await this._fetchProductos();
-      this._fetchMozos().catch(e => console.warn("[DB] Mozos remotos no disponibles", e));
-      this._fetchIngredientes().catch(e => console.warn("[DB] Ingredientes remotos no disponibles", e));
-      this._fetchRecetas().catch(e => console.warn("[DB] Recetas remotas no disponibles", e));
-      this._fetchPedidos().catch(e => console.warn("[DB] Pedidos remotos no disponibles", e));
+      this._fetchMozos().catch(e => Logger.warn("[DB] Mozos remotos no disponibles", e));
+      this._fetchIngredientes().catch(e => Logger.warn("[DB] Ingredientes remotos no disponibles", e));
+      this._fetchRecetas().catch(e => Logger.warn("[DB] Recetas remotas no disponibles", e));
+      this._fetchPedidos().catch(e => Logger.warn("[DB] Pedidos remotos no disponibles", e));
 
       await this._procesarSyncQueue();
 
-      console.log("[DB] Inicialización completada.");
+      Logger.info("[DB] Inicialización completada.");
       EventBus.emit('db:inicializada');
       return true;
     } catch (e) {
-      console.error("[DB] Error crítico en init:", e);
+      Logger.error("[DB] Error crítico en init:", e);
       this._mostrarErrorCarga();
       return false;
     }
@@ -52,7 +57,13 @@ var DB = (function() {
     EventBus.emit('app:error', 'No se pudieron cargar los datos iniciales.');
   };
 
-  // ── MÉTODOS DE PEDIDO ──────────────────────────────────
+  /**
+   * Crea un pedido de mesa delegando en PedidoManager si está disponible.
+   * @param {number} numeroMesa
+   * @param {string} mozo
+   * @param {number} comensales
+   * @returns {Promise<object>} El pedido creado
+   */
   combined.crearPedidoMesa = function(numeroMesa, mozo, comensales) {
     if (typeof PedidoManager !== 'undefined' && PedidoManager.crearPedidoMesa) {
       return PedidoManager.crearPedidoMesa(numeroMesa, mozo, comensales);
@@ -60,6 +71,12 @@ var DB = (function() {
     return this.crearPedido(numeroMesa, mozo, comensales);
   };
 
+  /**
+   * Agrega un ítem a un pedido. Actualmente delegado a PedidoManager si existe.
+   * @param {string} pedidoId
+   * @param {object} item
+   * @returns {boolean}
+   */
   combined.agregarItemAPedido = function(pedidoId, item) {
     if (typeof PedidoManager !== 'undefined' && PedidoManager.agregarItemAPedido) {
       return PedidoManager.agregarItemAPedido(pedidoId, item);
@@ -67,15 +84,23 @@ var DB = (function() {
     return false;
   };
 
+  /**
+   * Cierra un pedido: descuenta stock, sincroniza y cambia estado a 'cerrada'.
+   * @param {string} id - ID del pedido
+   * @param {string} formaPago
+   * @param {number} total
+   * @param {number} descuento
+   * @returns {Promise<object|null>} El pedido actualizado o null si falla
+   */
   combined.cerrarPedido = async function(id, formaPago, total, descuento) {
     const pedido = this.pedidos.find(p => p.id === id);
     if (!pedido) {
-      console.warn(`[DB] Pedido ${id} no encontrado.`);
+      Logger.warn(`[DB] Pedido ${id} no encontrado.`);
       return null;
     }
 
     if (pedido.estado === 'cerrada' || pedido.estado === 'cerrado') {
-      console.warn(`[DB] El pedido ${id} ya está cerrado.`);
+      Logger.warn(`[DB] El pedido ${id} ya está cerrado.`);
       return pedido;
     }
 
@@ -85,7 +110,7 @@ var DB = (function() {
         await this.consumirIngredientesDeProducto(item.prodId, item.qty, `Venta Mesa ${pedido.mesa}`);
       }
     } catch (e) {
-      console.warn("[DB] Error descontando stock local:", e);
+      Logger.warn("[DB] Error descontando stock local:", e);
     }
 
     try {
@@ -100,7 +125,7 @@ var DB = (function() {
         })
       });
     } catch (e) {
-      console.warn("[DB] No se pudo descontar stock online, encolando.");
+      Logger.warn("[DB] No se pudo descontar stock online, encolando.");
       this._encolarOperacion('procesarVenta', {
         items: JSON.parse(pedido.items || '[]').map(it => ({ productoId: it.prodId, cantidad: it.qty }))
       });
@@ -119,8 +144,8 @@ var DB = (function() {
         mozo: pedidoActualizado.mozo || 'Sin mozo',
         comensales: pedidoActualizado.comensales || 1,
         estado: pedidoActualizado.estado,
-        items: Array.isArray(pedidoActualizado.items) 
-                 ? JSON.stringify(pedidoActualizado.items) 
+        items: Array.isArray(pedidoActualizado.items)
+                 ? JSON.stringify(pedidoActualizado.items)
                  : pedidoActualizado.items,
         total: pedidoActualizado.total,
         created_at: pedidoActualizado.created_at,
@@ -129,9 +154,9 @@ var DB = (function() {
 
       try {
         await this.syncGuardarPedido(pedidoParaSync);
-        console.log(`[DB] Pedido ${id} sincronizado con Sheets como cerrado.`);
+        Logger.info(`[DB] Pedido ${id} sincronizado con Sheets como cerrado.`);
       } catch (e) {
-        console.warn(`[DB] Error al sincronizar cierre del pedido ${id}. Encolando.`);
+        Logger.warn(`[DB] Error al sincronizar cierre del pedido ${id}. Encolando.`);
         this._encolarOperacion('guardarPedido', { pedido: pedidoParaSync });
       }
     }
@@ -139,7 +164,11 @@ var DB = (function() {
     return pedidoActualizado;
   };
 
-  // ── MÉTODOS DE DELIVERY ────────────────────────────────
+  /**
+   * Crea un pedido de delivery, delegando en PedidoManager si existe.
+   * @param {object} datos
+   * @returns {object} El pedido de delivery creado
+   */
   combined.crearPedidoDelivery = function(datos) {
     if (typeof PedidoManager !== 'undefined' && PedidoManager.crearPedidoDelivery) {
       return PedidoManager.crearPedidoDelivery(datos);
@@ -154,6 +183,11 @@ var DB = (function() {
     return nuevo;
   };
 
+  /**
+   * Envía un pedido de delivery a cocina, delegando en PedidoManager.
+   * @param {string} deliveryId
+   * @returns {boolean}
+   */
   combined.enviarPedidoDeliveryACocina = function(deliveryId) {
     if (typeof PedidoManager !== 'undefined' && PedidoManager.enviarPedidoDeliveryACocina) {
       return PedidoManager.enviarPedidoDeliveryACocina(deliveryId);
@@ -161,6 +195,12 @@ var DB = (function() {
     return false;
   };
 
+  /**
+   * Actualiza un pedido de delivery.
+   * @param {string} id
+   * @param {object} cambios
+   * @returns {object|null}
+   */
   combined.actualizarPedidoDelivery = function(id, cambios) {
     const idx = this.pedidosDelivery.findIndex(p => p.id === id);
     if (idx >= 0) {
@@ -170,6 +210,10 @@ var DB = (function() {
     return this.pedidosDelivery[idx] || null;
   };
 
+  /**
+   * Elimina un pedido de delivery.
+   * @param {string} id
+   */
   combined.eliminarPedidoDelivery = function(id) {
     this.pedidosDelivery = this.pedidosDelivery.filter(p => p.id !== id);
     this.savePedidosDelivery();

@@ -1,8 +1,7 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-inventario.js (v5.1 – validación de stock)
+   PubPOS — MÓDULO: db-inventario.js (v5.2 – logging unificado + JSDoc)
    Propósito: Gestión de ingredientes, recetas y movimientos de stock.
-   Nuevo: método validarStockParaItems para verificar disponibilidad
-          antes de enviar un pedido a cocina.
+              Validación de stock para ítems antes de enviar.
    ================================================================ */
 
 const DBInventario = (function() {
@@ -12,7 +11,7 @@ const DBInventario = (function() {
   module.recetas = [];
   module.movimientos = [];
 
-  // ── NORMALIZACIONES (sin cambios) ──────────────────────────
+  /* ── NORMALIZACIONES ─────────────────────────────────────── */
   module._normalizarIngrediente = function(i) {
     return {
       id: this._validarId(i.id, 'ins'),
@@ -63,7 +62,7 @@ const DBInventario = (function() {
     return isNaN(num) ? defecto : num;
   };
 
-  // ── PERSISTENCIA LOCAL (sin cambios) ──────────────────────
+  /* ── PERSISTENCIA LOCAL ────────────────────────────────── */
   module._cargarIngredientesLocal = function() {
     const raw = localStorage.getItem('pubpos_ingredientes');
     if (raw) {
@@ -105,7 +104,11 @@ const DBInventario = (function() {
     localStorage.setItem('pubpos_movimientos', JSON.stringify(this.movimientos));
   };
 
-  // ── CONSULTAS ──────────────────────────────────────────────
+  /**
+   * Retorna los ingredientes necesarios para un producto.
+   * @param {string} productoId
+   * @returns {Array}
+   */
   module.getIngredientesDeProducto = function(productoId) {
     const receta = this.recetas.find(r => r.productoId === productoId);
     if (!receta) return [];
@@ -118,7 +121,13 @@ const DBInventario = (function() {
     }).filter(i => i !== undefined);
   };
 
-  // ── DESCONTAR STOCK ────────────────────────────────────────
+  /**
+   * Descuenta del stock los ingredientes necesarios para producir un producto.
+   * @param {string} productoId
+   * @param {number} cantidad
+   * @param {string} motivo
+   * @returns {Promise<boolean>}
+   */
   module.consumirIngredientesDeProducto = async function(productoId, cantidad, motivo = 'Consumo') {
     const receta = this.recetas.find(r => r.productoId === productoId);
     if (!receta) return false;
@@ -155,7 +164,13 @@ const DBInventario = (function() {
     return true;
   };
 
-  // ── AJUSTE MANUAL ──────────────────────────────────────────
+  /**
+   * Ajusta manualmente el stock de un ingrediente.
+   * @param {string} ingredienteId
+   * @param {number} cantidadDelta
+   * @param {string} motivo
+   * @returns {boolean}
+   */
   module.ajustarStock = function(ingredienteId, cantidadDelta, motivo = 'Ajuste manual') {
     const ingrediente = this.ingredientes.find(i => i.id === ingredienteId);
     if (!ingrediente) return false;
@@ -186,22 +201,18 @@ const DBInventario = (function() {
     return true;
   };
 
-  // ================================================================
-  // NUEVO MÉTODO: validar stock para un conjunto de ítems
-  // ================================================================
   /**
-   * Verifica si hay stock suficiente para preparar los ítems.
-   * @param {Array} items - Array de objetos { prodId, nombre, qty }
-   * @returns {Object} { ok: boolean, faltantes: [{ ingrediente, faltante, stockActual, unidad }] }
+   * Verifica si hay stock suficiente para preparar un conjunto de ítems.
+   * @param {Array} items - [{ prodId, nombre, qty }]
+   * @returns {{ ok: boolean, faltantes: Array }}
    */
   module.validarStockParaItems = function(items) {
     const faltantes = [];
-    // Mapa para acumular total necesario de cada ingrediente
-    const totalNecesario = new Map(); // key: ingredienteId, value: { cantidadNecesaria, stockActual, nombre, unidad }
+    const totalNecesario = new Map();
 
     for (const item of items) {
       const receta = this.recetas.find(r => r.productoId == item.prodId);
-      if (!receta) continue; // producto sin receta, no podemos validar
+      if (!receta) continue;
 
       for (const ingReceta of receta.ingredientes) {
         const ingData = this.ingredientes.find(i => i.id === ingReceta.ingredienteId);
@@ -221,7 +232,6 @@ const DBInventario = (function() {
       }
     }
 
-    // Verificar cada ingrediente
     for (const [ingId, datos] of totalNecesario.entries()) {
       if (datos.stockActual < datos.cantidadNecesaria) {
         faltantes.push({
@@ -233,10 +243,7 @@ const DBInventario = (function() {
       }
     }
 
-    return {
-      ok: faltantes.length === 0,
-      faltantes
-    };
+    return { ok: faltantes.length === 0, faltantes };
   };
 
   return module;

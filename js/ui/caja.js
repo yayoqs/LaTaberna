@@ -1,16 +1,10 @@
 /* ================================================================
-   PubPOS — MÓDULO: caja.js (v4.0 – reactivo al Store)
-   ================================================================
-   Cambios:
-   • Eliminadas las llamadas a DB.fetchTodosPedidos() y las
-     suscripciones individuales a EventBus.
-   • Ahora se suscribe a Store y vuelve a renderizar cada vez que
-     cambian los pedidos.
-   • El botón de cierre de turno sigue usando App.cerrarTurnoApp().
+   PubPOS — MÓDULO: caja.js (v4.1 – logging unificado + JSDoc)
+   Propósito: Resumen del turno y cierre de caja. Ahora obtiene los
+              datos del Store y se suscribe a cambios.
    ================================================================ */
 const Caja = (() => {
 
-  /* ── CREACIÓN DINÁMICA DE LA VISTA ───────────────────────── */
   function _asegurarVista() {
     if ($id('view-caja')) return;
 
@@ -40,7 +34,9 @@ const Caja = (() => {
     document.body.insertBefore(main, referencia);
   }
 
-  /* ── RENDER ────────────────────────────────────────────── */
+  /**
+   * Renderiza el resumen de caja con los datos del Store.
+   */
   function render() {
     _asegurarVista();
     const statsEl = $id('cajaStats');
@@ -93,17 +89,13 @@ const Caja = (() => {
       </tr>`;
   }
 
-  /* ── SUSCRIPCIÓN AL STORE ──────────────────────────────── */
   function _initListeners() {
-    // Solo reaccionar si cambian los pedidos en el Store
     Store.subscribe((state, action) => {
-      // Solo re-renderizar si la acción afecta a los pedidos
       if (action.type.startsWith('PEDIDOS') || action.type.startsWith('PEDIDO')) {
         render();
       }
     });
 
-    // La primera vez que la vista se activa, forzamos render
     EventBus.on('db:inicializada', render);
     EventBus.on('vista:cambiada', (vista) => {
       if (vista === 'caja') render();

@@ -1,11 +1,12 @@
 /* ================================================================
-   PubPOS — MÓDULO: turno-manager.js (v1.1 – manejo robusto de fetch)
-   Propósito: Cierra el turno actual, guarda un archivo JSON en Drive
-              y resetea el sistema local. Maneja errores de red y
-              asegura respaldo local incluso si falla la conexión.
+   PubPOS — MÓDULO: turno-manager.js (v1.2 – logging unificado + JSDoc)
    ================================================================ */
 const TurnoManager = (() => {
 
+  /**
+   * Cierra el turno actual, guarda respaldo en Drive y resetea el sistema.
+   * @returns {Promise<{exito: boolean, mensaje: string, urlArchivo?: string}>}
+   */
   async function cerrarTurno() {
     if (typeof PedidoManager === 'undefined' || !PedidoManager.getTurnoActual) {
       return { exito: false, mensaje: 'Sistema de turnos no disponible.' };
@@ -29,7 +30,6 @@ const TurnoManager = (() => {
     Logger.info(`[TurnoManager] Cerrando turno ${turno.id}...`);
 
     let urlArchivo = null;
-    let subidaExitosa = false;
     try {
       if (typeof DB !== 'undefined' && typeof DB.llamar === 'function') {
         showToast('info', '<i class="fas fa-cloud-upload-alt fa-spin"></i> Subiendo cierre de turno...');
@@ -39,7 +39,6 @@ const TurnoManager = (() => {
         });
         if (respuesta && !respuesta.error) {
           urlArchivo = respuesta.urlArchivo || respuesta.fileUrl || null;
-          subidaExitosa = true;
           Logger.info(`[TurnoManager] Archivo guardado en Drive: ${urlArchivo}`);
         } else {
           throw new Error(respuesta.error || 'Respuesta inesperada del servidor');
@@ -51,11 +50,9 @@ const TurnoManager = (() => {
       if (mensajeError === 'Failed to fetch') {
         mensajeError = 'No se pudo conectar con el servidor. Verifica tu conexión a internet.';
       }
-      // Guardar respaldo local siempre
       const backupKey = 'pubpos_backup_fallback_' + turno.id;
       localStorage.setItem(backupKey, JSON.stringify(datosTurno));
       showToast('error', `No se pudo subir el cierre: ${mensajeError}. Se guardó un respaldo local.`);
-      // No detenemos el flujo: reseteamos igual para no bloquear el sistema
     }
 
     try {
@@ -127,6 +124,10 @@ const TurnoManager = (() => {
     EventBus.emit('turno:cerrado', { timestamp: new Date().toISOString() });
   }
 
+  /**
+   * Devuelve el estado del turno actual sin modificarlo.
+   * @returns {object|null}
+   */
   function obtenerEstado() {
     if (typeof PedidoManager !== 'undefined' && PedidoManager.getTurnoActual) {
       return PedidoManager.getTurnoActual();

@@ -5,8 +5,11 @@
 
 const Cuenta = (() => {
 
+  /**
+   * Solicita la cuenta de la mesa activa. Cambia el estado a 'cuenta'
+   * y genera el ticket de pre‑cuenta.
+   */
   function pedirCuenta() {
-    // Verificar que el rol sea mesero, admin, master o caja
     const rol = Auth.getRol();
     const rolesPermitidos = ['mesero', 'admin', 'master', 'caja'];
     if (!rolesPermitidos.includes(rol)) {

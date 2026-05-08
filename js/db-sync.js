@@ -1,25 +1,37 @@
- /* ================================================================
-   PubPOS — MÓDULO: db-sync.js (v5.4 – reconstrucción de comandas al iniciar)
-   Propósito: Al descargar pedidos desde Sheets, ahora también se
-              reconstruyen las comandas en DB.comandas para que el
-              KDS las muestre inmediatamente.
+/* ================================================================
+   PubPOS — MÓDULO: db-sync.js (v5.5 – logging unificado + JSDoc)
+   Propósito: Sincronización con Google Sheets, cola offline y
+              método genérico de llamada. Reconstruye comandas al
+              iniciar.
    ================================================================ */
 window.DBSync = (function() {
   const module = {};
 
   module.urlSheets = "https://script.google.com/macros/s/AKfycbzbLLE-lJJRyeHpLTxyvtI7hganGCLHOd9EJJmNqAQBPUz22KfFBW_JZIpX1kq7t7tZcQ/exec";
+
   module.syncQueue = [];
 
+  /**
+   * Carga la cola de sincronización desde localStorage.
+   */
   module._cargarSyncQueueLocal = function() {
     const raw = localStorage.getItem('pubpos_sync_queue');
     this.syncQueue = raw ? JSON.parse(raw) : [];
   };
 
+  /**
+   * Persiste la cola de sincronización en localStorage y emite evento.
+   */
   module._saveSyncQueue = function() {
     localStorage.setItem('pubpos_sync_queue', JSON.stringify(this.syncQueue));
     if (window.EventBus) EventBus.emit('sync:colaActualizada', this.syncQueue.length);
   };
 
+  /**
+   * Agrega una operación a la cola para reintento posterior.
+   * @param {string} action - Nombre de la acción
+   * @param {object} payload - Datos de la operación
+   */
   module._encolarOperacion = function(action, payload) {
     this.syncQueue.push({
       id: 'sync_' + Date.now() + '_' + Math.random().toString(36),
@@ -29,9 +41,13 @@ window.DBSync = (function() {
       creado: new Date().toISOString()
     });
     this._saveSyncQueue();
-    if (window.Logger) Logger.info(`[DB Sync] Operación "${action}" encolada.`);
+    Logger.info(`[DB Sync] Operación "${action}" encolada.`);
   };
 
+  /**
+   * Procesa todas las operaciones pendientes en la cola.
+   * Las exitosas se eliminan; las fallidas se reencolan hasta 5 intentos.
+   */
   module._procesarSyncQueue = async function() {
     if (this.syncQueue.length === 0) return;
     Logger.info(`[DB Sync] Procesando cola (${this.syncQueue.length} operaciones)...`);
@@ -66,6 +82,12 @@ window.DBSync = (function() {
     EventBus.emit('sync:colaActualizada', this.syncQueue.length);
   };
 
+  /**
+   * Envía datos al backend mediante una petición GET con parámetros JSON.
+   * @param {string} action
+   * @param {object} payload
+   * @returns {Promise<object>} Respuesta del backend
+   */
   module._sendDataViaGet = async function(action, payload) {
     const data = { action, ...payload };
     const param = encodeURIComponent(JSON.stringify(data));
@@ -77,6 +99,7 @@ window.DBSync = (function() {
     return respData;
   };
 
+  /** Descarga productos desde Sheets y los guarda localmente. */
   module._fetchProductos = async function() {
     try {
       const res = await fetch(`${this.urlSheets}?action=getProductos`, { mode: 'cors' });
@@ -95,6 +118,7 @@ window.DBSync = (function() {
     }
   };
 
+  /** Descarga mozos desde Sheets y los guarda localmente. */
   module._fetchMozos = async function() {
     try {
       const res = await fetch(`${this.urlSheets}?action=getMozos`, { mode: 'cors' });
@@ -104,12 +128,14 @@ window.DBSync = (function() {
         this.mozos = data.mozos.map(m => window.DB._normalizarMozo(m));
         window.DB.saveMozos();
         EventBus.emit('mozos:cargados', this.mozos);
+        Logger.info(`[DB Sync] ${this.mozos.length} mozos sincronizados.`);
       }
     } catch (e) {
       Logger.warn("[DB Sync] Error obteniendo mozos.");
     }
   };
 
+  /** Descarga ingredientes desde Sheets y los guarda localmente. */
   module._fetchIngredientes = async function() {
     try {
       const res = await fetch(`${this.urlSheets}?action=getInsumos`, { mode: 'cors' });
@@ -121,12 +147,14 @@ window.DBSync = (function() {
       if (ing.length) {
         this.ingredientes = ing.map(i => window.DB._normalizarIngrediente(i));
         window.DB.saveIngredientes();
+        Logger.info(`[DB Sync] ${this.ingredientes.length} ingredientes sincronizados.`);
       }
     } catch (e) {
       Logger.warn("[DB Sync] Error obteniendo insumos.");
     }
   };
 
+  /** Descarga recetas desde Sheets y las guarda localmente. */
   module._fetchRecetas = async function() {
     try {
       const res = await fetch(`${this.urlSheets}?action=getRecetas`, { mode: 'cors' });
@@ -148,12 +176,16 @@ window.DBSync = (function() {
         });
         this.recetas = Array.from(mapa.values());
         window.DB.saveRecetas();
+        Logger.info(`[DB Sync] ${this.recetas.length} recetas sincronizadas.`);
       }
     } catch (e) {
       Logger.warn("[DB Sync] Error obteniendo recetas.");
     }
   };
 
+  /**
+   * Descarga pedidos desde Sheets y reconstruye las comandas para KDS.
+   */
   module._fetchPedidos = async function() {
     try {
       const res = await fetch(`${this.urlSheets}?action=getPedidos`, { mode: 'cors' });
@@ -175,14 +207,11 @@ window.DBSync = (function() {
         }))
         .filter(p => p.id && p.mesa);
 
-      // 1. Guardar pedidos en DB
       window.DB.pedidos = pedidosRemotos;
       window.DB.savePedidos();
 
-      // 2. Reconstruir comandas para KDS
       const comandasReconstruidas = [];
       pedidosRemotos.forEach(pedido => {
-        // Solo pedidos abiertos o en proceso generan comanda en cocina
         if (pedido.estado !== 'abierta' && pedido.estado !== 'en_proceso') return;
 
         let items;
@@ -193,7 +222,6 @@ window.DBSync = (function() {
         }
         if (!Array.isArray(items) || items.length === 0) return;
 
-        // Actualizar la mesa en memoria
         const mesa = window.DB.getMesa(pedido.mesa);
         if (mesa) {
           mesa.estado = pedido.estado === 'abierta' ? 'ocupada' : 'esperando';
@@ -205,12 +233,11 @@ window.DBSync = (function() {
           mesa.total = pedido.total;
         }
 
-        // Crear una comanda con esos items
         const comanda = {
           id: 'kds_restored_' + pedido.id,
           mesa: pedido.mesa,
           mozo: pedido.mozo,
-          destino: 'cocina',      // por defecto; si hay items con destino barra se podría duplicar
+          destino: 'cocina',
           items: items.map(it => ({
             prodId: it.prodId || '',
             nombre: it.nombre || '',
@@ -229,11 +256,9 @@ window.DBSync = (function() {
         comandasReconstruidas.push(comanda);
       });
 
-      // 3. Guardar comandas y notificar
       window.DB.comandas = comandasReconstruidas;
-      window.DB.saveComandas(); // esto emite EventBus y guarda en localStorage
+      window.DB.saveComandas();
 
-      // 4. Forzar actualización del Store para que KDS reaccione
       if (typeof Store !== 'undefined') {
         comandasReconstruidas.forEach(c => {
           Store.dispatch({ type: 'COMANDA_AGREGADA', payload: c });
@@ -247,6 +272,9 @@ window.DBSync = (function() {
     }
   };
 
+  /**
+   * Sincroniza todos los datos con Google Sheets y procesa la cola offline.
+   */
   module.sincronizarTodo = async function() {
     showToast('info', 'Sincronizando...');
     try {
@@ -265,7 +293,7 @@ window.DBSync = (function() {
     }
   };
 
-  // ── RESTO DE FUNCIONES (sin cambios) ────────────────────────
+  /** Guarda un producto en Sheets o lo encola si falla. */
   module.syncGuardarProducto = async function(producto) {
     const idx = this.productos.findIndex(p => p.id == producto.id);
     if (idx >= 0) this.productos[idx] = producto;
@@ -280,6 +308,7 @@ window.DBSync = (function() {
     }
   };
 
+  /** Elimina un producto de Sheets o encola la operación. */
   module.syncEliminarProducto = async function(productoId) {
     this.productos = this.productos.filter(p => p.id != productoId);
     localStorage.setItem('pubpos_cache_prod', JSON.stringify(this.productos));
@@ -292,6 +321,7 @@ window.DBSync = (function() {
     }
   };
 
+  /** Guarda un mozo en Sheets o lo encola si falla. */
   module.syncGuardarMozo = async function(mozo) {
     const idx = this.mozos.findIndex(m => m.id === mozo.id);
     if (idx >= 0) this.mozos[idx] = mozo;
@@ -305,16 +335,18 @@ window.DBSync = (function() {
     }
   };
 
+  /** Guarda un pedido en Sheets o lo encola si falla. */
   module.syncGuardarPedido = async function(pedido) {
     try {
       const respuesta = await this._sendDataViaGet('guardarPedido', { pedido });
-      console.log('🛰️ [DB Sync] Respuesta de guardarPedido:', JSON.stringify(respuesta, null, 2));
+      Logger.debug(`[DB Sync] Respuesta de guardarPedido: ${JSON.stringify(respuesta)}`);
     } catch (e) {
       Logger.warn('[DB Sync] Offline, pedido encolado.');
       this._encolarOperacion('guardarPedido', { pedido });
     }
   };
 
+  /** Guarda un ingrediente en Sheets o lo encola. */
   module.syncGuardarIngrediente = async function(ingrediente) {
     const idx = this.ingredientes.findIndex(i => i.id == ingrediente.id);
     if (idx >= 0) this.ingredientes[idx] = ingrediente;
@@ -328,6 +360,7 @@ window.DBSync = (function() {
     }
   };
 
+  /** Elimina un ingrediente de Sheets o encola la operación. */
   module.syncEliminarIngrediente = async function(ingredienteId) {
     this.ingredientes = this.ingredientes.filter(i => i.id != ingredienteId);
     window.DB.saveIngredientes();
@@ -339,6 +372,7 @@ window.DBSync = (function() {
     }
   };
 
+  /** Guarda una receta en Sheets o la encola. */
   module.syncGuardarReceta = async function(receta) {
     let recetaLocal = this.recetas.find(r => r.productoId == receta.productoId);
     if (!recetaLocal) {
@@ -357,8 +391,17 @@ window.DBSync = (function() {
     }
   };
 
-  module.getPendingSyncCount = function() { return this.syncQueue.length; };
+  /** Retorna la cantidad de operaciones pendientes en la cola. */
+  module.getPendingSyncCount = function() {
+    return this.syncQueue.length;
+  };
 
+  /**
+   * Método genérico para llamadas al backend con timeout.
+   * @param {string} action
+   * @param {object} payload
+   * @returns {Promise<object>}
+   */
   module.llamar = async function(action, payload) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);

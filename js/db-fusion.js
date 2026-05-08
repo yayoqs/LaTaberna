@@ -1,21 +1,27 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-fusion.js
+   PubPOS — MÓDULO: db-fusion.js (v1.1 – logging unificado + JSDoc)
    Propósito: Fusión y liberación de mesas virtuales.
    ================================================================ */
 
 const DBFusion = (function() {
   const module = {};
 
+  /**
+   * Fusiona varias mesas en una mesa virtual.
+   * @param {number[]} numeros - Números de las mesas a fusionar
+   * @param {string} mozo - Mozo asignado a la mesa virtual
+   * @returns {object|null} La mesa virtual creada o null si falla
+   */
   module.fusionarMesas = function(numeros, mozo) {
     const mesasSeleccionadas = numeros.map(num => this.getMesa(num)).filter(m => m);
     if (mesasSeleccionadas.length !== numeros.length) {
-      console.warn('[DB] Algunas mesas no existen.');
+      Logger.warn('[DB] Algunas mesas no existen.');
       return null;
     }
 
     const estadosPermitidos = ['libre', 'ocupada', 'esperando'];
     if (!mesasSeleccionadas.every(m => estadosPermitidos.includes(m.estado))) {
-      console.warn('[DB] Solo se pueden fusionar mesas libres, ocupadas o esperando.');
+      Logger.warn('[DB] Solo se pueden fusionar mesas libres, ocupadas o esperando.');
       return null;
     }
 
@@ -69,6 +75,10 @@ const DBFusion = (function() {
     return mesaVirtual;
   };
 
+  /**
+   * Libera las mesas que estaban fusionadas en una mesa virtual.
+   * @param {object} mesaVirtual - La mesa virtual a liberar
+   */
   module.liberarMesasFusionadas = function(mesaVirtual) {
     if (!mesaVirtual.esVirtual || !mesaVirtual.mesasFusionadas) return;
 

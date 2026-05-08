@@ -1,23 +1,22 @@
 /* ================================================================
-   PubPOS — MÓDULO: app.js (v5 – controlador de vistas ligero)
-   Propósito: Gestionar la navegación entre vistas, el reloj y la UI.
-              La inicialización pesada ahora reside en Bootstrap.js.
+   PubPOS — MÓDULO: app.js (v5.1 – logging unificado + JSDoc)
+   Propósito: Controlador de vistas, reloj, navegación y suscripción
+              a eventos de UI.
    ================================================================ */
 const App = {
   /**
-   * Inicializa los componentes de UI que no dependen de la lógica de negocio.
-   * La inicialización de módulos (Auth, DB, PedidoManager, etc.) la hace Bootstrap.
+   * Inicializa componentes de UI que no dependen de la lógica de negocio.
    */
   async init() {
-    console.log('[App] Iniciando UI...');
+    Logger.info('[App] Iniciando UI...');
     this._iniciarReloj();
     this._initRealVH();
     this._mejorarFocoEnModales();
     this._suscribirEventos();
-    console.log('[App] UI lista.');
+    Logger.info('[App] UI lista.');
   },
 
-  /* ── RELOJ ─────────────────────────────────────────────── */
+  /** Reloj en el header */
   _iniciarReloj() {
     const actualizar = () => {
       const ahora = new Date();
@@ -30,7 +29,7 @@ const App = {
     setInterval(actualizar, 1000);
   },
 
-  /* ── TAMAÑO REAL DE VIEWPORT (móviles) ──────────────────── */
+  /** Tamaño real de viewport en móviles */
   _initRealVH() {
     function setRealVH() {
       const vh = window.innerHeight * 0.01;
@@ -41,7 +40,7 @@ const App = {
     setRealVH();
   },
 
-  /* ── MEJORA FOCO EN MODALES ─────────────────────────────── */
+  /** Mejora el foco en inputs dentro de modales */
   _mejorarFocoEnModales() {
     document.addEventListener('focusin', (e) => {
       const target = e.target;
@@ -63,7 +62,10 @@ const App = {
     });
   },
 
-  /* ── NAVEGACIÓN ENTRE VISTAS ────────────────────────────── */
+  /**
+   * Navega a una vista verificando permisos.
+   * @param {string} nombre - Nombre de la vista (ej. 'mesas')
+   */
   showView(nombre) {
     if (!Auth.getRol()) { Auth.mostrarLogin(); return; }
 
@@ -94,14 +96,12 @@ const App = {
       if (!Auth.puedeAccederPerfil()) { showToast('error', 'No tienes permiso para acceder a Perfil'); return; }
     }
 
-    // Ocultar todas las vistas y desactivar botones
     document.querySelectorAll('.view').forEach(v => {
       v.classList.remove('active');
       v.style.display = '';
     });
     document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
 
-    // Activar la vista y el botón correspondiente
     const vista = $id(`view-${nombre}`);
     const btn = document.querySelector(`[data-view="${nombre}"]`);
     if (vista) {
@@ -112,12 +112,10 @@ const App = {
 
     EventBus.emit('vista:cambiada', nombre);
 
-    // Actualizar UI del header (selector de simulación)
     if (Auth.esMasterReal && Auth.esMasterReal()) {
       Auth.aplicarRestriccionesUI();
     }
 
-    // Llamar al render de cada módulo
     if (nombre === 'mesas' && window.Mesas) Mesas.render();
     if (nombre === 'cocina' && window.KDS) KDS.refresh();
     if (nombre === 'caja' && window.Caja) Caja.render();
@@ -130,7 +128,7 @@ const App = {
     if (nombre === 'perfil' && window.Perfil) Perfil.render();
   },
 
-  /* ── SUSCRIPCIÓN A EVENTOS DE UI ────────────────────────── */
+  /** Suscripción a eventos generales de UI */
   _suscribirEventos() {
     EventBus.on('sincronizacion:completada', () => {
       if (window.Mesas) Mesas.render();
@@ -162,7 +160,7 @@ const App = {
       }
     });
     EventBus.on('turno:iniciado', (turno) => {
-      console.log('[App] Turno iniciado:', turno?.id);
+      Logger.info(`[App] Turno iniciado: ${turno?.id}`);
       if (window.Caja) Caja.render();
     });
     EventBus.on('turno:cerrado', () => {
@@ -170,12 +168,12 @@ const App = {
       if (window.Caja) Caja.render();
     });
     EventBus.on('audit:actualizado', (info) => {
-      console.log(`[App] Bitácora actualizada: ${info.total} registros.`);
+      Logger.info(`[App] Bitácora actualizada: ${info.total} registros.`);
     });
   },
 
   /**
-   * Función pública para invocar el cierre de turno desde cualquier vista.
+   * Cierra el turno actual desde cualquier vista.
    */
   async cerrarTurnoApp() {
     if (typeof TurnoManager === 'undefined') {

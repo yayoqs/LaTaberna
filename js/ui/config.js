@@ -1,8 +1,7 @@
 /* ================================================================
-   PubPOS — MÓDULO: config.js (v3 – reactivo al Store)
+   PubPOS — MÓDULO: config.js (v3.1 – JSDoc completo)
    Propósito: Vista de configuración (productos, mozos, zonas).
-              Ahora lee del Store y persiste cambios a través de DB,
-              que a su vez actualiza el Store automáticamente.
+              Lee del Store y persiste cambios a través de DB.
    ================================================================ */
 const Config = (() => {
   function _asegurarVista() {
@@ -63,6 +62,7 @@ const Config = (() => {
     document.body.insertBefore(main, referencia);
   }
 
+  /** Carga los valores actuales de configuración */
   function cargar() {
     _asegurarVista();
     const config = Store.getState().config || DB.config || {};
@@ -72,7 +72,7 @@ const Config = (() => {
         { nombre: 'terraza', cantidad: 0 }
       ];
       delete config.cantidadMesas;
-      DB.saveConfig(); // persiste y actualiza Store
+      DB.saveConfig();
     }
     $id('cfgNombreLocal').value = config.nombreLocal || '';
     $id('cfgDireccion').value = config.direccion || '';
@@ -104,7 +104,6 @@ const Config = (() => {
     if (!config.zonas) return;
     if (campo === 'cantidad') config.zonas[idx].cantidad = parseInt(valor) || 0;
     else config.zonas[idx].nombre = valor.trim() || `zona_${idx+1}`;
-    // No persistimos aún, solo modificamos en memoria; se guardará al hacer clic en "Guardar"
   }
 
   function agregarZona() {
@@ -126,6 +125,7 @@ const Config = (() => {
     _renderZonas();
   }
 
+  /** Guarda la configuración general */
   function guardar() {
     const zonasContainer = $id('zonasContainer');
     let config = Store.getState().config || {};
@@ -150,7 +150,6 @@ const Config = (() => {
     };
     delete config.cantidadMesas;
 
-    // Persistir en DB (esto actualizará el Store automáticamente)
     DB.config = config;
     DB._inicializarMesas();
     DB.saveConfig();
@@ -159,6 +158,7 @@ const Config = (() => {
     showToast('success', '<i class="fas fa-check-circle"></i> Configuración guardada');
   }
 
+  /** Renderiza la lista de productos en la configuración */
   function renderProductos() {
     _asegurarVista();
     const cont = $id('productosLista');
@@ -226,6 +226,7 @@ const Config = (() => {
 
   function cerrarModalProducto() { $id('modalProducto').style.display = 'none'; }
 
+  /** Guarda un producto nuevo o editado */
   async function guardarProducto() {
     const nombre = $val('prodNombre');
     const precio = parseFloat($id('prodPrecio')?.value);
@@ -248,7 +249,6 @@ const Config = (() => {
       return;
     }
     cerrarModalProducto();
-    // El Store se actualizará automáticamente vía DB.syncGuardarProducto -> DB.save
     renderProductos();
     if (typeof Pedido !== 'undefined' && Pedido._setCat) Pedido._setCat('Todos');
   }
@@ -268,6 +268,7 @@ const Config = (() => {
     }
   }
 
+  /** Renderiza la lista de mozos */
   function renderMozos() {
     const container = $id('mozosLista');
     if (!container) return;
@@ -289,7 +290,6 @@ const Config = (() => {
     DB.mozos.push({ id: 'mozo_' + Date.now(), nombre, activo: true });
     DB.saveMozos();
     $id('nuevoMozoNombre').value = '';
-    // El Store se actualizará automáticamente
     showToast('success', 'Mozo añadido');
   }
 
@@ -297,25 +297,14 @@ const Config = (() => {
     if (!confirm('¿Eliminar mozo?')) return;
     DB.mozos.splice(idx, 1);
     DB.saveMozos();
-    // El Store se actualizará automáticamente
     showToast('warning', 'Mozo eliminado');
   }
 
-  /* ── SUSCRIPCIÓN AL STORE ──────────────────────────────── */
   function _initListeners() {
     Store.subscribe((state, action) => {
-      // Re-renderizar productos si cambian
-      if (action.type.startsWith('PRODUCTO')) {
-        renderProductos();
-      }
-      // Re-renderizar mozos si cambian
-      if (action.type.startsWith('MOZO')) {
-        renderMozos();
-      }
-      // Re-renderizar zonas si cambia la configuración
-      if (action.type === 'CONFIG_INICIALIZAR') {
-        _renderZonas();
-      }
+      if (action.type.startsWith('PRODUCTO')) renderProductos();
+      if (action.type.startsWith('MOZO')) renderMozos();
+      if (action.type === 'CONFIG_INICIALIZAR') _renderZonas();
     });
 
     EventBus.on('vista:cambiada', (vista) => {

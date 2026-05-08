@@ -1,7 +1,7 @@
 /* ================================================================
-   PubPOS — MÓDULO: recetas.js (v5 – reactivo al Store)
-   Propósito: Vista de recetario. Ahora obtiene productos y recetas
-              del Store y se re-renderiza automáticamente al cambiar
+   PubPOS — MÓDULO: recetas.js (v5.1 – JSDoc completo)
+   Propósito: Vista de recetario. Obtiene productos y recetas del
+              Store y se re-renderiza automáticamente al cambiar
               esos datos. Incluye modal de creación/edición de recetas.
    ================================================================ */
 
@@ -9,7 +9,6 @@ const Recetas = (() => {
 
   let _terminoBusqueda = '';
 
-  /* ── CREACIÓN DINÁMICA DE LA VISTA ───────────────────────── */
   function _asegurarVista() {
     if ($id('view-recetas')) return;
 
@@ -33,7 +32,9 @@ const Recetas = (() => {
     document.body.insertBefore(main, referencia);
   }
 
-  /* ── RENDERIZAR LA CUADRÍCULA ────────────────────────────── */
+  /**
+   * Renderiza la cuadrícula de recetas obteniendo datos del Store.
+   */
   function render() {
     _asegurarVista();
     const grid = $id('recetasGrid');
@@ -43,21 +44,18 @@ const Recetas = (() => {
     const rol = Auth.getRol();
     let productos = (state.productos || []).filter(p => p.activo !== false);
 
-    // Filtrar por destino según el rol
     if (rol === 'cocina') {
       productos = productos.filter(p => p.destino === 'cocina' || p.destino === 'ambos');
     } else if (rol === 'barra') {
       productos = productos.filter(p => p.destino === 'barra' || p.destino === 'ambos');
     }
 
-    // Solo productos con receta
     const recetas = state.recetas || [];
     productos = productos.filter(prod => {
       const receta = recetas.find(r => r.productoId == prod.id);
       return receta && receta.ingredientes && receta.ingredientes.length > 0;
     });
 
-    // Búsqueda
     if (_terminoBusqueda) {
       const term = _terminoBusqueda.toLowerCase();
       productos = productos.filter(p => p.nombre.toLowerCase().includes(term));
@@ -68,7 +66,6 @@ const Recetas = (() => {
       return;
     }
 
-    // Orden alfabético
     productos.sort((a, b) => a.nombre.localeCompare(b.nombre));
 
     grid.innerHTML = productos.map(prod => {
@@ -89,13 +86,12 @@ const Recetas = (() => {
     }).join('');
   }
 
-  /* ── FILTRAR POR BÚSQUEDA ────────────────────────────────── */
+  /** Filtra recetas por término de búsqueda */
   function filtrar() {
     _terminoBusqueda = $id('recetasSearch')?.value?.trim() || '';
     render();
   }
 
-  /* ── COLOR BASADO EN EL NOMBRE ───────────────────────────── */
   function _getColorFromName(nombre) {
     let hash = 0;
     for (let i = 0; i < nombre.length; i++) {
@@ -106,7 +102,6 @@ const Recetas = (() => {
     return `hsl(${h}, 55%, 45%)`;
   }
 
-  /* ── ÍCONO SEGÚN CATEGORÍA DE INGREDIENTE ────────────────── */
   function _iconoPorCategoria(categoria) {
     const mapa = {
       cocina: 'fa-fire-burner',
@@ -116,7 +111,7 @@ const Recetas = (() => {
     return mapa[categoria] || 'fa-box';
   }
 
-  /* ── MOSTRAR DETALLE DE RECETA (MODAL) ───────────────────── */
+  /** Muestra el modal de detalle de una receta */
   function mostrarDetalle(prodId) {
     const state = Store.getState();
     const producto = (state.productos || []).find(p => p.id == prodId);
@@ -155,7 +150,6 @@ const Recetas = (() => {
 
     $id('detalleTitulo').innerHTML = `<i class="fas fa-utensils"></i> ${producto.nombre}`;
 
-    // Ingredientes
     let htmlIng = '<h4><i class="fas fa-list-ul"></i> Ingredientes</h4><ul class="receta-ingredientes-lista">';
     receta.ingredientes.forEach(ing => {
       const ingData = (state.ingredientes || []).find(i => i.id == ing.ingredienteId);
@@ -179,7 +173,6 @@ const Recetas = (() => {
     htmlIng += '</ul>';
     $id('detalleIngredientes').innerHTML = htmlIng;
 
-    // Instrucciones
     const instrucciones = receta.instrucciones || 'Sin instrucciones de preparación.';
     const pasosHTML = instrucciones
       .split('\n')
@@ -205,7 +198,7 @@ const Recetas = (() => {
     Recetas.mostrarModalReceta(prodId);
   }
 
-  /* ── MODAL DE CREACIÓN/EDICIÓN DE RECETA ──────────────────── */
+  /** Asegura que el modal de creación/edición de receta exista */
   function _asegurarModalReceta() {
     if ($id('modalReceta')) return;
 
@@ -232,6 +225,7 @@ const Recetas = (() => {
     document.body.appendChild(modal);
   }
 
+  /** Muestra el modal de receta */
   function mostrarModalReceta(productoId = null) {
     _asegurarModalReceta();
 
@@ -288,6 +282,7 @@ const Recetas = (() => {
     }
   }
 
+  /** Guarda la receta actual */
   async function guardarReceta() {
     const productoId = document.getElementById('recProductoId').value;
     if (!productoId) {
@@ -332,7 +327,6 @@ const Recetas = (() => {
     }
 
     cerrarModalReceta();
-    // El Store se actualizará automáticamente vía DB.saveRecetas()
     showToast('success', 'Receta actualizada');
   }
 
@@ -349,7 +343,6 @@ const Recetas = (() => {
   /* ── SUSCRIPCIÓN AL STORE ───────────────────────────────── */
   function _initListeners() {
     Store.subscribe((state, action) => {
-      // Re-renderizar cuando cambien productos o recetas
       if (action.type.startsWith('PRODUCTO') || action.type.startsWith('RECETA')) {
         render();
       }

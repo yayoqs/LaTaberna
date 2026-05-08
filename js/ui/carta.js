@@ -1,13 +1,16 @@
 /* ================================================================
-   PubPOS — MÓDULO: carta.js (v2 – reactivo al Store)
+   PubPOS — MÓDULO: carta.js (v2.1 – JSDoc completo)
    Propósito: Carta de productos dentro del modal de pedido.
-              Ahora obtiene los productos del Store y se re-renderiza
+              Obtiene los productos del Store y se re-renderiza
               automáticamente cuando cambian.
    ================================================================ */
 const Carta = (() => {
   let _categoriaActiva = 'Todos';
   let _terminoBusqueda = '';
 
+  /**
+   * Renderiza las pestañas de categorías y la grilla de productos.
+   */
   function render() {
     _renderCategorias();
     _renderProductos();
@@ -29,11 +32,16 @@ const Carta = (() => {
       `).join('');
   }
 
+  /**
+   * Establece la categoría activa para filtrar productos.
+   * @param {string} cat
+   */
   function setCategoria(cat) {
     _categoriaActiva = cat;
     render();
   }
 
+  /** Filtra productos según el término de búsqueda */
   function filtrar() {
     _terminoBusqueda = ($id('searchProducto')?.value || '').toLowerCase();
     _renderProductos();
@@ -82,6 +90,10 @@ const Carta = (() => {
       </article>`;
   }
 
+  /**
+   * Emite un evento cuando se selecciona un producto.
+   * @param {string} prodId
+   */
   function seleccionarProducto(prodId) {
     const producto = (Store.getState().productos || []).find(p => p.id === prodId);
     if (producto) {
@@ -97,9 +109,8 @@ const Carta = (() => {
       }
     });
 
-    // Render inicial cuando la vista de pedido esté activa
     EventBus.on('vista:cambiada', (vista) => {
-      if (vista === 'mesas') render(); // se usa dentro del modal de pedido
+      if (vista === 'mesas') render();
     });
   }
 

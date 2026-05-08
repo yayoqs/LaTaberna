@@ -1,5 +1,8 @@
 /* ================================================================
-   PubPOS — MÓDULO: kds.js (v4.3 – escucha también EventBus)
+   PubPOS — MÓDULO: kds.js (v4.4 – logging unificado + JSDoc)
+   Propósito: Monitor de cocina (KDS). Muestra las comandas activas
+              filtradas por rol. Se actualiza automáticamente desde
+              el Store y también escucha eventos de comandas enviadas.
    ================================================================ */
 const KDS = (() => {
   const MINUTOS_URGENTE = 15;
@@ -26,6 +29,9 @@ const KDS = (() => {
     document.body.insertBefore(main, referencia);
   }
 
+  /**
+   * Refresca la vista de KDS con las comandas activas del Store.
+   */
   function refresh() {
     _asegurarVista();
     const cont = $id('cocinaKDS');
@@ -35,11 +41,8 @@ const KDS = (() => {
     const rol = Auth.getRol();
 
     let comandas = Store.getState().comandas || [];
-
-    // Filtrar comandas que no tengan items
     comandas = comandas.filter(c => c && Array.isArray(c.items));
 
-    // Filtrar las que ya expiraron
     comandas = comandas.filter(c => {
       if (c.estado === 'lista') {
         return (ahora - c.ts) < MINUTOS_OCULTAR_LISTA * 60 * 1000;
@@ -47,7 +50,6 @@ const KDS = (() => {
       return true;
     });
 
-    // Filtrar por rol
     if (rol === 'cocina') {
       comandas = comandas.filter(c => c.destino === 'cocina' || c.destino === 'ambos');
     } else if (rol === 'barra') {
@@ -64,6 +66,7 @@ const KDS = (() => {
     cont.innerHTML = comandas.map(_htmlKdsCard).join('');
   }
 
+  /** @returns {string} HTML de una tarjeta de comanda */
   function _htmlKdsCard(c) {
     const minutos = Math.floor((Date.now() - c.ts) / 60000);
     const urgente = minutos > MINUTOS_URGENTE;
@@ -121,6 +124,11 @@ const KDS = (() => {
       </article>`;
   }
 
+  /**
+   * Cambia el estado de una comanda en el Store y notifica a otros módulos.
+   * @param {string} id - ID de la comanda
+   * @param {string} estado - Nuevo estado ('en-proceso' o 'lista')
+   */
   function _setEstado(id, estado) {
     const comandas = Store.getState().comandas || [];
     const c = comandas.find(x => x.id === id);

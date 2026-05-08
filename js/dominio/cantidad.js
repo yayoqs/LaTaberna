@@ -6,6 +6,7 @@
 class Cantidad {
   /**
    * @param {number} valor - Entero positivo
+   * @throws {Error} Si el valor no es un entero positivo
    */
   constructor(valor) {
     if (!Number.isInteger(valor) || valor <= 0) {
@@ -15,22 +16,36 @@ class Cantidad {
     Object.freeze(this);
   }
 
+  /** @returns {number} El valor numérico */
   get valor() { return this._valor; }
 
-  // ── Operaciones ──────────────────────────────────────────
+  /**
+   * Suma dos cantidades y devuelve una nueva.
+   * @param {Cantidad} otra
+   * @returns {Cantidad}
+   */
   sumar(otra) {
     return new Cantidad(this._valor + otra._valor);
   }
 
-  // ── Comparaciones ────────────────────────────────────────
+  /** @returns {boolean} */
   esMayorQue(otra) { return this._valor > otra._valor; }
+  /** @returns {boolean} */
   esMenorQue(otra) { return this._valor < otra._valor; }
+  /** @returns {boolean} */
   esIgual(otra)    { return this._valor === otra._valor; }
 
+  /** @returns {string} */
   toString() { return String(this._valor); }
+  /** @returns {number} */
   toJSON()   { return this._valor; }
 }
 
+/**
+ * Factory segura: devuelve null si el valor no es válido.
+ * @param {number} valor
+ * @returns {Cantidad|null}
+ */
 function crearCantidad(valor) {
   try {
     return new Cantidad(valor);
@@ -39,5 +54,5 @@ function crearCantidad(valor) {
   }
 }
 
-window.Cantidad   = Cantidad;
+window.Cantidad = Cantidad;
 window.crearCantidad = crearCantidad;
