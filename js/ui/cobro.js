@@ -1,19 +1,11 @@
 /* ================================================================
-   PubPOS — MÓDULO: cobro.js (v4.5 – cierre blindado con DDD)
-   ================================================================
-   Cambios:
-   • Eliminado el acceso directo a window.PedidoService y DB.
-   • Ahora se obtiene PedidoService desde Deps.obtener('pedidoService').
-   • Si el servicio no está disponible, se muestra un error y no se
-     continúa (ya no hay fallback a DB.cerrarPedido).
-   • La liberación de mesa y los tickets se mantienen igual.
+   PubPOS — MÓDULO: cobro.js (v4.6 – botón Pagado)
    ================================================================ */
 const Cobro = (() => {
   let _mesaACerrar = null;
   let _formaPago = 'Efectivo';
   let _pagosParciales = [];
 
-  /* ── CREACIÓN DINÁMICA DEL MODAL DE CIERRE ───────────────── */
   function _asegurarModalCierre() {
     if ($id('modalCierre')) return;
 
@@ -194,7 +186,6 @@ const Cobro = (() => {
     if (totalEl) totalEl.textContent = `TOTAL A COBRAR: ${fmtMoney(total)}`;
   }
 
-  /* ── LÓGICA DE CIERRE (usando exclusivamente PedidoService) ── */
   async function confirmarCierre() {
     if (!_mesaACerrar) return;
 
@@ -202,17 +193,13 @@ const Cobro = (() => {
     const usarSplit = ppContainer && ppContainer.style.display !== 'none';
     let pagos = [];
 
-    // Calcular montos
     if (usarSplit) {
       pagos = _pagosParciales.filter(p => p.monto > 0);
-      if (pagos.length === 0) {
-        showToast('error', 'No hay pagos registrados.');
-        return;
-      }
+      if (pagos.length === 0) { showToast('error', 'No hay pagos registrados.'); return; }
       const sumaPagos = pagos.reduce((s, p) => s + p.monto, 0);
       const total = calcularTotal(_mesaACerrar.items);
       if (Math.abs(sumaPagos - total) > 0.01) {
-        showToast('warning', `La suma de pagos (${fmtMoney(sumaPagos)}) no coincide con el total (${fmtMoney(total)}). Ajusta los montos.`);
+        showToast('warning', `La suma de pagos (${fmtMoney(sumaPagos)}) no coincide con el total (${fmtMoney(total)}).`);
         return;
       }
     } else {
@@ -223,13 +210,12 @@ const Cobro = (() => {
       pagos = [{ persona: 'Total', monto: totalFinal, formaPago: _formaPago }];
     }
 
-    // ── Obtener PedidoService desde el contenedor ──────────
+    // 1. Cerrar el pedido a través del servicio de dominio
     let pedidoService;
     try {
       pedidoService = Deps.obtener('pedidoService');
     } catch (e) {
-      showToast('error', 'Servicio de pedidos no disponible. No se puede cerrar la mesa.');
-      Logger.error('[Cobro] PedidoService no encontrado en Deps.');
+      showToast('error', 'Servicio de pedidos no disponible.');
       return;
     }
 
@@ -238,7 +224,6 @@ const Cobro = (() => {
       return;
     }
 
-    // ── Ejecutar cierre a través del servicio de dominio ───
     try {
       await pedidoService.cerrarPedido(_mesaACerrar.pedidoId, {
         formaPago: pagos[0].formaPago,
@@ -251,30 +236,53 @@ const Cobro = (() => {
       return;
     }
 
-    // ── Generar tickets ────────────────────────────────────
-    if (usarSplit) {
-      pagos.forEach(pago => {
-        const ticketHTML = Tickets.generarCierreParcial(_mesaACerrar, pago);
-        Tickets.mostrar(ticketHTML, `Comprobante ${pago.persona} — Mesa ${_mesaACerrar.numero}`);
-      });
-    } else {
-      const ticketHTML = Tickets.generarCierre(_mesaACerrar, pagos[0].monto, 0, pagos[0].formaPago);
-      Tickets.mostrar(ticketHTML, `Comprobante — Mesa ${_mesaACerrar.numero}`);
+    // 2. Forzar sincronización con Sheets
+    const pedidoCerrado = DB.pedidos.find(p => p.id === _mesaACerrar.pedidoId);
+    if (pedidoCerrado && typeof DB.syncGuardarPedido === 'function') {
+      const pedidoParaSync = {
+        id: pedidoCerrado.id,
+        mesa: pedidoCerrado.mesa,
+        mozo: pedidoCerrado.mozo || 'Sin mozo',
+        comensales: pedidoCerrado.comensales || 1,
+        estado: pedidoCerrado.estado,
+        items: Array.isArray(pedidoCerrado.items) ? JSON.stringify(pedidoCerrado.items) : pedidoCerrado.items,
+        total: pedidoCerrado.total,
+        created_at: pedidoCerrado.created_at,
+        updated_at: pedidoCerrado.updated_at
+      };
+      try {
+        await DB.syncGuardarPedido(pedidoParaSync);
+        Logger.info('[Cobro] Pedido sincronizado con Sheets tras el cierre.');
+      } catch (e) {
+        Logger.warn('[Cobro] Error al sincronizar con Sheets, encolado.', e);
+        showToast('warning', 'El ticket se guardó localmente y se enviará cuando haya conexión.');
+      }
     }
 
-    // ── Liberar mesa ──────────────────────────────────────
-    if (_mesaACerrar.esVirtual) {
-      DB.liberarMesasFusionadas(_mesaACerrar);
-    } else {
-      const idx = DB.mesas.findIndex(m => m.numero === _mesaACerrar.numero);
-      if (idx >= 0) DB.mesas[idx] = mesaVacia(_mesaACerrar.numero);
-    }
-    DB.saveMesas();
-    EventBus.emit('pedido:cerrado', { mesa: _mesaACerrar.numero });
-
+    // 3. Cerrar el modal de cobro y mostrar ticket con botones Imprimir y Pagado
     cerrarModalCierre();
-    if (typeof Pedido !== 'undefined' && Pedido.cerrar) Pedido.cerrar();
-    _mesaACerrar = null;
+
+    const ticketHTML = Tickets.generarCierre(_mesaACerrar, pagos[0].monto, 0, pagos[0].formaPago);
+    Tickets.mostrar(ticketHTML, `Comprobante — Mesa ${_mesaACerrar.numero}`, {
+      textoImprimir: 'Imprimir',
+      claseImprimir: 'btn-print',
+      onImprimir: () => true,
+      textoExtra: 'Pagado',
+      onExtra: async () => {
+        // Liberar la mesa
+        if (_mesaACerrar.esVirtual) {
+          DB.liberarMesasFusionadas(_mesaACerrar);
+        } else {
+          const idx = DB.mesas.findIndex(m => m.numero === _mesaACerrar.numero);
+          if (idx >= 0) DB.mesas[idx] = mesaVacia(_mesaACerrar.numero);
+        }
+        DB.saveMesas();
+        EventBus.emit('pedido:cerrado', { mesa: _mesaACerrar.numero });
+        if (typeof Pedido !== 'undefined' && Pedido.cerrar) Pedido.cerrar();
+        showToast('success', `Mesa ${_mesaACerrar.numero} pagada y liberada.`);
+        _mesaACerrar = null;
+      }
+    });
   }
 
   function cerrarModalCierre() {

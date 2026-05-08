@@ -1,11 +1,8 @@
 /* ================================================================
-   PubPOS — MÓDULO: tickets.js (v4.3 – botón imprimir dinámico)
+   PubPOS — MÓDULO: tickets.js (v4.4 – botón extra "Pagado")
    ================================================================ */
 const Tickets = (() => {
 
-  /* ═══════════════════════════════════════════════════════════
-     RENDERER: genera HTML de tickets (puro, sin interacción con DOM)
-     ═══════════════════════════════════════════════════════════ */
   const Renderer = {
     generarComanda(comanda, destino) {
       const hora  = fmtHoraCorta(Date.now());
@@ -122,9 +119,6 @@ const Tickets = (() => {
     }
   };
 
-  /* ═══════════════════════════════════════════════════════════
-     MODAL: gestiona la vista previa y la impresión (UI)
-     ═══════════════════════════════════════════════════════════ */
   const Modal = {
     _modals: [],
 
@@ -226,7 +220,13 @@ const Tickets = (() => {
       if (typeof opciones.editarCallback === 'function') {
         html += `<button class="btn-secondary" id="${prefix}-editar"><i class="fas fa-pen"></i> ${opciones.textoEditar || 'Editar'}</button>`;
       }
-      // Botón imprimir dinámico: acepta textoImprimir y callback onImprimir
+      // Botón extra (ej. "Pagado")
+      if (typeof opciones.onExtra === 'function') {
+        html += `<button class="btn-primary" id="${prefix}-extra" style="background:var(--color-success); border:none; color:#000;">
+                  <i class="fas fa-check-circle"></i> ${opciones.textoExtra || 'Acción'}
+                </button>`;
+      }
+      // Botón imprimir
       const textoImprimir = opciones.textoImprimir || 'Imprimir';
       const claseImprimir = opciones.claseImprimir || 'btn-print';
       html += `<button class="${claseImprimir}" id="${prefix}-imprimir"><i class="fas fa-print"></i> ${textoImprimir}</button>`;
@@ -236,6 +236,7 @@ const Tickets = (() => {
     _vincularEventos(prefix, opciones = {}) {
       const closeBtn = document.getElementById(`${prefix}-close`);
       const editBtn = document.getElementById(`${prefix}-editar`);
+      const extraBtn = document.getElementById(`${prefix}-extra`);
       const printBtn = document.getElementById(`${prefix}-imprimir`);
 
       if (closeBtn) {
@@ -247,23 +248,22 @@ const Tickets = (() => {
 
       if (printBtn) {
         printBtn.onclick = async () => {
-          // Ejecutar el callback onImprimir si existe (puede devolver false para abortar)
-          let debeImprimir = true;
           if (typeof opciones.onImprimir === 'function') {
-            debeImprimir = await opciones.onImprimir();
+            await opciones.onImprimir();
           }
-          if (debeImprimir) {
-            const contentDiv = document.getElementById(`${prefix}-content`);
-            if (!contentDiv) return;
-            // Si es reimpresión, añadimos la marca
-            let html = contentDiv.innerHTML;
-            if (opciones.esReimpresion) {
-              html = `<div class="t-center t-small" style="color:red;margin-bottom:8px;">*** REIMPRESO ***</div>` + html;
-            }
-            _imprimirEnVentana(html, 'Comanda');
-            const overlay = document.getElementById(prefix);
-            if (overlay) overlay.style.display = 'none';
+          const contentDiv = document.getElementById(`${prefix}-content`);
+          if (!contentDiv) return;
+          _imprimirEnVentana(contentDiv.innerHTML, 'Comanda');
+        };
+      }
+
+      if (extraBtn) {
+        extraBtn.onclick = async () => {
+          if (typeof opciones.onExtra === 'function') {
+            await opciones.onExtra();
           }
+          const overlay = document.getElementById(prefix);
+          if (overlay) overlay.style.display = 'none';
         };
       }
 
@@ -280,9 +280,6 @@ const Tickets = (() => {
     }
   };
 
-  /* ═══════════════════════════════════════════════════════════
-     FUNCIONES AUXILIARES (privadas)
-     ═══════════════════════════════════════════════════════════ */
   function _agruparItems(items) {
     const map = {};
     (items || []).forEach(it => {
@@ -315,9 +312,6 @@ const Tickets = (() => {
     win.document.close();
   }
 
-  /* ═══════════════════════════════════════════════════════════
-     API PÚBLICA
-     ═══════════════════════════════════════════════════════════ */
   return {
     generarComanda: Renderer.generarComanda.bind(Renderer),
     generarCuenta: (mesa) => Renderer.generarCuenta(mesa, DB.config),
