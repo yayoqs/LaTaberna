@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: cobro.js (v4.6 – botón Pagado)
+   PubPOS — MÓDULO: cobro.js (v4.7 – sincronización forzada del cierre)
    ================================================================ */
 const Cobro = (() => {
   let _mesaACerrar = null;
@@ -236,20 +236,23 @@ const Cobro = (() => {
       return;
     }
 
-    // 2. Forzar sincronización con Sheets
+    // 2. Forzar sincronización inmediata con Sheets
     const pedidoCerrado = DB.pedidos.find(p => p.id === _mesaACerrar.pedidoId);
     if (pedidoCerrado && typeof DB.syncGuardarPedido === 'function') {
       const pedidoParaSync = {
-        id: pedidoCerrado.id,
-        mesa: pedidoCerrado.mesa,
-        mozo: pedidoCerrado.mozo || 'Sin mozo',
-        comensales: pedidoCerrado.comensales || 1,
-        estado: pedidoCerrado.estado,
-        items: Array.isArray(pedidoCerrado.items) ? JSON.stringify(pedidoCerrado.items) : pedidoCerrado.items,
-        total: pedidoCerrado.total,
-        created_at: pedidoCerrado.created_at,
-        updated_at: pedidoCerrado.updated_at
+        id:          pedidoCerrado.id,
+        mesa:        pedidoCerrado.mesa,
+        mozo:        pedidoCerrado.mozo || 'Sin mozo',
+        comensales:  pedidoCerrado.comensales || 1,
+        estado:      'cerrada',   // forzamos el estado a 'cerrada'
+        items:       Array.isArray(pedidoCerrado.items)
+                       ? JSON.stringify(pedidoCerrado.items)
+                       : (pedidoCerrado.items || '[]'),
+        total:       pedidoCerrado.total || 0,
+        created_at:  pedidoCerrado.created_at,
+        updated_at:  pedidoCerrado.updated_at || new Date().toISOString()
       };
+
       try {
         await DB.syncGuardarPedido(pedidoParaSync);
         Logger.info('[Cobro] Pedido sincronizado con Sheets tras el cierre.');
@@ -257,6 +260,8 @@ const Cobro = (() => {
         Logger.warn('[Cobro] Error al sincronizar con Sheets, encolado.', e);
         showToast('warning', 'El ticket se guardó localmente y se enviará cuando haya conexión.');
       }
+    } else {
+      Logger.warn('[Cobro] No se encontró el pedido cerrado en DB o falta syncGuardarPedido.');
     }
 
     // 3. Cerrar el modal de cobro y mostrar ticket con botones Imprimir y Pagado
