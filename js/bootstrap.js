@@ -1,12 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: bootstrap.js (v1.8 – contenedor de dependencias)
-   ================================================================
-   Cambios:
-   • Después de crear los repositorios, se registran en Deps.
-   • Los servicios ya se configuran con ellos; ahora también se
-     registran en Deps para que los comandos los usen fácilmente.
-   • Se elimina el paso de inyectar repo al PedidoManager porque
-     ya no es necesario (PedidoManager usa PedidoService directamente).
+   PubPOS — MÓDULO: bootstrap.js (v1.9 – adaptadores simplificados)
    ================================================================ */
 const Bootstrap = (() => {
 
@@ -55,23 +48,18 @@ const Bootstrap = (() => {
     }
 
     // ── 5. Inyección de dependencias (REPOSITORIOS) ──────
-    // PedidoRepositoryLocal ya está definido como variable global, lo usamos.
     let pedidoRepo = typeof PedidoRepositoryLocal !== 'undefined' ? PedidoRepositoryLocal : null;
 
     const deliveryRepo = {
       async crearDelivery(datos) {
-        if (!window.DB || !DB.crearPedidoDelivery) throw new Error('DB no disponible');
-        const nuevo = DB.crearPedidoDelivery(datos);
-        if (!nuevo) throw new Error('No se pudo crear el delivery');
-        return nuevo;
+        // Usamos directamente el método del core (ya que DB lo expande)
+        return DB.crearPedidoDelivery(datos);
       },
       async obtenerPorId(id) {
-        if (!window.DB || !DB.pedidosDelivery) return null;
-        return DB.pedidosDelivery.find(p => p.id === id) || null;
+        return (DB.pedidosDelivery || []).find(p => p.id === id) || null;
       },
       async guardarDelivery(datos) {
-        if (!window.DB || !DB.pedidosDelivery) throw new Error('DB no disponible');
-        const idx = DB.pedidosDelivery.findIndex(p => p.id === datos.id);
+        const idx = (DB.pedidosDelivery || []).findIndex(p => p.id === datos.id);
         if (idx >= 0) {
           DB.pedidosDelivery[idx] = { ...DB.pedidosDelivery[idx], ...datos };
         }
@@ -81,15 +69,14 @@ const Bootstrap = (() => {
 
     const inventarioRepo = {
       async guardarIngrediente(datos) {
-        if (!window.DB || typeof DB.syncGuardarIngrediente !== 'function') {
+        if (typeof DB.syncGuardarIngrediente !== 'function') {
           throw new Error('DB.syncGuardarIngrediente no disponible');
         }
         await DB.syncGuardarIngrediente(datos);
         return datos;
       },
       async obtenerPorId(id) {
-        if (!window.DB || !DB.ingredientes) return null;
-        return DB.ingredientes.find(i => i.id == id) || null;
+        return (DB.ingredientes || []).find(i => i.id == id) || null;
       },
       async registrarMovimiento(movimiento) {
         if (typeof DB.ajustarStock === 'function') {
@@ -109,7 +96,6 @@ const Bootstrap = (() => {
     // ── 6. Configurar Servicios de Dominio ────────────────
     if (typeof PedidoService !== 'undefined' && pedidoRepo) {
       PedidoService.configurar(pedidoRepo);
-      // También registramos el servicio en el contenedor
       if (typeof Deps !== 'undefined') Deps.registrar('pedidoService', PedidoService);
       Logger.info('[Bootstrap] PedidoService configurado y registrado.');
     }
@@ -124,10 +110,10 @@ const Bootstrap = (() => {
       Logger.info('[Bootstrap] InventarioService configurado.');
     }
 
-    // ── 7. Iniciar PedidoManager (ya no necesita repo explícito) ─
+    // ── 7. Iniciar PedidoManager ──────────────────────────
     try {
       if (typeof PedidoManager !== 'undefined') {
-        const turno = PedidoManager.init({ pedidoRepo }); // aún se lo pasamos para compatibilidad
+        const turno = PedidoManager.init({ pedidoRepo });
         Logger.info(`[Bootstrap] PedidoManager activo. Turno: ${turno?.id}`);
       }
     } catch (e) {

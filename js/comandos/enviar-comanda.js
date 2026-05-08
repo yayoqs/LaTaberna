@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — COMANDO: enviar-comanda.js (v2.2 – Store inmediato)
+   PubPOS — COMANDO: enviar-comanda.js (v3.0 – delegación total al repo)
    ================================================================ */
 
 function crearComandoEnviarComanda(datos) {
@@ -37,106 +37,36 @@ async function handleEnviarComanda(comando) {
     Logger.warn('[EnviarComanda] No se pudo validar stock:', e.message);
   }
 
-  const cocinaItems = itemsPendientes.filter(it => it.destino === 'cocina' || it.destino === 'ambos');
-  const barraItems  = itemsPendientes.filter(it => it.destino === 'barra'  || it.destino === 'ambos');
-  if (!cocinaItems.length && !barraItems.length) throw new Error('Los ítems no tienen un destino válido');
-
-  const _crearComanda = (items, destinoKds) => {
-    items.forEach(it => {
-      it.enviado = true;
-      it.enviadoA = destinoKds;
-      it.enviadoTs = Date.now();
-    });
-
-    const comanda = {
-      id: 'kds_' + Date.now() + '_' + Math.random().toString(36).substr(2,6),
-      mesa: mesa.numero,
-      mozo: mozo,
-      destino: destinoKds,
-      items: items.map(it => ({ ...it })),
-      observaciones: observaciones || '',
-      estado: 'nueva',
-      ts: Date.now()
-    };
-
-    // Persistir en DB
-    if (typeof DB !== 'undefined' && DB.comandas) {
-      DB.comandas.push(comanda);
-      DB.saveComandas(); // persiste en localStorage y emite EventBus
-    }
-
-    // Despachar al Store inmediatamente para que el KDS reaccione
-    if (typeof Store !== 'undefined') {
-      Store.dispatch({ type: 'COMANDA_AGREGADA', payload: comanda });
-    }
-
-    Logger.debug(`[EnviarComanda] Comanda creada para ${destinoKds}`, comanda);
-    return comanda;
-  };
-
-  const comandasCreadas = [];
-  const ticketsGenerados = { cocina: null, barra: null };
-
-  if (cocinaItems.length && barraItems.length) {
-    const comCocina = _crearComanda(cocinaItems, 'cocina');
-    const comBarra  = _crearComanda(barraItems,  'barra');
-    comandasCreadas.push(comCocina, comBarra);
-    if (typeof Tickets !== 'undefined') {
-      ticketsGenerados.cocina = Tickets.generarComanda(comCocina, 'cocina');
-      ticketsGenerados.barra  = Tickets.generarComanda(comBarra,  'barra');
-    }
-  } else if (cocinaItems.length) {
-    const comCocina = _crearComanda(cocinaItems, 'cocina');
-    comandasCreadas.push(comCocina);
-    if (typeof Tickets !== 'undefined') ticketsGenerados.cocina = Tickets.generarComanda(comCocina, 'cocina');
-  } else if (barraItems.length) {
-    const comBarra = _crearComanda(barraItems, 'barra');
-    comandasCreadas.push(comBarra);
-    if (typeof Tickets !== 'undefined') ticketsGenerados.barra = Tickets.generarComanda(comBarra, 'barra');
+  // Obtener repositorio
+  let repo;
+  try {
+    repo = Deps.obtener('pedidoRepo');
+  } catch (e) {
+    throw new Error('Repositorio de pedidos no disponible: ' + e.message);
   }
 
-  // Actualizar mesa
+  if (typeof repo.enviarComanda !== 'function') {
+    throw new Error('El repositorio no soporta la operación enviarComanda');
+  }
+
+  // Delegar toda la persistencia
+  let resultado;
+  try {
+    resultado = await repo.enviarComanda(mesa, itemsPendientes, mozo, comensales, observaciones);
+  } catch (e) {
+    throw new Error('Error al enviar comanda: ' + e.message);
+  }
+
+  // Actualizar estado de la mesa
   if (mesa.estado === 'libre') mesa.estado = 'ocupada';
-  if (typeof DB !== 'undefined' && DB.saveMesas) DB.saveMesas();
+  DB.saveMesas();
 
-  // Actualizar pedido y sincronizar con Sheets
-  if (mesa.pedidoId && typeof DB !== 'undefined' && DB.actualizarPedido) {
-    try {
-      const pedidoActualizado = await DB.actualizarPedido(mesa.pedidoId, {
-        estado: 'en_proceso',
-        items: JSON.stringify(mesa.items),
-        total: calcularTotal(mesa.items),
-        mozo: mesa.mozo,
-        comensales: mesa.comensales,
-        observaciones: mesa.observaciones
-      });
-      Logger.debug(`[EnviarComanda] Pedido ${mesa.pedidoId} actualizado localmente.`);
-
-      if (pedidoActualizado && typeof DB.syncGuardarPedido === 'function') {
-        try {
-          const pedidoParaSync = {
-            ...pedidoActualizado,
-            items: Array.isArray(pedidoActualizado.items) ? JSON.stringify(pedidoActualizado.items) : pedidoActualizado.items
-          };
-          await DB.syncGuardarPedido(pedidoParaSync);
-          Logger.info(`[EnviarComanda] Pedido ${mesa.pedidoId} sincronizado con Sheets.`);
-        } catch (syncError) {
-          Logger.warn('[EnviarComanda] Error al sincronizar pedido con Sheets. Encolado.', syncError);
-          if (typeof DB._encolarOperacion === 'function') DB._encolarOperacion('guardarPedido', { pedido: pedidoActualizado });
-          showToast('warning', 'Comanda enviada, pero no se pudo actualizar la hoja de cálculo. Se reintentará.');
-        }
-      }
-    } catch (e) {
-      Logger.warn('[EnviarComanda] No se pudo actualizar pedido:', e);
-    }
-  }
-
-  // Notificar
-  comandasCreadas.forEach(c => EventBus.emit('comanda:enviada', c));
+  // Notificar a otros módulos
+  resultado.comandas.forEach(c => EventBus.emit('comanda:enviada', c));
   EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: mesa.estado });
-  Logger.info(`[EnviarComanda] ${comandasCreadas.length} comanda(s) enviada(s).`);
+  Logger.info(`[EnviarComanda] ${resultado.comandas.length} comanda(s) enviada(s).`);
 
-  return { comandas: comandasCreadas, ticketsHTML: ticketsGenerados };
+  return resultado;
 }
 
 CommandBus.registrar('enviarComanda', handleEnviarComanda);

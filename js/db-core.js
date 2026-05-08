@@ -1,8 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-core.js (v3.2.5 – un solo mozo por defecto)
-   Propósito: Núcleo de base de datos: mesas, pedidos, comandas,
-              mozos, configuración y pedidos de delivery.
-              Ahora solo incluye un mozo "Trini" por defecto.
+   PubPOS — MÓDULO: db-core.js (v3.2.6 – métodos de delivery incluidos)
    ================================================================ */
 const DBCore = (function() {
   const module = {};
@@ -67,7 +64,7 @@ const DBCore = (function() {
     };
   };
 
-  /* ── VALIDACIONES BÁSICAS ────────────────────────────────── */
+  /* ── VALIDACIONES ────────────────────────────────────────── */
   module._validarId = function(val, prefijo) {
     if (typeof val === 'string' && val.length > 0) return val;
     return `${prefijo}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
@@ -228,20 +225,16 @@ const DBCore = (function() {
     }
   };
 
-  /* ── GUARDADO (CON NOTIFICACIÓN AL STORE) ────────────────── */
+  /* ── GUARDADO ────────────────────────────────────────────── */
   module.saveConfig = function() {
     localStorage.setItem('pubpos_config', JSON.stringify(this.config));
-    if (typeof Store !== 'undefined') {
-      Store.dispatch({ type: 'CONFIG_INICIALIZAR', payload: this.config });
-    }
+    if (typeof Store !== 'undefined') Store.dispatch({ type: 'CONFIG_INICIALIZAR', payload: this.config });
   };
 
   module.saveMesas = function() {
     localStorage.setItem('pubpos_mesas', JSON.stringify(this.mesas));
     EventBus.emit('mesas:guardadas', this.mesas);
-    if (typeof Store !== 'undefined') {
-      Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: this.mesas });
-    }
+    if (typeof Store !== 'undefined') Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: this.mesas });
   };
 
   module.saveComandas = function() {
@@ -252,24 +245,18 @@ const DBCore = (function() {
   module.savePedidos = function() {
     localStorage.setItem('pubpos_pedidos', JSON.stringify(this.pedidos));
     EventBus.emit('pedidos:guardados', this.pedidos);
-    if (typeof Store !== 'undefined') {
-      Store.dispatch({ type: 'PEDIDOS_INICIALIZAR', payload: this.pedidos });
-    }
+    if (typeof Store !== 'undefined') Store.dispatch({ type: 'PEDIDOS_INICIALIZAR', payload: this.pedidos });
   };
 
   module.saveMozos = function() {
     localStorage.setItem('pubpos_mozos', JSON.stringify(this.mozos));
-    if (typeof Store !== 'undefined') {
-      Store.dispatch({ type: 'MOZOS_INICIALIZAR', payload: this.mozos });
-    }
+    if (typeof Store !== 'undefined') Store.dispatch({ type: 'MOZOS_INICIALIZAR', payload: this.mozos });
   };
 
   module.savePedidosDelivery = function() {
     localStorage.setItem('pubpos_pedidos_delivery', JSON.stringify(this.pedidosDelivery));
     EventBus.emit('pedidosDelivery:guardados', this.pedidosDelivery);
-    if (typeof Store !== 'undefined') {
-      Store.dispatch({ type: 'PEDIDOSDELIVERY_INICIALIZAR', payload: this.pedidosDelivery });
-    }
+    if (typeof Store !== 'undefined') Store.dispatch({ type: 'PEDIDOSDELIVERY_INICIALIZAR', payload: this.pedidosDelivery });
   };
 
   /* ── GESTIÓN DE PEDIDOS (mesa) ───────────────────────────── */
@@ -306,6 +293,47 @@ const DBCore = (function() {
 
   module.getMesa = function(num) {
     return this.mesas.find(m => m.numero == num);
+  };
+
+  /* ── GESTIÓN DE DELIVERY ─────────────────────────────────── */
+  /**
+   * Crea un nuevo pedido de delivery.
+   * @param {object} datos - { direccion, telefono, items, total, repartidor, observaciones, estado }
+   * @returns {object} El pedido creado
+   */
+  module.crearPedidoDelivery = function(datos) {
+    const nuevo = this._normalizarPedidoDelivery({
+      ...datos,
+      id: 'deliv_' + Date.now(),
+      created_at: new Date().toISOString()
+    });
+    this.pedidosDelivery.push(nuevo);
+    this.savePedidosDelivery();
+    return nuevo;
+  };
+
+  /**
+   * Actualiza campos de un pedido de delivery.
+   * @param {string} id
+   * @param {object} cambios
+   * @returns {object|null}
+   */
+  module.actualizarPedidoDelivery = function(id, cambios) {
+    const idx = this.pedidosDelivery.findIndex(p => p.id === id);
+    if (idx >= 0) {
+      this.pedidosDelivery[idx] = { ...this.pedidosDelivery[idx], ...cambios };
+      this.savePedidosDelivery();
+    }
+    return this.pedidosDelivery[idx] || null;
+  };
+
+  /**
+   * Elimina un pedido de delivery.
+   * @param {string} id
+   */
+  module.eliminarPedidoDelivery = function(id) {
+    this.pedidosDelivery = this.pedidosDelivery.filter(p => p.id !== id);
+    this.savePedidosDelivery();
   };
 
   return module;

@@ -1,5 +1,13 @@
 /* ================================================================
-   PubPOS — MÓDULO: db.js (Orquestador v2.5 – logging unificado + JSDoc)
+   PubPOS — MÓDULO: db.js (Orquestador v3.0 – simplificado)
+   ================================================================
+   Cambios:
+   • Eliminados crearPedidoMesa y agregarItemAPedido (ya no se usan).
+   • Eliminados crearPedidoDelivery, enviarPedidoDeliveryACocina,
+     actualizarPedidoDelivery y eliminarPedidoDelivery (se usarán
+     desde el repositorio de delivery directamente).
+   • DB queda como orquestador mínimo: init, cerrarPedido (interno),
+     y acceso a los submódulos (core, sync, inventario, fusion).
    ================================================================ */
 var DB = (function() {
   const core = DBCore;
@@ -58,34 +66,8 @@ var DB = (function() {
   };
 
   /**
-   * Crea un pedido de mesa delegando en PedidoManager si está disponible.
-   * @param {number} numeroMesa
-   * @param {string} mozo
-   * @param {number} comensales
-   * @returns {Promise<object>} El pedido creado
-   */
-  combined.crearPedidoMesa = function(numeroMesa, mozo, comensales) {
-    if (typeof PedidoManager !== 'undefined' && PedidoManager.crearPedidoMesa) {
-      return PedidoManager.crearPedidoMesa(numeroMesa, mozo, comensales);
-    }
-    return this.crearPedido(numeroMesa, mozo, comensales);
-  };
-
-  /**
-   * Agrega un ítem a un pedido. Actualmente delegado a PedidoManager si existe.
-   * @param {string} pedidoId
-   * @param {object} item
-   * @returns {boolean}
-   */
-  combined.agregarItemAPedido = function(pedidoId, item) {
-    if (typeof PedidoManager !== 'undefined' && PedidoManager.agregarItemAPedido) {
-      return PedidoManager.agregarItemAPedido(pedidoId, item);
-    }
-    return false;
-  };
-
-  /**
    * Cierra un pedido: descuenta stock, sincroniza y cambia estado a 'cerrada'.
+   * (Este método es llamado por el repositorio, no por la UI directamente)
    * @param {string} id - ID del pedido
    * @param {string} formaPago
    * @param {number} total
@@ -162,61 +144,6 @@ var DB = (function() {
     }
 
     return pedidoActualizado;
-  };
-
-  /**
-   * Crea un pedido de delivery, delegando en PedidoManager si existe.
-   * @param {object} datos
-   * @returns {object} El pedido de delivery creado
-   */
-  combined.crearPedidoDelivery = function(datos) {
-    if (typeof PedidoManager !== 'undefined' && PedidoManager.crearPedidoDelivery) {
-      return PedidoManager.crearPedidoDelivery(datos);
-    }
-    const nuevo = this._normalizarPedidoDelivery({
-      ...datos,
-      id: 'deliv_' + Date.now(),
-      created_at: new Date().toISOString()
-    });
-    this.pedidosDelivery.push(nuevo);
-    this.savePedidosDelivery();
-    return nuevo;
-  };
-
-  /**
-   * Envía un pedido de delivery a cocina, delegando en PedidoManager.
-   * @param {string} deliveryId
-   * @returns {boolean}
-   */
-  combined.enviarPedidoDeliveryACocina = function(deliveryId) {
-    if (typeof PedidoManager !== 'undefined' && PedidoManager.enviarPedidoDeliveryACocina) {
-      return PedidoManager.enviarPedidoDeliveryACocina(deliveryId);
-    }
-    return false;
-  };
-
-  /**
-   * Actualiza un pedido de delivery.
-   * @param {string} id
-   * @param {object} cambios
-   * @returns {object|null}
-   */
-  combined.actualizarPedidoDelivery = function(id, cambios) {
-    const idx = this.pedidosDelivery.findIndex(p => p.id === id);
-    if (idx >= 0) {
-      this.pedidosDelivery[idx] = { ...this.pedidosDelivery[idx], ...cambios };
-      this.savePedidosDelivery();
-    }
-    return this.pedidosDelivery[idx] || null;
-  };
-
-  /**
-   * Elimina un pedido de delivery.
-   * @param {string} id
-   */
-  combined.eliminarPedidoDelivery = function(id) {
-    this.pedidosDelivery = this.pedidosDelivery.filter(p => p.id !== id);
-    this.savePedidosDelivery();
   };
 
   return combined;
