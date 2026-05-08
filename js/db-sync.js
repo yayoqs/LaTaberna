@@ -1,11 +1,13 @@
-/* ================================================================
-   PubPOS — MÓDULO: db-sync.js (v5.3 – reconstruye comandas)
+ /* ================================================================
+   PubPOS — MÓDULO: db-sync.js (v5.4 – reconstrucción de comandas al iniciar)
+   Propósito: Al descargar pedidos desde Sheets, ahora también se
+              reconstruyen las comandas en DB.comandas para que el
+              KDS las muestre inmediatamente.
    ================================================================ */
 window.DBSync = (function() {
   const module = {};
 
   module.urlSheets = "https://script.google.com/macros/s/AKfycbzbLLE-lJJRyeHpLTxyvtI7hganGCLHOd9EJJmNqAQBPUz22KfFBW_JZIpX1kq7t7tZcQ/exec";
-  
   module.syncQueue = [];
 
   module._cargarSyncQueueLocal = function() {
@@ -84,11 +86,10 @@ window.DBSync = (function() {
         this.productos = data.productos.map(p => window.DB._normalizarProducto(p));
         localStorage.setItem('pubpos_cache_prod', JSON.stringify(this.productos));
         EventBus.emit('productos:cargados', this.productos);
-        const conImagen = this.productos.filter(p => p.imagen && p.imagen.trim() !== '').length;
-        Logger.info(`[DB Sync] ${this.productos.length} productos sincronizados (${conImagen} con imagen).`);
+        Logger.info(`[DB Sync] ${this.productos.length} productos sincronizados.`);
       }
     } catch (e) {
-      Logger.warn("[DB Sync] Error obteniendo productos, usando caché local.", e.message);
+      Logger.warn("[DB Sync] Error obteniendo productos, usando caché.");
       const cache = localStorage.getItem('pubpos_cache_prod');
       this.productos = cache ? JSON.parse(cache).map(p => window.DB._normalizarProducto(p)) : [];
     }
@@ -103,10 +104,9 @@ window.DBSync = (function() {
         this.mozos = data.mozos.map(m => window.DB._normalizarMozo(m));
         window.DB.saveMozos();
         EventBus.emit('mozos:cargados', this.mozos);
-        Logger.info(`[DB Sync] ${this.mozos.length} mozos sincronizados.`);
       }
     } catch (e) {
-      Logger.warn("[DB Sync] Error obteniendo mozos, manteniendo locales.", e.message);
+      Logger.warn("[DB Sync] Error obteniendo mozos.");
     }
   };
 
@@ -121,10 +121,9 @@ window.DBSync = (function() {
       if (ing.length) {
         this.ingredientes = ing.map(i => window.DB._normalizarIngrediente(i));
         window.DB.saveIngredientes();
-        Logger.info(`[DB Sync] ${this.ingredientes.length} ingredientes sincronizados.`);
       }
     } catch (e) {
-      Logger.warn("[DB Sync] Error obteniendo insumos, usando caché.", e.message);
+      Logger.warn("[DB Sync] Error obteniendo insumos.");
     }
   };
 
@@ -149,10 +148,9 @@ window.DBSync = (function() {
         });
         this.recetas = Array.from(mapa.values());
         window.DB.saveRecetas();
-        Logger.info(`[DB Sync] ${this.recetas.length} recetas sincronizadas.`);
       }
     } catch (e) {
-      Logger.warn("[DB Sync] Error obteniendo recetas.", e.message);
+      Logger.warn("[DB Sync] Error obteniendo recetas.");
     }
   };
 
@@ -161,8 +159,10 @@ window.DBSync = (function() {
       const res = await fetch(`${this.urlSheets}?action=getPedidos`, { mode: 'cors' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      if (data && Array.isArray(data.pedidos)) {
-        const pedidosRemotos = data.pedidos.map(p => ({
+      if (!data || !Array.isArray(data.pedidos)) return;
+
+      const pedidosRemotos = data.pedidos
+        .map(p => ({
           id: p.id || '',
           mesa: parseInt(p.mesa) || 0,
           mozo: p.mozo || 'Sin mozo',
@@ -172,63 +172,78 @@ window.DBSync = (function() {
           total: parseFloat(p.total) || 0,
           created_at: p.created_at || new Date().toISOString(),
           updated_at: p.updated_at || new Date().toISOString()
-        })).filter(p => p.id && p.mesa);
+        }))
+        .filter(p => p.id && p.mesa);
 
-        window.DB.pedidos = pedidosRemotos;
-        window.DB.savePedidos();
+      // 1. Guardar pedidos en DB
+      window.DB.pedidos = pedidosRemotos;
+      window.DB.savePedidos();
 
-        // Reconstruir comandas en KDS a partir de los pedidos activos
-        window.DB.comandas = [];
-        pedidosRemotos.forEach(pedido => {
-          if (pedido.estado === 'abierta' || pedido.estado === 'en_proceso') {
-            const mesa = window.DB.getMesa(pedido.mesa);
-            if (mesa) {
-              mesa.estado = pedido.estado === 'abierta' ? 'ocupada' : 'esperando';
-              mesa.pedidoId = pedido.id;
-              mesa.mozo = pedido.mozo;
-              mesa.comensales = pedido.comensales;
-              mesa.abiertaEn = pedido.created_at;
-              try {
-                mesa.items = JSON.parse(pedido.items || '[]');
-              } catch (e) {
-                mesa.items = [];
-              }
-              mesa.total = pedido.total;
+      // 2. Reconstruir comandas para KDS
+      const comandasReconstruidas = [];
+      pedidosRemotos.forEach(pedido => {
+        // Solo pedidos abiertos o en proceso generan comanda en cocina
+        if (pedido.estado !== 'abierta' && pedido.estado !== 'en_proceso') return;
 
-              // Crear comanda para KDS con los items del pedido
-              const itemsComanda = mesa.items.map(it => ({
-                prodId: it.prodId || '',
-                nombre: it.nombre,
-                precio: it.precio,
-                qty: it.qty,
-                destino: it.destino || 'cocina',
-                obs: it.obs || '',
-                enviado: true,
-                enviadoA: it.destino || 'cocina',
-                enviadoTs: pedido.updated_at || Date.now()
-              }));
+        let items;
+        try {
+          items = typeof pedido.items === 'string' ? JSON.parse(pedido.items) : pedido.items;
+        } catch (e) {
+          items = [];
+        }
+        if (!Array.isArray(items) || items.length === 0) return;
 
-              if (itemsComanda.length > 0) {
-                window.DB.comandas.push({
-                  id: 'kds_restored_' + pedido.id,
-                  mesa: pedido.mesa,
-                  mozo: pedido.mozo,
-                  destino: 'cocina',
-                  items: itemsComanda,
-                  observaciones: '',
-                  estado: 'nueva',
-                  ts: Date.now()
-                });
-              }
-            }
-          }
+        // Actualizar la mesa en memoria
+        const mesa = window.DB.getMesa(pedido.mesa);
+        if (mesa) {
+          mesa.estado = pedido.estado === 'abierta' ? 'ocupada' : 'esperando';
+          mesa.pedidoId = pedido.id;
+          mesa.mozo = pedido.mozo;
+          mesa.comensales = pedido.comensales;
+          mesa.abiertaEn = pedido.created_at;
+          mesa.items = items;
+          mesa.total = pedido.total;
+        }
+
+        // Crear una comanda con esos items
+        const comanda = {
+          id: 'kds_restored_' + pedido.id,
+          mesa: pedido.mesa,
+          mozo: pedido.mozo,
+          destino: 'cocina',      // por defecto; si hay items con destino barra se podría duplicar
+          items: items.map(it => ({
+            prodId: it.prodId || '',
+            nombre: it.nombre || '',
+            precio: it.precio || 0,
+            qty: it.qty || 1,
+            destino: it.destino || 'cocina',
+            obs: it.obs || '',
+            enviado: true,
+            enviadoA: it.destino || 'cocina',
+            enviadoTs: pedido.updated_at || Date.now()
+          })),
+          observaciones: '',
+          estado: 'nueva',
+          ts: Date.now()
+        };
+        comandasReconstruidas.push(comanda);
+      });
+
+      // 3. Guardar comandas y notificar
+      window.DB.comandas = comandasReconstruidas;
+      window.DB.saveComandas(); // esto emite EventBus y guarda en localStorage
+
+      // 4. Forzar actualización del Store para que KDS reaccione
+      if (typeof Store !== 'undefined') {
+        comandasReconstruidas.forEach(c => {
+          Store.dispatch({ type: 'COMANDA_AGREGADA', payload: c });
         });
-        window.DB.saveMesas();
-        window.DB.saveComandas();
-        Logger.info(`[DB Sync] ${pedidosRemotos.length} pedidos sincronizados y comandas reconstruidas.`);
       }
+
+      window.DB.saveMesas();
+      Logger.info(`[DB Sync] ${pedidosRemotos.length} pedidos sincronizados, ${comandasReconstruidas.length} comandas reconstruidas.`);
     } catch (e) {
-      Logger.warn("[DB Sync] Error obteniendo pedidos, se mantiene estado local.", e.message);
+      Logger.warn("[DB Sync] Error obteniendo pedidos.", e.message);
     }
   };
 
@@ -250,6 +265,7 @@ window.DBSync = (function() {
     }
   };
 
+  // ── RESTO DE FUNCIONES (sin cambios) ────────────────────────
   module.syncGuardarProducto = async function(producto) {
     const idx = this.productos.findIndex(p => p.id == producto.id);
     if (idx >= 0) this.productos[idx] = producto;
