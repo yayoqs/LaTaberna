@@ -45,9 +45,29 @@
       margin-right: 12px;
       cursor: default;
       white-space: nowrap;
+      align-items: center;
+      gap: 4px;
     }
     #syncPendingBadge i {
-      margin-right: 4px;
+      font-size: 12px;
+    }
+
+    /* Selector de espacio (oculto por ahora, se activará en fase 2) */
+    #espacioSelectorContainer {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-right: 12px;
+      font-size: 13px;
+      color: var(--color-text-sec);
+    }
+    #espacioSelectorContainer select {
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      color: var(--color-text);
+      padding: 4px 8px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
     }
   </style>
 </head>
@@ -104,6 +124,9 @@
       <span id="syncPendingBadge" title="Cambios pendientes de sincronización">
         <i class="fas fa-cloud-upload-alt"></i><span id="syncPendingCount">0</span>
       </span>
+
+      <!-- 🌐 Selector de espacio (dinámico, se llena desde Auth) -->
+      <div id="espacioSelectorContainer"></div>
 
       <button class="btn-secondary" onclick="App.cerrarTurnoApp()" title="Cerrar Turno" style="padding:6px 10px;" data-rol="admin,master">
         <i class="fas fa-door-closed"></i><span> Cerrar Turno</span>

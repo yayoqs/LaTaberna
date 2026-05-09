@@ -1,13 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: db.js (Orquestador v3.0 – simplificado)
-   ================================================================
-   Cambios:
-   • Eliminados crearPedidoMesa y agregarItemAPedido (ya no se usan).
-   • Eliminados crearPedidoDelivery, enviarPedidoDeliveryACocina,
-     actualizarPedidoDelivery y eliminarPedidoDelivery (se usarán
-     desde el repositorio de delivery directamente).
-   • DB queda como orquestador mínimo: init, cerrarPedido (interno),
-     y acceso a los submódulos (core, sync, inventario, fusion).
+   PubPOS — MÓDULO: db.js (Orquestador v3.1 – gancho multi-espacio)
    ================================================================ */
 var DB = (function() {
   const core = DBCore;
@@ -25,9 +17,8 @@ var DB = (function() {
   combined.urlSheets = sync.urlSheets;
 
   /**
-   * Inicializa la base de datos: carga configuración, mesas, pedidos
-   * locales y luego sincroniza con Google Sheets.
-   * @returns {Promise<boolean>} true si la inicialización fue exitosa
+   * Inicializa la base de datos.
+   * @returns {Promise<boolean>}
    */
   combined.init = async function() {
     try {
@@ -66,13 +57,25 @@ var DB = (function() {
   };
 
   /**
+   * Retorna el id del espacio activo actual.
+   * Si Auth no está disponible, retorna 'esp_taberna' por defecto.
+   * @returns {string}
+   */
+  combined.espacioActivoId = function() {
+    if (typeof Auth !== 'undefined' && Auth.getEspacioActivo) {
+      const espacio = Auth.getEspacioActivo();
+      if (espacio && espacio.id) return espacio.id;
+    }
+    return 'esp_taberna'; // fallback: espacio por defecto
+  };
+
+  /**
    * Cierra un pedido: descuenta stock, sincroniza y cambia estado a 'cerrada'.
-   * (Este método es llamado por el repositorio, no por la UI directamente)
-   * @param {string} id - ID del pedido
+   * @param {string} id
    * @param {string} formaPago
    * @param {number} total
    * @param {number} descuento
-   * @returns {Promise<object|null>} El pedido actualizado o null si falla
+   * @returns {Promise<object|null>}
    */
   combined.cerrarPedido = async function(id, formaPago, total, descuento) {
     const pedido = this.pedidos.find(p => p.id === id);

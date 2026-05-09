@@ -1,22 +1,15 @@
 /* ================================================================
-   PubPOS — MÓDULO: auth.js (v5.7 – documentación JSDoc y robustez)
+   PubPOS — MÓDULO: auth.js (v6.0 – soporte multi-espacio)
    ================================================================
-   Cambios respecto a v5.6:
-   • Se agregó documentación JSDoc completa para todas las funciones
-     públicas, incluyendo parámetros, retornos y ejemplos de uso.
-   • Se unificó la validación de credenciales usando las constantes
-     USUARIOS definidas al inicio del módulo.
-   • Se corrigió el acceso a _usuarioActual desde Perfil.js (antes
-     se accedía directamente a la propiedad "privada"; ahora hay un
-     método público actualizarNombre).
-   • Se agregó Logger en lugar de console para advertencias.
+   Cambios:
+   • El objeto usuario ahora incluye 'espacios' (array) y
+     'espacioActivoId'. Cada espacio tiene { id, nombre, rol, tipo }.
+   • Métodos nuevos: getEspacios(), getEspacioActivo(),
+     cambiarEspacio(id).
+   • Al iniciar sesión con usuarios precargados, se asigna
+     automáticamente el espacio "La Taberna" con su rol.
    ================================================================ */
 const Auth = (() => {
-  /**
-   * Lista de usuarios precargados.
-   * En producción estos datos deberían venir de la hoja "Empleados".
-   * @type {Array<{nombre: string, password: string, rol: string}>}
-   */
   const USUARIOS = [
     { nombre: 'master',   password: 'master123', rol: 'master' },
     { nombre: 'admin',    password: 'admin123',  rol: 'admin' },
@@ -30,16 +23,14 @@ const Auth = (() => {
     { nombre: 'cliente',  password: 'cliente',   rol: 'cliente' }
   ];
 
-  /** @type {object|null} Datos del usuario autenticado */
+  /** @type {object|null} */
   let _usuarioActual = null;
 
-  /** @type {string|null} Rol simulado (solo para master) */
+  /** @type {string|null} rol simulado (solo master) */
   let _rolSimulado = null;
 
   /**
-   * Inicializa el módulo de autenticación.
-   * Si hay una sesión guardada en sessionStorage, la restaura.
-   * Si no, muestra el modal de login.
+   * Inicializa el módulo. Si hay sesión guardada, la restaura.
    */
   function init() {
     const saved = sessionStorage.getItem('usuarioActual');
@@ -53,10 +44,6 @@ const Auth = (() => {
     }
   }
 
-  /**
-   * Devuelve la vista por defecto según el rol efectivo.
-   * @returns {string} Nombre de la vista (ej. 'mesas', 'cocina')
-   */
   function getDefaultView() {
     const rol = getRolEfectivo();
     if (rol === 'cocina' || rol === 'barra') return 'cocina';
@@ -65,15 +52,14 @@ const Auth = (() => {
     if (rol === 'reparto') return 'reparto';
     if (rol === 'eventos') return 'eventos';
     if (rol === 'cliente') return 'menu';
-    // admin y master vuelven a mesas como vista principal
     return 'mesas';
   }
 
   /**
-   * Intenta iniciar sesión con usuario y contraseña.
-   * @param {string} nombre - Nombre de usuario
-   * @param {string} password - Contraseña
-   * @returns {boolean} true si el login fue exitoso
+   * Inicia sesión. Crea el espacio "La Taberna" automáticamente.
+   * @param {string} nombre
+   * @param {string} password
+   * @returns {boolean}
    */
   function login(nombre, password) {
     const user = USUARIOS.find(u => u.nombre === nombre && u.password === password);
@@ -81,7 +67,20 @@ const Auth = (() => {
       showToast('error', 'Usuario o contraseña incorrectos');
       return false;
     }
-    _usuarioActual = { nombre: user.nombre, rol: user.rol };
+
+    const espacioTaberna = {
+      id: 'esp_taberna',
+      nombre: 'La Taberna',
+      tipo: 'bar',
+      rol: user.rol
+    };
+
+    _usuarioActual = {
+      nombre: user.nombre,
+      rol: user.rol,
+      espacios: [espacioTaberna],
+      espacioActivoId: espacioTaberna.id
+    };
     _rolSimulado = null;
     sessionStorage.setItem('usuarioActual', JSON.stringify(_usuarioActual));
     aplicarRestriccionesUI();
@@ -92,7 +91,7 @@ const Auth = (() => {
     return true;
   }
 
-  /** Cierra la sesión actual y muestra el login */
+  /** Cierra sesión */
   function logout() {
     _usuarioActual = null;
     _rolSimulado = null;
@@ -104,7 +103,6 @@ const Auth = (() => {
   // ── MODAL DE LOGIN ──────────────────────────────────────
   let loginModal = null;
 
-  /** Muestra el modal de inicio de sesión */
   function mostrarLogin() {
     if (!loginModal) {
       loginModal = document.createElement('div');
@@ -137,12 +135,10 @@ const Auth = (() => {
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   }
 
-  /** Oculta el modal de login */
   function cerrarModalLogin() {
     if (loginModal) loginModal.style.display = 'none';
   }
 
-  /** Toma los valores del formulario de login y los envía a login() */
   function _loginFromModal() {
     const usuario = document.getElementById('loginUsuario')?.value.trim() || '';
     const password = document.getElementById('loginPassword')?.value.trim() || '';
@@ -153,50 +149,73 @@ const Auth = (() => {
     if (passInput) passInput.value = '';
   }
 
-  /**
-   * Devuelve el rol efectivo (considera simulación de master).
-   * @returns {string|null}
-   */
   function getRolEfectivo() {
     if (_usuarioActual?.rol === 'master' && _rolSimulado) return _rolSimulado;
+    if (_usuarioActual?.espacioActivoId) {
+      const espacio = _usuarioActual.espacios?.find(e => e.id === _usuarioActual.espacioActivoId);
+      if (espacio) return espacio.rol;
+    }
     return _usuarioActual?.rol || null;
   }
 
-  /**
-   * Verifica si el usuario tiene un permiso específico.
-   * @param {string} permiso - Nombre del permiso (ej. 'cerrarMesa')
-   * @returns {boolean}
-   */
   function tienePermiso(permiso) {
     const rol = getRolEfectivo();
     if (!rol) return false;
     return (typeof Roles !== 'undefined' && Roles.getPermisos(rol)[permiso] === true);
   }
 
-  /** @returns {string|null} Rol del usuario logueado */
   function getRol() { return _usuarioActual?.rol || null; }
-
-  /** @returns {string} Nombre del usuario logueado */
   function getNombre() { return _usuarioActual?.nombre || ''; }
 
-  /**
-   * Retorna el objeto completo del usuario actual.
-   * @returns {object|null} { nombre, rol, rolEfectivo, simulando }
-   */
   function getUsuarioActual() {
     if (!_usuarioActual) return null;
     return {
       nombre: _usuarioActual.nombre,
       rol: _usuarioActual.rol,
       rolEfectivo: getRolEfectivo(),
-      simulando: _rolSimulado || null
+      simulando: _rolSimulado || null,
+      espacios: _usuarioActual.espacios || [],
+      espacioActivoId: _usuarioActual.espacioActivoId
     };
   }
 
   /**
-   * Actualiza el nombre del usuario actual (usado por Perfil).
-   * @param {string} nuevoNombre
+   * Devuelve la lista de espacios del usuario.
+   * @returns {Array<{id:string, nombre:string, rol:string, tipo:string}>}
    */
+  function getEspacios() {
+    return _usuarioActual?.espacios || [];
+  }
+
+  /**
+   * Devuelve el espacio activo actual.
+   * @returns {{id:string, nombre:string, rol:string, tipo:string}|null}
+   */
+  function getEspacioActivo() {
+    if (!_usuarioActual?.espacioActivoId) return null;
+    return _usuarioActual.espacios?.find(e => e.id === _usuarioActual.espacioActivoId) || null;
+  }
+
+  /**
+   * Cambia al espacio indicado y actualiza la UI.
+   * @param {string} espacioId
+   */
+  function cambiarEspacio(espacioId) {
+    const espacio = _usuarioActual?.espacios?.find(e => e.id === espacioId);
+    if (!espacio) return;
+
+    _usuarioActual.espacioActivoId = espacioId;
+    sessionStorage.setItem('usuarioActual', JSON.stringify(_usuarioActual));
+    aplicarRestriccionesUI();
+
+    // Recargar la vista inicial (o la que corresponda según el rol en este espacio)
+    if (window.App) {
+      App.showView(getDefaultView());
+    }
+    showToast('info', `Cambiaste a "${espacio.nombre}" (${espacio.rol})`);
+    Logger.info(`[Auth] Espacio cambiado a "${espacio.nombre}"`);
+  }
+
   function actualizarNombre(nuevoNombre) {
     if (!_usuarioActual) return;
     if (!nuevoNombre || typeof nuevoNombre !== 'string') {
@@ -209,7 +228,7 @@ const Auth = (() => {
     Logger.info(`[Auth] Nombre actualizado a "${nuevoNombre}"`);
   }
 
-  // ── MÉTODOS DE COMPROBACIÓN DE ROL ──────────────────────
+  // ── MÉTODOS DE ROL ──────────────────────────────────────
   function esMasterReal() { return _usuarioActual?.rol === 'master'; }
   function esMaster() { return _usuarioActual?.rol === 'master' && !_rolSimulado; }
   function esAdmin() { const r = getRolEfectivo(); return r === 'admin' || r === 'master'; }
@@ -222,7 +241,6 @@ const Auth = (() => {
   function esCliente() { const r = getRolEfectivo(); return r === 'cliente' || r === 'admin' || r === 'master'; }
   function esEventos() { const r = getRolEfectivo(); return r === 'eventos' || r === 'admin' || r === 'master'; }
 
-  // ── PERMISOS ESPECÍFICOS ────────────────────────────────
   function puede(permiso) { return tienePermiso(permiso); }
   function puedeEliminarItemEnviado() { return tienePermiso('eliminarItemEnviado'); }
   function puedeCerrarMesa() { return tienePermiso('cerrarMesa'); }
@@ -244,20 +262,13 @@ const Auth = (() => {
     const rol = getRolEfectivo();
     return ['eventos', 'admin', 'master'].includes(rol);
   }
-  function puedeAccederPerfil() {
-    return getRolEfectivo() !== null;
-  }
+  function puedeAccederPerfil() { return getRolEfectivo() !== null; }
 
-  /**
-   * Actualiza la UI según el rol actual.
-   * Muestra/oculta elementos con data-rol, actualiza el selector de
-   * simulación para el master y refleja el nombre en el header.
-   */
   function aplicarRestriccionesUI() {
     const userEl = document.getElementById('usuarioActualDisplay');
     const rolEfectivo = getRolEfectivo();
     if (userEl) {
-      let displayText = _usuarioActual ? `${_usuarioActual.nombre} (${_usuarioActual.rol})` : '';
+      let displayText = _usuarioActual ? `${_usuarioActual.nombre} (${rolEfectivo})` : '';
       if (_rolSimulado) displayText += ` ⇒ ${_rolSimulado}`;
       userEl.textContent = displayText;
     }
@@ -270,6 +281,10 @@ const Auth = (() => {
       el.style.display = mostrar ? '' : 'none';
     });
 
+    // Selector de espacios (nuevo)
+    _renderSelectorEspacio();
+
+    // Selector de simulación (master)
     const mozoContainer = document.querySelector('.mozo-selector');
     if (!mozoContainer || !_usuarioActual) return;
 
@@ -295,10 +310,25 @@ const Auth = (() => {
     }
   }
 
-  /**
-   * Cambia el rol simulado (solo para master).
-   * @param {string} rol - Nuevo rol a simular (vacío para quitar simulación)
-   */
+  function _renderSelectorEspacio() {
+    const container = document.getElementById('espacioSelectorContainer');
+    if (!container || !_usuarioActual) return;
+
+    const espacios = _usuarioActual.espacios || [];
+    if (espacios.length <= 1) {
+      container.innerHTML = '';
+      return;
+    }
+
+    const activo = _usuarioActual.espacioActivoId;
+    container.innerHTML = `
+      <i class="fas fa-home"></i>
+      <select id="espacioSelect" onchange="Auth.cambiarEspacio(this.value)">
+        ${espacios.map(e => `<option value="${e.id}" ${e.id === activo ? 'selected' : ''}>${e.nombre} (${e.rol})</option>`).join('')}
+      </select>
+    `;
+  }
+
   function _cambiarRolSimulado(rol) {
     if (!_usuarioActual || _usuarioActual.rol !== 'master') return;
     if (!rol) {
@@ -312,47 +342,21 @@ const Auth = (() => {
     if (window.App) App.showView(vistaInicial);
   }
 
-  // ── API PÚBLICA ────────────────────────────────────────
   return {
-    init,
-    login,
-    logout,
-    getRol,
-    getNombre,
-    getUsuarioActual,
-    actualizarNombre,       // ← NUEVO método público
-    tienePermiso,
-    puede,
-    esMaster,
-    esAdmin,
-    esCocina,
-    esBarra,
-    esCaja,
-    esMesero,
-    esDespensa,
-    esReparto,
-    esCliente,
-    esEventos,
-    puedeEliminarItemEnviado,
-    puedeCerrarMesa,
-    puedeAccederCaja,
-    puedeAccederCocina,
-    puedeCambiarEstadoComanda,
-    puedeEditarProductos,
-    puedeEditarPrecios,
-    getDefaultView,
-    mostrarLogin,
-    cerrarModalLogin,
-    _loginFromModal,
-    _cambiarRolSimulado,
-    getRolEfectivo,
-    esMasterReal,
-    aplicarRestriccionesUI,
-    puedeAccederRecetas,
-    puedeAccederReparto,
-    puedeAccederMenu,
-    puedeAccederEventos,
-    puedeAccederPerfil
+    init, login, logout,
+    getRol, getNombre, getUsuarioActual,
+    getEspacios, getEspacioActivo, cambiarEspacio,
+    actualizarNombre,
+    tienePermiso, puede,
+    esMaster, esAdmin, esCocina, esBarra, esCaja, esMesero,
+    esDespensa, esReparto, esCliente, esEventos,
+    puedeEliminarItemEnviado, puedeCerrarMesa,
+    puedeAccederCaja, puedeAccederCocina, puedeCambiarEstadoComanda,
+    puedeEditarProductos, puedeEditarPrecios,
+    getDefaultView, mostrarLogin, cerrarModalLogin, _loginFromModal,
+    _cambiarRolSimulado, getRolEfectivo, esMasterReal, aplicarRestriccionesUI,
+    puedeAccederRecetas, puedeAccederReparto, puedeAccederMenu,
+    puedeAccederEventos, puedeAccederPerfil
   };
 })();
 

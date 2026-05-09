@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: store.js (v1.1 – reducer delivery mejorado)
+   PubPOS — MÓDULO: store.js (v1.2 – soporte multi-espacio)
    ================================================================ */
 const Store = (() => {
   let state = {
@@ -11,7 +11,9 @@ const Store = (() => {
     ingredientes: [],
     recetas: [],
     mozos: [],
-    config: {}
+    config: {},
+    espacios: [],
+    espacioActivo: null
   };
 
   const listeners = [];
@@ -68,9 +70,13 @@ const Store = (() => {
     newState.recetas         = recetasReducer(newState.recetas, action, newState);
     newState.mozos           = mozosReducer(newState.mozos, action, newState);
     newState.config          = configReducer(newState.config, action, newState);
+    newState.espacios        = espaciosReducer(newState.espacios, action, newState);
+    newState.espacioActivo   = espacioActivoReducer(newState.espacioActivo, action, newState);
 
     return newState;
   }
+
+  /* ── SUB-REDUCTORES (añadidos los de espacios) ────────────── */
 
   function mesasReducer(mesas, action) {
     switch (action.type) {
@@ -103,19 +109,16 @@ const Store = (() => {
 
   function deliveryReducer(deliveries, action) {
     switch (action.type) {
-      case 'PEDIDOSDELIVERY_INICIALIZAR': // usado por db-core y bootstrap
+      case 'PEDIDOSDELIVERY_INICIALIZAR':
       case 'DELIVERY_INICIALIZAR':
         return action.payload || [];
-      case 'DELIVERY_CREADO':
-        return [...deliveries, action.payload];
+      case 'DELIVERY_CREADO': return [...deliveries, action.payload];
       case 'DELIVERY_ACTUALIZADO': {
         const { id, cambios } = action.payload;
         return deliveries.map(d => d.id === id ? { ...d, ...cambios } : d);
       }
-      case 'DELIVERY_ELIMINADO':
-        return deliveries.filter(d => d.id !== action.payload);
-      default:
-        return deliveries;
+      case 'DELIVERY_ELIMINADO': return deliveries.filter(d => d.id !== action.payload);
+      default: return deliveries;
     }
   }
 
@@ -170,6 +173,21 @@ const Store = (() => {
     switch (action.type) {
       case 'CONFIG_INICIALIZAR': return action.payload || {};
       default: return config;
+    }
+  }
+
+  function espaciosReducer(espacios, action) {
+    switch (action.type) {
+      case 'ESPACIOS_INICIALIZAR': return action.payload || [];
+      case 'ESPACIO_AGREGADO': return [...espacios, action.payload];
+      default: return espacios;
+    }
+  }
+
+  function espacioActivoReducer(espacioActivo, action) {
+    switch (action.type) {
+      case 'ESPACIO_ACTIVO_CAMBIADO': return action.payload;
+      default: return espacioActivo;
     }
   }
 
