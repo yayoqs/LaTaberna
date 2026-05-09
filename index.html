@@ -32,6 +32,23 @@
     .cierre-persona-group { margin-bottom: 12px; border-bottom: 1px dashed var(--color-border); }
     .cierre-persona-header { font-weight: bold; display: flex; justify-content: space-between; }
     .pago-persona-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
+    
+    /* Badge de sincronización */
+    #syncPendingBadge {
+      display: none;
+      background: var(--color-warning);
+      color: #000;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 99px;
+      margin-right: 12px;
+      cursor: default;
+      white-space: nowrap;
+    }
+    #syncPendingBadge i {
+      margin-right: 4px;
+    }
   </style>
 </head>
 <body>
@@ -83,6 +100,11 @@
     </nav>
 
     <div class="header-right">
+      <!-- 🔔 Badge de sincronización -->
+      <span id="syncPendingBadge" title="Cambios pendientes de sincronización">
+        <i class="fas fa-cloud-upload-alt"></i><span id="syncPendingCount">0</span>
+      </span>
+
       <button class="btn-secondary" onclick="App.cerrarTurnoApp()" title="Cerrar Turno" style="padding:6px 10px;" data-rol="admin,master">
         <i class="fas fa-door-closed"></i><span> Cerrar Turno</span>
       </button>
@@ -105,13 +127,13 @@
        SCRIPTS: orden obligatorio
        ═══════════════════════════════════════════════════════════ -->
   <script src="js/utils.js"></script>
-  <script src="js/lib/logger.js"></script>        <!-- Logger + ErrorHandler -->
+  <script src="js/lib/logger.js"></script>
   <script src="js/lib/eventBus.js"></script>
   <script src="js/lib/command-bus.js"></script>
   <script src="js/lib/store.js"></script>
-  <script src="js/lib/deps.js"></script>          <!-- Contenedor de dependencias -->
+  <script src="js/lib/deps.js"></script>
 
-  <!-- Base de datos (core, sync, inventario, fusión) -->
+  <!-- Base de datos -->
   <script src="js/db-core.js"></script>
   <script src="js/db-sync.js"></script>
   <script src="js/db-inventario.js"></script>
@@ -163,7 +185,7 @@
   <script src="js/ui/eventos.js"></script>
   <script src="js/ui/perfil.js"></script>
 
-  <!-- Bootstrap (inicialización general) -->
+  <!-- Bootstrap y App -->
   <script src="js/bootstrap.js"></script>
   <script src="js/app.js"></script>
 

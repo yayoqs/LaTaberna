@@ -1,22 +1,17 @@
 /* ================================================================
-   PubPOS — MÓDULO: app.js (v5.1 – logging unificado + JSDoc)
-   Propósito: Controlador de vistas, reloj, navegación y suscripción
-              a eventos de UI.
+   PubPOS — MÓDULO: app.js (v5.2 – badge de sincronización + online/offline)
    ================================================================ */
 const App = {
-  /**
-   * Inicializa componentes de UI que no dependen de la lógica de negocio.
-   */
   async init() {
     Logger.info('[App] Iniciando UI...');
     this._iniciarReloj();
     this._initRealVH();
     this._mejorarFocoEnModales();
     this._suscribirEventos();
+    this._iniciarMonitoreoConexion();
     Logger.info('[App] UI lista.');
   },
 
-  /** Reloj en el header */
   _iniciarReloj() {
     const actualizar = () => {
       const ahora = new Date();
@@ -29,7 +24,6 @@ const App = {
     setInterval(actualizar, 1000);
   },
 
-  /** Tamaño real de viewport en móviles */
   _initRealVH() {
     function setRealVH() {
       const vh = window.innerHeight * 0.01;
@@ -40,7 +34,6 @@ const App = {
     setRealVH();
   },
 
-  /** Mejora el foco en inputs dentro de modales */
   _mejorarFocoEnModales() {
     document.addEventListener('focusin', (e) => {
       const target = e.target;
@@ -62,14 +55,9 @@ const App = {
     });
   },
 
-  /**
-   * Navega a una vista verificando permisos.
-   * @param {string} nombre - Nombre de la vista (ej. 'mesas')
-   */
   showView(nombre) {
     if (!Auth.getRol()) { Auth.mostrarLogin(); return; }
 
-    // Validaciones de permisos
     if (nombre === 'caja' && !Auth.puedeAccederCaja()) { showToast('error', 'No tienes permiso para acceder a Caja'); return; }
     if (nombre === 'cocina' && !Auth.puedeAccederCocina()) { showToast('error', 'No tienes permiso para acceder a Cocina'); return; }
     if (nombre === 'config' && !Auth.esAdmin()) { showToast('error', 'Solo administradores pueden acceder a Configuración'); return; }
@@ -128,7 +116,19 @@ const App = {
     if (nombre === 'perfil' && window.Perfil) Perfil.render();
   },
 
-  /** Suscripción a eventos generales de UI */
+  /** Monitorea la conexión a internet */
+  _iniciarMonitoreoConexion() {
+    window.addEventListener('online', () => {
+      showToast('success', '<i class="fas fa-wifi"></i> Conexión restablecida. Sincronizando...');
+      Logger.info('[App] Conexión restablecida.');
+    });
+
+    window.addEventListener('offline', () => {
+      showToast('warning', '<i class="fas fa-exclamation-triangle"></i> Sin conexión. Los cambios se guardarán localmente.');
+      Logger.warn('[App] Conexión perdida.');
+    });
+  },
+
   _suscribirEventos() {
     EventBus.on('sincronizacion:completada', () => {
       if (window.Mesas) Mesas.render();
@@ -152,13 +152,20 @@ const App = {
     });
     EventBus.on('recetas:actualizadas', () => { if (window.Recetas) Recetas.render(); });
     EventBus.on('pedidosDelivery:guardados', () => { if (window.Reparto) Reparto.render(); });
+
+    // ── Badge de sincronización ──────────────────────────
     EventBus.on('sync:colaActualizada', (pendientes) => {
       const badge = document.getElementById('syncPendingBadge');
-      if (badge) {
-        badge.textContent = pendientes > 0 ? pendientes : '';
-        badge.style.display = pendientes > 0 ? 'inline-block' : 'none';
+      const countSpan = document.getElementById('syncPendingCount');
+      if (badge && countSpan) {
+        countSpan.textContent = pendientes;
+        badge.style.display = pendientes > 0 ? 'inline-flex' : 'none';
+        if (pendientes > 0) {
+          Logger.debug(`[App] Badge de sincronización: ${pendientes} pendientes.`);
+        }
       }
     });
+
     EventBus.on('turno:iniciado', (turno) => {
       Logger.info(`[App] Turno iniciado: ${turno?.id}`);
       if (window.Caja) Caja.render();
@@ -172,9 +179,6 @@ const App = {
     });
   },
 
-  /**
-   * Cierra el turno actual desde cualquier vista.
-   */
   async cerrarTurnoApp() {
     if (typeof TurnoManager === 'undefined') {
       showToast('error', 'Sistema de turnos no disponible.');
