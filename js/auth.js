@@ -1,16 +1,9 @@
 /* ================================================================
-   PubPOS — MÓDULO: auth.js (v6.0 – soporte multi-espacio)
-   ================================================================
-   Cambios:
-   • El objeto usuario ahora incluye 'espacios' (array) y
-     'espacioActivoId'. Cada espacio tiene { id, nombre, rol, tipo }.
-   • Métodos nuevos: getEspacios(), getEspacioActivo(),
-     cambiarEspacio(id).
-   • Al iniciar sesión con usuarios precargados, se asigna
-     automáticamente el espacio "La Taberna" con su rol.
+   PubPOS — MÓDULO: auth.js (v7.0 – hashing SHA‑256 + español neutro)
    ================================================================ */
 const Auth = (() => {
-  const USUARIOS = [
+  // ── CONFIGURACIÓN INICIAL SOLO PARA PRIMER ARRANQUE ────────
+  const USUARIOS_POR_DEFECTO = [
     { nombre: 'master',   password: 'master123', rol: 'master' },
     { nombre: 'admin',    password: 'admin123',  rol: 'admin' },
     { nombre: 'cocina',   password: 'cocina',    rol: 'cocina' },
@@ -20,18 +13,67 @@ const Auth = (() => {
     { nombre: 'despensa', password: 'despensa',  rol: 'despensa' },
     { nombre: 'eventos',  password: 'eventos',   rol: 'eventos' },
     { nombre: 'reparto',  password: 'reparto',   rol: 'reparto' },
-    { nombre: 'cliente',  password: 'cliente',   rol: 'cliente' }
+    { nombre: 'cliente',  password: 'cliente',   rol: 'cliente' },
+    { nombre: 'artista',  password: 'artista',   rol: 'artista' }
   ];
+
+  /** @type {Array<{nombre:string, hash:string, rol:string}>} */
+  let _usuarios = [];
 
   /** @type {object|null} */
   let _usuarioActual = null;
-
-  /** @type {string|null} rol simulado (solo master) */
   let _rolSimulado = null;
 
+  // ── HASHING ────────────────────────────────────────────────
   /**
-   * Inicializa el módulo. Si hay sesión guardada, la restaura.
+   * Calcula el hash SHA-256 de un texto.
+   * @param {string} texto
+   * @returns {Promise<string>} hash en hexadecimal
    */
+  async function _sha256(texto) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(texto);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  // ── INICIALIZACIÓN DE USUARIOS ────────────────────────────
+  /**
+   * Carga los usuarios desde localStorage. Si no hay, migra los
+   * usuarios por defecto y guarda sus hashes.
+   */
+  async function _cargarUsuarios() {
+    const guardados = localStorage.getItem('pubpos_usuarios');
+    if (guardados) {
+      try {
+        _usuarios = JSON.parse(guardados);
+        if (!Array.isArray(_usuarios) || _usuarios.length === 0) throw new Error('Array vacío');
+        Logger.info('[Auth] Usuarios cargados desde localStorage.');
+        return;
+      } catch (e) {
+        Logger.warn('[Auth] Datos de usuarios corruptos, regenerando...');
+      }
+    }
+
+    // Primera ejecución: hashear contraseñas por defecto
+    Logger.info('[Auth] Creando usuarios iniciales con hash...');
+    _usuarios = [];
+    for (const u of USUARIOS_POR_DEFECTO) {
+      const hash = await _sha256(u.password);
+      _usuarios.push({ nombre: u.nombre, hash, rol: u.rol });
+    }
+    localStorage.setItem('pubpos_usuarios', JSON.stringify(_usuarios));
+  }
+
+  /**
+   * Guarda la lista de usuarios en localStorage.
+   */
+  function _guardarUsuarios() {
+    localStorage.setItem('pubpos_usuarios', JSON.stringify(_usuarios));
+  }
+
+  // ── AUTENTICACIÓN ─────────────────────────────────────────
   function init() {
     const saved = sessionStorage.getItem('usuarioActual');
     if (saved) {
@@ -50,20 +92,21 @@ const Auth = (() => {
     if (rol === 'caja') return 'caja';
     if (rol === 'despensa') return 'despensa';
     if (rol === 'reparto') return 'reparto';
-    if (rol === 'eventos') return 'eventos';
+    if (rol === 'eventos' || rol === 'artista') return 'eventos';
     if (rol === 'cliente') return 'menu';
     return 'mesas';
   }
 
   /**
-   * Inicia sesión. Crea el espacio "La Taberna" automáticamente.
+   * Inicia sesión verificando hash.
    * @param {string} nombre
    * @param {string} password
-   * @returns {boolean}
+   * @returns {Promise<boolean>}
    */
-  function login(nombre, password) {
-    const user = USUARIOS.find(u => u.nombre === nombre && u.password === password);
-    if (!user) {
+  async function login(nombre, password) {
+    const hashIngresado = await _sha256(password);
+    const usuario = _usuarios.find(u => u.nombre === nombre && u.hash === hashIngresado);
+    if (!usuario) {
       showToast('error', 'Usuario o contraseña incorrectos');
       return false;
     }
@@ -72,12 +115,12 @@ const Auth = (() => {
       id: 'esp_taberna',
       nombre: 'La Taberna',
       tipo: 'bar',
-      rol: user.rol
+      rol: usuario.rol
     };
 
     _usuarioActual = {
-      nombre: user.nombre,
-      rol: user.rol,
+      nombre: usuario.nombre,
+      rol: usuario.rol,
       espacios: [espacioTaberna],
       espacioActivoId: espacioTaberna.id
     };
@@ -85,18 +128,17 @@ const Auth = (() => {
     sessionStorage.setItem('usuarioActual', JSON.stringify(_usuarioActual));
     aplicarRestriccionesUI();
     cerrarModalLogin();
-    showToast('success', `Bienvenido ${user.nombre} (${user.rol})`);
+    showToast('success', 'Bienvenido/a ' + usuario.nombre + ' (' + usuario.rol + ')');
     const vistaInicial = getDefaultView();
     if (window.App) App.showView(vistaInicial);
     return true;
   }
 
-  /** Cierra sesión */
   function logout() {
     _usuarioActual = null;
     _rolSimulado = null;
     sessionStorage.removeItem('usuarioActual');
-    document.querySelectorAll('[data-rol]').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('[data-rol]').forEach(function(el) { el.style.display = 'none'; });
     mostrarLogin();
   }
 
@@ -109,45 +151,70 @@ const Auth = (() => {
       loginModal.id = 'modalLogin';
       loginModal.className = 'modal-overlay';
       loginModal.style.display = 'flex';
-      loginModal.innerHTML = `
-        <div class="modal-small" style="max-width:360px;">
-          <div class="modal-header">
-            <h3><i class="fas fa-beer"></i> La Taberna</h3>
-            <button class="modal-close" onclick="Auth.cerrarModalLogin()"><i class="fas fa-times"></i></button>
-          </div>
-          <div class="modal-small-body">
-            <label>Usuario</label>
-            <input type="text" id="loginUsuario" placeholder="Ej: admin, master, cocina, barra, caja, mesero, despensa, eventos, reparto, cliente">
-            <label>Contraseña</label>
-            <input type="password" id="loginPassword" placeholder="Contraseña">
-            <div class="modal-small-footer">
-              <button class="btn-primary" onclick="Auth._loginFromModal()" style="width:100%;">
-                <i class="fas fa-sign-in-alt"></i> Ingresar
-              </button>
-            </div>
-          </div>
-        </div>
-      `;
+      loginModal.innerHTML =
+        '<div class="modal-small" style="max-width:360px;">' +
+          '<div class="modal-header">' +
+            '<h3><i class="fas fa-beer"></i> La Taberna</h3>' +
+            '<button class="modal-close" onclick="Auth.cerrarModalLogin()"><i class="fas fa-times"></i></button>' +
+          '</div>' +
+          '<div class="modal-small-body">' +
+            '<label>Usuario</label>' +
+            '<input type="text" id="loginUsuario" placeholder="Ej: admin, mesero, cocina...">' +
+            '<label>Contraseña</label>' +
+            '<input type="password" id="loginPassword" placeholder="Contraseña">' +
+            '<div class="modal-small-footer">' +
+              '<button class="btn-primary" onclick="Auth._loginFromModal()" style="width:100%;">' +
+                '<i class="fas fa-sign-in-alt"></i> Ingresar' +
+              '</button>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
       document.body.appendChild(loginModal);
     } else {
       loginModal.style.display = 'flex';
     }
-    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(function(v) { v.classList.remove('active'); });
   }
 
   function cerrarModalLogin() {
     if (loginModal) loginModal.style.display = 'none';
   }
 
-  function _loginFromModal() {
+  async function _loginFromModal() {
     const usuario = document.getElementById('loginUsuario')?.value.trim() || '';
     const password = document.getElementById('loginPassword')?.value.trim() || '';
-    login(usuario, password);
+    await login(usuario, password);
     const userInput = document.getElementById('loginUsuario');
     const passInput = document.getElementById('loginPassword');
     if (userInput) userInput.value = '';
     if (passInput) passInput.value = '';
   }
+
+  // ── GESTIÓN DE CONTRASEÑAS (solo admin/master) ─────────────
+  /**
+   * Cambia la contraseña de un usuario (solo master/admin).
+   * @param {string} nombreUsuario
+   * @param {string} nuevaPassword
+   * @returns {Promise<boolean>}
+   */
+  async function cambiarPassword(nombreUsuario, nuevaPassword) {
+    if (!esAdmin() && !esMasterReal()) {
+      showToast('error', 'No tienes permiso para cambiar contraseñas');
+      return false;
+    }
+    const idx = _usuarios.findIndex(u => u.nombre === nombreUsuario);
+    if (idx === -1) {
+      showToast('error', 'Usuario no encontrado');
+      return false;
+    }
+    const nuevoHash = await _sha256(nuevaPassword);
+    _usuarios[idx].hash = nuevoHash;
+    _guardarUsuarios();
+    showToast('success', 'Contraseña actualizada');
+    return true;
+  }
+
+  // ── PERMISOS (se mantienen sin cambios) ──────────────────
 
   function getRolEfectivo() {
     if (_usuarioActual?.rol === 'master' && _rolSimulado) return _rolSimulado;
@@ -179,27 +246,15 @@ const Auth = (() => {
     };
   }
 
-  /**
-   * Devuelve la lista de espacios del usuario.
-   * @returns {Array<{id:string, nombre:string, rol:string, tipo:string}>}
-   */
   function getEspacios() {
     return _usuarioActual?.espacios || [];
   }
 
-  /**
-   * Devuelve el espacio activo actual.
-   * @returns {{id:string, nombre:string, rol:string, tipo:string}|null}
-   */
   function getEspacioActivo() {
     if (!_usuarioActual?.espacioActivoId) return null;
     return _usuarioActual.espacios?.find(e => e.id === _usuarioActual.espacioActivoId) || null;
   }
 
-  /**
-   * Cambia al espacio indicado y actualiza la UI.
-   * @param {string} espacioId
-   */
   function cambiarEspacio(espacioId) {
     const espacio = _usuarioActual?.espacios?.find(e => e.id === espacioId);
     if (!espacio) return;
@@ -208,12 +263,11 @@ const Auth = (() => {
     sessionStorage.setItem('usuarioActual', JSON.stringify(_usuarioActual));
     aplicarRestriccionesUI();
 
-    // Recargar la vista inicial (o la que corresponda según el rol en este espacio)
     if (window.App) {
       App.showView(getDefaultView());
     }
-    showToast('info', `Cambiaste a "${espacio.nombre}" (${espacio.rol})`);
-    Logger.info(`[Auth] Espacio cambiado a "${espacio.nombre}"`);
+    showToast('info', 'Cambiaste a "' + espacio.nombre + '" (' + espacio.rol + ')');
+    Logger.info('[Auth] Espacio cambiado a "' + espacio.nombre + '"');
   }
 
   function actualizarNombre(nuevoNombre) {
@@ -225,10 +279,9 @@ const Auth = (() => {
     _usuarioActual.nombre = nuevoNombre;
     sessionStorage.setItem('usuarioActual', JSON.stringify(_usuarioActual));
     aplicarRestriccionesUI();
-    Logger.info(`[Auth] Nombre actualizado a "${nuevoNombre}"`);
+    Logger.info('[Auth] Nombre actualizado a "' + nuevoNombre + '"');
   }
 
-  // ── MÉTODOS DE ROL ──────────────────────────────────────
   function esMasterReal() { return _usuarioActual?.rol === 'master'; }
   function esMaster() { return _usuarioActual?.rol === 'master' && !_rolSimulado; }
   function esAdmin() { const r = getRolEfectivo(); return r === 'admin' || r === 'master'; }
@@ -240,6 +293,7 @@ const Auth = (() => {
   function esReparto() { const r = getRolEfectivo(); return r === 'reparto' || r === 'admin' || r === 'master'; }
   function esCliente() { const r = getRolEfectivo(); return r === 'cliente' || r === 'admin' || r === 'master'; }
   function esEventos() { const r = getRolEfectivo(); return r === 'eventos' || r === 'admin' || r === 'master'; }
+  function esArtista() { const r = getRolEfectivo(); return r === 'artista' || r === 'admin' || r === 'master'; }
 
   function puede(permiso) { return tienePermiso(permiso); }
   function puedeEliminarItemEnviado() { return tienePermiso('eliminarItemEnviado'); }
@@ -260,7 +314,7 @@ const Auth = (() => {
   function puedeAccederMenu() { return getRolEfectivo() !== null; }
   function puedeAccederEventos() {
     const rol = getRolEfectivo();
-    return ['eventos', 'admin', 'master'].includes(rol);
+    return ['eventos', 'artista', 'admin', 'master'].includes(rol);
   }
   function puedeAccederPerfil() { return getRolEfectivo() !== null; }
 
@@ -268,12 +322,12 @@ const Auth = (() => {
     const userEl = document.getElementById('usuarioActualDisplay');
     const rolEfectivo = getRolEfectivo();
     if (userEl) {
-      let displayText = _usuarioActual ? `${_usuarioActual.nombre} (${rolEfectivo})` : '';
-      if (_rolSimulado) displayText += ` ⇒ ${_rolSimulado}`;
+      let displayText = _usuarioActual ? _usuarioActual.nombre + ' (' + rolEfectivo + ')' : '';
+      if (_rolSimulado) displayText += ' ⇒ ' + _rolSimulado;
       userEl.textContent = displayText;
     }
 
-    document.querySelectorAll('[data-rol]').forEach(el => {
+    document.querySelectorAll('[data-rol]').forEach(function(el) {
       const roles = el.dataset.rol.split(',').map(r => r.trim());
       const mostrar = roles.includes(rolEfectivo) ||
                      (rolEfectivo === 'admin' && roles.includes('admin')) ||
@@ -281,28 +335,26 @@ const Auth = (() => {
       el.style.display = mostrar ? '' : 'none';
     });
 
-    // Selector de espacios (nuevo)
     _renderSelectorEspacio();
 
-    // Selector de simulación (master)
     const mozoContainer = document.querySelector('.mozo-selector');
     if (!mozoContainer || !_usuarioActual) return;
 
     if (esMasterReal()) {
       const rolesDisponibles = (typeof Roles !== 'undefined')
-        ? Roles.lista.filter(r => r !== 'master')
+        ? Roles.lista.filter(function(r) { return r !== 'master'; })
         : [];
       const seleccionado = _rolSimulado || '';
-      const opciones = rolesDisponibles.map(r =>
-        `<option value="${r}" ${r === seleccionado ? 'selected' : ''}>${r.charAt(0).toUpperCase() + r.slice(1)}</option>`
-      ).join('');
-      mozoContainer.innerHTML = `
-        <i class="fas fa-eye"></i>
-        <select id="rolSimulado" onchange="Auth._cambiarRolSimulado(this.value)">
-          <option value="">— Ver como —</option>
-          ${opciones}
-        </select>
-      `;
+      const opciones = rolesDisponibles.map(function(r) {
+        return '<option value="' + r + '" ' + (r === seleccionado ? 'selected' : '') + '>' +
+               r.charAt(0).toUpperCase() + r.slice(1) + '</option>';
+      }).join('');
+      mozoContainer.innerHTML =
+        '<i class="fas fa-eye"></i>' +
+        '<select id="rolSimulado" onchange="Auth._cambiarRolSimulado(this.value)">' +
+          '<option value="">— Ver como —</option>' +
+          opciones +
+        '</select>';
       const selectEl = mozoContainer.querySelector('#rolSimulado');
       if (selectEl) selectEl.value = seleccionado;
     } else {
@@ -321,12 +373,13 @@ const Auth = (() => {
     }
 
     const activo = _usuarioActual.espacioActivoId;
-    container.innerHTML = `
-      <i class="fas fa-home"></i>
-      <select id="espacioSelect" onchange="Auth.cambiarEspacio(this.value)">
-        ${espacios.map(e => `<option value="${e.id}" ${e.id === activo ? 'selected' : ''}>${e.nombre} (${e.rol})</option>`).join('')}
-      </select>
-    `;
+    container.innerHTML =
+      '<i class="fas fa-home"></i>' +
+      '<select id="espacioSelect" onchange="Auth.cambiarEspacio(this.value)">' +
+        espacios.map(function(e) {
+          return '<option value="' + e.id + '" ' + (e.id === activo ? 'selected' : '') + '>' + e.nombre + ' (' + e.rol + ')</option>';
+        }).join('') +
+      '</select>';
   }
 
   function _cambiarRolSimulado(rol) {
@@ -349,15 +402,23 @@ const Auth = (() => {
     actualizarNombre,
     tienePermiso, puede,
     esMaster, esAdmin, esCocina, esBarra, esCaja, esMesero,
-    esDespensa, esReparto, esCliente, esEventos,
+    esDespensa, esReparto, esCliente, esEventos, esArtista,
     puedeEliminarItemEnviado, puedeCerrarMesa,
     puedeAccederCaja, puedeAccederCocina, puedeCambiarEstadoComanda,
     puedeEditarProductos, puedeEditarPrecios,
     getDefaultView, mostrarLogin, cerrarModalLogin, _loginFromModal,
     _cambiarRolSimulado, getRolEfectivo, esMasterReal, aplicarRestriccionesUI,
     puedeAccederRecetas, puedeAccederReparto, puedeAccederMenu,
-    puedeAccederEventos, puedeAccederPerfil
+    puedeAccederEventos, puedeAccederPerfil,
+    cambiarPassword, _cargarUsuarios
   };
 })();
 
 window.Auth = Auth;
+
+// Inicializar usuarios (async) cuando el DOM esté listo
+document.addEventListener('DOMContentLoaded', function() {
+  Auth._cargarUsuarios().catch(function(e) {
+    Logger.error('[Auth] Error al cargar usuarios:', e);
+  });
+});

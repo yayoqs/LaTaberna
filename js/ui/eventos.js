@@ -1,7 +1,11 @@
 /* ================================================================
-   PubPOS — MÓDULO: eventos.js (v1.1 – logging unificado + JSDoc)
-   Propósito: Gestión de eventos. Crear evento genera carpeta en
-              Drive con presupuesto y menú automáticos.
+   PubPOS — MÓDULO: eventos.js (v1.2 – soporte para artista)
+   ================================================================
+   Cambios:
+   • Si el usuario es artista, solo ve sus propios eventos.
+   • Al guardar un evento, se agrega el campo artistaId con el
+     nombre del usuario logueado.
+   • El rol artista también puede crear eventos.
    ================================================================ */
 const Eventos = (() => {
 
@@ -15,8 +19,12 @@ const Eventos = (() => {
       <div class="view-toolbar">
         <h2><i class="fas fa-calendar-alt"></i> Gestión de Eventos</h2>
         <div class="toolbar-actions">
-          <button class="btn-primary" onclick="Eventos.mostrarFormulario()"><i class="fas fa-plus"></i> Nuevo Evento</button>
-          <button class="btn-secondary" onclick="Eventos.render()"><i class="fas fa-sync-alt"></i> Actualizar</button>
+          <button class="btn-primary" onclick="Eventos.mostrarFormulario()" data-rol="artista,eventos,admin,master">
+            <i class="fas fa-plus"></i> Nuevo Evento
+          </button>
+          <button class="btn-secondary" onclick="Eventos.render()">
+            <i class="fas fa-sync-alt"></i> Actualizar
+          </button>
         </div>
       </div>
       <div class="reparto-table-wrap" style="padding:20px;">
@@ -24,7 +32,7 @@ const Eventos = (() => {
           <thead>
             <tr>
               <th>Fecha</th><th>Tipo</th><th>Cliente</th><th>Personas</th>
-              <th>Lugar</th><th>Carpeta</th><th>Presupuesto</th><th>Menú</th>
+              <th>Lugar</th><th>Artista</th><th>Carpeta</th><th>Presupuesto</th><th>Menú</th>
             </tr>
           </thead>
           <tbody id="eventosBody"></tbody>
@@ -35,9 +43,6 @@ const Eventos = (() => {
     document.body.insertBefore(main, referencia);
   }
 
-  /**
-   * Obtiene los eventos desde el backend y los muestra en la tabla.
-   */
   async function render() {
     _asegurarVista();
     const tbody = $id('eventosBody');
@@ -46,10 +51,16 @@ const Eventos = (() => {
     try {
       const resp = await fetch(`${DB.urlSheets}?action=getEventos`, { mode: 'cors' });
       const data = await resp.json();
-      const eventos = data.eventos || [];
+      let eventos = data.eventos || [];
+
+      // Si el usuario es artista, filtrar solo sus eventos
+      if (Auth.esArtista()) {
+        const nombreArtista = Auth.getNombre();
+        eventos = eventos.filter(ev => ev.artistaId === nombreArtista);
+      }
 
       if (!eventos.length) {
-        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;">No hay eventos registrados</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:40px;">No hay eventos registrados</td></tr>`;
         return;
       }
 
@@ -62,6 +73,7 @@ const Eventos = (() => {
           <td><strong>${ev.cliente}</strong></td>
           <td>${ev.personas || '-'}</td>
           <td>${ev.lugar || '-'}</td>
+          <td>${ev.artistaId || '-'}</td>
           <td><a href="${ev.carpetaUrl}" target="_blank" title="Abrir carpeta"><i class="fas fa-folder-open"></i> Ver</a></td>
           <td><a href="${ev.presupuestoUrl}" target="_blank" title="Abrir presupuesto"><i class="fas fa-file-invoice"></i> Presupuesto</a></td>
           <td><a href="${ev.menuUrl}" target="_blank" title="Abrir menú"><i class="fas fa-utensils"></i> Menú</a></td>
@@ -69,7 +81,7 @@ const Eventos = (() => {
       `).join('');
     } catch (e) {
       Logger.error('[Eventos] Error cargando:', e);
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;">Error al cargar eventos</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;">Error al cargar eventos</td></tr>`;
     }
   }
 
@@ -114,9 +126,6 @@ const Eventos = (() => {
     if (modal) modal.style.display = 'none';
   }
 
-  /**
-   * Guarda un nuevo evento llamando al backend para crear carpeta en Drive.
-   */
   async function guardarEvento() {
     const fecha = $val('evtFecha');
     const tipo = $val('evtTipo');
@@ -137,7 +146,8 @@ const Eventos = (() => {
       cliente,
       personas,
       lugar,
-      observaciones
+      observaciones,
+      artistaId: Auth.getNombre()  // ← se asocia al artista logueado
     };
 
     try {

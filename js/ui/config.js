@@ -1,7 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: config.js (v3.1 – JSDoc completo)
-   Propósito: Vista de configuración (productos, mozos, zonas).
-              Lee del Store y persiste cambios a través de DB.
+   PubPOS — MÓDULO: config.js (v4.1 – gestión de contraseñas para master)
    ================================================================ */
 const Config = (() => {
   function _asegurarVista() {
@@ -43,6 +41,18 @@ const Config = (() => {
             <label>Zonas / Espacios</label>
             <div id="zonasContainer" style="display:flex; flex-direction:column; gap:6px;"></div>
             <button class="btn-secondary" onclick="Config.agregarZona()"><i class="fas fa-plus"></i> Añadir Zona</button>
+
+            <div style="margin-top:16px; padding-top:12px; border-top:1px solid var(--color-border);">
+              <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
+                <input type="checkbox" id="cfgBloquearStock" checked style="width:auto; accent-color:var(--color-accent);">
+                <span><i class="fas fa-boxes"></i> Bloquear envío si falta stock</span>
+              </label>
+              <p style="font-size:11px; color:var(--color-text-muted); margin-top:4px;">
+                Si está activado, al enviar una comanda se verificará que haya stock suficiente de cada ingrediente.
+                En caso de faltante, se pedirá confirmación para forzar el envío.
+              </p>
+            </div>
+
             <button class="btn-primary" onclick="Config.guardar()"><i class="fas fa-save"></i> Guardar</button>
           </div>
         </section>
@@ -54,6 +64,14 @@ const Config = (() => {
               <input type="text" id="nuevoMozoNombre" placeholder="Nombre del mozo">
               <button class="btn-secondary" onclick="Config.agregarMozo()"><i class="fas fa-plus"></i> Añadir</button>
             </div>
+          </div>
+        </section>
+        <!-- 🔐 Gestión de Contraseñas (solo master) -->
+        <section class="config-card" id="usuariosCard" style="display:none;">
+          <h3><i class="fas fa-key"></i> Contraseñas de Usuarios</h3>
+          <div class="local-config">
+            <p style="font-size:12px; color:var(--color-text-muted); margin-bottom:8px;">Solo el master puede cambiar contraseñas.</p>
+            <div id="usuariosLista" style="display:flex; flex-direction:column; gap:6px;"></div>
           </div>
         </section>
       </div>
@@ -78,11 +96,87 @@ const Config = (() => {
     $id('cfgDireccion').value = config.direccion || '';
     $id('cfgCuit').value = config.cuit || '';
     $id('cfgPie').value = config.pieTicket || '';
+
+    const bloquear = config.bloquearStockInsuficiente !== false;
+    const chk = $id('cfgBloquearStock');
+    if (chk) chk.checked = bloquear;
+
     _renderZonas();
     renderMozos();
     renderProductos();
+    _renderUsuarios();  // ← nuevo
   }
 
+  // ── USUARIOS (solo master) ────────────────────────────────
+  function _renderUsuarios() {
+    const card = $id('usuariosCard');
+    if (!card) return;
+
+    // Solo visible para el master real (no simulación)
+    if (typeof Auth !== 'undefined' && Auth.esMasterReal && Auth.esMasterReal()) {
+      card.style.display = '';
+    } else {
+      card.style.display = 'none';
+      return;
+    }
+
+    const lista = $id('usuariosLista');
+    if (!lista) return;
+
+    // Obtener la lista de usuarios desde localStorage
+    let usuarios = [];
+    try {
+      const raw = localStorage.getItem('pubpos_usuarios');
+      if (raw) usuarios = JSON.parse(raw);
+    } catch (e) {
+      usuarios = [];
+    }
+
+    if (!usuarios.length) {
+      lista.innerHTML = '<p style="color:var(--color-text-muted);">No hay usuarios.</p>';
+      return;
+    }
+
+    lista.innerHTML = usuarios.map(function(u) {
+      return '<div style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--color-border);">' +
+               '<span style="flex:1;"><strong>' + u.nombre + '</strong> (' + u.rol + ')</span>' +
+               '<button class="btn-ajuste" onclick="Config._mostrarCambiarPassword(\'' + u.nombre + '\')">' +
+                 '<i class="fas fa-key"></i> Cambiar' +
+               '</button>' +
+             '</div>';
+    }).join('');
+  }
+
+  /**
+   * Muestra un prompt para cambiar la contraseña de un usuario (solo master).
+   * @param {string} nombreUsuario
+   */
+  async function _mostrarCambiarPassword(nombreUsuario) {
+    if (!Auth.esMasterReal || !Auth.esMasterReal()) {
+      showToast('error', 'Solo el master puede cambiar contraseñas');
+      return;
+    }
+
+    const nueva = prompt('Nueva contraseña para ' + nombreUsuario + ':');
+    if (!nueva || nueva.trim().length === 0) return;
+
+    const confirmacion = prompt('Confirma la nueva contraseña:');
+    if (confirmacion !== nueva) {
+      showToast('error', 'Las contraseñas no coinciden');
+      return;
+    }
+
+    if (typeof Auth.cambiarPassword === 'function') {
+      const ok = await Auth.cambiarPassword(nombreUsuario, nueva.trim());
+      if (ok) {
+        _renderUsuarios(); // actualizar lista (aunque no cambia visualmente)
+      }
+    } else {
+      showToast('error', 'Función no disponible');
+    }
+  }
+
+  // ── ZONAS ─────────────────────────────────────────────────
   function _renderZonas() {
     const container = $id('zonasContainer');
     if (!container) return;
@@ -146,7 +240,8 @@ const Config = (() => {
       direccion: $val('cfgDireccion'),
       cuit: $val('cfgCuit'),
       pieTicket: $val('cfgPie'),
-      zonas: config.zonas || [{ nombre: 'salon', cantidad: 12 }]
+      zonas: config.zonas || [{ nombre: 'salon', cantidad: 12 }],
+      bloquearStockInsuficiente: $id('cfgBloquearStock')?.checked ?? true
     };
     delete config.cantidadMesas;
 
@@ -328,7 +423,8 @@ const Config = (() => {
     eliminarMozo,
     agregarZona,
     eliminarZona,
-    _updateZona
+    _updateZona,
+    _mostrarCambiarPassword  // ← expuesto para el onclick
   };
 })();
 

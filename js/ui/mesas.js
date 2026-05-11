@@ -1,7 +1,9 @@
 /* ================================================================
-   PubPOS — MÓDULO: mesas.js (v6.1 – JSDoc completo)
+   PubPOS — MÓDULO: mesas.js (v6.2 – comando agregarMesa)
    Propósito: Mapa de mesas con zonas dinámicas y colores. Obtiene
               los datos del Store y se suscribe a cambios.
+              Ahora usa CommandBus para agregar mesas en lugar de
+              tocar DB directamente.
    ================================================================ */
 const Mesas = (() => {
 
@@ -217,6 +219,7 @@ const Mesas = (() => {
     }
   }
 
+  /** Agrega una nueva mesa usando el comando correspondiente */
   function agregarMesa() {
     if (typeof DB === 'undefined') return;
     const zona = _zonaActiva !== 'todas' ? _zonaActiva : (DB.config.zonas[0]?.nombre || 'salon');
@@ -224,13 +227,28 @@ const Mesas = (() => {
     const maxNum = mesas.reduce((max, m) => Math.max(max, m.numero || 0), 0);
     const nuevoNum = maxNum + 1;
 
-    const nuevaMesa = { ...mesaVacia(nuevoNum, zona) };
-
-    Store.dispatch({ type: 'MESA_AGREGAR', payload: nuevaMesa });
-
-    DB.mesas.push(nuevaMesa);
-    DB.saveMesas();
-    showToast('success', `Mesa ${nuevoNum} agregada (${zona})`);
+    if (typeof CommandBus !== 'undefined') {
+      CommandBus.ejecutar({
+        type: 'agregarMesa',
+        datos: { numero: nuevoNum, zona }
+      }).then(resultado => {
+        if (resultado.exito) {
+          showToast('success', `Mesa ${nuevoNum} agregada (${zona})`);
+        } else {
+          showToast('error', resultado.error || 'Error al agregar mesa');
+        }
+      }).catch(err => {
+        Logger.error('[Mesas] Error al ejecutar comando agregarMesa:', err);
+        showToast('error', 'Error inesperado al agregar mesa');
+      });
+    } else {
+      // Fallback si CommandBus no está disponible
+      const nuevaMesa = { ...mesaVacia(nuevoNum, zona) };
+      Store.dispatch({ type: 'MESA_AGREGAR', payload: nuevaMesa });
+      DB.mesas.push(nuevaMesa);
+      DB.saveMesas();
+      showToast('success', `Mesa ${nuevoNum} agregada (${zona})`);
+    }
   }
 
   /**

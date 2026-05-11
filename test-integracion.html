@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>PubPOS – Tests de Integración</title>
+  <style>
+    body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
+    h1 { color: #f59e0b; }
+    .suite { margin-bottom: 24px; border-bottom: 1px solid #2e2e42; padding-bottom: 12px; }
+    .test { margin: 4px 0; padding: 4px 8px; border-radius: 4px; }
+    .pass { background: rgba(34,197,94,.2); }
+    .fail { background: rgba(239,68,68,.2); }
+    .summary { margin-top: 20px; font-weight: bold; }
+    .error { color: #ef4444; margin-bottom: 16px; }
+    .info { color: #94a3b8; font-size: 12px; margin: 2px 0; }
+  </style>
+</head>
+<body>
+  <h1>🧪 PubPOS – Tests de Integración</h1>
+  <div id="results"></div>
+
+  <!-- DEPENDENCIAS (rutas desde raíz del proyecto) -->
+  <script src="js/utils.js"></script>
+  <script src="js/lib/logger.js"></script>
+  <script src="js/lib/eventBus.js"></script>
+  <script src="js/lib/store.js"></script>
+  <script src="js/lib/command-bus.js"></script>
+  <script src="js/lib/deps.js"></script>
+  <script src="js/dominio/resultado.js"></script>
+  <script src="js/dominio/dinero.js"></script>
+  <script src="js/dominio/cantidad.js"></script>
+  <script src="js/dominio/direccion.js"></script>
+  <script src="js/dominio/pedido.js"></script>
+  <script src="js/dominio/delivery.js"></script>
+  <script src="js/dominio/ingrediente.js"></script>
+  <script src="js/db-core.js"></script>
+  <script src="js/repositorios/pedido-repository.js"></script>
+  <script src="js/comandos/crear-pedido-mesa.js"></script>
+  <script src="js/comandos/enviar-comanda.js"></script>
+  <script src="js/comandos/agregar-mesa.js"></script>
+  <script src="js/comandos/liberar-mesa.js"></script>
+
+  <script>
+    (function() {
+      var resultsEl = document.getElementById('results');
+      var passed = 0, failed = 0;
+
+      function assert(condition, msg) {
+        if (condition) {
+          passed++;
+          resultsEl.innerHTML += '<div class="test pass">✔ ' + msg + '</div>';
+        } else {
+          failed++;
+          resultsEl.innerHTML += '<div class="test fail">✘ ' + msg + '</div>';
+        }
+      }
+
+      async function runTests() {
+        Logger.setLevel('ERROR'); // Silenciar logs durante tests
+
+        // ── Configurar entorno ──────────────────────────
+        // Simular una DB mínima con todas las funciones necesarias
+        if (!window.DB) {
+          window.DB = {};
+        }
+        DB.config = { zonas: [{ nombre: 'salon', cantidad: 5 }] };
+        DB.pedidos = [];
+        DB.comandas = [];
+        DB.mesas = [
+          { numero: 1, estado: 'libre', zona: 'salon', items: [], mozo: '', comensales: 1, abiertaEn: null, observaciones: '', pedidoId: null, esVirtual: false },
+          { numero: 2, estado: 'libre', zona: 'salon', items: [], mozo: '', comensales: 1, abiertaEn: null, observaciones: '', pedidoId: null, esVirtual: false }
+        ];
+        DB.mozos = [{ id: 'mozo_1', nombre: 'Trini', activo: true }];
+        DB.saveMesas = function() { /* mock */ };
+        DB.savePedidos = function() { /* mock */ };
+        DB.saveComandas = function() { /* mock */ };
+        DB.getMesa = function(num) { return DB.mesas.find(function(m) { return m.numero == num; }); };
+
+        // Mock de crearPedido (necesario para el repositorio)
+        DB.crearPedido = async function(mesa, mozo, comensales) {
+          var nuevo = {
+            id: 'ped_' + Date.now(),
+            mesa: mesa,
+            mozo: mozo,
+            comensales: comensales,
+            estado: 'abierta',
+            items: '[]',
+            total: 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          DB.pedidos.push(nuevo);
+          return nuevo;
+        };
+
+        // Mock de syncGuardarPedido (se llama en abrirMesa pero puede fallar sin afectar)
+        DB.syncGuardarPedido = async function() { return true; };
+
+        // Mock de actualizarPedido (necesario para enviarComanda)
+        DB.actualizarPedido = async function(id, cambios) {
+          var idx = DB.pedidos.findIndex(function(p) { return p.id === id; });
+          if (idx >= 0) {
+            DB.pedidos[idx] = Object.assign({}, DB.pedidos[idx], cambios);
+          }
+          return DB.pedidos[idx];
+        };
+
+        // Mock de syncGuardarPedido (para el final del envío)
+        DB._encolarOperacion = function() {};
+
+        // Registrar dependencias
+        Deps.registrar('pedidoRepo', PedidoRepositoryLocal);
+        
+        // Mock de PedidoManager (necesario para comandos)
+        window.PedidoManager = {
+          getTurnoActual: function() { return { id: 'turno_test', estado: 'abierto' }; },
+          registrar: function() {}
+        };
+
+        // Poblar Store con mesas iniciales
+        Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
+
+        // ── Suite 1: Comando agregarMesa ─────────────────
+        resultsEl.innerHTML += '<div class="suite"><h2>Comando: agregarMesa</h2></div>';
+        
+        var result = await CommandBus.ejecutar({
+          type: 'agregarMesa',
+          datos: { numero: 3, zona: 'salon' }
+        });
+        assert(result.exito === true, 'agregarMesa: crea mesa 3 exitosamente');
+        var mesa3 = DB.mesas.find(function(m) { return m.numero === 3; });
+        assert(!!mesa3, 'agregarMesa: mesa 3 existe en DB');
+        assert(mesa3.estado === 'libre', 'agregarMesa: mesa 3 está libre');
+
+        // ── Suite 2: Comando crearPedidoMesa ──────────────
+        resultsEl.innerHTML += '<div class="suite"><h2>Comando: crearPedidoMesa</h2></div>';
+
+        // Debe fallar si no hay mesa
+        var resultFallo = await CommandBus.ejecutar({
+          type: 'crearPedidoMesa',
+          datos: { numeroMesa: 99, mozo: 'Test', comensales: 2 }
+        });
+        assert(!resultFallo.exito, 'crearPedidoMesa: falla si mesa no existe');
+        
+        // Debe ser exitoso con mesa libre
+        var resultOk = await CommandBus.ejecutar({
+          type: 'crearPedidoMesa',
+          datos: { numeroMesa: 1, mozo: 'Trini', comensales: 2 }
+        });
+        assert(resultOk.exito === true, 'crearPedidoMesa: crea pedido en mesa 1');
+        var mesa1 = DB.mesas.find(function(m) { return m.numero === 1; });
+        assert(mesa1.estado === 'ocupada', 'crearPedidoMesa: mesa 1 pasa a ocupada');
+        assert(mesa1.pedidoId !== null, 'crearPedidoMesa: mesa 1 tiene pedidoId');
+
+        // ── Suite 3: Comando liberarMesa ──────────────────
+        resultsEl.innerHTML += '<div class="suite"><h2>Comando: liberarMesa</h2></div>';
+
+        var resultLiberar = await CommandBus.ejecutar({
+          type: 'liberarMesa',
+          datos: { numeroMesa: 1 }
+        });
+        assert(resultLiberar.exito === true, 'liberarMesa: libera mesa 1');
+        var mesa1libre = DB.mesas.find(function(m) { return m.numero === 1; });
+        assert(mesa1libre.estado === 'libre', 'liberarMesa: mesa 1 vuelve a libre');
+
+        // ── Suite 4: Comando enviarComanda ────────────────
+        resultsEl.innerHTML += '<div class="suite"><h2>Comando: enviarComanda</h2></div>';
+
+        var mesa2 = DB.mesas.find(function(m) { return m.numero === 2; });
+        mesa2.items = [
+          { prodId: 'prod_test', nombre: 'Hamburguesa', precio: 1500, destino: 'cocina', qty: 1, obs: '', enviado: false, persona: 'General' }
+        ];
+        var pedidoMock = {
+          id: 'ped_test',
+          mesa: 2,
+          mozo: 'Trini',
+          comensales: 2,
+          estado: 'abierta',
+          items: JSON.stringify(mesa2.items),
+          total: 1500,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        DB.pedidos.push(pedidoMock);
+        mesa2.pedidoId = 'ped_test';
+        mesa2.estado = 'ocupada';
+
+        Deps.registrar('inventarioService', {
+          validarStockParaItems: function() { return { ok: true, faltantes: [] }; }
+        });
+
+        var resultEnviar = await CommandBus.ejecutar({
+          type: 'enviarComanda',
+          datos: {
+            mesa: mesa2,
+            mozo: 'Trini',
+            comensales: 2,
+            observaciones: '',
+            itemsPendientes: mesa2.items
+          }
+        });
+        assert(resultEnviar.exito === true, 'enviarComanda: envío exitoso');
+        assert(DB.comandas.length === 1, 'enviarComanda: se creó 1 comanda');
+        assert(DB.comandas[0].destino === 'cocina', 'enviarComanda: comanda destino cocina');
+
+        // ── Resumen ──────────────────────────────────────
+        resultsEl.innerHTML += '<div class="summary">' + passed + ' pasaron, ' + failed + ' fallaron</div>';
+        if (failed === 0) {
+          resultsEl.innerHTML += '<div class="test pass">✔ Todos los tests de integración pasaron.</div>';
+        }
+      }
+
+      // Ejecutar después de que carguen todos los scripts
+      window.addEventListener('load', function() {
+        runTests().catch(function(e) {
+          resultsEl.innerHTML += '<div class="error">Error en tests: ' + e.message + '</div>';
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

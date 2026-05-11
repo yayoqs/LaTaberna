@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: cobro.js (v4.7 – sincronización forzada del cierre)
+   PubPOS — MÓDULO: cobro.js (v5.0 – usa comando liberarMesa)
    ================================================================ */
 const Cobro = (() => {
   let _mesaACerrar = null;
@@ -210,7 +210,7 @@ const Cobro = (() => {
       pagos = [{ persona: 'Total', monto: totalFinal, formaPago: _formaPago }];
     }
 
-    // 1. Cerrar el pedido a través del servicio de dominio
+    // ── 1. Cerrar el pedido a través del Servicio de Dominio ──
     let pedidoService;
     try {
       pedidoService = Deps.obtener('pedidoService');
@@ -236,7 +236,8 @@ const Cobro = (() => {
       return;
     }
 
-    // 2. Forzar sincronización inmediata con Sheets
+    // ── 2. Sincronización inmediata con Sheets (se delega en el servicio, pero forzamos igual) ──
+    //    El servicio ya incluye sincronización. Se mantiene la lógica de respaldo.
     const pedidoCerrado = DB.pedidos.find(p => p.id === _mesaACerrar.pedidoId);
     if (pedidoCerrado && typeof DB.syncGuardarPedido === 'function') {
       const pedidoParaSync = {
@@ -244,7 +245,7 @@ const Cobro = (() => {
         mesa:        pedidoCerrado.mesa,
         mozo:        pedidoCerrado.mozo || 'Sin mozo',
         comensales:  pedidoCerrado.comensales || 1,
-        estado:      'cerrada',   // forzamos el estado a 'cerrada'
+        estado:      'cerrada',
         items:       Array.isArray(pedidoCerrado.items)
                        ? JSON.stringify(pedidoCerrado.items)
                        : (pedidoCerrado.items || '[]'),
@@ -260,11 +261,9 @@ const Cobro = (() => {
         Logger.warn('[Cobro] Error al sincronizar con Sheets, encolado.', e);
         showToast('warning', 'El ticket se guardó localmente y se enviará cuando haya conexión.');
       }
-    } else {
-      Logger.warn('[Cobro] No se encontró el pedido cerrado en DB o falta syncGuardarPedido.');
     }
 
-    // 3. Cerrar el modal de cobro y mostrar ticket con botones Imprimir y Pagado
+    // ── 3. Cerrar el modal y mostrar ticket con acciones ──
     cerrarModalCierre();
 
     const ticketHTML = Tickets.generarCierre(_mesaACerrar, pagos[0].monto, 0, pagos[0].formaPago);
@@ -274,17 +273,37 @@ const Cobro = (() => {
       onImprimir: () => true,
       textoExtra: 'Pagado',
       onExtra: async () => {
-        // Liberar la mesa
-        if (_mesaACerrar.esVirtual) {
-          DB.liberarMesasFusionadas(_mesaACerrar);
-        } else {
-          const idx = DB.mesas.findIndex(m => m.numero === _mesaACerrar.numero);
-          if (idx >= 0) DB.mesas[idx] = mesaVacia(_mesaACerrar.numero);
+        // ── Liberar la mesa usando el comando ──
+        try {
+          if (typeof CommandBus !== 'undefined') {
+            const res = await CommandBus.ejecutar({
+              type: 'liberarMesa',
+              datos: { numeroMesa: _mesaACerrar.numero }
+            });
+            if (res.exito) {
+              EventBus.emit('pedido:cerrado', { mesa: _mesaACerrar.numero });
+              if (typeof Pedido !== 'undefined' && Pedido.cerrar) Pedido.cerrar();
+              showToast('success', `Mesa ${_mesaACerrar.numero} pagada y liberada.`);
+            } else {
+              showToast('error', 'Error al liberar la mesa: ' + res.error);
+            }
+          } else {
+            // Fallback si CommandBus no está disponible (mantenemos acceso directo mínimo)
+            if (_mesaACerrar.esVirtual) {
+              DB.liberarMesasFusionadas(_mesaACerrar);
+            } else {
+              const idx = DB.mesas.findIndex(m => m.numero === _mesaACerrar.numero);
+              if (idx >= 0) DB.mesas[idx] = mesaVacia(_mesaACerrar.numero);
+            }
+            DB.saveMesas();
+            EventBus.emit('pedido:cerrado', { mesa: _mesaACerrar.numero });
+            if (typeof Pedido !== 'undefined' && Pedido.cerrar) Pedido.cerrar();
+            showToast('success', `Mesa ${_mesaACerrar.numero} pagada y liberada.`);
+          }
+        } catch (err) {
+          Logger.error('[Cobro] Error al liberar mesa:', err);
+          showToast('error', 'Error inesperado al liberar la mesa.');
         }
-        DB.saveMesas();
-        EventBus.emit('pedido:cerrado', { mesa: _mesaACerrar.numero });
-        if (typeof Pedido !== 'undefined' && Pedido.cerrar) Pedido.cerrar();
-        showToast('success', `Mesa ${_mesaACerrar.numero} pagada y liberada.`);
         _mesaACerrar = null;
       }
     });

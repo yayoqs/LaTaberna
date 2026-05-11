@@ -1,8 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-sync.js (v5.5 – logging unificado + JSDoc)
-   Propósito: Sincronización con Google Sheets, cola offline y
-              método genérico de llamada. Reconstruye comandas al
-              iniciar.
+   PubPOS — MÓDULO: db-sync.js (v5.6 – fetch optimizado + detección de cambios)
    ================================================================ */
 window.DBSync = (function() {
   const module = {};
@@ -106,10 +103,21 @@ window.DBSync = (function() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (data && Array.isArray(data.productos)) {
-        this.productos = data.productos.map(p => window.DB._normalizarProducto(p));
+        const nuevos = data.productos.map(p => window.DB._normalizarProducto(p));
+        // Detectar cambios comparando con la caché
+        const cache = localStorage.getItem('pubpos_cache_prod');
+        const anteriores = cache ? JSON.parse(cache) : [];
+        const cambiaron = JSON.stringify(nuevos) !== JSON.stringify(anteriores);
+        
+        this.productos = nuevos;
         localStorage.setItem('pubpos_cache_prod', JSON.stringify(this.productos));
-        EventBus.emit('productos:cargados', this.productos);
-        Logger.info(`[DB Sync] ${this.productos.length} productos sincronizados.`);
+        
+        if (cambiaron) {
+          EventBus.emit('productos:cargados', this.productos);
+          Logger.info(`[DB Sync] ${this.productos.length} productos sincronizados (cambios detectados).`);
+        } else {
+          Logger.debug('[DB Sync] Productos sin cambios.');
+        }
       }
     } catch (e) {
       Logger.warn("[DB Sync] Error obteniendo productos, usando caché.");
@@ -185,6 +193,8 @@ window.DBSync = (function() {
 
   /**
    * Descarga pedidos desde Sheets y reconstruye las comandas para KDS.
+   * Optimización: solo actualiza si hay cambios, y maneja conflictos simple
+   * (servidor gana si tiene la misma antigüedad o más reciente).
    */
   module._fetchPedidos = async function() {
     try {
@@ -207,66 +217,98 @@ window.DBSync = (function() {
         }))
         .filter(p => p.id && p.mesa);
 
-      window.DB.pedidos = pedidosRemotos;
-      window.DB.savePedidos();
+      const locales = window.DB.pedidos;
+      const localesMap = new Map(locales.map(p => [p.id, p]));
+      let hayCambios = false;
 
-      const comandasReconstruidas = [];
-      pedidosRemotos.forEach(pedido => {
-        if (pedido.estado !== 'abierta' && pedido.estado !== 'en_proceso') return;
-
-        let items;
-        try {
-          items = typeof pedido.items === 'string' ? JSON.parse(pedido.items) : pedido.items;
-        } catch (e) {
-          items = [];
+      const fusionados = [];
+      for (const remoto of pedidosRemotos) {
+        const local = localesMap.get(remoto.id);
+        if (!local) {
+          // Nuevo pedido desde servidor
+          fusionados.push(remoto);
+          hayCambios = true;
+        } else {
+          // Resolver conflicto: gana el más reciente
+          const tsRemoto = new Date(remoto.updated_at).getTime();
+          const tsLocal = new Date(local.updated_at).getTime();
+          if (tsRemoto >= tsLocal) {
+            fusionados.push(remoto);
+            if (JSON.stringify(remoto) !== JSON.stringify(local)) hayCambios = true;
+          } else {
+            // Conservar versión local (más reciente), pero la agregamos igual para no perderla
+            fusionados.push(local);
+          }
         }
-        if (!Array.isArray(items) || items.length === 0) return;
-
-        const mesa = window.DB.getMesa(pedido.mesa);
-        if (mesa) {
-          mesa.estado = pedido.estado === 'abierta' ? 'ocupada' : 'esperando';
-          mesa.pedidoId = pedido.id;
-          mesa.mozo = pedido.mozo;
-          mesa.comensales = pedido.comensales;
-          mesa.abiertaEn = pedido.created_at;
-          mesa.items = items;
-          mesa.total = pedido.total;
-        }
-
-        const comanda = {
-          id: 'kds_restored_' + pedido.id,
-          mesa: pedido.mesa,
-          mozo: pedido.mozo,
-          destino: 'cocina',
-          items: items.map(it => ({
-            prodId: it.prodId || '',
-            nombre: it.nombre || '',
-            precio: it.precio || 0,
-            qty: it.qty || 1,
-            destino: it.destino || 'cocina',
-            obs: it.obs || '',
-            enviado: true,
-            enviadoA: it.destino || 'cocina',
-            enviadoTs: pedido.updated_at || Date.now()
-          })),
-          observaciones: '',
-          estado: 'nueva',
-          ts: Date.now()
-        };
-        comandasReconstruidas.push(comanda);
-      });
-
-      window.DB.comandas = comandasReconstruidas;
-      window.DB.saveComandas();
-
-      if (typeof Store !== 'undefined') {
-        comandasReconstruidas.forEach(c => {
-          Store.dispatch({ type: 'COMANDA_AGREGADA', payload: c });
-        });
       }
 
-      window.DB.saveMesas();
-      Logger.info(`[DB Sync] ${pedidosRemotos.length} pedidos sincronizados, ${comandasReconstruidas.length} comandas reconstruidas.`);
+      if (hayCambios || fusionados.length !== locales.length) {
+        window.DB.pedidos = fusionados;
+        window.DB.savePedidos();
+
+        // Reconstruir comandas
+        const comandasReconstruidas = [];
+        fusionados.forEach(pedido => {
+          if (pedido.estado !== 'abierta' && pedido.estado !== 'en_proceso') return;
+
+          let items;
+          try {
+            items = typeof pedido.items === 'string' ? JSON.parse(pedido.items) : pedido.items;
+          } catch (e) {
+            items = [];
+          }
+          if (!Array.isArray(items) || items.length === 0) return;
+
+          const mesa = window.DB.getMesa(pedido.mesa);
+          if (mesa) {
+            mesa.estado = pedido.estado === 'abierta' ? 'ocupada' : 'esperando';
+            mesa.pedidoId = pedido.id;
+            mesa.mozo = pedido.mozo;
+            mesa.comensales = pedido.comensales;
+            mesa.abiertaEn = pedido.created_at;
+            mesa.items = items;
+            mesa.total = pedido.total;
+          }
+
+          const comanda = {
+            id: 'kds_restored_' + pedido.id,
+            mesa: pedido.mesa,
+            mozo: pedido.mozo,
+            destino: 'cocina',
+            items: items.map(it => ({
+              prodId: it.prodId || '',
+              nombre: it.nombre || '',
+              precio: it.precio || 0,
+              qty: it.qty || 1,
+              destino: it.destino || 'cocina',
+              obs: it.obs || '',
+              enviado: true,
+              enviadoA: it.destino || 'cocina',
+              enviadoTs: pedido.updated_at || Date.now()
+            })),
+            observaciones: '',
+            estado: 'nueva',
+            ts: Date.now()
+          };
+          comandasReconstruidas.push(comanda);
+        });
+
+        window.DB.comandas = comandasReconstruidas;
+        window.DB.saveComandas();
+
+        if (typeof Store !== 'undefined') {
+          comandasReconstruidas.forEach(c => {
+            Store.dispatch({ type: 'COMANDA_AGREGADA', payload: c });
+          });
+        }
+
+        window.DB.saveMesas();
+        Logger.info(`[DB Sync] ${fusionados.length} pedidos sincronizados, ${comandasReconstruidas.length} comandas reconstruidas (cambios detectados).`);
+        EventBus.emit('pedidos:guardados', fusionados);
+        EventBus.emit('comandas:guardadas', comandasReconstruidas);
+      } else {
+        Logger.debug('[DB Sync] Pedidos sin cambios.');
+      }
     } catch (e) {
       Logger.warn("[DB Sync] Error obteniendo pedidos.", e.message);
     }
@@ -276,7 +318,6 @@ window.DBSync = (function() {
    * Sincroniza todos los datos con Google Sheets y procesa la cola offline.
    */
   module.sincronizarTodo = async function() {
-    showToast('info', 'Sincronizando...');
     try {
       await Promise.all([
         this._fetchProductos(),
@@ -286,10 +327,9 @@ window.DBSync = (function() {
         this._fetchPedidos()
       ]);
       await this._procesarSyncQueue();
-      showToast('success', 'Datos sincronizados');
       EventBus.emit('sincronizacion:completada');
     } catch (e) {
-      showToast('error', '<i class="fas fa-exclamation-circle"></i> Error de conexión');
+      Logger.warn('[DB Sync] Error en sincronización:', e);
     }
   };
 

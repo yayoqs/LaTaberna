@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: bootstrap.js (v1.9 – adaptadores simplificados)
+   PubPOS — MÓDULO: bootstrap.js (v2.0 – SyncService integrado)
    ================================================================ */
 const Bootstrap = (() => {
 
@@ -52,7 +52,6 @@ const Bootstrap = (() => {
 
     const deliveryRepo = {
       async crearDelivery(datos) {
-        // Usamos directamente el método del core (ya que DB lo expande)
         return DB.crearPedidoDelivery(datos);
       },
       async obtenerPorId(id) {
@@ -85,7 +84,6 @@ const Bootstrap = (() => {
       }
     };
 
-    // Registrar en el contenedor
     if (typeof Deps !== 'undefined') {
       if (pedidoRepo) Deps.registrar('pedidoRepo', pedidoRepo);
       Deps.registrar('deliveryRepo', deliveryRepo);
@@ -125,13 +123,23 @@ const Bootstrap = (() => {
       Logger.warn('[Bootstrap] TurnoManager no encontrado.');
     }
 
-    // ── 9. Inicializar UI ─────────────────────────────────
+    // ── 9. Iniciar SyncService (cola periódica) ───────────
+    try {
+      if (typeof SyncService !== 'undefined') {
+        SyncService.iniciar();
+        Logger.info('[Bootstrap] SyncService iniciado.');
+      }
+    } catch (e) {
+      Logger.warn('[Bootstrap] Error al iniciar SyncService:', e);
+    }
+
+    // ── 10. Inicializar UI ─────────────────────────────────
     if (typeof App !== 'undefined' && App.init) {
       App.init();
       Logger.info('[Bootstrap] UI iniciada.');
     }
 
-    // ── 10. Mostrar vista inicial ─────────────────────────
+    // ── 11. Mostrar vista inicial ─────────────────────────
     try {
       if (Auth.getRol()) {
         const vistaDefecto = Auth.getDefaultView();

@@ -1,9 +1,8 @@
 /* ================================================================
-   PubPOS — MÓDULO: roles.js (v2 – nuevos roles despensa, eventos, reparto)
+   PubPOS — MÓDULO: roles.js (v3 – nuevo rol artista)
    ================================================================ */
-
 const Roles = {
-  lista: ['master', 'admin', 'cocina', 'barra', 'caja', 'mesero', 'despensa', 'eventos', 'reparto', 'cliente'],
+  lista: ['master', 'admin', 'cocina', 'barra', 'caja', 'mesero', 'despensa', 'eventos', 'reparto', 'cliente', 'artista'],
 
   permisos: {
     master: {
@@ -85,6 +84,15 @@ const Roles = {
       editarProductos: false, editarUsuarios: false, editarPrecios: false,
       verRecetasCocina: false, verRecetasBarra: false,
       editarInventarioCocina: false, editarInventarioBarra: false
+    },
+    artista: {
+      verMesas: false, verCocina: false, verCaja: false, verConfig: false,
+      tomarPedido: false, modificarPedidoEnviado: false, eliminarItemEnviado: false,
+      cerrarMesa: false, accederCaja: false, accederCocina: false, cambiarEstadoComanda: false,
+      editarProductos: false, editarUsuarios: false, editarPrecios: false,
+      verRecetasCocina: false, verRecetasBarra: false,
+      editarInventarioCocina: false, editarInventarioBarra: false,
+      verEventos: true, crearEventos: true, editarPerfil: true
     }
   },
 

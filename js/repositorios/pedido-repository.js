@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — REPOSITORIO: pedido-repository.js (v1.7 – método enviarComanda)
+   PubPOS — REPOSITORIO: pedido-repository.js (v1.9 – liberarMesa)
    ================================================================ */
 const PedidoRepository = {
   async crearPedidoMesa(datos) { throw new Error('No implementado'); },
@@ -7,7 +7,9 @@ const PedidoRepository = {
   async cerrarPedido(id, datosCierre) { throw new Error('No implementado'); },
   async obtenerTodos()     { throw new Error('No implementado'); },
   async abrirMesa(numeroMesa, mozo, comensales) { throw new Error('No implementado'); },
-  async enviarComanda(mesa, itemsPendientes, mozo, comensales, observaciones) { throw new Error('No implementado'); }
+  async enviarComanda(mesa, itemsPendientes, mozo, comensales, observaciones) { throw new Error('No implementado'); },
+  async agregarMesa(datosMesa) { throw new Error('No implementado'); },
+  async liberarMesa(numeroMesa) { throw new Error('No implementado'); }
 };
 
 const PedidoRepositoryLocal = (() => {
@@ -57,15 +59,6 @@ const PedidoRepositoryLocal = (() => {
     return pedidoLocal;
   }
 
-  /**
-   * Envía una comanda: crea las comandas en DB, actualiza el pedido y sincroniza.
-   * @param {object} mesa
-   * @param {Array} itemsPendientes
-   * @param {string} mozo
-   * @param {number} comensales
-   * @param {string} observaciones
-   * @returns {Promise<{comandas: Array, ticketsHTML: object}>}
-   */
   async function enviarComanda(mesa, itemsPendientes, mozo, comensales, observaciones) {
     if (!window.DB || !DB.comandas) throw new Error('DB.comandas no disponible');
 
@@ -116,14 +109,11 @@ const PedidoRepositoryLocal = (() => {
       if (typeof Tickets !== 'undefined') ticketsGenerados.barra = Tickets.generarComanda(comBarra, 'barra');
     }
 
-    // Persistir comandas
     DB.saveComandas();
-    // Despachar al Store por cada comanda
     if (typeof Store !== 'undefined') {
       comandasCreadas.forEach(c => Store.dispatch({ type: 'COMANDA_AGREGADA', payload: c }));
     }
 
-    // Actualizar pedido y sincronizar con Sheets
     if (mesa.pedidoId && typeof DB.actualizarPedido === 'function') {
       try {
         const pedidoActualizado = await DB.actualizarPedido(mesa.pedidoId, {
@@ -209,13 +199,68 @@ const PedidoRepositoryLocal = (() => {
     return DB.pedidos;
   }
 
+  async function agregarMesa(datosMesa) {
+    if (!window.DB || !DB.mesas) throw new Error('DB no disponible');
+
+    const existente = DB.mesas.find(m => m.numero === datosMesa.numero);
+    if (existente) throw new Error(`Ya existe una mesa con el número ${datosMesa.numero}`);
+
+    DB.mesas.push(datosMesa);
+    DB.saveMesas();
+
+    if (typeof Store !== 'undefined') {
+      Store.dispatch({ type: 'MESA_AGREGAR', payload: datosMesa });
+    }
+
+    return datosMesa;
+  }
+
+  /**
+   * Libera una mesa (individual o virtual) y persiste los cambios.
+   * @param {number|string} numeroMesa - Número de la mesa a liberar
+   * @returns {object} La mesa liberada
+   */
+  async function liberarMesa(numeroMesa) {
+    if (!window.DB || !DB.mesas) throw new Error('DB no disponible');
+
+    const mesa = DB.mesas.find(m => m.numero == numeroMesa);
+    if (!mesa) throw new Error('Mesa no encontrada');
+
+    if (mesa.esVirtual) {
+      DB.liberarMesasFusionadas(mesa);
+    } else {
+      const idx = DB.mesas.findIndex(m => m.numero === mesa.numero);
+      if (idx >= 0) DB.mesas[idx] = mesaVacia(mesa.numero);
+    }
+    DB.saveMesas();
+
+    // Sincronizar Store
+    if (typeof Store !== 'undefined') {
+      if (mesa.esVirtual) {
+        // Al liberar una virtual, las mesas originales vuelven a estado libre
+        (mesa.mesasFusionadas || []).forEach(num => {
+          Store.dispatch({ type: 'MESA_CAMBIAR_ESTADO', payload: { numero: num, estado: 'libre' } });
+        });
+        // La virtual debe eliminarse del Store
+        Store.dispatch({ type: 'MESA_ELIMINAR', payload: mesa.numero });
+      } else {
+        Store.dispatch({ type: 'MESA_CAMBIAR_ESTADO', payload: { numero: mesa.numero, estado: 'libre' } });
+      }
+    }
+
+    EventBus.emit('mesa:liberada', { numero: numeroMesa });
+    return mesa;
+  }
+
   return {
     abrirMesa,
     enviarComanda,
     crearPedidoMesa,
     obtenerPorId,
     cerrarPedido,
-    obtenerTodos
+    obtenerTodos,
+    agregarMesa,
+    liberarMesa
   };
 })();
 
