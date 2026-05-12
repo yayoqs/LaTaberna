@@ -1,18 +1,14 @@
 /* ================================================================
-   Raíz — MÓDULO: db-appwrite.js (v1.1)
-   Propósito: Cliente de Appwrite para sincronización en tiempo real.
-              Colecciones con primera letra mayúscula.
-              databaseId: "LaTaberna-main"
+   Raíz — MÓDULO: db-appwrite.js (v1.4 – Database ID definitivo)
    ================================================================ */
 var DBAppwrite = (function() {
   var module = {};
 
   module.client = null;
   module.databases = null;
-  module.databaseId = 'LaTaberna-main';  // ← Corregido
+  module.databaseId = '6a0275cb0022ebf7d30d';   // ← Database ID correcto
   module.habilitado = false;
 
-  // Colecciones con primera letra mayúscula
   module.COLECCIONES = {
     productos: 'Productos',
     pedidos: 'Pedidos',
@@ -25,14 +21,15 @@ var DBAppwrite = (function() {
     configuracion: 'Configuracion'
   };
 
-  /**
-   * Inicializa el cliente de Appwrite con credenciales guardadas en localStorage.
-   * @returns {Promise<boolean>} true si se conectó correctamente
-   */
   module.init = async function() {
+    if (typeof window.Appwrite === 'undefined') {
+      Logger.warn('[Appwrite] SDK no cargado.');
+      module.habilitado = false;
+      return false;
+    }
+
     var habilitado = localStorage.getItem('appwrite_habilitado') === 'true';
     if (!habilitado) {
-      Logger.info('[Appwrite] Desactivado por configuración. Usando Google Sheets.');
       module.habilitado = false;
       return false;
     }
@@ -42,19 +39,17 @@ var DBAppwrite = (function() {
     var apiKey = localStorage.getItem('appwrite_api_key') || '';
 
     if (!projectId || !apiKey) {
-      Logger.warn('[Appwrite] Sin credenciales completas. Usando Google Sheets.');
+      Logger.warn('[Appwrite] Sin credenciales completas.');
       module.habilitado = false;
       return false;
     }
 
     try {
-      module.client = new Appwrite.Client();
-      module.client
+      module.client = new Appwrite.Client()
         .setEndpoint(endpoint)
-        .setProject(projectId)
-        .setKey(apiKey);
+        .setProject(projectId);
 
-      module.databases = new Appwrite.Databases(module.client);
+      module.databases = new Appwrite.Databases(module.client, apiKey);
       module.habilitado = true;
       Logger.info('[Appwrite] Cliente inicializado correctamente.');
       return true;
@@ -65,11 +60,6 @@ var DBAppwrite = (function() {
     }
   };
 
-  /**
-   * Obtiene todos los documentos de una colección.
-   * @param {string} coleccion - nombre interno (minúsculas)
-   * @returns {Promise<Array>} array de documentos planos
-   */
   module.listar = async function(coleccion) {
     if (!module.habilitado || !module.databases) return [];
     try {
@@ -94,12 +84,6 @@ var DBAppwrite = (function() {
     }
   };
 
-  /**
-   * Crea un documento en una colección.
-   * @param {string} coleccion
-   * @param {object} datos
-   * @returns {Promise<object|null>}
-   */
   module.crear = async function(coleccion, datos) {
     if (!module.habilitado || !module.databases) return null;
     try {
@@ -119,13 +103,6 @@ var DBAppwrite = (function() {
     }
   };
 
-  /**
-   * Actualiza un documento existente.
-   * @param {string} coleccion
-   * @param {string} id
-   * @param {object} cambios
-   * @returns {Promise<object|null>}
-   */
   module.actualizar = async function(coleccion, id, cambios) {
     if (!module.habilitado || !module.databases) return null;
     try {
@@ -144,12 +121,6 @@ var DBAppwrite = (function() {
     }
   };
 
-  /**
-   * Elimina un documento.
-   * @param {string} coleccion
-   * @param {string} id
-   * @returns {Promise<boolean>}
-   */
   module.eliminar = async function(coleccion, id) {
     if (!module.habilitado || !module.databases) return false;
     try {
@@ -165,18 +136,10 @@ var DBAppwrite = (function() {
     }
   };
 
-  // ── REALTIME ─────────────────────────────────────────────────
   var _realtimeCallbacks = [];
-
-  /**
-   * Se suscribe a cambios en tiempo real de las colecciones relevantes.
-   * @param {function} onCambio - función que se llama con { coleccion, tipo, datos }
-   */
   module.suscribirRealtime = function(onCambio) {
     if (!module.habilitado || !module.client) return;
-
     _realtimeCallbacks.push(onCambio);
-
     var canales = [
       'databases.' + module.databaseId + '.collections.' + module.COLECCIONES.pedidos + '.documents',
       'databases.' + module.databaseId + '.collections.' + module.COLECCIONES.comandas + '.documents'
@@ -184,24 +147,15 @@ var DBAppwrite = (function() {
 
     try {
       var realtime = new Appwrite.Realtime(module.client);
-
       canales.forEach(function(canal) {
         realtime.subscribe(canal, function(payload) {
-          Logger.debug('[Appwrite Realtime] Evento recibido:', payload.events, payload.payload);
-          var coleccion = '';
-          if (canal.indexOf('Pedidos') !== -1) coleccion = 'pedidos';
-          else if (canal.indexOf('Comandas') !== -1) coleccion = 'comandas';
-
+          var coleccion = canal.indexOf('Pedidos') !== -1 ? 'pedidos' : 'comandas';
           var tipo = 'update';
           if (payload.events.includes('create')) tipo = 'create';
           else if (payload.events.includes('delete')) tipo = 'delete';
-
-          _realtimeCallbacks.forEach(function(cb) {
-            cb(coleccion, tipo, payload.payload);
-          });
+          _realtimeCallbacks.forEach(function(cb) { cb(coleccion, tipo, payload.payload); });
         });
       });
-
       Logger.info('[Appwrite] Suscripciones Realtime activas.');
     } catch (e) {
       Logger.warn('[Appwrite] No se pudo activar Realtime:', e.message);

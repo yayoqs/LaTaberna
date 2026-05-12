@@ -1,0 +1,27 @@
+{
+  "name": "lataberna",
+  "version": "1.0.0",
+  "description": "Sistema POS (Punto de Venta) completo para pub restaurant. Gestión de mesas, toma de pedidos, monitor de cocina (KDS) y emisión de tickets de 80mm. Funciona **100% sin conexión a internet** una vez descargado (las fuentes e íconos son locales).",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yayoqs/LaTaberna.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/yayoqs/LaTaberna/issues"
+  },
+  "homepage": "https://github.com/yayoqs/LaTaberna#readme",
+  "dependencies": {
+    "appwrite": "^25.0.0"
+  }
+}
