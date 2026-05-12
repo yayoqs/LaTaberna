@@ -16,7 +16,7 @@ var DBAppwrite = (function() {
     comandas: 'Comandas',
     ingredientes: 'Ingredientes',
     recetas: 'Recetas',
-    pedidos_delivery: 'Pedidos_delivery',
+    pedidos_delivery: 'Pedidos-delivery',
     usuarios: 'Usuarios',
     configuracion: 'Configuracion'
   };

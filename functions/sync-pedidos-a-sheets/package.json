@@ -1,0 +1,10 @@
+{
+  "name": "sync-pedidos-a-sheets",
+  "version": "1.0.0",
+  "description": "Función de Appwrite que sincroniza la colección Pedidos hacia Google Sheets",
+  "main": "index.js",
+  "dependencies": {
+    "node-appwrite": "^14.2.0",
+    "googleapis": "^144.0.0"
+  }
+}
