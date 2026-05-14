@@ -4,7 +4,7 @@
 window.DBSync = (function() {
   const module = {};
 
-  module.urlSheets = "https://script.google.com/macros/s/AKfycbzbLLE-lJJRyeHpLTxyvtI7hganGCLHOd9EJJmNqAQBPUz22KfFBW_JZIpX1kq7t7tZcQ/exec";
+  module.urlSheets = "https://script.google.com/macros/s/AKfycbyChxMapLHKxlXHMRyi75mwsJLkjHOPyLmgStFLbt50eXAGHPats7LHcUp8gGJst0xKZA/exec";
 
   module.syncQueue = [];
 
