@@ -8,7 +8,7 @@
   <!-- FontAwesome desde CDN -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-  <!-- SDK de Appwrite local (instalado con npm en Termux) -->
+  <!-- SDK de Appwrite (cargado desde local) -->
   <script src="js/appwrite.min.js"></script>
 
   <!-- CSS Modular -->
@@ -35,22 +35,7 @@
     .cierre-persona-group { margin-bottom: 12px; border-bottom: 1px dashed var(--color-border); }
     .cierre-persona-header { font-weight: bold; display: flex; justify-content: space-between; }
     .pago-persona-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; }
-    
-    #syncPendingBadge {
-      display: none;
-      background: var(--color-warning);
-      color: #000;
-      font-size: 11px;
-      font-weight: 700;
-      padding: 2px 8px;
-      border-radius: 99px;
-      margin-right: 12px;
-      cursor: default;
-      white-space: nowrap;
-      align-items: center;
-      gap: 4px;
-    }
-    #syncPendingBadge i { font-size: 12px; }
+
     #syncStatusIndicator { margin-right: 8px; font-size: 14px; }
 
     #espacioSelectorContainer {
@@ -121,28 +106,10 @@
 
     <div class="header-right">
       <span id="syncStatusIndicator" title="Sin sincronizar"><i class="fas fa-sync-alt"></i></span>
-      <span id="syncPendingBadge" title="Cambios pendientes de sincronización">
-        <i class="fas fa-cloud-upload-alt"></i><span id="syncPendingCount">0</span>
-      </span>
-
-      <!-- Botón de Appwrite (solo admin/master) -->
-      <button class="btn-secondary" onclick="ConfigAppwrite.abrirModal()" title="Configurar Appwrite" 
-              style="padding:6px 10px; margin-right:8px;" data-rol="admin,master">
-        <i class="fas fa-cloud"></i>
-      </button>
-
-      <div id="espacioSelectorContainer"></div>
-
-      <button class="btn-secondary" onclick="App.cerrarTurnoApp()" title="Cerrar Turno" style="padding:6px 10px;" data-rol="admin,master">
-        <i class="fas fa-door-closed"></i><span> Cerrar Turno</span>
-      </button>
       <span id="usuarioActualDisplay" style="margin:0 12px; font-size:13px; color:var(--color-text-sec);"></span>
       <button class="btn-secondary" onclick="Auth.logout()" title="Cerrar sesión" style="padding:6px 10px;">
         <i class="fas fa-sign-out-alt"></i>
       </button>
-      <div class="mozo-selector">
-        <!-- dinámico -->
-      </div>
     </div>
   </header>
 
@@ -156,13 +123,12 @@
   <script src="js/lib/deps.js"></script>
 
   <script src="js/db-core.js"></script>
-  <script src="js/db-sync.js"></script>
   <script src="js/db-inventario.js"></script>
   <script src="js/db-fusion.js"></script>
+  <script src="js/db-shim.js"></script>
   <script src="js/db-appwrite.js"></script>
   <script src="js/db.js"></script>
-  <script src="js/sync-service.js"></script>
-
+  <script src="js/lib/loader.js"></script>
   <script src="js/roles.js"></script>
   <script src="js/auth.js"></script>
 
@@ -197,7 +163,6 @@
   <script src="js/ui/caja.js"></script>
   <script src="js/ui/tickets.js"></script>
   <script src="js/ui/config.js"></script>
-  <script src="js/ui/config-appwrite.js"></script>
   <script src="js/ui/despensa.js"></script>
   <script src="js/ui/recetas.js"></script>
   <script src="js/ui/reparto.js"></script>

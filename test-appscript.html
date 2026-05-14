@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test de Conexión Google Apps Script</title>
+  <style>
+    body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
+    h1 { color: #f59e0b; }
+    .test { margin: 4px 0; padding: 4px 8px; border-radius: 4px; }
+    .pass { background: rgba(34,197,94,.2); }
+    .fail { background: rgba(239,68,68,.2); }
+    .info { color: #94a3b8; font-size: 12px; margin: 2px 0; }
+    button { margin-top: 16px; padding: 12px 24px; background: #f59e0b; color: #000; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test de Conexión con Google Apps Script</h1>
+  <p class="info">Verifica que la URL del script esté activa y responda correctamente.</p>
+  <div id="results"></div>
+  <button onclick="location.reload()">🔄 Probar de nuevo</button>
+
+  <script>
+    (function() {
+      var resultsEl = document.getElementById('results');
+      var passed = 0, failed = 0;
+
+      function assert(condition, msg) {
+        if (condition) {
+          passed++;
+          resultsEl.innerHTML += '<div class="test pass">✔ ' + msg + '</div>';
+        } else {
+          failed++;
+          resultsEl.innerHTML += '<div class="test fail">✘ ' + msg + '</div>';
+        }
+      }
+
+      async function runTests() {
+        resultsEl.innerHTML = '';
+
+        // La URL que se usará (debe coincidir con la del shim)
+        var urlSheets = 'https://script.google.com/macros/s/AKfycbx0oOw0_HydwkJpwHMBtjGedXTMfqk6_tUIIrGz94JdzURC9CT1M73ap5IU_apEf5190A/exec';
+
+        resultsEl.innerHTML += '<div class="info">URL base: ' + urlSheets + '</div>';
+
+        // 1. Probar si la URL responde con una solicitud GET simple
+        resultsEl.innerHTML += '<h2>1. Verificación de disponibilidad</h2>';
+        try {
+          var controller = new AbortController();
+          var timeoutId = setTimeout(function() { controller.abort(); }, 10000);
+          var res = await fetch(urlSheets + '?action=ping', { mode: 'cors', signal: controller.signal });
+          clearTimeout(timeoutId);
+          assert(res.ok, 'El servidor responde (HTTP ' + res.status + ')');
+          var text = await res.text();
+          assert(true, 'Respuesta obtenida: ' + text.substring(0, 100));
+        } catch (e) {
+          assert(false, 'Error de conexión: ' + e.message);
+        }
+
+        // 2. Probar específicamente la llamada a getEventos (que es la que falla)
+        resultsEl.innerHTML += '<h2>2. Llamada a getEventos</h2>';
+        try {
+          var res2 = await fetch(urlSheets + '?action=getEventos', { mode: 'cors' });
+          if (res2.ok) {
+            var data = await res2.json();
+            assert(Array.isArray(data.eventos), 'getEventos devuelve array de eventos (longitud: ' + data.eventos.length + ')');
+          } else {
+            assert(false, 'Respuesta no OK: HTTP ' + res2.status);
+          }
+        } catch (e) {
+          assert(false, 'Error en getEventos: ' + e.message);
+        }
+
+        resultsEl.innerHTML += '<h2>Resultado</h2>';
+        resultsEl.innerHTML += '<p>' + passed + ' pasaron, ' + failed + ' fallaron.</p>';
+      }
+
+      window.addEventListener('load', function() {
+        runTests().catch(function(e) {
+          resultsEl.innerHTML += '<div class="fail">Error inesperado: ' + e.message + '</div>';
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

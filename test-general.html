@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test General - La Taberna</title>
+  <style>
+    body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
+    h1 { color: #f59e0b; }
+    h2 { color: #94a3b8; margin-top: 24px; }
+    .test { margin: 4px 0; padding: 4px 8px; border-radius: 4px; }
+    .pass { background: rgba(34,197,94,.2); }
+    .fail { background: rgba(239,68,68,.2); }
+    .info { color: #94a3b8; font-size: 12px; margin: 2px 0; }
+    button { margin-top: 16px; padding: 12px 24px; background: #f59e0b; color: #000; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test General de Carga y Funcionamiento</h1>
+  <p class="info">Verifica que todos los scripts y módulos funcionen sin errores.</p>
+  <div id="results"></div>
+  <button onclick="location.reload()">🔄 Ejecutar de nuevo</button>
+
+  <!-- Cargar exactamente los mismos scripts que index.html, en orden -->
+  <script src="js/utils.js"></script>
+  <script src="js/lib/logger.js"></script>
+  <script src="js/lib/eventBus.js"></script>
+  <script src="js/lib/command-bus.js"></script>
+  <script src="js/lib/store.js"></script>
+  <script src="js/lib/deps.js"></script>
+  <script src="js/db-core.js"></script>
+  <script src="js/db-inventario.js"></script>
+  <script src="js/db-fusion.js"></script>
+  <script src="js/appwrite.min.js"></script>
+  <script src="js/db-appwrite.js"></script>
+  <script src="js/db.js"></script>
+
+  <script>
+    (function() {
+      var resultsEl = document.getElementById('results');
+      var passed = 0, failed = 0;
+
+      function assert(condition, msg) {
+        if (condition) {
+          passed++;
+          resultsEl.innerHTML += '<div class="test pass">✔ ' + msg + '</div>';
+        } else {
+          failed++;
+          resultsEl.innerHTML += '<div class="test fail">✘ ' + msg + '</div>';
+        }
+      }
+
+      async function runTests() {
+        resultsEl.innerHTML = '';
+
+        // 1. Verificar funciones globales de utils.js
+        resultsEl.innerHTML += '<h2>1. Utilidades globales</h2>';
+        assert(typeof $id === 'function', '$id está definido');
+        assert(typeof fmtMoney === 'function', 'fmtMoney está definido');
+        assert(typeof showToast === 'function', 'showToast está definido');
+        assert(typeof calcularTotal === 'function', 'calcularTotal está definido');
+        assert(typeof fmtHoraCorta === 'function', 'fmtHoraCorta está definido');
+
+        // 2. Verificar módulos del núcleo
+        resultsEl.innerHTML += '<h2>2. Módulos del núcleo</h2>';
+        assert(typeof Logger !== 'undefined', 'Logger existe');
+        assert(typeof EventBus !== 'undefined', 'EventBus existe');
+        assert(typeof Store !== 'undefined', 'Store existe');
+        assert(typeof CommandBus !== 'undefined', 'CommandBus existe');
+        assert(typeof Deps !== 'undefined', 'Deps existe');
+
+        // 3. Verificar módulos de base de datos
+        resultsEl.innerHTML += '<h2>3. Base de datos</h2>';
+        assert(typeof DB !== 'undefined', 'DB existe');
+        assert(typeof DBAppwrite !== 'undefined', 'DBAppwrite existe');
+
+        // 4. Verificar que Appwrite SDK está disponible
+        resultsEl.innerHTML += '<h2>4. SDK Appwrite</h2>';
+        assert(typeof Appwrite !== 'undefined', 'Appwrite SDK cargado');
+
+        // 5. Probar inicialización de Appwrite
+        resultsEl.innerHTML += '<h2>5. Inicialización de Appwrite</h2>';
+        var appwriteOk = false;
+        try {
+          appwriteOk = await DBAppwrite.init();
+          assert(appwriteOk === true, 'DBAppwrite.init() retorna true');
+        } catch (e) {
+          assert(false, 'Error en DBAppwrite.init: ' + e.message);
+        }
+
+        // 6. Probar listado de una colección (productos)
+        if (appwriteOk) {
+          resultsEl.innerHTML += '<h2>6. Lectura de datos desde Appwrite</h2>';
+          try {
+            var productos = await DBAppwrite.listar('productos');
+            assert(Array.isArray(productos), 'Listado de productos obtenido (' + productos.length + ' productos)');
+          } catch (e) {
+            assert(false, 'Error al listar productos: ' + e.message);
+          }
+        }
+
+        // 7. Simular acciones del Store y verificar que los listeners no fallen
+        resultsEl.innerHTML += '<h2>7. Store y listeners</h2>';
+        var listenerError = null;
+        var testListener = function(state, action) {
+          try {
+            // Intentar usar $id para ver si falla
+            if (typeof $id === 'function') {
+              $id('results'); // solo para probar que $id funciona
+            }
+          } catch (e) {
+            listenerError = e.message;
+          }
+        };
+        Store.subscribe(testListener);
+
+        Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: [] });
+        Store.dispatch({ type: 'PEDIDOS_INICIALIZAR', payload: [] });
+        Store.dispatch({ type: 'PRODUCTOS_INICIALIZAR', payload: [] });
+
+        if (listenerError) {
+          assert(false, 'Error en listener del Store: ' + listenerError);
+        } else {
+          assert(true, 'Store despacha acciones sin errores en listeners');
+        }
+
+        // 8. Verificar que EventBus funciona sin errores
+        resultsEl.innerHTML += '<h2>8. EventBus</h2>';
+        var eventError = null;
+        EventBus.on('test:evento', function() {
+          try {
+            if (typeof $id !== 'function') throw new Error('$id no definido en handler de EventBus');
+          } catch (e) {
+            eventError = e.message;
+          }
+        });
+        EventBus.emit('test:evento', {});
+        if (eventError) {
+          assert(false, 'Error en handler de EventBus: ' + eventError);
+        } else {
+          assert(true, 'EventBus emite y maneja eventos sin errores');
+        }
+
+        resultsEl.innerHTML += '<h2>Resultado</h2>';
+        resultsEl.innerHTML += '<p>' + passed + ' pruebas pasaron, ' + failed + ' fallaron.</p>';
+      }
+
+      window.addEventListener('load', function() {
+        runTests().catch(function(e) {
+          resultsEl.innerHTML += '<div class="test fail">Error global: ' + e.message + '</div>';
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

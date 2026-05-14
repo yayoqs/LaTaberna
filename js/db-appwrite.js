@@ -1,12 +1,15 @@
 /* ================================================================
-   Raíz — MÓDULO: db-appwrite.js (v1.4 – Database ID definitivo)
+   Raíz — MÓDULO: db-appwrite.js (v2.0 – Realtime automático)
+   Propósito: Cliente de Appwrite para sincronización en tiempo real.
+              Ahora incluye la inicialización del Realtime que antes
+              estaba en sync-service.js.
    ================================================================ */
 var DBAppwrite = (function() {
   var module = {};
 
   module.client = null;
   module.databases = null;
-  module.databaseId = '6a0275cb0022ebf7d30d';   // ← Database ID correcto
+  module.databaseId = '6a0275cb0022ebf7d30d';
   module.habilitado = false;
 
   module.COLECCIONES = {
@@ -16,7 +19,7 @@ var DBAppwrite = (function() {
     comandas: 'Comandas',
     ingredientes: 'Ingredientes',
     recetas: 'Recetas',
-    pedidos_delivery: 'Pedidos-delivery',
+    pedidos_delivery: 'Pedidos_delivery',
     usuarios: 'Usuarios',
     configuracion: 'Configuracion'
   };
@@ -136,10 +139,14 @@ var DBAppwrite = (function() {
     }
   };
 
+  // ── REALTIME ─────────────────────────────────────────────────
   var _realtimeCallbacks = [];
+
   module.suscribirRealtime = function(onCambio) {
     if (!module.habilitado || !module.client) return;
+
     _realtimeCallbacks.push(onCambio);
+
     var canales = [
       'databases.' + module.databaseId + '.collections.' + module.COLECCIONES.pedidos + '.documents',
       'databases.' + module.databaseId + '.collections.' + module.COLECCIONES.comandas + '.documents'
@@ -147,19 +154,76 @@ var DBAppwrite = (function() {
 
     try {
       var realtime = new Appwrite.Realtime(module.client);
+
       canales.forEach(function(canal) {
         realtime.subscribe(canal, function(payload) {
-          var coleccion = canal.indexOf('Pedidos') !== -1 ? 'pedidos' : 'comandas';
+          Logger.debug('[Appwrite Realtime] Evento recibido:', payload.events, payload.payload);
+          var coleccion = '';
+          if (canal.indexOf('Pedidos') !== -1) coleccion = 'pedidos';
+          else if (canal.indexOf('Comandas') !== -1) coleccion = 'comandas';
+
           var tipo = 'update';
           if (payload.events.includes('create')) tipo = 'create';
           else if (payload.events.includes('delete')) tipo = 'delete';
-          _realtimeCallbacks.forEach(function(cb) { cb(coleccion, tipo, payload.payload); });
+
+          _realtimeCallbacks.forEach(function(cb) {
+            cb(coleccion, tipo, payload.payload);
+          });
         });
       });
+
       Logger.info('[Appwrite] Suscripciones Realtime activas.');
     } catch (e) {
       Logger.warn('[Appwrite] No se pudo activar Realtime:', e.message);
     }
+  };
+
+  /**
+   * Inicia el Realtime con el callback que actualiza el Store y la UI.
+   * Reemplaza la funcionalidad que antes tenía sync-service.js.
+   */
+  module.iniciarRealtime = function() {
+    if (!module.habilitado) return;
+
+    module.suscribirRealtime(function(coleccion, tipo) {
+      Logger.debug('[Appwrite Realtime] Cambio en ' + coleccion + ' (' + tipo + ')');
+
+      if (coleccion === 'pedidos') {
+        module.listar('pedidos').then(function(pedidos) {
+          if (pedidos.length) {
+            window.DB.pedidos = pedidos.map(function(p) {
+              p.items = typeof p.items === 'string' ? p.items : JSON.stringify(p.items);
+              return p;
+            });
+            window.DB.savePedidos();
+            if (typeof Store !== 'undefined') {
+              Store.dispatch({ type: 'PEDIDOS_INICIALIZAR', payload: window.DB.pedidos });
+            }
+            EventBus.emit('sincronizacion:completada');
+          }
+        }).catch(function(e) {
+          Logger.warn('[Appwrite Realtime] Error al listar pedidos:', e);
+        });
+      } else if (coleccion === 'comandas') {
+        module.listar('comandas').then(function(comandas) {
+          if (comandas.length) {
+            window.DB.comandas = comandas.map(function(c) {
+              c.items = typeof c.items === 'string' ? JSON.parse(c.items) : c.items;
+              return c;
+            });
+            window.DB.saveComandas();
+            comandas.forEach(function(c) {
+              if (typeof Store !== 'undefined') {
+                Store.dispatch({ type: 'COMANDA_AGREGADA', payload: c });
+              }
+            });
+            EventBus.emit('comandas:guardadas', window.DB.comandas);
+          }
+        }).catch(function(e) {
+          Logger.warn('[Appwrite Realtime] Error al listar comandas:', e);
+        });
+      }
+    });
   };
 
   return module;

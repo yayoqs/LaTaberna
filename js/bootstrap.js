@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: bootstrap.js (v2.0 – SyncService integrado)
+   Raíz — MÓDULO: bootstrap.js (v3.0 – Appwrite puro)
    ================================================================ */
 const Bootstrap = (() => {
 
@@ -17,7 +17,7 @@ const Bootstrap = (() => {
       return;
     }
 
-    // ── 2. Base de datos ──────────────────────────────────
+    // ── 2. Base de datos (Appwrite) ───────────────────────
     try {
       await DB.init();
       Logger.info('[Bootstrap] DB lista.');
@@ -62,16 +62,15 @@ const Bootstrap = (() => {
         if (idx >= 0) {
           DB.pedidosDelivery[idx] = { ...DB.pedidosDelivery[idx], ...datos };
         }
-        DB.savePedidosDelivery();
+        // En Appwrite, ya se guardó directamente desde la app cuando se creó
       }
     };
 
     const inventarioRepo = {
       async guardarIngrediente(datos) {
-        if (typeof DB.syncGuardarIngrediente !== 'function') {
-          throw new Error('DB.syncGuardarIngrediente no disponible');
+        if (typeof DBAppwrite !== 'undefined' && DBAppwrite.habilitado) {
+          await DBAppwrite.crear('ingredientes', datos);
         }
-        await DB.syncGuardarIngrediente(datos);
         return datos;
       },
       async obtenerPorId(id) {
@@ -123,17 +122,13 @@ const Bootstrap = (() => {
       Logger.warn('[Bootstrap] TurnoManager no encontrado.');
     }
 
-    // ── 9. Iniciar SyncService (cola periódica) ───────────
-    try {
-      if (typeof SyncService !== 'undefined') {
-        SyncService.iniciar();
-        Logger.info('[Bootstrap] SyncService iniciado.');
-      }
-    } catch (e) {
-      Logger.warn('[Bootstrap] Error al iniciar SyncService:', e);
+    // ── 9. Iniciar Realtime de Appwrite ───────────────────
+    if (typeof DBAppwrite !== 'undefined' && DBAppwrite.habilitado) {
+      DBAppwrite.iniciarRealtime();
+      Logger.info('[Bootstrap] Realtime de Appwrite iniciado.');
     }
 
-    // ── 10. Inicializar UI ─────────────────────────────────
+    // ── 10. Inicializar UI ────────────────────────────────
     if (typeof App !== 'undefined' && App.init) {
       App.init();
       Logger.info('[Bootstrap] UI iniciada.');
