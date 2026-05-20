@@ -1,162 +1,157 @@
 /* ================================================================
-   Raíz — MÓDULO: puente-appwrite.js (v1.0)
-   Propósito: Redirigir las escrituras de la app hacia Appwrite
-              cuando está habilitado. Parchea DB y PedidoRepository.
+   Raíz — MÓDULO: puente-appwrite.js (v3.1)
+   Propósito: Redirigir escrituras a Appwrite. Debe llamarse
+              explícitamente después de que DBAppwrite esté listo.
    ================================================================ */
-(function() {
-  // Esperar a que DB y DBAppwrite estén listos
-  function parchear() {
-    if (typeof DB === 'undefined' || typeof DBAppwrite === 'undefined') {
-      setTimeout(parchear, 200);
-      return;
+function activarPuenteAppwrite() {
+  if (typeof DB === 'undefined' || typeof DBAppwrite === 'undefined' || !DBAppwrite.habilitado) {
+    Logger.warn('[Puente] No se puede activar aún.');
+    return;
+  }
+
+  // ── PRODUCTOS ──────────────────────────────────────────
+  DB.syncGuardarProducto = async function(producto) {
+    var idx = DB.productos.findIndex(p => p.id === producto.id);
+    if (idx >= 0) DB.productos[idx] = producto;
+    else DB.productos.push(producto);
+
+    var dataSinId = Object.assign({}, producto);
+    delete dataSinId.id;
+
+    try {
+      var existente = await DBAppwrite.listar('productos');
+      var encontrado = existente.find(p => p.id === producto.id);
+      if (encontrado) {
+        await DBAppwrite.actualizar('productos', encontrado.id, dataSinId);
+      } else {
+        var creado = await DBAppwrite.crear('productos', producto.id, dataSinId);
+        if (creado && creado.id && creado.id !== producto.id) {
+          producto.id = creado.id; // actualizar con el $id real si cambió
+          DB.productos = DB.productos.map(p => p.id === producto.id ? producto : p);
+        }
+      }
+    } catch (e) {
+      Logger.error('[Puente] Error guardando producto:', e);
     }
+    EventBus.emit('productos:cargados', DB.productos);
+  };
 
-    // ── PRODUCTOS ──────────────────────────────────────────
-    DB.syncGuardarProducto = async function(producto) {
-      // Actualizar memoria local
-      var idx = DB.productos.findIndex(function(p) { return p.id === producto.id; });
-      if (idx >= 0) DB.productos[idx] = producto;
-      else DB.productos.push(producto);
+  DB.syncEliminarProducto = async function(productoId) {
+    DB.productos = DB.productos.filter(p => p.id !== productoId);
+    try {
+      await DBAppwrite.eliminar('productos', productoId);
+    } catch (e) {
+      Logger.error('[Puente] Error eliminando producto:', e);
+    }
+    EventBus.emit('productos:cargados', DB.productos);
+  };
 
-      if (DBAppwrite.habilitado) {
-        try {
-          // Verificar si existe en Appwrite
-          var existente = await DBAppwrite.listar('productos');
-          var encontrado = existente.find(function(p) { return p.id === producto.id; });
-          if (encontrado) {
-            await DBAppwrite.actualizar('productos', producto.id, producto);
-          } else {
-            await DBAppwrite.crear('productos', producto);
-          }
-        } catch (e) {
-          Logger.error('[Bridge] Error guardando producto en Appwrite:', e);
+  // ── INGREDIENTES ───────────────────────────────────────
+  DB.syncGuardarIngrediente = async function(ingrediente) {
+    var idx = DB.ingredientes.findIndex(i => i.id === ingrediente.id);
+    if (idx >= 0) DB.ingredientes[idx] = ingrediente;
+    else DB.ingredientes.push(ingrediente);
+
+    var dataSinId = Object.assign({}, ingrediente);
+    delete dataSinId.id;
+
+    try {
+      var existente = await DBAppwrite.listar('ingredientes');
+      var encontrado = existente.find(i => i.id === ingrediente.id);
+      if (encontrado) {
+        await DBAppwrite.actualizar('ingredientes', encontrado.id, dataSinId);
+      } else {
+        var creado = await DBAppwrite.crear('ingredientes', ingrediente.id, dataSinId);
+        if (creado && creado.id && creado.id !== ingrediente.id) {
+          ingrediente.id = creado.id;
+          DB.ingredientes = DB.ingredientes.map(i => i.id === ingrediente.id ? ingrediente : i);
         }
       }
-      EventBus.emit('productos:cargados', DB.productos);
-    };
+    } catch (e) {
+      Logger.error('[Puente] Error guardando ingrediente:', e);
+    }
+    DB.saveIngredientes();
+  };
 
-    DB.syncEliminarProducto = async function(productoId) {
-      DB.productos = DB.productos.filter(function(p) { return p.id !== productoId; });
-      if (DBAppwrite.habilitado) {
-        try {
-          await DBAppwrite.eliminar('productos', productoId);
-        } catch (e) {
-          Logger.error('[Bridge] Error eliminando producto en Appwrite:', e);
-        }
+  DB.syncEliminarIngrediente = async function(ingredienteId) {
+    DB.ingredientes = DB.ingredientes.filter(i => i.id !== ingredienteId);
+    try {
+      await DBAppwrite.eliminar('ingredientes', ingredienteId);
+    } catch (e) {
+      Logger.error('[Puente] Error eliminando ingrediente:', e);
+    }
+    DB.saveIngredientes();
+  };
+
+  // ── RECETAS ────────────────────────────────────────────
+  DB.syncGuardarReceta = async function(receta) {
+    var idx = DB.recetas.findIndex(r => r.productoId === receta.productoId);
+    if (idx >= 0) DB.recetas[idx] = receta;
+    else DB.recetas.push(receta);
+
+    var dataSinId = Object.assign({}, receta);
+    delete dataSinId.id;
+
+    try {
+      // Las recetas usan unique() como id
+      var creado = await DBAppwrite.crear('recetas', null, dataSinId);
+      if (creado && creado.id && creado.id !== receta.id) {
+        receta.id = creado.id;
+        DB.recetas = DB.recetas.map(r => r.productoId === receta.productoId ? receta : r);
       }
-      EventBus.emit('productos:cargados', DB.productos);
-    };
+    } catch (e) {
+      Logger.error('[Puente] Error guardando receta:', e);
+    }
+    DB.saveRecetas();
+    EventBus.emit('recetas:actualizadas');
+  };
 
-    // ── INGREDIENTES ───────────────────────────────────────
-    DB.syncGuardarIngrediente = async function(ingrediente) {
-      var idx = DB.ingredientes.findIndex(function(i) { return i.id === ingrediente.id; });
-      if (idx >= 0) DB.ingredientes[idx] = ingrediente;
-      else DB.ingredientes.push(ingrediente);
-
-      if (DBAppwrite.habilitado) {
-        try {
-          var existente = await DBAppwrite.listar('ingredientes');
-          var encontrado = existente.find(function(i) { return i.id === ingrediente.id; });
-          if (encontrado) {
-            await DBAppwrite.actualizar('ingredientes', ingrediente.id, ingrediente);
-          } else {
-            await DBAppwrite.crear('ingredientes', ingrediente);
-          }
-        } catch (e) {
-          Logger.error('[Bridge] Error guardando ingrediente:', e);
-        }
-      }
-      DB.saveIngredientes();
-    };
-
-    DB.syncEliminarIngrediente = async function(ingredienteId) {
-      DB.ingredientes = DB.ingredientes.filter(function(i) { return i.id !== ingredienteId; });
-      if (DBAppwrite.habilitado) {
-        try {
-          await DBAppwrite.eliminar('ingredientes', ingredienteId);
-        } catch (e) {
-          Logger.error('[Bridge] Error eliminando ingrediente:', e);
-        }
-      }
-      DB.saveIngredientes();
-    };
-
-    // ── RECETAS ────────────────────────────────────────────
-    DB.syncGuardarReceta = async function(receta) {
-      if (DBAppwrite.habilitado) {
-        try {
-          await DBAppwrite.crear('recetas', receta);
-        } catch (e) {
-          Logger.error('[Bridge] Error guardando receta:', e);
-        }
-      }
-      // También actualizar localmente
-      var idx = DB.recetas.findIndex(function(r) { return r.productoId === receta.productoId; });
-      if (idx >= 0) DB.recetas[idx] = receta;
-      else DB.recetas.push(receta);
-      DB.saveRecetas();
-      EventBus.emit('recetas:actualizadas');
-    };
-
-    // ── PEDIDOS Y MESAS ────────────────────────────────────
-    // Parchear PedidoRepositoryLocal para que persista en Appwrite
-    if (typeof PedidoRepositoryLocal !== 'undefined') {
-      var repoOriginal = Object.assign({}, PedidoRepositoryLocal);
-
-      // Envolver métodos que modifican mesas/pedidos
-      ['abrirMesa', 'crearPedidoMesa', 'enviarComanda', 'cerrarPedido', 'liberarMesa', 'agregarMesa'].forEach(function(metodo) {
-        var original = PedidoRepositoryLocal[metodo];
-        PedidoRepositoryLocal[metodo] = async function() {
-          var resultado = await original.apply(this, arguments);
-          // Después de la operación local, sincronizar con Appwrite
-          if (DBAppwrite.habilitado && resultado) {
-            try {
-              // Sincronizar mesas
-              var mesasActualizadas = DB.mesas.filter(function(m) {
-                // Solo mesas que no sean virtuales o recién modificadas
-                return !m.esVirtual;
+  // ── PEDIDOS / MESAS / COMANDAS ─────────────────────────
+  if (typeof PedidoRepositoryLocal !== 'undefined') {
+    var metodos = ['abrirMesa', 'crearPedidoMesa', 'enviarComanda', 'cerrarPedido', 'liberarMesa', 'agregarMesa'];
+    metodos.forEach(function(metodo) {
+      var original = PedidoRepositoryLocal[metodo];
+      if (typeof original !== 'function') return;
+      PedidoRepositoryLocal[metodo] = async function() {
+        var resultado = await original.apply(this, arguments);
+        if (DBAppwrite.habilitado && resultado) {
+          try {
+            for (var i = 0; i < DB.mesas.length; i++) {
+              var m = DB.mesas[i];
+              if (m.esVirtual) continue;
+              var dataMesa = Object.assign({}, m);
+              delete dataMesa.numero; // no enviar el id
+              await DBAppwrite.crear('mesas', String(m.numero), dataMesa).catch(function() {
+                return DBAppwrite.actualizar('mesas', String(m.numero), dataMesa);
               });
-              for (var i = 0; i < mesasActualizadas.length; i++) {
-                var mesa = mesasActualizadas[i];
-                await DBAppwrite.actualizar('mesas', String(mesa.numero), mesa).catch(function() {
-                  // Si falla, intentar crear
-                  return DBAppwrite.crear('mesas', mesa);
-                });
-              }
-
-              // Sincronizar pedidos
-              for (var j = 0; j < DB.pedidos.length; j++) {
-                var pedido = DB.pedidos[j];
-                await DBAppwrite.crear('pedidos', pedido).catch(function() {
-                  return DBAppwrite.actualizar('pedidos', pedido.id, pedido);
-                });
-              }
-
-              // Sincronizar comandas
-              for (var k = 0; k < DB.comandas.length; k++) {
-                var comanda = DB.comandas[k];
-                await DBAppwrite.crear('comandas', comanda).catch(function() {
-                  return DBAppwrite.actualizar('comandas', comanda.id, comanda);
-                });
-              }
-            } catch (e) {
-              Logger.error('[Bridge] Error sincronizando pedidos/mesas:', e);
             }
+            for (var j = 0; j < DB.pedidos.length; j++) {
+              var p = DB.pedidos[j];
+              var dataPedido = Object.assign({}, p);
+              delete dataPedido.id;
+              await DBAppwrite.crear('pedidos', p.id, dataPedido).catch(function() {
+                return DBAppwrite.actualizar('pedidos', p.id, dataPedido);
+              });
+            }
+            for (var k = 0; k < DB.comandas.length; k++) {
+              var c = DB.comandas[k];
+              var dataComanda = Object.assign({}, c);
+              delete dataComanda.id;
+              await DBAppwrite.crear('comandas', c.id, dataComanda).catch(function() {
+                return DBAppwrite.actualizar('comandas', c.id, dataComanda);
+              });
+            }
+          } catch (e) {
+            Logger.error('[Puente] Error sincronizando pedidos/mesas/comandas:', e);
           }
-          return resultado;
-        };
-      });
-    }
-
-    Logger.info('[Bridge] Escrituras conectadas a Appwrite.');
-  }
-
-  // Iniciar el parche después de que el DOM esté listo
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() {
-      setTimeout(parchear, 1500); // dar tiempo a que DB.init termine
+        }
+        return resultado;
+      };
     });
-  } else {
-    setTimeout(parchear, 1500);
   }
-})();
+
+  Logger.info('[Puente] Escrituras conectadas a Appwrite.');
+  EventBus.emit('puente:listo');
+}
+
+window.activarPuenteAppwrite = activarPuenteAppwrite;
