@@ -1,11 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: eventos.js (v1.2 – soporte para artista)
-   ================================================================
-   Cambios:
-   • Si el usuario es artista, solo ve sus propios eventos.
-   • Al guardar un evento, se agrega el campo artistaId con el
-     nombre del usuario logueado.
-   • El rol artista también puede crear eventos.
+   Raíz — MÓDULO: eventos.js (v1.3 – usa DB.llamar POST)
    ================================================================ */
 const Eventos = (() => {
 
@@ -49,11 +43,10 @@ const Eventos = (() => {
     if (!tbody) return;
 
     try {
-      const resp = await fetch(`${DB.urlSheets}?action=getEventos`, { mode: 'cors' });
-      const data = await resp.json();
-      let eventos = data.eventos || [];
+      // Usar DB.llamar (POST) en lugar de fetch GET
+      const respuesta = await DB.llamar('getEventos', {});
+      let eventos = respuesta.eventos || [];
 
-      // Si el usuario es artista, filtrar solo sus eventos
       if (Auth.esArtista()) {
         const nombreArtista = Auth.getNombre();
         eventos = eventos.filter(ev => ev.artistaId === nombreArtista);
@@ -147,11 +140,12 @@ const Eventos = (() => {
       personas,
       lugar,
       observaciones,
-      artistaId: Auth.getNombre()  // ← se asocia al artista logueado
+      artistaId: Auth.getNombre()
     };
 
     try {
       showToast('info', '<i class="fas fa-spinner fa-spin"></i> Creando carpeta y documentos...');
+      // Usar DB.llamar (POST) para crear el evento
       const respuesta = await DB.llamar('crearCarpetaEvento', datos);
       if (respuesta.error) {
         showToast('error', `Error: ${respuesta.error}`);
