@@ -1,5 +1,5 @@
 /* ================================================================
-   Raíz — MÓDULO: bootstrap.js (v3.0 – Appwrite puro)
+   Raíz — MÓDULO: bootstrap.js (v3.1 – espera al Loader)
    ================================================================ */
 const Bootstrap = (() => {
 
@@ -62,7 +62,6 @@ const Bootstrap = (() => {
         if (idx >= 0) {
           DB.pedidosDelivery[idx] = { ...DB.pedidosDelivery[idx], ...datos };
         }
-        // En Appwrite, ya se guardó directamente desde la app cuando se creó
       }
     };
 
@@ -152,6 +151,14 @@ const Bootstrap = (() => {
   return { arrancar };
 })();
 
-document.addEventListener('DOMContentLoaded', () => {
-  Bootstrap.arrancar();
+// ── Iniciar todo después de que el Loader confirme las dependencias ──
+document.addEventListener('DOMContentLoaded', function() {
+  if (typeof Loader !== 'undefined') {
+    Loader.cuandoListo(function() {
+      Bootstrap.arrancar();
+    });
+  } else {
+    // Si el loader falla en cargar, arrancar igual después de un pequeño retraso
+    setTimeout(function() { Bootstrap.arrancar(); }, 1000);
+  }
 });

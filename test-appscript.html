@@ -2,27 +2,31 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Test de Conexión Google Apps Script</title>
+  <title>Test de Conexión Apps Script</title>
   <style>
     body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
     h1 { color: #f59e0b; }
+    .suite { margin-bottom: 24px; border-bottom: 1px solid #2e2e42; padding-bottom: 12px; }
     .test { margin: 4px 0; padding: 4px 8px; border-radius: 4px; }
     .pass { background: rgba(34,197,94,.2); }
     .fail { background: rgba(239,68,68,.2); }
+    .summary { margin-top: 20px; font-weight: bold; }
     .info { color: #94a3b8; font-size: 12px; margin: 2px 0; }
     button { margin-top: 16px; padding: 12px 24px; background: #f59e0b; color: #000; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
   </style>
 </head>
 <body>
-  <h1>🧪 Test de Conexión con Google Apps Script</h1>
-  <p class="info">Verifica que la URL del script esté activa y responda correctamente.</p>
+  <h1>🧪 Test de Funciones de Google Apps Script</h1>
+  <p class="info">Verifica que las funciones necesarias (getEventos, getDocumentosUsuario, guardarCierreTurno) respondan correctamente.</p>
   <div id="results"></div>
-  <button onclick="location.reload()">🔄 Probar de nuevo</button>
+  <button onclick="location.reload()">🔄 Ejecutar de nuevo</button>
 
   <script>
     (function() {
       var resultsEl = document.getElementById('results');
       var passed = 0, failed = 0;
+      // La URL del script (debe ser exactamente la misma que en db-shim.js)
+      var URL_SCRIPT = 'https://script.google.com/macros/s/AKfycbwdg8Nrm-bwMGfb0VnphYcIlviVC2jcpKTSJVxYd7ygp1Nr8umOGHTNYcs3DRcbJoFceA/exec';
 
       function assert(condition, msg) {
         if (condition) {
@@ -34,51 +38,67 @@
         }
       }
 
+      async function testFunction(action, payload) {
+        var controller = new AbortController();
+        var timeoutId = setTimeout(function() { controller.abort(); }, 10000);
+        try {
+          var data = Object.assign({}, payload, { action: action });
+          var param = encodeURIComponent(JSON.stringify(data));
+          var url = URL_SCRIPT + '?json=' + param;
+          var res = await fetch(url, { signal: controller.signal, mode: 'cors' });
+          clearTimeout(timeoutId);
+          if (!res.ok) throw new Error('HTTP ' + res.status);
+          var json = await res.json();
+          return { ok: true, data: json };
+        } catch (e) {
+          clearTimeout(timeoutId);
+          return { ok: false, error: e.message };
+        }
+      }
+
       async function runTests() {
         resultsEl.innerHTML = '';
 
-        // La URL que se usará (debe coincidir con la del shim)
-        var urlSheets = 'https://script.google.com/macros/s/AKfycbx0oOw0_HydwkJpwHMBtjGedXTMfqk6_tUIIrGz94JdzURC9CT1M73ap5IU_apEf5190A/exec';
-
-        resultsEl.innerHTML += '<div class="info">URL base: ' + urlSheets + '</div>';
-
-        // 1. Probar si la URL responde con una solicitud GET simple
-        resultsEl.innerHTML += '<h2>1. Verificación de disponibilidad</h2>';
-        try {
-          var controller = new AbortController();
-          var timeoutId = setTimeout(function() { controller.abort(); }, 10000);
-          var res = await fetch(urlSheets + '?action=ping', { mode: 'cors', signal: controller.signal });
-          clearTimeout(timeoutId);
-          assert(res.ok, 'El servidor responde (HTTP ' + res.status + ')');
-          var text = await res.text();
-          assert(true, 'Respuesta obtenida: ' + text.substring(0, 100));
-        } catch (e) {
-          assert(false, 'Error de conexión: ' + e.message);
+        // 1. getEventos
+        resultsEl.innerHTML += '<h2>1. getEventos</h2>';
+        var res1 = await testFunction('getEventos', {});
+        assert(res1.ok, 'Conexión establecida');
+        if (res1.ok && !res1.data.error) {
+          assert(Array.isArray(res1.data.eventos), 'Respuesta contiene array de eventos (' + res1.data.eventos.length + ')');
+        } else {
+          assert(false, 'Error en getEventos: ' + (res1.data?.error || res1.error));
         }
 
-        // 2. Probar específicamente la llamada a getEventos (que es la que falla)
-        resultsEl.innerHTML += '<h2>2. Llamada a getEventos</h2>';
-        try {
-          var res2 = await fetch(urlSheets + '?action=getEventos', { mode: 'cors' });
-          if (res2.ok) {
-            var data = await res2.json();
-            assert(Array.isArray(data.eventos), 'getEventos devuelve array de eventos (longitud: ' + data.eventos.length + ')');
-          } else {
-            assert(false, 'Respuesta no OK: HTTP ' + res2.status);
-          }
-        } catch (e) {
-          assert(false, 'Error en getEventos: ' + e.message);
+        // 2. getDocumentosUsuario (requiere un usuario existente)
+        resultsEl.innerHTML += '<h2>2. getDocumentosUsuario</h2>';
+        var res2 = await testFunction('getDocumentosUsuario', { usuario: 'admin' });
+        assert(res2.ok, 'Conexión establecida');
+        if (res2.ok && !res2.data.error) {
+          assert(Array.isArray(res2.data.documentos), 'Respuesta contiene array de documentos');
+        } else {
+          assert(false, 'Error en getDocumentosUsuario: ' + (res2.data?.error || res2.error));
         }
 
-        resultsEl.innerHTML += '<h2>Resultado</h2>';
-        resultsEl.innerHTML += '<p>' + passed + ' pasaron, ' + failed + ' fallaron.</p>';
+        // 3. guardarCierreTurno (solo probar que la función existe, sin datos reales)
+        resultsEl.innerHTML += '<h2>3. guardarCierreTurno</h2>';
+        var res3 = await testFunction('guardarCierreTurno', {
+          turnoId: 'test_' + Date.now(),
+          inicio: new Date().toISOString(),
+          cierre: new Date().toISOString(),
+          pedidos: [],
+          auditLog: []
+        });
+        assert(res3.ok, 'Conexión establecida');
+        if (res3.ok && !res3.data.error) {
+          assert(typeof res3.data.urlArchivo === 'string', 'Devuelve urlArchivo');
+        } else {
+          assert(false, 'Error en guardarCierreTurno: ' + (res3.data?.error || res3.error));
+        }
+
+        resultsEl.innerHTML += '<div class="summary">' + passed + ' pasaron, ' + failed + ' fallaron</div>';
       }
 
-      window.addEventListener('load', function() {
-        runTests().catch(function(e) {
-          resultsEl.innerHTML += '<div class="fail">Error inesperado: ' + e.message + '</div>';
-        });
-      });
+      window.addEventListener('load', runTests);
     })();
   </script>
 </body>

@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Debug Apps Script (POST)</title>
+  <style>
+    body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
+    h1 { color: #f59e0b; }
+    .test { margin: 4px 0; padding: 4px 8px; border-radius: 4px; }
+    .pass { background: rgba(34,197,94,.2); }
+    .fail { background: rgba(239,68,68,.2); }
+    pre { background: #111; padding: 10px; white-space: pre-wrap; word-wrap: break-word; }
+    button { margin-top: 16px; padding: 12px 24px; background: #f59e0b; color: #000; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Debug de Conexión a Google Apps Script (POST)</h1>
+  <div id="results"></div>
+  <button onclick="location.reload()">🔄 Ejecutar de nuevo</button>
+
+  <script>
+    (function() {
+      var resultsEl = document.getElementById('results');
+      var URL_SCRIPT = 'https://script.google.com/macros/s/AKfycbyYxK0vSYRkYQ_8BqkPgT7iSQ7pW-G-2e6PVhsunptWesEonm8UE2UkirfdQAU74Q4WCw/exec';
+
+      function log(msg) {
+        resultsEl.innerHTML += '<div>' + msg + '</div>';
+      }
+
+      async function testPost(action, payload) {
+        var data = Object.assign({}, payload, { action: action });
+        log('<strong>Enviando a:</strong> ' + URL_SCRIPT);
+        log('<strong>Payload:</strong> ' + JSON.stringify(data));
+        try {
+          var res = await fetch(URL_SCRIPT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify(data),
+            mode: 'cors'
+          });
+          log('<strong>Status:</strong> ' + res.status + ' ' + res.statusText);
+          var text = await res.text();
+          log('<strong>Respuesta:</strong>');
+          log('<pre>' + text + '</pre>');
+        } catch(e) {
+          log('❌ Error: ' + e.message);
+        }
+      }
+
+      async function runTests() {
+        resultsEl.innerHTML = '';
+        log('<h2>1. getEventos</h2>');
+        await testPost('getEventos', {});
+
+        log('<h2>2. getDocumentosUsuario</h2>');
+        await testPost('getDocumentosUsuario', { usuario: 'admin' });
+
+        log('<h2>3. guardarCierreTurno</h2>');
+        await testPost('guardarCierreTurno', { turnoId: 'test_123', inicio: '2026-01-01', cierre: '2026-01-01', pedidos: '[]', auditLog: '[]' });
+      }
+
+      window.addEventListener('load', runTests);
+    })();
+  </script>
+</body>
+</html>
