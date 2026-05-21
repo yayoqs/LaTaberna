@@ -9,7 +9,7 @@ var DBShim = (function() {
   var module = {};
 
   // URL del Google Apps Script (debe coincidir con tu despliegue)
-  module.urlSheets = 'https://script.google.com/macros/s/AKfycbyYxK0vSYRkYQ_8BqkPgT7iSQ7pW-G-2e6PVhsunptWesEonm8UE2UkirfdQAU74Q4WCw/exec';
+  module.urlSheets = 'https://script.google.com/macros/s/AKfycbw2hRaJTCPx6WM0MK2g7dCgrbIUd3CavINAxFWoRjy-tytyIUh9t1THI1RjEngPCoUY/exec';
 
   /**
    * Llama a una función del Google Apps Script (eventos, perfil, cierre de turno).

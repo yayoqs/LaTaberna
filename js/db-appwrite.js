@@ -1,5 +1,9 @@
 /* ================================================================
-   Raíz — MÓDULO: db-appwrite.js (v2.1)
+   Raíz — MÓDULO: db-appwrite.js (v2.3)
+   Propósito: Cliente de Appwrite. Al recibir un evento Realtime
+              (cambio en pedidos o comandas), además de actualizar
+              el Store, envía una notificación a Google Apps Script
+              para que actualice Sheets.
    ================================================================ */
 var DBAppwrite = (function() {
   var module = {};
@@ -20,6 +24,9 @@ var DBAppwrite = (function() {
     usuarios: 'Usuarios',
     configuracion: 'Configuracion'
   };
+
+  // URL del Google Apps Script (debe coincidir con la última implementación)
+  var URL_SCRIPT = 'https://script.google.com/macros/s/AKfycbw2hRaJTCPx6WM0MK2g7dCgrbIUd3CavINAxFWoRjy-tytyIUh9t1THI1RjEngPCoUY/exec';
 
   module.init = async function() {
     if (typeof window.Appwrite === 'undefined') {
@@ -93,7 +100,9 @@ var DBAppwrite = (function() {
       data.id = response.$id;
       return data;
     } catch (e) {
-      Logger.error('[Appwrite] Error al crear en ' + coleccion + ':', e);
+      if (e.code !== 409) {
+        Logger.error('[Appwrite] Error al crear en ' + coleccion + ':', e);
+      }
       return null;
     }
   };
@@ -111,7 +120,9 @@ var DBAppwrite = (function() {
       data.id = response.$id;
       return data;
     } catch (e) {
-      Logger.error('[Appwrite] Error al actualizar ' + coleccion + ':', e);
+      if (e.code !== 404) {
+        Logger.error('[Appwrite] Error al actualizar ' + coleccion + ':', e);
+      }
       return null;
     }
   };
@@ -131,6 +142,27 @@ var DBAppwrite = (function() {
     }
   };
 
+  /**
+   * Notifica al Google Apps Script sobre un cambio en Appwrite
+   * para que actualice Sheets inmediatamente.
+   */
+  function notificarASheets(coleccion, tipo, doc) {
+    if (coleccion !== 'pedidos' && coleccion !== 'comandas' && coleccion !== 'mesas') return; // Solo colecciones que sincronizamos con Sheets
+
+    fetch(URL_SCRIPT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({
+        action: 'syncFromAppwrite',
+        coleccion: coleccion,
+        tipo: tipo,
+        datos: doc
+      })
+    }).catch(function(e) {
+      Logger.warn('[Appwrite] Error al notificar a Sheets:', e);
+    });
+  }
+
   var _realtimeCallbacks = [];
   module.suscribirRealtime = function(onCambio) {
     if (!module.habilitado || !module.client) return;
@@ -147,10 +179,17 @@ var DBAppwrite = (function() {
           var tipo = 'update';
           if (payload.events.includes('create')) tipo = 'create';
           else if (payload.events.includes('delete')) tipo = 'delete';
+
+          // Notificar a los callbacks internos
           _realtimeCallbacks.forEach(function(cb) { cb(coleccion, tipo, payload.payload); });
+          
+          // Notificar a Google Sheets para actualización inmediata
+          if (payload.payload) {
+            notificarASheets(coleccion, tipo, payload.payload);
+          }
         });
       });
-      Logger.info('[Appwrite] Suscripciones Realtime activas.');
+      Logger.info('[Appwrite] Suscripciones Realtime activas (con notificación a Sheets).');
     } catch (e) {
       Logger.warn('[Appwrite] No se pudo activar Realtime:', e.message);
     }
