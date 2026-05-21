@@ -1,8 +1,22 @@
 /* ================================================================
-   Raíz — MÓDULO: puente-appwrite.js (v3.1)
-   Propósito: Redirigir escrituras a Appwrite. Debe llamarse
-              explícitamente después de que DBAppwrite esté listo.
+   Raíz — MÓDULO: puente-appwrite.js (v4.5)
+   Propósito: Redirigir escrituras a Appwrite. Sincroniza mesas
+              iniciales si DB._mesasPendientesSync es true.
    ================================================================ */
+
+function _normalizarFecha(valor) {
+  if (!valor) return null;
+  if (typeof valor === 'number') {
+    return new Date(valor).toISOString();
+  }
+  var str = String(valor);
+  var parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) {
+    return parsed.toISOString();
+  }
+  return str.substring(0, 100);
+}
+
 function activarPuenteAppwrite() {
   if (typeof DB === 'undefined' || typeof DBAppwrite === 'undefined' || !DBAppwrite.habilitado) {
     Logger.warn('[Puente] No se puede activar aún.');
@@ -26,7 +40,7 @@ function activarPuenteAppwrite() {
       } else {
         var creado = await DBAppwrite.crear('productos', producto.id, dataSinId);
         if (creado && creado.id && creado.id !== producto.id) {
-          producto.id = creado.id; // actualizar con el $id real si cambió
+          producto.id = creado.id;
           DB.productos = DB.productos.map(p => p.id === producto.id ? producto : p);
         }
       }
@@ -93,7 +107,6 @@ function activarPuenteAppwrite() {
     delete dataSinId.id;
 
     try {
-      // Las recetas usan unique() como id
       var creado = await DBAppwrite.crear('recetas', null, dataSinId);
       if (creado && creado.id && creado.id !== receta.id) {
         receta.id = creado.id;
@@ -106,6 +119,41 @@ function activarPuenteAppwrite() {
     EventBus.emit('recetas:actualizadas');
   };
 
+  // ── SINCRONIZAR MESAS INICIALES SI ES NECESARIO ────────
+  if (DB._mesasPendientesSync) {
+    Logger.info('[Puente] Sincronizando mesas iniciales con Appwrite...');
+    var promesas = [];
+    for (var i = 0; i < DB.mesas.length; i++) {
+      var m = DB.mesas[i];
+      if (m.esVirtual) continue;
+      var dataMesa = {
+        numero: m.numero,
+        estado: String(m.estado || 'libre'),
+        pedidoId: String(m.pedidoId || '').substring(0, 50),
+        items: Array.isArray(m.items) ? JSON.stringify(m.items).substring(0, 5000) : String(m.items || '[]').substring(0, 5000),
+        mozo: String(m.mozo || '').substring(0, 100),
+        comensales: Number(m.comensales) || 1,
+        abiertaEn: _normalizarFecha(m.abiertaEn),
+        observaciones: String(m.observaciones || '').substring(0, 500),
+        zona: String(m.zona || 'salon').substring(0, 50),
+        mesasFusionadas: Array.isArray(m.mesasFusionadas) ? JSON.stringify(m.mesasFusionadas).substring(0, 500) : String(m.mesasFusionadas || '').substring(0, 500),
+        esVirtual: Boolean(m.esVirtual)
+      };
+      promesas.push(
+        DBAppwrite.crear('mesas', String(m.numero), dataMesa).catch(function() {
+          return DBAppwrite.actualizar('mesas', String(m.numero), dataMesa);
+        })
+      );
+    }
+    Promise.all(promesas).then(function() {
+      Logger.info('[Puente] Mesas iniciales sincronizadas.');
+      DB._mesasPendientesSync = false;
+      EventBus.emit('mesas:guardadas', DB.mesas);
+    }).catch(function(e) {
+      Logger.error('[Puente] Error sincronizando mesas iniciales:', e);
+    });
+  }
+
   // ── PEDIDOS / MESAS / COMANDAS ─────────────────────────
   if (typeof PedidoRepositoryLocal !== 'undefined') {
     var metodos = ['abrirMesa', 'crearPedidoMesa', 'enviarComanda', 'cerrarPedido', 'liberarMesa', 'agregarMesa'];
@@ -116,27 +164,53 @@ function activarPuenteAppwrite() {
         var resultado = await original.apply(this, arguments);
         if (DBAppwrite.habilitado && resultado) {
           try {
+            // Sincronizar mesas con campos sanitizados
             for (var i = 0; i < DB.mesas.length; i++) {
               var m = DB.mesas[i];
               if (m.esVirtual) continue;
-              var dataMesa = Object.assign({}, m);
-              delete dataMesa.numero; // no enviar el id
+
+              var dataMesa = {
+                numero: m.numero,
+                estado: String(m.estado || 'libre'),
+                pedidoId: String(m.pedidoId || '').substring(0, 50),
+                items: Array.isArray(m.items) ? JSON.stringify(m.items).substring(0, 5000) : String(m.items || '[]').substring(0, 5000),
+                mozo: String(m.mozo || '').substring(0, 100),
+                comensales: Number(m.comensales) || 1,
+                abiertaEn: _normalizarFecha(m.abiertaEn),
+                observaciones: String(m.observaciones || '').substring(0, 500),
+                zona: String(m.zona || 'salon').substring(0, 50),
+                mesasFusionadas: Array.isArray(m.mesasFusionadas) ? JSON.stringify(m.mesasFusionadas).substring(0, 500) : String(m.mesasFusionadas || '').substring(0, 500),
+                esVirtual: Boolean(m.esVirtual)
+              };
+
               await DBAppwrite.crear('mesas', String(m.numero), dataMesa).catch(function() {
                 return DBAppwrite.actualizar('mesas', String(m.numero), dataMesa);
               });
             }
+            // Sincronizar pedidos
             for (var j = 0; j < DB.pedidos.length; j++) {
               var p = DB.pedidos[j];
               var dataPedido = Object.assign({}, p);
               delete dataPedido.id;
+              if (Array.isArray(dataPedido.items)) {
+                dataPedido.items = JSON.stringify(dataPedido.items).substring(0, 5000);
+              } else {
+                dataPedido.items = String(dataPedido.items || '[]').substring(0, 5000);
+              }
               await DBAppwrite.crear('pedidos', p.id, dataPedido).catch(function() {
                 return DBAppwrite.actualizar('pedidos', p.id, dataPedido);
               });
             }
+            // Sincronizar comandas
             for (var k = 0; k < DB.comandas.length; k++) {
               var c = DB.comandas[k];
               var dataComanda = Object.assign({}, c);
               delete dataComanda.id;
+              if (Array.isArray(dataComanda.items)) {
+                dataComanda.items = JSON.stringify(dataComanda.items).substring(0, 5000);
+              } else {
+                dataComanda.items = String(dataComanda.items || '[]').substring(0, 5000);
+              }
               await DBAppwrite.crear('comandas', c.id, dataComanda).catch(function() {
                 return DBAppwrite.actualizar('comandas', c.id, dataComanda);
               });

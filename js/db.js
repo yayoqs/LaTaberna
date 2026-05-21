@@ -1,7 +1,8 @@
 /* ================================================================
-   Raíz — MÓDULO: db.js (Orquestador v5.0 – Appwrite puro)
-   Propósito: Orquestador de base de datos. Solo usa Appwrite y
-              configuración local (sin Google Sheets).
+   Raíz — MÓDULO: db.js (Orquestador v5.1 – Appwrite puro)
+   Propósito: Appwrite es la única fuente de verdad. Las mesas se
+              cargan desde allí. Si está vacío, se crean las mesas
+              iniciales y se sincronizan con el puente.
    ================================================================ */
 var DB = (function() {
   const core = DBCore;
@@ -18,9 +19,9 @@ var DB = (function() {
   };
 
   /**
-   * Inicializa la base de datos. Carga datos desde Appwrite y
-   * la configuración local. Ya no depende de Google Sheets.
-   * @returns {Promise<boolean>}
+   * Inicializa la base de datos. Carga datos desde Appwrite.
+   * Si no hay mesas en Appwrite, las crea a partir de config.zonas
+   * y las sincroniza inmediatamente después de que el puente esté listo.
    */
   combined.init = async function() {
     try {
@@ -32,73 +33,89 @@ var DB = (function() {
         appwriteOk = await appwrite.init();
       }
 
+      if (!appwriteOk) {
+        Logger.warn("[DB] Appwrite no disponible. La aplicación no puede iniciar.");
+        this._mostrarErrorCarga();
+        return false;
+      }
+
       // 2. Cargar configuración local
       this._cargarConfigLocal();
-      this._cargarMozosLocal(); // Se mantiene por si acaso, aunque ya no se usan
+      this._cargarMozosLocal();
 
-      // 3. Si Appwrite está activo, cargar datos desde allí
-      if (appwriteOk) {
-        Logger.info('[DB] Cargando datos desde Appwrite...');
-        try {
-          var prodAppwrite = await appwrite.listar('productos');
-          if (prodAppwrite.length) {
-            this.productos = prodAppwrite.map(p => this._normalizarProducto(p));
-            EventBus.emit('productos:cargados', this.productos);
-          }
-
-          var pedidosAppwrite = await appwrite.listar('pedidos');
-          if (pedidosAppwrite.length) {
-            this.pedidos = pedidosAppwrite.map(p => ({
-              ...p,
-              items: typeof p.items === 'string' ? p.items : JSON.stringify(p.items)
-            }));
-          }
-
-          var comandasAppwrite = await appwrite.listar('comandas');
-          if (comandasAppwrite.length) {
-            this.comandas = comandasAppwrite.map(c => ({
-              ...c,
-              items: typeof c.items === 'string' ? JSON.parse(c.items) : c.items
-            }));
-          }
-
-          var mesasAppwrite = await appwrite.listar('mesas');
-          if (mesasAppwrite.length) {
-            this.mesas = mesasAppwrite.map(m => this._normalizarMesa(m));
-          }
-
-          var ingAppwrite = await appwrite.listar('ingredientes');
-          if (ingAppwrite.length) {
-            this.ingredientes = ingAppwrite.map(i => this._normalizarIngrediente(i));
-          }
-
-          var recAppwrite = await appwrite.listar('recetas');
-          if (recAppwrite.length) {
-            this.recetas = recAppwrite;
-          }
-
-          try {
-            var delivAppwrite = await appwrite.listar('pedidos_delivery');
-            if (delivAppwrite.length) {
-              this.pedidosDelivery = delivAppwrite;
-            }
-          } catch (e) {
-            Logger.debug('[DB] Sin pedidos delivery en Appwrite.');
-          }
-
-          // Inicializar mesas si vienen vacías (primer arranque)
-          if (!this.mesas.length && this.config.zonas) {
-            this._inicializarMesas();
-          }
-
-          Logger.info('[DB] Datos de Appwrite cargados exitosamente.');
-        } catch (e) {
-          Logger.error('[DB] Error al cargar desde Appwrite:', e);
-          this._mostrarErrorCarga();
-          return false;
+      // 3. Cargar datos desde Appwrite
+      Logger.info('[DB] Cargando datos desde Appwrite...');
+      try {
+        var prodAppwrite = await appwrite.listar('productos');
+        if (prodAppwrite.length) {
+          this.productos = prodAppwrite.map(p => this._normalizarProducto(p));
+          EventBus.emit('productos:cargados', this.productos);
         }
-      } else {
-        Logger.warn('[DB] Appwrite no disponible. La aplicación no puede iniciar.');
+
+        var pedidosAppwrite = await appwrite.listar('pedidos');
+        if (pedidosAppwrite.length) {
+          this.pedidos = pedidosAppwrite.map(p => ({
+            ...p,
+            items: typeof p.items === 'string' ? p.items : JSON.stringify(p.items)
+          }));
+        }
+
+        var comandasAppwrite = await appwrite.listar('comandas');
+        if (comandasAppwrite.length) {
+          this.comandas = comandasAppwrite.map(c => ({
+            ...c,
+            items: typeof c.items === 'string' ? JSON.parse(c.items) : c.items
+          }));
+        }
+
+        var mesasAppwrite = await appwrite.listar('mesas');
+        if (mesasAppwrite.length > 0) {
+          // Appwrite tiene mesas → fuente de verdad
+          this.mesas = mesasAppwrite.map(m => this._normalizarMesa(m));
+          Logger.info('[DB] ' + this.mesas.length + ' mesas cargadas desde Appwrite.');
+        } else {
+          // Appwrite está vacío → generar mesas desde configuración
+          Logger.info('[DB] Sin mesas en Appwrite. Generando desde config.zonas...');
+          this.mesas = [];
+          var zonas = this.config.zonas || [{ nombre: 'salon', cantidad: 12 }];
+          var numero = 1;
+          for (var z = 0; z < zonas.length; z++) {
+            var zona = zonas[z];
+            for (var n = 0; n < zona.cantidad; n++) {
+              this.mesas.push({
+                ...mesaVacia(numero, zona.nombre),
+                numero: numero
+              });
+              numero++;
+            }
+          }
+          Logger.info('[DB] ' + this.mesas.length + ' mesas iniciales generadas localmente.');
+          // Las sincronizaremos con Appwrite en cuanto el puente esté listo
+          this._mesasPendientesSync = true;
+        }
+
+        var ingAppwrite = await appwrite.listar('ingredientes');
+        if (ingAppwrite.length) {
+          this.ingredientes = ingAppwrite.map(i => this._normalizarIngrediente(i));
+        }
+
+        var recAppwrite = await appwrite.listar('recetas');
+        if (recAppwrite.length) {
+          this.recetas = recAppwrite;
+        }
+
+        try {
+          var delivAppwrite = await appwrite.listar('pedidos_delivery');
+          if (delivAppwrite.length) {
+            this.pedidosDelivery = delivAppwrite;
+          }
+        } catch (e) {
+          Logger.debug('[DB] Sin pedidos delivery en Appwrite.');
+        }
+
+        Logger.info('[DB] Datos de Appwrite cargados exitosamente.');
+      } catch (e) {
+        Logger.error('[DB] Error al cargar desde Appwrite:', e);
         this._mostrarErrorCarga();
         return false;
       }
@@ -127,7 +144,6 @@ var DB = (function() {
 
   /**
    * Cierra un pedido. Solo actualiza en Appwrite.
-   * Ya no sincroniza con Sheets.
    */
   combined.cerrarPedido = async function(id, formaPago, total, descuento) {
     const pedido = this.pedidos.find(p => p.id === id);
@@ -141,7 +157,6 @@ var DB = (function() {
       return pedido;
     }
 
-    // Actualizar en Appwrite
     if (appwrite && appwrite.habilitado) {
       try {
         await appwrite.actualizar('pedidos', id, {
@@ -156,7 +171,6 @@ var DB = (function() {
       }
     }
 
-    // Actualizar en memoria
     pedido.estado = 'cerrada';
     pedido.total = total;
     pedido.updated_at = new Date().toISOString();
