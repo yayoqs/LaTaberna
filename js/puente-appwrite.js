@@ -1,7 +1,8 @@
 /* ================================================================
-   Raíz — MÓDULO: puente-appwrite.js (v4.5)
+   Raíz — MÓDULO: puente-appwrite.js (v4.6)
    Propósito: Redirigir escrituras a Appwrite. Sincroniza mesas
               iniciales si DB._mesasPendientesSync es true.
+              Convierte campos problemáticos a tipos correctos.
    ================================================================ */
 
 function _normalizarFecha(valor) {
@@ -206,6 +207,8 @@ function activarPuenteAppwrite() {
               var c = DB.comandas[k];
               var dataComanda = Object.assign({}, c);
               delete dataComanda.id;
+              // Convertir mesa a string explícitamente
+              dataComanda.mesa = String(c.mesa || '').substring(0, 50);
               if (Array.isArray(dataComanda.items)) {
                 dataComanda.items = JSON.stringify(dataComanda.items).substring(0, 5000);
               } else {
