@@ -1,8 +1,8 @@
 /* ================================================================
    Raíz — MÓDULO: puente-appwrite.js (v4.6)
-   Propósito: Redirigir escrituras a Appwrite. Sincroniza mesas
-              iniciales si DB._mesasPendientesSync es true.
-              Convierte campos problemáticos a tipos correctos.
+   Propósito: Redirigir escrituras a Appwrite. Ahora intenta
+              actualizar primero (para evitar 409) y solo crea
+              si el documento no existe (404).
    ================================================================ */
 
 function _normalizarFecha(valor) {
@@ -120,41 +120,6 @@ function activarPuenteAppwrite() {
     EventBus.emit('recetas:actualizadas');
   };
 
-  // ── SINCRONIZAR MESAS INICIALES SI ES NECESARIO ────────
-  if (DB._mesasPendientesSync) {
-    Logger.info('[Puente] Sincronizando mesas iniciales con Appwrite...');
-    var promesas = [];
-    for (var i = 0; i < DB.mesas.length; i++) {
-      var m = DB.mesas[i];
-      if (m.esVirtual) continue;
-      var dataMesa = {
-        numero: m.numero,
-        estado: String(m.estado || 'libre'),
-        pedidoId: String(m.pedidoId || '').substring(0, 50),
-        items: Array.isArray(m.items) ? JSON.stringify(m.items).substring(0, 5000) : String(m.items || '[]').substring(0, 5000),
-        mozo: String(m.mozo || '').substring(0, 100),
-        comensales: Number(m.comensales) || 1,
-        abiertaEn: _normalizarFecha(m.abiertaEn),
-        observaciones: String(m.observaciones || '').substring(0, 500),
-        zona: String(m.zona || 'salon').substring(0, 50),
-        mesasFusionadas: Array.isArray(m.mesasFusionadas) ? JSON.stringify(m.mesasFusionadas).substring(0, 500) : String(m.mesasFusionadas || '').substring(0, 500),
-        esVirtual: Boolean(m.esVirtual)
-      };
-      promesas.push(
-        DBAppwrite.crear('mesas', String(m.numero), dataMesa).catch(function() {
-          return DBAppwrite.actualizar('mesas', String(m.numero), dataMesa);
-        })
-      );
-    }
-    Promise.all(promesas).then(function() {
-      Logger.info('[Puente] Mesas iniciales sincronizadas.');
-      DB._mesasPendientesSync = false;
-      EventBus.emit('mesas:guardadas', DB.mesas);
-    }).catch(function(e) {
-      Logger.error('[Puente] Error sincronizando mesas iniciales:', e);
-    });
-  }
-
   // ── PEDIDOS / MESAS / COMANDAS ─────────────────────────
   if (typeof PedidoRepositoryLocal !== 'undefined') {
     var metodos = ['abrirMesa', 'crearPedidoMesa', 'enviarComanda', 'cerrarPedido', 'liberarMesa', 'agregarMesa'];
@@ -165,7 +130,7 @@ function activarPuenteAppwrite() {
         var resultado = await original.apply(this, arguments);
         if (DBAppwrite.habilitado && resultado) {
           try {
-            // Sincronizar mesas con campos sanitizados
+            // Sincronizar mesas
             for (var i = 0; i < DB.mesas.length; i++) {
               var m = DB.mesas[i];
               if (m.esVirtual) continue;
@@ -184,8 +149,12 @@ function activarPuenteAppwrite() {
                 esVirtual: Boolean(m.esVirtual)
               };
 
-              await DBAppwrite.crear('mesas', String(m.numero), dataMesa).catch(function() {
-                return DBAppwrite.actualizar('mesas', String(m.numero), dataMesa);
+              // Intentar actualizar primero, si falla (404) entonces crear
+              await DBAppwrite.actualizar('mesas', String(m.numero), dataMesa).catch(function(e) {
+                if (e.code === 404) {
+                  return DBAppwrite.crear('mesas', String(m.numero), dataMesa);
+                }
+                throw e; // Si no es 404, propagar el error
               });
             }
             // Sincronizar pedidos
@@ -198,8 +167,11 @@ function activarPuenteAppwrite() {
               } else {
                 dataPedido.items = String(dataPedido.items || '[]').substring(0, 5000);
               }
-              await DBAppwrite.crear('pedidos', p.id, dataPedido).catch(function() {
-                return DBAppwrite.actualizar('pedidos', p.id, dataPedido);
+              await DBAppwrite.actualizar('pedidos', p.id, dataPedido).catch(function(e) {
+                if (e.code === 404) {
+                  return DBAppwrite.crear('pedidos', p.id, dataPedido);
+                }
+                throw e;
               });
             }
             // Sincronizar comandas
@@ -207,15 +179,16 @@ function activarPuenteAppwrite() {
               var c = DB.comandas[k];
               var dataComanda = Object.assign({}, c);
               delete dataComanda.id;
-              // Convertir mesa a string explícitamente
-              dataComanda.mesa = String(c.mesa || '').substring(0, 50);
               if (Array.isArray(dataComanda.items)) {
                 dataComanda.items = JSON.stringify(dataComanda.items).substring(0, 5000);
               } else {
                 dataComanda.items = String(dataComanda.items || '[]').substring(0, 5000);
               }
-              await DBAppwrite.crear('comandas', c.id, dataComanda).catch(function() {
-                return DBAppwrite.actualizar('comandas', c.id, dataComanda);
+              await DBAppwrite.actualizar('comandas', c.id, dataComanda).catch(function(e) {
+                if (e.code === 404) {
+                  return DBAppwrite.crear('comandas', c.id, dataComanda);
+                }
+                throw e;
               });
             }
           } catch (e) {
