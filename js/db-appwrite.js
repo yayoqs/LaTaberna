@@ -1,9 +1,8 @@
 /* ================================================================
-   Raíz — MÓDULO: db-appwrite.js (v2.3)
-   Propósito: Cliente de Appwrite. Al recibir un evento Realtime
-              (cambio en pedidos o comandas), además de actualizar
-              el Store, envía una notificación a Google Apps Script
-              para que actualice Sheets.
+   Raíz — MÓDULO: db-appwrite.js (v2.4)
+   Propósito: Cliente de Appwrite. Suscripciones Realtime incluyen
+              Mesas. Notifica a Sheets sobre cambios en Mesas,
+              Pedidos y Comandas.
    ================================================================ */
 var DBAppwrite = (function() {
   var module = {};
@@ -25,8 +24,7 @@ var DBAppwrite = (function() {
     configuracion: 'Configuracion'
   };
 
-  // URL del Google Apps Script (debe coincidir con la última implementación)
-  var URL_SCRIPT = 'https://script.google.com/macros/s/AKfycbw2hRaJTCPx6WM0MK2g7dCgrbIUd3CavINAxFWoRjy-tytyIUh9t1THI1RjEngPCoUY/exec';
+  var URL_SCRIPT = 'https://script.google.com/macros/s/AKfycbylhfXpCU_RA49avGsxaK5SIpRVhrxfto0IRJ94R4QOcbfC8Z8AI2wdxGTb5z_wBV8VzQ/exec';
 
   module.init = async function() {
     if (typeof window.Appwrite === 'undefined') {
@@ -142,12 +140,9 @@ var DBAppwrite = (function() {
     }
   };
 
-  /**
-   * Notifica al Google Apps Script sobre un cambio en Appwrite
-   * para que actualice Sheets inmediatamente.
-   */
   function notificarASheets(coleccion, tipo, doc) {
-    if (coleccion !== 'pedidos' && coleccion !== 'comandas' && coleccion !== 'mesas') return; // Solo colecciones que sincronizamos con Sheets
+    // Notificar cambios en pedidos, comandas y mesas
+    if (coleccion !== 'pedidos' && coleccion !== 'comandas' && coleccion !== 'mesas') return;
 
     fetch(URL_SCRIPT, {
       method: 'POST',
@@ -169,21 +164,24 @@ var DBAppwrite = (function() {
     _realtimeCallbacks.push(onCambio);
     var canales = [
       'databases.' + module.databaseId + '.collections.' + module.COLECCIONES.pedidos + '.documents',
-      'databases.' + module.databaseId + '.collections.' + module.COLECCIONES.comandas + '.documents'
+      'databases.' + module.databaseId + '.collections.' + module.COLECCIONES.comandas + '.documents',
+      'databases.' + module.databaseId + '.collections.' + module.COLECCIONES.mesas + '.documents'
     ];
     try {
       var realtime = new Appwrite.Realtime(module.client);
       canales.forEach(function(canal) {
         realtime.subscribe(canal, function(payload) {
-          var coleccion = canal.indexOf('Pedidos') !== -1 ? 'pedidos' : 'comandas';
+          var coleccion = '';
+          if (canal.indexOf('Pedidos') !== -1) coleccion = 'pedidos';
+          else if (canal.indexOf('Comandas') !== -1) coleccion = 'comandas';
+          else if (canal.indexOf('Mesas') !== -1) coleccion = 'mesas';
+
           var tipo = 'update';
           if (payload.events.includes('create')) tipo = 'create';
           else if (payload.events.includes('delete')) tipo = 'delete';
 
-          // Notificar a los callbacks internos
           _realtimeCallbacks.forEach(function(cb) { cb(coleccion, tipo, payload.payload); });
           
-          // Notificar a Google Sheets para actualización inmediata
           if (payload.payload) {
             notificarASheets(coleccion, tipo, payload.payload);
           }
@@ -222,6 +220,15 @@ var DBAppwrite = (function() {
             EventBus.emit('comandas:guardadas', window.DB.comandas);
           }
         }).catch(function(e) { Logger.warn('[Appwrite Realtime] Error al listar comandas:', e); });
+      } else if (coleccion === 'mesas') {
+        module.listar('mesas').then(function(mesas) {
+          if (mesas.length) {
+            window.DB.mesas = mesas.map(function(m) { return window.DB._normalizarMesa(m); });
+            window.DB.saveMesas();
+            if (typeof Store !== 'undefined') Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: window.DB.mesas });
+            EventBus.emit('mesas:guardadas', window.DB.mesas);
+          }
+        }).catch(function(e) { Logger.warn('[Appwrite Realtime] Error al listar mesas:', e); });
       }
     });
   };
