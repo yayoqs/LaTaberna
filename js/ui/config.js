@@ -1,5 +1,7 @@
 /* ================================================================
-   PubPOS — MÓDULO: config.js (v4.1 – gestión de contraseñas para master)
+   Raíz — MÓDULO: config.js (v4.2 – Appwrite sync, completo)
+   Propósito: Vista de configuración (productos, mozos, zonas, stock).
+              Lee del Store y persiste cambios en DB y Appwrite.
    ================================================================ */
 const Config = (() => {
   function _asegurarVista() {
@@ -104,7 +106,7 @@ const Config = (() => {
     _renderZonas();
     renderMozos();
     renderProductos();
-    _renderUsuarios();  // ← nuevo
+    _renderUsuarios();
   }
 
   // ── USUARIOS (solo master) ────────────────────────────────
@@ -112,7 +114,6 @@ const Config = (() => {
     const card = $id('usuariosCard');
     if (!card) return;
 
-    // Solo visible para el master real (no simulación)
     if (typeof Auth !== 'undefined' && Auth.esMasterReal && Auth.esMasterReal()) {
       card.style.display = '';
     } else {
@@ -123,7 +124,6 @@ const Config = (() => {
     const lista = $id('usuariosLista');
     if (!lista) return;
 
-    // Obtener la lista de usuarios desde localStorage
     let usuarios = [];
     try {
       const raw = localStorage.getItem('pubpos_usuarios');
@@ -147,10 +147,6 @@ const Config = (() => {
     }).join('');
   }
 
-  /**
-   * Muestra un prompt para cambiar la contraseña de un usuario (solo master).
-   * @param {string} nombreUsuario
-   */
   async function _mostrarCambiarPassword(nombreUsuario) {
     if (!Auth.esMasterReal || !Auth.esMasterReal()) {
       showToast('error', 'Solo el master puede cambiar contraseñas');
@@ -169,7 +165,7 @@ const Config = (() => {
     if (typeof Auth.cambiarPassword === 'function') {
       const ok = await Auth.cambiarPassword(nombreUsuario, nueva.trim());
       if (ok) {
-        _renderUsuarios(); // actualizar lista (aunque no cambia visualmente)
+        _renderUsuarios();
       }
     } else {
       showToast('error', 'Función no disponible');
@@ -219,8 +215,8 @@ const Config = (() => {
     _renderZonas();
   }
 
-  /** Guarda la configuración general */
-  function guardar() {
+  /** Guarda la configuración general, incluyendo sincronización con Appwrite */
+  async function guardar() {
     const zonasContainer = $id('zonasContainer');
     let config = Store.getState().config || {};
 
@@ -245,15 +241,36 @@ const Config = (() => {
     };
     delete config.cantidadMesas;
 
+    // Guardar en memoria y localStorage
     DB.config = config;
-    DB._inicializarMesas();
     DB.saveConfig();
     DB.saveMesas();
     if (window.Mesas) Mesas.render();
     showToast('success', '<i class="fas fa-check-circle"></i> Configuración guardada');
+
+    // Sincronizar configuración con Appwrite
+    if (typeof DBAppwrite !== 'undefined' && DBAppwrite.habilitado) {
+      try {
+        var datosConfig = {
+          clave: 'global',
+          valor: JSON.stringify(config)
+        };
+        var existente = await DBAppwrite.listar('configuracion');
+        var docGlobal = existente.find(function(d) { return d.clave === 'global'; });
+        if (docGlobal) {
+          await DBAppwrite.actualizar('configuracion', docGlobal.id, datosConfig);
+          Logger.info('[Config] Configuración actualizada en Appwrite.');
+        } else {
+          await DBAppwrite.crear('configuracion', 'global', datosConfig);
+          Logger.info('[Config] Configuración creada en Appwrite.');
+        }
+      } catch (e) {
+        Logger.warn('[Config] No se pudo sincronizar configuración con Appwrite:', e);
+      }
+    }
   }
 
-  /** Renderiza la lista de productos en la configuración */
+  // ── PRODUCTOS ─────────────────────────────────────────────
   function renderProductos() {
     _asegurarVista();
     const cont = $id('productosLista');
@@ -321,7 +338,6 @@ const Config = (() => {
 
   function cerrarModalProducto() { $id('modalProducto').style.display = 'none'; }
 
-  /** Guarda un producto nuevo o editado */
   async function guardarProducto() {
     const nombre = $val('prodNombre');
     const precio = parseFloat($id('prodPrecio')?.value);
@@ -363,7 +379,7 @@ const Config = (() => {
     }
   }
 
-  /** Renderiza la lista de mozos */
+  // ── MOZOS ────────────────────────────────────────────────
   function renderMozos() {
     const container = $id('mozosLista');
     if (!container) return;
@@ -395,6 +411,7 @@ const Config = (() => {
     showToast('warning', 'Mozo eliminado');
   }
 
+  // ── INICIALIZACIÓN ────────────────────────────────────────
   function _initListeners() {
     Store.subscribe((state, action) => {
       if (action.type.startsWith('PRODUCTO')) renderProductos();
@@ -424,7 +441,7 @@ const Config = (() => {
     agregarZona,
     eliminarZona,
     _updateZona,
-    _mostrarCambiarPassword  // ← expuesto para el onclick
+    _mostrarCambiarPassword
   };
 })();
 

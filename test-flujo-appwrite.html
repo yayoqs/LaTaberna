@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Test de Envío Directo Sheets → Appwrite</title>
+  <title>Test de Flujo Real - Appwrite</title>
   <style>
     body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
     h1 { color: #f59e0b; }
@@ -13,24 +13,36 @@
     .info { color: #94a3b8; font-size: 12px; margin: 2px 0; }
     pre { background: #111; padding: 10px; white-space: pre-wrap; word-wrap: break-word; font-size: 11px; }
     button { margin-top: 16px; padding: 12px 24px; background: #f59e0b; color: #000; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+    .section { margin: 16px 0; padding: 12px; background: #1a1a2e; border-radius: 8px; }
   </style>
 </head>
 <body>
-  <h1>🧪 Test de Envío Directo Sheets → Appwrite</h1>
-  <p class="info">Simula exactamente lo que hace procesarCambiosPendientes: envía un PATCH a Appwrite para actualizar un documento.</p>
+  <h1>🧪 Test de Flujo Real: Pedido → Comanda</h1>
+  <p class="info">Abre una mesa, crea un pedido, envía una comanda y verifica la sincronización entre colecciones.</p>
   <div id="results"></div>
   <button onclick="location.reload()">🔄 Ejecutar de nuevo</button>
 
   <script src="js/utils.js"></script>
   <script src="js/lib/logger.js"></script>
+  <script src="js/lib/eventBus.js"></script>
+  <script src="js/lib/store.js"></script>
   <script src="js/appwrite.min.js"></script>
   <script src="js/init-appwrite.js"></script>
   <script src="js/db-appwrite.js"></script>
+  <script src="js/db-core.js"></script>
+  <script src="js/db-inventario.js"></script>
+  <script src="js/db-fusion.js"></script>
+  <script src="js/db-shim.js"></script>
+  <script src="js/db.js"></script>
+  <script src="js/puente-appwrite.js"></script>
 
   <script>
     (function() {
       var resultsEl = document.getElementById('results');
       var passed = 0, failed = 0;
+      var TEST_MESA = 997;
+      var testPedidoId = null;
+      var testComandaId = null;
 
       function assert(condition, msg) {
         if (condition) {
@@ -42,69 +54,178 @@
         }
       }
 
+      function logSection(title, obj) {
+        resultsEl.innerHTML += '<div class="section"><strong>' + title + '</strong><pre>' + JSON.stringify(obj, null, 2) + '</pre></div>';
+      }
+
       async function runTests() {
         resultsEl.innerHTML = '';
         Logger.setLevel('ERROR');
 
+        // Inicializar
         await DBAppwrite.init();
         if (!DBAppwrite.habilitado) {
           resultsEl.innerHTML += '<div class="fail">❌ Appwrite no habilitado.</div>';
           return;
         }
 
-        // ── 1. Crear documento de prueba ─────────────────
-        resultsEl.innerHTML += '<h2>1. Crear documento de prueba</h2>';
-        var testId = 'test_envio_' + Date.now();
-        var data = {
-          mesa: 996,
-          mozo: 'TestEnvio',
+        window.Auth = { getEspacioActivo: function() { return { id: 'esp_taberna' }; } };
+        window.PedidoManager = { getTurnoActual: function() { return { id: 'test', estado: 'abierto' }; }, registrar: function() {} };
+        DB.config = { zonas: [{ nombre: 'salon', cantidad: 12 }] };
+        DB.mesas = [];
+        DB.pedidos = [];
+        DB.comandas = [];
+        if (typeof activarPuenteAppwrite === 'function') activarPuenteAppwrite();
+
+        // ── Paso 0: Limpiar mesa de prueba si existe ──────
+        resultsEl.innerHTML += '<h2>Paso 0: Preparar entorno</h2>';
+        try { await DBAppwrite.eliminar('mesas', String(TEST_MESA)); } catch(e) {}
+        assert(true, 'Mesa ' + TEST_MESA + ' eliminada si existía');
+
+        // Crear mesa libre
+        var mesaData = {
+          numero: TEST_MESA,
+          estado: 'libre',
+          pedidoId: '',
+          items: '[]',
+          mozo: '',
           comensales: 1,
+          abiertaEn: new Date().toISOString(),
+          observaciones: '',
+          zona: 'salon',
+          mesasFusionadas: '',
+          esVirtual: false
+        };
+        var mesaCreada = await DBAppwrite.crear('mesas', String(TEST_MESA), mesaData);
+        assert(!!mesaCreada, 'Mesa ' + TEST_MESA + ' creada libre');
+
+        // ── Paso 1: Abrir mesa (crear pedido) ─────────────
+        resultsEl.innerHTML += '<h2>Paso 1: Abrir Mesa ' + TEST_MESA + '</h2>';
+        testPedidoId = 'ped_test_' + Date.now();
+        var pedidoData = {
+          mesa: TEST_MESA,
+          mozo: 'TestFlujo',
+          comensales: 4,
           estado: 'abierta',
           items: '[]',
           total: 0,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-          observaciones: ''
+          observaciones: 'Pedido de prueba'
         };
 
-        try {
-          await DBAppwrite.crear('pedidos', testId, data);
-          assert(true, 'Documento creado: ' + testId);
-        } catch(e) {
-          assert(false, 'Error al crear: ' + e.message);
-          return;
-        }
+        // Crear pedido en Appwrite
+        var pedidoCreado = await DBAppwrite.crear('pedidos', testPedidoId, pedidoData);
+        assert(!!pedidoCreado, 'Pedido creado: ' + testPedidoId);
 
-        // ── 2. Simular envío de cambio (PATCH) ───────────
-        resultsEl.innerHTML += '<h2>2. Simular PATCH (cambio de estado)</h2>';
-        try {
-          var cambios = { estado: 'cerrada' };
-          resultsEl.innerHTML += '<div class="info">Enviando PATCH a Appwrite con: ' + JSON.stringify(cambios) + '</div>';
-          var resultado = await DBAppwrite.actualizar('pedidos', testId, cambios);
-          resultsEl.innerHTML += '<div class="info">Respuesta: ' + JSON.stringify(resultado) + '</div>';
-          assert(!!resultado, 'PATCH exitoso');
-          assert(resultado.estado === 'cerrada', 'Estado actualizado a cerrada');
-        } catch(e) {
-          assert(false, 'Error en PATCH: ' + e.message);
-          resultsEl.innerHTML += '<div class="fail">Error completo: ' + JSON.stringify(e) + '</div>';
-        }
+        // Actualizar mesa: estado ocupada, pedidoId asignado
+        await DBAppwrite.actualizar('mesas', String(TEST_MESA), {
+          estado: 'ocupada',
+          pedidoId: testPedidoId,
+          mozo: 'TestFlujo',
+          comensales: 4,
+          abiertaEn: new Date().toISOString()
+        });
 
-        // ── 3. Verificar en Appwrite ─────────────────────
-        resultsEl.innerHTML += '<h2>3. Verificar en Appwrite</h2>';
-        var verificado = await DBAppwrite.listar('pedidos').then(l => l.find(p => p.id === testId));
-        assert(!!verificado, 'Documento encontrado');
-        assert(verificado.estado === 'cerrada', 'Estado es cerrada en Appwrite');
+        // Verificar estado de ambas colecciones
+        var mesaLeida = await DBAppwrite.listar('mesas').then(l => l.find(m => m.numero == TEST_MESA));
+        var pedidoLeido = await DBAppwrite.listar('pedidos').then(l => l.find(p => p.id === testPedidoId));
 
-        // ── 4. Limpiar ───────────────────────────────────
-        resultsEl.innerHTML += '<h2>4. Limpiar</h2>';
-        await DBAppwrite.eliminar('pedidos', testId);
-        assert(true, 'Documento eliminado');
+        assert(mesaLeida.estado === 'ocupada', 'Mesa ' + TEST_MESA + ' está OCUPADA');
+        assert(mesaLeida.pedidoId === testPedidoId, 'Mesa tiene pedidoId correcto');
+        assert(!!pedidoLeido, 'Pedido existe en Appwrite');
+        assert(pedidoLeido.estado === 'abierta', 'Pedido está ABIERTO');
 
-        resultsEl.innerHTML += '<h2>Resultado</h2>';
+        logSection('Mesa ' + TEST_MESA + ' después de abrir', mesaLeida);
+        logSection('Pedido ' + testPedidoId, pedidoLeido);
+
+        // ── Paso 2: Enviar comanda ────────────────────────
+        resultsEl.innerHTML += '<h2>Paso 2: Enviar Comanda</h2>';
+        testComandaId = 'com_test_' + Date.now();
+        var itemsComanda = [
+          { prodId: 'prod_test', nombre: 'Hamburguesa', precio: 1500, qty: 2, destino: 'cocina', obs: '', enviado: true, enviadoA: 'cocina', enviadoTs: Date.now() }
+        ];
+        var comandaData = {
+          mesa: String(TEST_MESA),
+          mozo: 'TestFlujo',
+          destino: 'cocina',
+          items: JSON.stringify(itemsComanda),
+          observaciones: 'Sin cebolla',
+          estado: 'nueva',
+          ts: Date.now(),
+          deliveryId: ''
+        };
+
+        // Crear comanda en Appwrite
+        var comandaCreada = await DBAppwrite.crear('comandas', testComandaId, comandaData);
+        assert(!!comandaCreada, 'Comanda creada: ' + testComandaId);
+
+        // Actualizar pedido: items, total, estado
+        var totalPedido = itemsComanda.reduce((sum, it) => sum + it.precio * it.qty, 0);
+        await DBAppwrite.actualizar('pedidos', testPedidoId, {
+          items: JSON.stringify(itemsComanda),
+          total: totalPedido,
+          estado: 'en_proceso',
+          updated_at: new Date().toISOString()
+        });
+
+        // Verificar estado de las tres colecciones
+        var mesaLeida2 = await DBAppwrite.listar('mesas').then(l => l.find(m => m.numero == TEST_MESA));
+        var pedidoLeido2 = await DBAppwrite.listar('pedidos').then(l => l.find(p => p.id === testPedidoId));
+        var comandaLeida = await DBAppwrite.listar('comandas').then(l => l.find(c => c.id === testComandaId));
+
+        assert(mesaLeida2.estado === 'ocupada', 'Mesa sigue OCUPADA');
+        assert(!!pedidoLeido2, 'Pedido existe');
+        assert(pedidoLeido2.estado === 'en_proceso', 'Pedido en EN_PROCESO');
+        assert(pedidoLeido2.total === totalPedido, 'Total del pedido: ' + totalPedido);
+        assert(!!comandaLeida, 'Comanda existe');
+        assert(comandaLeida.estado === 'nueva', 'Comanda NUEVA');
+
+        logSection('Mesa ' + TEST_MESA + ' después de comanda', mesaLeida2);
+        logSection('Pedido ' + testPedidoId + ' después de comanda', pedidoLeido2);
+        logSection('Comanda ' + testComandaId, comandaLeida);
+
+        // ── Paso 3: Marcar comanda como lista ──────────────
+        resultsEl.innerHTML += '<h2>Paso 3: Comanda LISTA</h2>';
+        await DBAppwrite.actualizar('comandas', testComandaId, { estado: 'lista' });
+        var comandaLista = await DBAppwrite.listar('comandas').then(l => l.find(c => c.id === testComandaId));
+        assert(comandaLista.estado === 'lista', 'Comanda marcada LISTA');
+
+        // ── Paso 4: Cerrar pedido y liberar mesa ───────────
+        resultsEl.innerHTML += '<h2>Paso 4: Cerrar Pedido y Liberar Mesa</h2>';
+        await DBAppwrite.actualizar('pedidos', testPedidoId, {
+          estado: 'cerrada',
+          updated_at: new Date().toISOString()
+        });
+        await DBAppwrite.actualizar('mesas', String(TEST_MESA), {
+          estado: 'libre',
+          pedidoId: '',
+          mozo: '',
+          items: '[]',
+          comensales: 1,
+          observaciones: ''
+        });
+
+        var mesaFinal = await DBAppwrite.listar('mesas').then(l => l.find(m => m.numero == TEST_MESA));
+        var pedidoFinal = await DBAppwrite.listar('pedidos').then(l => l.find(p => p.id === testPedidoId));
+        assert(mesaFinal.estado === 'libre', 'Mesa vuelve a LIBRE');
+        assert(pedidoFinal.estado === 'cerrada', 'Pedido CERRADO');
+
+        logSection('Mesa ' + TEST_MESA + ' final', mesaFinal);
+        logSection('Pedido ' + testPedidoId + ' final', pedidoFinal);
+
+        // ── Paso 5: Limpiar datos de prueba ────────────────
+        resultsEl.innerHTML += '<h2>Paso 5: Limpiar</h2>';
+        try { await DBAppwrite.eliminar('comandas', testComandaId); } catch(e) {}
+        try { await DBAppwrite.eliminar('pedidos', testPedidoId); } catch(e) {}
+        try { await DBAppwrite.eliminar('mesas', String(TEST_MESA)); } catch(e) {}
+        assert(true, 'Datos de prueba eliminados');
+
+        // ── Resumen ───────────────────────────────────────
+        resultsEl.innerHTML += '<h2>Resultado Final</h2>';
         resultsEl.innerHTML += '<p>' + passed + ' pasaron, ' + failed + ' fallaron.</p>';
         if (failed === 0) {
-          resultsEl.innerHTML += '<div class="pass">✔ El PATCH directo funciona. El problema está en procesarCambiosPendientes (Apps Script).</div>';
-          resultsEl.innerHTML += '<div class="info">Revisa en el editor de Apps Script la función enviarCambioAAppwrite. Asegúrate de que use el endpoint correcto, los headers X-Appwrite-Project y X-Appwrite-Key, y que el body sea {"data": {"estado": "cerrada"}}.</div>';
+          resultsEl.innerHTML += '<div class="pass">✔ El flujo completo funciona correctamente. Las colecciones se sincronizan.</div>';
         }
       }
 

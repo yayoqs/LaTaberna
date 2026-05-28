@@ -1,8 +1,9 @@
 /* ================================================================
-   Raíz — MÓDULO: db.js (Orquestador v5.1 – Appwrite puro)
-   Propósito: Appwrite es la única fuente de verdad. Las mesas se
-              cargan desde allí. Si está vacío, se crean las mesas
-              iniciales y se sincronizan con el puente.
+   Raíz — MÓDULO: db.js (Orquestador v5.2 – Configuración dinámica)
+   Propósito: Appwrite es la única fuente de verdad. La configuración
+              de zonas se carga desde Appwrite (con fallback local).
+              Las mesas se generan según la configuración si Appwrite
+              está vacío.
    ================================================================ */
 var DB = (function() {
   const core = DBCore;
@@ -19,9 +20,10 @@ var DB = (function() {
   };
 
   /**
-   * Inicializa la base de datos. Carga datos desde Appwrite.
-   * Si no hay mesas en Appwrite, las crea a partir de config.zonas
-   * y las sincroniza inmediatamente después de que el puente esté listo.
+   * Inicializa la base de datos. Carga configuración desde Appwrite
+   * (o localStorage si Appwrite está vacío). Luego carga el resto de
+   * colecciones. Si no hay mesas en Appwrite, las genera a partir de
+   * la configuración y las marca para sincronizar con el puente.
    */
   combined.init = async function() {
     try {
@@ -39,11 +41,13 @@ var DB = (function() {
         return false;
       }
 
-      // 2. Cargar configuración local
-      this._cargarConfigLocal();
+      // 2. Cargar configuración (zonas, nombre local, etc.)
+      await this._cargarConfiguracion();
+
+      // 3. Cargar mozos locales (obsoleto pero se mantiene)
       this._cargarMozosLocal();
 
-      // 3. Cargar datos desde Appwrite
+      // 4. Cargar datos desde Appwrite
       Logger.info('[DB] Cargando datos desde Appwrite...');
       try {
         var prodAppwrite = await appwrite.listar('productos');
@@ -90,7 +94,6 @@ var DB = (function() {
             }
           }
           Logger.info('[DB] ' + this.mesas.length + ' mesas iniciales generadas localmente.');
-          // Las sincronizaremos con Appwrite en cuanto el puente esté listo
           this._mesasPendientesSync = true;
         }
 
@@ -98,19 +101,17 @@ var DB = (function() {
         if (ingAppwrite.length) {
           this.ingredientes = ingAppwrite.map(i => this._normalizarIngrediente(i));
         }
+
         var recAppwrite = await appwrite.listar('recetas');
         if (recAppwrite.length) {
           this.recetas = recAppwrite.map(function(r) {
             if (typeof r.ingredientes === 'string') {
-              try {
-                r.ingredientes = JSON.parse(r.ingredientes);
-              } catch (e) {
-                r.ingredientes = [];
-              }
+              try { r.ingredientes = JSON.parse(r.ingredientes); } catch (e) { r.ingredientes = []; }
             }
             return r;
           });
         }
+
         try {
           var delivAppwrite = await appwrite.listar('pedidos_delivery');
           if (delivAppwrite.length) {
@@ -134,6 +135,35 @@ var DB = (function() {
       Logger.error("[DB] Error crítico en init:", e);
       this._mostrarErrorCarga();
       return false;
+    }
+  };
+
+  /**
+   * Carga la configuración desde Appwrite (colección Configuracion).
+   * Si no existe, usa el fallback local (localStorage / DB.config por defecto).
+   */
+  combined._cargarConfiguracion = async function() {
+    if (typeof appwrite !== 'undefined' && appwrite.habilitado) {
+      try {
+        var configAppwrite = await appwrite.listar('configuracion');
+        var docGlobal = configAppwrite.find(function(d) { return d.clave === 'global'; });
+        if (docGlobal && docGlobal.valor) {
+          this.config = JSON.parse(docGlobal.valor);
+          Logger.info('[DB] Configuración cargada desde Appwrite.');
+          // Asegurar que exista el array de zonas
+          if (!this.config.zonas) {
+            this.config.zonas = [{ nombre: 'salon', cantidad: 12 }];
+          }
+          return;
+        }
+      } catch (e) {
+        Logger.warn('[DB] No se pudo cargar configuración desde Appwrite, usando local.');
+      }
+    }
+    // Fallback: cargar desde localStorage (lo que ya existía)
+    this._cargarConfigLocal();
+    if (!this.config.zonas) {
+      this.config.zonas = [{ nombre: 'salon', cantidad: 12 }];
     }
   };
 

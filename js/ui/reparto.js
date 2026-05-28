@@ -46,8 +46,8 @@ const Reparto = (() => {
     }
     const ordenados = [...pedidosValidos].sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
     tbody.innerHTML = ordenados.map(p => {
-      const items = p.items || [];
-      const resumen = items.map(i => `${i.qty}x ${i.nombre}`).join(', ') || '—';
+      var items = (typeof p.items === 'string') ? JSON.parse(p.items || '[]') : (Array.isArray(p.items) ? p.items : []);
+      var resumen = items.map(function(i) { return i.qty + 'x ' + i.nombre; }).join(', ') || '—';
       const badgeClase = { pendiente:'warning', en_preparacion:'info', en_camino:'accent', entregado:'success' }[p.estado] || 'default';
 
       const estaListo = _deliveryFlags[p.id]?.listoParaRecoger === true;
