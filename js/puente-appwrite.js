@@ -1,5 +1,5 @@
 /* ================================================================
-   Raíz — MÓDULO: puente-appwrite.js (v4.6)
+   Raíz — MÓDULO: puente-appwrite.js (v4.7)
    Propósito: Redirigir escrituras a Appwrite. Ahora intenta
               actualizar primero (para evitar 409) y solo crea
               si el documento no existe (404).
@@ -130,7 +130,7 @@ function activarPuenteAppwrite() {
         var resultado = await original.apply(this, arguments);
         if (DBAppwrite.habilitado && resultado) {
           try {
-            // Sincronizar mesas
+            // Sincronizar mesas (actualizar primero, crear solo si falla con 404)
             for (var i = 0; i < DB.mesas.length; i++) {
               var m = DB.mesas[i];
               if (m.esVirtual) continue;
@@ -149,15 +149,14 @@ function activarPuenteAppwrite() {
                 esVirtual: Boolean(m.esVirtual)
               };
 
-              // Intentar actualizar primero, si falla (404) entonces crear
-              await DBAppwrite.actualizar('mesas', String(m.numero), dataMesa).catch(function(e) {
-                if (e.code === 404) {
-                  return DBAppwrite.crear('mesas', String(m.numero), dataMesa);
+              await DBAppwrite.actualizar('mesas', String(m.numero), dataMesa).catch(async function(e) {
+                if (e && e.code === 404) {
+                  return await DBAppwrite.crear('mesas', String(m.numero), dataMesa);
                 }
-                throw e; // Si no es 404, propagar el error
+                throw e;
               });
             }
-            // Sincronizar pedidos
+            // Sincronizar pedidos (actualizar primero, crear solo si 404)
             for (var j = 0; j < DB.pedidos.length; j++) {
               var p = DB.pedidos[j];
               var dataPedido = Object.assign({}, p);
@@ -167,14 +166,14 @@ function activarPuenteAppwrite() {
               } else {
                 dataPedido.items = String(dataPedido.items || '[]').substring(0, 5000);
               }
-              await DBAppwrite.actualizar('pedidos', p.id, dataPedido).catch(function(e) {
-                if (e.code === 404) {
-                  return DBAppwrite.crear('pedidos', p.id, dataPedido);
+              await DBAppwrite.actualizar('pedidos', p.id, dataPedido).catch(async function(e) {
+                if (e && e.code === 404) {
+                  return await DBAppwrite.crear('pedidos', p.id, dataPedido);
                 }
                 throw e;
               });
             }
-            // Sincronizar comandas
+            // Sincronizar comandas (actualizar primero, crear solo si 404)
             for (var k = 0; k < DB.comandas.length; k++) {
               var c = DB.comandas[k];
               var dataComanda = Object.assign({}, c);
@@ -184,9 +183,9 @@ function activarPuenteAppwrite() {
               } else {
                 dataComanda.items = String(dataComanda.items || '[]').substring(0, 5000);
               }
-              await DBAppwrite.actualizar('comandas', c.id, dataComanda).catch(function(e) {
-                if (e.code === 404) {
-                  return DBAppwrite.crear('comandas', c.id, dataComanda);
+              await DBAppwrite.actualizar('comandas', c.id, dataComanda).catch(async function(e) {
+                if (e && e.code === 404) {
+                  return await DBAppwrite.crear('comandas', c.id, dataComanda);
                 }
                 throw e;
               });

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test de Envío Directo Sheets → Appwrite</title>
+  <style>
+    body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
+    h1 { color: #f59e0b; }
+    h2 { color: #94a3b8; margin-top: 24px; }
+    .test { margin: 4px 0; padding: 4px 8px; border-radius: 4px; }
+    .pass { background: rgba(34,197,94,.2); }
+    .fail { background: rgba(239,68,68,.2); }
+    .info { color: #94a3b8; font-size: 12px; margin: 2px 0; }
+    pre { background: #111; padding: 10px; white-space: pre-wrap; word-wrap: break-word; font-size: 11px; }
+    button { margin-top: 16px; padding: 12px 24px; background: #f59e0b; color: #000; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test de Envío Directo Sheets → Appwrite</h1>
+  <p class="info">Simula exactamente lo que hace procesarCambiosPendientes: envía un PATCH a Appwrite para actualizar un documento.</p>
+  <div id="results"></div>
+  <button onclick="location.reload()">🔄 Ejecutar de nuevo</button>
+
+  <script src="js/utils.js"></script>
+  <script src="js/lib/logger.js"></script>
+  <script src="js/appwrite.min.js"></script>
+  <script src="js/init-appwrite.js"></script>
+  <script src="js/db-appwrite.js"></script>
+
+  <script>
+    (function() {
+      var resultsEl = document.getElementById('results');
+      var passed = 0, failed = 0;
+
+      function assert(condition, msg) {
+        if (condition) {
+          passed++;
+          resultsEl.innerHTML += '<div class="test pass">✔ ' + msg + '</div>';
+        } else {
+          failed++;
+          resultsEl.innerHTML += '<div class="test fail">✘ ' + msg + '</div>';
+        }
+      }
+
+      async function runTests() {
+        resultsEl.innerHTML = '';
+        Logger.setLevel('ERROR');
+
+        await DBAppwrite.init();
+        if (!DBAppwrite.habilitado) {
+          resultsEl.innerHTML += '<div class="fail">❌ Appwrite no habilitado.</div>';
+          return;
+        }
+
+        // ── 1. Crear documento de prueba ─────────────────
+        resultsEl.innerHTML += '<h2>1. Crear documento de prueba</h2>';
+        var testId = 'test_envio_' + Date.now();
+        var data = {
+          mesa: 996,
+          mozo: 'TestEnvio',
+          comensales: 1,
+          estado: 'abierta',
+          items: '[]',
+          total: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          observaciones: ''
+        };
+
+        try {
+          await DBAppwrite.crear('pedidos', testId, data);
+          assert(true, 'Documento creado: ' + testId);
+        } catch(e) {
+          assert(false, 'Error al crear: ' + e.message);
+          return;
+        }
+
+        // ── 2. Simular envío de cambio (PATCH) ───────────
+        resultsEl.innerHTML += '<h2>2. Simular PATCH (cambio de estado)</h2>';
+        try {
+          var cambios = { estado: 'cerrada' };
+          resultsEl.innerHTML += '<div class="info">Enviando PATCH a Appwrite con: ' + JSON.stringify(cambios) + '</div>';
+          var resultado = await DBAppwrite.actualizar('pedidos', testId, cambios);
+          resultsEl.innerHTML += '<div class="info">Respuesta: ' + JSON.stringify(resultado) + '</div>';
+          assert(!!resultado, 'PATCH exitoso');
+          assert(resultado.estado === 'cerrada', 'Estado actualizado a cerrada');
+        } catch(e) {
+          assert(false, 'Error en PATCH: ' + e.message);
+          resultsEl.innerHTML += '<div class="fail">Error completo: ' + JSON.stringify(e) + '</div>';
+        }
+
+        // ── 3. Verificar en Appwrite ─────────────────────
+        resultsEl.innerHTML += '<h2>3. Verificar en Appwrite</h2>';
+        var verificado = await DBAppwrite.listar('pedidos').then(l => l.find(p => p.id === testId));
+        assert(!!verificado, 'Documento encontrado');
+        assert(verificado.estado === 'cerrada', 'Estado es cerrada en Appwrite');
+
+        // ── 4. Limpiar ───────────────────────────────────
+        resultsEl.innerHTML += '<h2>4. Limpiar</h2>';
+        await DBAppwrite.eliminar('pedidos', testId);
+        assert(true, 'Documento eliminado');
+
+        resultsEl.innerHTML += '<h2>Resultado</h2>';
+        resultsEl.innerHTML += '<p>' + passed + ' pasaron, ' + failed + ' fallaron.</p>';
+        if (failed === 0) {
+          resultsEl.innerHTML += '<div class="pass">✔ El PATCH directo funciona. El problema está en procesarCambiosPendientes (Apps Script).</div>';
+          resultsEl.innerHTML += '<div class="info">Revisa en el editor de Apps Script la función enviarCambioAAppwrite. Asegúrate de que use el endpoint correcto, los headers X-Appwrite-Project y X-Appwrite-Key, y que el body sea {"data": {"estado": "cerrada"}}.</div>';
+        }
+      }
+
+      window.addEventListener('load', function() {
+        setTimeout(runTests, 1000);
+      });
+    })();
+  </script>
+</body>
+</html>

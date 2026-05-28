@@ -1,8 +1,8 @@
 /* ================================================================
-   Raíz — MÓDULO: db-appwrite.js (v2.4)
-   Propósito: Cliente de Appwrite. Suscripciones Realtime incluyen
-              Mesas. Notifica a Sheets sobre cambios en Mesas,
-              Pedidos y Comandas.
+   Raíz — MÓDULO: db-appwrite.js (v2.5)
+   Propósito: Cliente de Appwrite. En el método crear, elimina
+              el campo 'id' del objeto datos antes de enviarlo
+              a Appwrite, para evitar errores de atributo desconocido.
    ================================================================ */
 var DBAppwrite = (function() {
   var module = {};
@@ -24,7 +24,7 @@ var DBAppwrite = (function() {
     configuracion: 'Configuracion'
   };
 
-  var URL_SCRIPT = 'https://script.google.com/macros/s/AKfycbylhfXpCU_RA49avGsxaK5SIpRVhrxfto0IRJ94R4QOcbfC8Z8AI2wdxGTb5z_wBV8VzQ/exec';
+  var URL_SCRIPT = 'https://script.google.com/macros/s/AKfycby8Dz_4r_aC1ocUNliCzQMnVAsIbmN4WbKdCG2n1hPOBVQ00rUIu3y6iTG_zFAfcazLzQ/exec';
 
   module.init = async function() {
     if (typeof window.Appwrite === 'undefined') {
@@ -88,11 +88,15 @@ var DBAppwrite = (function() {
     if (!module.habilitado || !module.databases) return null;
     try {
       var id = docId || 'unique()';
+      // Eliminar el campo 'id' del objeto datos, porque Appwrite no lo acepta como atributo
+      var datosLimpios = Object.assign({}, datos);
+      delete datosLimpios.id;
+      
       var response = await module.databases.createDocument(
         module.databaseId,
         module.COLECCIONES[coleccion],
         id,
-        datos
+        datosLimpios
       );
       var data = Object.assign({}, response);
       data.id = response.$id;
@@ -141,7 +145,6 @@ var DBAppwrite = (function() {
   };
 
   function notificarASheets(coleccion, tipo, doc) {
-    // Notificar cambios en pedidos, comandas y mesas
     if (coleccion !== 'pedidos' && coleccion !== 'comandas' && coleccion !== 'mesas') return;
 
     fetch(URL_SCRIPT, {

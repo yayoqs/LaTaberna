@@ -98,12 +98,19 @@ var DB = (function() {
         if (ingAppwrite.length) {
           this.ingredientes = ingAppwrite.map(i => this._normalizarIngrediente(i));
         }
-
         var recAppwrite = await appwrite.listar('recetas');
         if (recAppwrite.length) {
-          this.recetas = recAppwrite;
+          this.recetas = recAppwrite.map(function(r) {
+            if (typeof r.ingredientes === 'string') {
+              try {
+                r.ingredientes = JSON.parse(r.ingredientes);
+              } catch (e) {
+                r.ingredientes = [];
+              }
+            }
+            return r;
+          });
         }
-
         try {
           var delivAppwrite = await appwrite.listar('pedidos_delivery');
           if (delivAppwrite.length) {
