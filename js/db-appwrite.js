@@ -1,8 +1,7 @@
 /* ================================================================
-   Raíz — MÓDULO: db-appwrite.js (v2.5)
-   Propósito: Cliente de Appwrite. En el método crear, elimina
-              el campo 'id' del objeto datos antes de enviarlo
-              a Appwrite, para evitar errores de atributo desconocido.
+   Raíz — MÓDULO: db-appwrite.js (v2.6)
+   Propósito: Emite 'comanda:enviada' al recibir eventos Realtime
+              de comandas, para que el KDS se actualice inmediatamente.
    ================================================================ */
 var DBAppwrite = (function() {
   var module = {};
@@ -88,7 +87,6 @@ var DBAppwrite = (function() {
     if (!module.habilitado || !module.databases) return null;
     try {
       var id = docId || 'unique()';
-      // Eliminar el campo 'id' del objeto datos, porque Appwrite no lo acepta como atributo
       var datosLimpios = Object.assign({}, datos);
       delete datosLimpios.id;
       
@@ -198,7 +196,7 @@ var DBAppwrite = (function() {
 
   module.iniciarRealtime = function() {
     if (!module.habilitado) return;
-    module.suscribirRealtime(function(coleccion, tipo) {
+    module.suscribirRealtime(function(coleccion, tipo, payload) {
       if (coleccion === 'pedidos') {
         module.listar('pedidos').then(function(pedidos) {
           if (pedidos.length) {
@@ -219,8 +217,20 @@ var DBAppwrite = (function() {
               return c;
             });
             window.DB.saveComandas();
-            comandas.forEach(function(c) { if (typeof Store !== 'undefined') Store.dispatch({ type: 'COMANDA_AGREGADA', payload: c }); });
+            // Despachar acción al Store y emitir evento para el KDS
+            if (typeof Store !== 'undefined') {
+              comandas.forEach(function(c) {
+                Store.dispatch({ type: 'COMANDA_AGREGADA', payload: c });
+              });
+            }
             EventBus.emit('comandas:guardadas', window.DB.comandas);
+            // Emitir 'comanda:enviada' para cada comanda nueva (tipo 'create')
+            if (tipo === 'create') {
+              var nuevaComanda = comandas.find(function(c) { return c.id === payload.$id; });
+              if (nuevaComanda) {
+                EventBus.emit('comanda:enviada', nuevaComanda);
+              }
+            }
           }
         }).catch(function(e) { Logger.warn('[Appwrite Realtime] Error al listar comandas:', e); });
       } else if (coleccion === 'mesas') {
