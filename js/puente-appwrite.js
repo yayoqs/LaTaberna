@@ -1,13 +1,84 @@
 /* ================================================================
-   Raíz — MÓDULO: puente-appwrite.js (v4.8 – sincronización inicial)
+   Raíz — MÓDULO: puente-appwrite.js (v5.0 – sincronización puntual)
+   Propósito: Redirigir escrituras a Appwrite de forma eficiente,
+              sincronizando solo el documento modificado, no todos.
+              Elimina la sincronización masiva que causaba 404 y rate limit.
    ================================================================ */
+
 function _normalizarFecha(valor) {
   if (!valor) return null;
-  if (typeof valor === 'number') return new Date(valor).toISOString();
+  if (typeof valor === 'number') {
+    return new Date(valor).toISOString();
+  }
   var str = String(valor);
   var parsed = new Date(str);
-  if (!isNaN(parsed.getTime())) return parsed.toISOString();
+  if (!isNaN(parsed.getTime())) {
+    return parsed.toISOString();
+  }
   return str.substring(0, 100);
+}
+
+// Función auxiliar para sanitizar una mesa antes de enviarla a Appwrite
+function _sanitizarMesa(m) {
+  return {
+    numero: m.numero,
+    estado: String(m.estado || 'libre'),
+    pedidoId: String(m.pedidoId || '').substring(0, 50),
+    items: Array.isArray(m.items) ? JSON.stringify(m.items).substring(0, 5000) : String(m.items || '[]').substring(0, 5000),
+    mozo: String(m.mozo || '').substring(0, 100),
+    comensales: Number(m.comensales) || 1,
+    abiertaEn: _normalizarFecha(m.abiertaEn),
+    observaciones: String(m.observaciones || '').substring(0, 500),
+    zona: String(m.zona || 'salon').substring(0, 50),
+    mesasFusionadas: Array.isArray(m.mesasFusionadas) ? JSON.stringify(m.mesasFusionadas).substring(0, 500) : String(m.mesasFusionadas || '').substring(0, 500),
+    esVirtual: Boolean(m.esVirtual)
+  };
+}
+
+// Función auxiliar para sanitizar un pedido
+function _sanitizarPedido(p) {
+  var data = Object.assign({}, p);
+  delete data.id; // el ID se usa como documentId, no como atributo
+  if (Array.isArray(data.items)) {
+    data.items = JSON.stringify(data.items).substring(0, 5000);
+  } else {
+    data.items = String(data.items || '[]').substring(0, 5000);
+  }
+  return data;
+}
+
+// Función auxiliar para sanitizar una comanda
+function _sanitizarComanda(c) {
+  var data = Object.assign({}, c);
+  delete data.id;
+  if (Array.isArray(data.items)) {
+    data.items = JSON.stringify(data.items).substring(0, 5000);
+  } else {
+    data.items = String(data.items || '[]').substring(0, 5000);
+  }
+  return data;
+}
+
+// Función genérica para crear o actualizar un documento en Appwrite
+async function _guardarEnAppwrite(coleccion, id, datos) {
+  if (!DBAppwrite.habilitado) return;
+  try {
+    // Intentar actualizar primero (más común)
+    await DBAppwrite.actualizar(coleccion, id, datos);
+  } catch (e) {
+    if (e && e.code === 404) {
+      // No existe, crear
+      try {
+        await DBAppwrite.crear(coleccion, id, datos);
+      } catch (e2) {
+        if (e2.code !== 409) {
+          Logger.error('[Puente] Error al crear ' + coleccion + ' ' + id + ':', e2);
+        }
+      }
+    } else if (e.code !== 409) {
+      Logger.error('[Puente] Error al actualizar ' + coleccion + ' ' + id + ':', e);
+    }
+  }
 }
 
 function activarPuenteAppwrite() {
@@ -23,25 +94,7 @@ function activarPuenteAppwrite() {
     for (var i = 0; i < DB.mesas.length; i++) {
       var m = DB.mesas[i];
       if (m.esVirtual) continue;
-      var dataMesa = {
-        numero: m.numero,
-        estado: String(m.estado || 'libre'),
-        pedidoId: String(m.pedidoId || '').substring(0, 50),
-        items: Array.isArray(m.items) ? JSON.stringify(m.items).substring(0, 5000) : String(m.items || '[]').substring(0, 5000),
-        mozo: String(m.mozo || '').substring(0, 100),
-        comensales: Number(m.comensales) || 1,
-        abiertaEn: _normalizarFecha(m.abiertaEn),
-        observaciones: String(m.observaciones || '').substring(0, 500),
-        zona: String(m.zona || 'salon').substring(0, 50),
-        mesasFusionadas: Array.isArray(m.mesasFusionadas) ? JSON.stringify(m.mesasFusionadas).substring(0, 500) : String(m.mesasFusionadas || '').substring(0, 500),
-        esVirtual: Boolean(m.esVirtual)
-      };
-      promesas.push(
-        DBAppwrite.crear('mesas', String(m.numero), dataMesa).catch(function(e) {
-          if (e && e.code === 409) return DBAppwrite.actualizar('mesas', String(m.numero), dataMesa);
-          throw e;
-        })
-      );
+      promesas.push(_guardarEnAppwrite('mesas', String(m.numero), _sanitizarMesa(m)));
     }
     Promise.all(promesas).then(function() {
       Logger.info('[Puente] Mesas iniciales sincronizadas.');
@@ -57,8 +110,10 @@ function activarPuenteAppwrite() {
     var idx = DB.productos.findIndex(p => p.id === producto.id);
     if (idx >= 0) DB.productos[idx] = producto;
     else DB.productos.push(producto);
+
     var dataSinId = Object.assign({}, producto);
     delete dataSinId.id;
+
     try {
       var existente = await DBAppwrite.listar('productos');
       var encontrado = existente.find(p => p.id === producto.id);
@@ -128,7 +183,24 @@ function activarPuenteAppwrite() {
     EventBus.emit('recetas:actualizadas');
   };
 
-  // ── PEDIDOS / MESAS / COMANDAS ─────────────────────────
+  // ── PEDIDOS / MESAS / COMANDAS (SINCRONIZACIÓN PUNTUAL) ──
+  // Exponemos funciones para que el repositorio las llame directamente
+  window._syncMesaAAppwrite = async function(mesa) {
+    if (!mesa || mesa.esVirtual) return;
+    await _guardarEnAppwrite('mesas', String(mesa.numero), _sanitizarMesa(mesa));
+  };
+
+  window._syncPedidoAAppwrite = async function(pedido) {
+    if (!pedido || !pedido.id) return;
+    await _guardarEnAppwrite('pedidos', pedido.id, _sanitizarPedido(pedido));
+  };
+
+  window._syncComandaAAppwrite = async function(comanda) {
+    if (!comanda || !comanda.id) return;
+    await _guardarEnAppwrite('comandas', comanda.id, _sanitizarComanda(comanda));
+  };
+
+  // Parcheamos PedidoRepositoryLocal para que llame a las funciones puntuales
   if (typeof PedidoRepositoryLocal !== 'undefined') {
     var metodos = ['abrirMesa', 'crearPedidoMesa', 'enviarComanda', 'cerrarPedido', 'liberarMesa', 'agregarMesa'];
     metodos.forEach(function(metodo) {
@@ -138,57 +210,36 @@ function activarPuenteAppwrite() {
         var resultado = await original.apply(this, arguments);
         if (DBAppwrite.habilitado && resultado) {
           try {
-            for (var i = 0; i < DB.mesas.length; i++) {
-              var m = DB.mesas[i];
-              if (m.esVirtual) continue;
-              var dataMesa = {
-                numero: m.numero,
-                estado: String(m.estado || 'libre'),
-                pedidoId: String(m.pedidoId || '').substring(0, 50),
-                items: Array.isArray(m.items) ? JSON.stringify(m.items).substring(0, 5000) : String(m.items || '[]').substring(0, 5000),
-                mozo: String(m.mozo || '').substring(0, 100),
-                comensales: Number(m.comensales) || 1,
-                abiertaEn: _normalizarFecha(m.abiertaEn),
-                observaciones: String(m.observaciones || '').substring(0, 500),
-                zona: String(m.zona || 'salon').substring(0, 50),
-                mesasFusionadas: Array.isArray(m.mesasFusionadas) ? JSON.stringify(m.mesasFusionadas).substring(0, 500) : String(m.mesasFusionadas || '').substring(0, 500),
-                esVirtual: Boolean(m.esVirtual)
-              };
-              await DBAppwrite.actualizar('mesas', String(m.numero), dataMesa).catch(async function(e) {
-                if (e && e.code === 404) return await DBAppwrite.crear('mesas', String(m.numero), dataMesa);
-                throw e;
-              });
+            // Sincronizar solo la mesa afectada, si la hay
+            if (resultado.mesa) {
+              var mesa = DB.mesas.find(m => m.numero == resultado.mesa);
+              if (mesa) await window._syncMesaAAppwrite(mesa);
             }
-            for (var j = 0; j < DB.pedidos.length; j++) {
-              var p = DB.pedidos[j];
-              var dataPedido = Object.assign({}, p);
-              delete dataPedido.id;
-              if (Array.isArray(dataPedido.items)) dataPedido.items = JSON.stringify(dataPedido.items).substring(0, 5000);
-              else dataPedido.items = String(dataPedido.items || '[]').substring(0, 5000);
-              await DBAppwrite.actualizar('pedidos', p.id, dataPedido).catch(async function(e) {
-                if (e && e.code === 404) return await DBAppwrite.crear('pedidos', p.id, dataPedido);
-                throw e;
-              });
+            // Sincronizar el pedido, si se devuelve uno
+            if (resultado.id && resultado.estado) { // es un pedido
+              await window._syncPedidoAAppwrite(resultado);
             }
-            for (var k = 0; k < DB.comandas.length; k++) {
-              var c = DB.comandas[k];
-              var dataComanda = Object.assign({}, c);
-              delete dataComanda.id;
-              if (Array.isArray(dataComanda.items)) dataComanda.items = JSON.stringify(dataComanda.items).substring(0, 5000);
-              else dataComanda.items = String(dataComanda.items || '[]').substring(0, 5000);
-              await DBAppwrite.actualizar('comandas', c.id, dataComanda).catch(async function(e) {
-                if (e && e.code === 404) return await DBAppwrite.crear('comandas', c.id, dataComanda);
-                throw e;
-              });
+            // Sincronizar las comandas, si se devuelven
+            if (resultado.comandas && Array.isArray(resultado.comandas)) {
+              for (var c = 0; c < resultado.comandas.length; c++) {
+                await window._syncComandaAAppwrite(resultado.comandas[c]);
+              }
             }
-          } catch (e) { Logger.error('[Puente] Error sincronizando pedidos/mesas/comandas:', e); }
+            // Si es una operación que modifica varias mesas (como fusión), sincronizamos las mesas afectadas
+            if (metodo === 'liberarMesa' && resultado) {
+              // resultado es la mesa liberada
+              await window._syncMesaAAppwrite(resultado);
+            }
+          } catch (e) {
+            Logger.error('[Puente] Error en sincronización puntual:', e);
+          }
         }
         return resultado;
       };
     });
   }
 
-  Logger.info('[Puente] Escrituras conectadas a Appwrite.');
+  Logger.info('[Puente] Escrituras conectadas a Appwrite (sincronización puntual).');
   EventBus.emit('puente:listo');
 }
 
