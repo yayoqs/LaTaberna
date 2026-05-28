@@ -1,7 +1,8 @@
 /* ================================================================
-   Raíz — MÓDULO: config.js (v4.2 – Appwrite sync, completo)
+   Raíz — MÓDULO: config.js (v4.2 completa – Appwrite sync + ajuste de mesas)
    Propósito: Vista de configuración (productos, mozos, zonas, stock).
               Lee del Store y persiste cambios en DB y Appwrite.
+              Al guardar, ajusta la cantidad de mesas según las zonas.
    ================================================================ */
 const Config = (() => {
   function _asegurarVista() {
@@ -215,7 +216,7 @@ const Config = (() => {
     _renderZonas();
   }
 
-  /** Guarda la configuración general, incluyendo sincronización con Appwrite */
+  /** Guarda la configuración general, incluyendo sincronización con Appwrite y ajuste de mesas */
   async function guardar() {
     const zonasContainer = $id('zonasContainer');
     let config = Store.getState().config || {};
@@ -245,6 +246,12 @@ const Config = (() => {
     DB.config = config;
     DB.saveConfig();
     DB.saveMesas();
+
+    // Ajustar cantidad de mesas según nuevas zonas
+    if (typeof DB.sincronizarMesasConConfig === 'function') {
+      await DB.sincronizarMesasConConfig();
+    }
+
     if (window.Mesas) Mesas.render();
     showToast('success', '<i class="fas fa-check-circle"></i> Configuración guardada');
 
@@ -413,36 +420,36 @@ const Config = (() => {
 
   // ── INICIALIZACIÓN ────────────────────────────────────────
   function _initListeners() {
-    Store.subscribe((state, action) => {
-      if (action.type.startsWith('PRODUCTO')) renderProductos();
-      if (action.type.startsWith('MOZO')) renderMozos();
-      if (action.type === 'CONFIG_INICIALIZAR') _renderZonas();
-    });
-
-    EventBus.on('vista:cambiada', (vista) => {
-      if (vista === 'config') cargar();
-    });
-  }
-
-  _initListeners();
-
-  return {
-    cargar,
-    guardar,
-    renderProductos,
-    abrirModalProducto,
-    cerrarModalProducto,
-    guardarProducto,
-    _editarProducto,
-    _eliminarProducto,
-    renderMozos,
-    agregarMozo,
-    eliminarMozo,
-    agregarZona,
-    eliminarZona,
-    _updateZona,
-    _mostrarCambiarPassword
-  };
-})();
+      Store.subscribe((state, action) => {
+        if (action.type.startsWith('PRODUCTO')) renderProductos();
+        if (action.type.startsWith('MOZO')) renderMozos();
+        if (action.type === 'CONFIG_INICIALIZAR') _renderZonas();
+      });
+  
+      EventBus.on('vista:cambiada', (vista) => {
+        if (vista === 'config') cargar();
+      });
+    }
+  
+    _initListeners();
+  
+    return {
+      cargar,
+      guardar,
+      renderProductos,
+      abrirModalProducto,
+      cerrarModalProducto,
+      guardarProducto,
+      _editarProducto,
+      _eliminarProducto,
+      renderMozos,
+      agregarMozo,
+      eliminarMozo,
+      agregarZona,
+      eliminarZona,
+      _updateZona,
+      _mostrarCambiarPassword
+    };
+  })();
 
 window.Config = Config;

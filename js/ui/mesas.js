@@ -1,9 +1,7 @@
 /* ================================================================
-   PubPOS — MÓDULO: mesas.js (v6.2 – comando agregarMesa)
+   Raíz — MÓDULO: mesas.js (v6.3 – ordenamiento forzado)
    Propósito: Mapa de mesas con zonas dinámicas y colores. Obtiene
-              los datos del Store y se suscribe a cambios.
-              Ahora usa CommandBus para agregar mesas en lugar de
-              tocar DB directamente.
+              los datos del Store y los ordena siempre por número.
    ================================================================ */
 const Mesas = (() => {
 
@@ -109,20 +107,17 @@ const Mesas = (() => {
     const grid = $id('mesasGrid');
     if (!grid) return;
 
-    const mesas = Store.getState().mesas;
-    if (!mesas || mesas.length === 0) {
-      setTimeout(_renderGrid, 200);
-      return;
-    }
-
-    let mesasVisibles = mesas.filter(m => m.estado !== 'fusionada');
+    let mesas = Store.getState().mesas || [];
+    mesas = mesas.filter(m => m.estado !== 'fusionada');
     if (_zonaActiva !== 'todas') {
-      mesasVisibles = mesasVisibles.filter(m => m.zona === _zonaActiva);
+      mesas = mesas.filter(m => m.zona === _zonaActiva);
     }
+    // Ordenar siempre por número
+    mesas.sort((a, b) => a.numero - b.numero);
 
     grid.innerHTML = '';
 
-    mesasVisibles.forEach(mesa => {
+    mesas.forEach(mesa => {
       const card = document.createElement('article');
       
       let clases = `mesa-card ${mesa.estado}`;
@@ -177,11 +172,6 @@ const Mesas = (() => {
       }
       grid.appendChild(card);
     });
-
-    const confirmBtn = document.getElementById('btnConfirmarFusion');
-    if (confirmBtn) {
-      confirmBtn.style.display = _modoSeleccion ? 'inline-flex' : 'none';
-    }
   }
 
   function toggleModoFusion() {
@@ -204,7 +194,7 @@ const Mesas = (() => {
 
   function fusionarMesasSeleccionadas() {
     if (_mesasSeleccionadas.size < 2) {
-      showToast('warning', 'Seleccioná al menos dos mesas para fusionar.');
+      showToast('warning', 'Selecciona al menos dos mesas para fusionar.');
       return;
     }
     const numeros = Array.from(_mesasSeleccionadas).sort((a,b) => a - b);
@@ -215,7 +205,7 @@ const Mesas = (() => {
       toggleModoFusion();
       EventBus.emit('mesa:seleccionada', mesaVirtual.numero);
     } else {
-      showToast('error', 'No se pudo fusionar. Verificá que las mesas estén en un estado válido.');
+      showToast('error', 'No se pudo fusionar. Verifica que las mesas estén en un estado válido.');
     }
   }
 
@@ -242,7 +232,6 @@ const Mesas = (() => {
         showToast('error', 'Error inesperado al agregar mesa');
       });
     } else {
-      // Fallback si CommandBus no está disponible
       const nuevaMesa = { ...mesaVacia(nuevoNum, zona) };
       Store.dispatch({ type: 'MESA_AGREGAR', payload: nuevaMesa });
       DB.mesas.push(nuevaMesa);

@@ -1,9 +1,11 @@
 /* ================================================================
-   Raíz — MÓDULO: db.js (Orquestador v5.3 – mesas ordenadas)
+   Raíz — MÓDULO: db.js (Orquestador v5.4 – ajuste de mesas por configuración)
    Propósito: Appwrite es la única fuente de verdad. La configuración
               de zonas se carga desde Appwrite (con fallback local).
               Las mesas se generan según la configuración si Appwrite
               está vacío y siempre se ordenan por número.
+              Incluye método sincronizarMesasConConfig para ajustar
+              la cantidad de mesas al cambiar las zonas desde la UI.
    ================================================================ */
 var DB = (function() {
   const core = DBCore;
@@ -66,7 +68,7 @@ var DB = (function() {
         var mesasAppwrite = await appwrite.listar('mesas');
         if (mesasAppwrite.length > 0) {
           this.mesas = mesasAppwrite.map(m => this._normalizarMesa(m));
-          this.mesas.sort((a, b) => a.numero - b.numero); // ← Ordenar siempre
+          this.mesas.sort((a, b) => a.numero - b.numero);
           Logger.info('[DB] ' + this.mesas.length + ' mesas cargadas desde Appwrite.');
         } else {
           Logger.info('[DB] Sin mesas en Appwrite. Generando desde config.zonas...');
@@ -83,7 +85,7 @@ var DB = (function() {
               numero++;
             }
           }
-          this.mesas.sort((a, b) => a.numero - b.numero); // ← Ordenar también las generadas
+          this.mesas.sort((a, b) => a.numero - b.numero);
           Logger.info('[DB] ' + this.mesas.length + ' mesas iniciales generadas localmente.');
           this._mesasPendientesSync = true;
         }
@@ -199,6 +201,71 @@ var DB = (function() {
     }
 
     return pedido;
+  };
+
+  /**
+   * Ajusta la cantidad de mesas según la configuración de zonas actual.
+   * Crea las mesas que falten y elimina las que sobren (empezando por el número más alto).
+   * Debe llamarse después de cambiar DB.config.zonas (ej. desde Config.guardar).
+   */
+  combined.sincronizarMesasConConfig = async function() {
+    if (!appwrite || !appwrite.habilitado) return;
+
+    var zonas = this.config.zonas || [{ nombre: 'salon', cantidad: 12 }];
+    var totalDeseado = 0;
+    for (var i = 0; i < zonas.length; i++) {
+      totalDeseado += zonas[i].cantidad;
+    }
+
+    var mesasActuales = this.mesas.filter(function(m) { return !m.esVirtual; });
+    var cantidadActual = mesasActuales.length;
+
+    if (cantidadActual === totalDeseado) return;
+
+    if (cantidadActual > totalDeseado) {
+      var sobrantes = mesasActuales.sort(function(a, b) { return b.numero - a.numero; }).slice(totalDeseado);
+      for (var i = 0; i < sobrantes.length; i++) {
+        var mesaEliminar = sobrantes[i];
+        try {
+          await appwrite.eliminar('mesas', String(mesaEliminar.numero));
+        } catch (e) {
+          Logger.warn('[DB] Error al eliminar mesa ' + mesaEliminar.numero + ':', e);
+        }
+        this.mesas = this.mesas.filter(function(m) { return m.numero !== mesaEliminar.numero; });
+      }
+    } else if (cantidadActual < totalDeseado) {
+      var maxNumero = mesasActuales.length > 0 ? Math.max.apply(null, mesasActuales.map(function(m) { return m.numero; })) : 0;
+      var faltantes = totalDeseado - cantidadActual;
+      for (var j = 0; j < faltantes; j++) {
+        maxNumero++;
+        var nuevaMesa = {
+          ...mesaVacia(maxNumero, 'salon'),
+          numero: maxNumero
+        };
+        try {
+          var dataMesa = {
+            numero: nuevaMesa.numero,
+            estado: 'libre',
+            pedidoId: '',
+            items: '[]',
+            mozo: '',
+            comensales: 1,
+            abiertaEn: new Date().toISOString(),
+            observaciones: '',
+            zona: nuevaMesa.zona,
+            esVirtual: false
+          };
+          await appwrite.crear('mesas', String(maxNumero), dataMesa);
+        } catch (e) {
+          Logger.warn('[DB] Error al crear mesa ' + maxNumero + ':', e);
+        }
+        this.mesas.push(nuevaMesa);
+      }
+    }
+
+    this.mesas.sort(function(a, b) { return a.numero - b.numero; });
+    this.saveMesas();
+    EventBus.emit('mesas:guardadas', this.mesas);
   };
 
   return combined;
