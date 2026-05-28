@@ -1,7 +1,8 @@
 /* ================================================================
-   Raíz — MÓDULO: db-appwrite.js (v2.6)
-   Propósito: Emite 'comanda:enviada' al recibir eventos Realtime
-              de comandas, para que el KDS se actualice inmediatamente.
+   Raíz — MÓDULO: db-appwrite.js (v2.7)
+   Propósito: Emite 'comanda:enviada' tanto para eventos create
+              como update de comandas, para que el KDS se actualice
+              siempre que llegue una comanda nueva o modificada.
    ================================================================ */
 var DBAppwrite = (function() {
   var module = {};
@@ -217,20 +218,18 @@ var DBAppwrite = (function() {
               return c;
             });
             window.DB.saveComandas();
-            // Despachar acción al Store y emitir evento para el KDS
             if (typeof Store !== 'undefined') {
               comandas.forEach(function(c) {
                 Store.dispatch({ type: 'COMANDA_AGREGADA', payload: c });
               });
             }
             EventBus.emit('comandas:guardadas', window.DB.comandas);
-            // Emitir 'comanda:enviada' para cada comanda nueva (tipo 'create')
-            if (tipo === 'create') {
-              var nuevaComanda = comandas.find(function(c) { return c.id === payload.$id; });
-              if (nuevaComanda) {
-                EventBus.emit('comanda:enviada', nuevaComanda);
+            // Emitir 'comanda:enviada' para cada comanda activa (nueva o en proceso)
+            comandas.forEach(function(c) {
+              if (c.estado === 'nueva' || c.estado === 'en-proceso') {
+                EventBus.emit('comanda:enviada', c);
               }
-            }
+            });
           }
         }).catch(function(e) { Logger.warn('[Appwrite Realtime] Error al listar comandas:', e); });
       } else if (coleccion === 'mesas') {

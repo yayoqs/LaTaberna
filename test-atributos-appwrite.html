@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test de Atributos - Appwrite</title>
+  <style>
+    body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
+    h1 { color: #f59e0b; }
+    h2 { color: #94a3b8; margin-top: 24px; }
+    table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 13px; }
+    th, td { border: 1px solid #2e2e42; padding: 6px 10px; text-align: left; }
+    th { background: #21212e; }
+    .pass { background: rgba(34,197,94,.2); }
+    .fail { background: rgba(239,68,68,.2); }
+    .warn { background: rgba(245,158,11,.2); }
+    .info { color: #94a3b8; font-size: 12px; margin: 2px 0; }
+    button { margin-top: 16px; padding: 12px 24px; background: #f59e0b; color: #000; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test de Atributos de Colecciones</h1>
+  <p class="info">Compara los atributos reales en Appwrite con los que la app espera encontrar.</p>
+  <div id="results"></div>
+  <button onclick="location.reload()">🔄 Ejecutar de nuevo</button>
+
+  <script src="js/appwrite.min.js"></script>
+  <script src="js/init-appwrite.js"></script>
+  <script src="js/db-appwrite.js"></script>
+
+  <script>
+    (function() {
+      var resultsEl = document.getElementById('results');
+
+      // Atributos esperados por el código (según puente, KDS y repositorios)
+      var ATRIBUTOS_ESPERADOS = {
+        'Mesas': ['numero', 'estado', 'pedidoId', 'items', 'mozo', 'comensales', 'abiertaEn', 'observaciones', 'zona', 'mesasFusionadas', 'esVirtual'],
+        'Pedidos': ['mesa', 'mozo', 'comensales', 'estado', 'items', 'total', 'created_at', 'updated_at', 'observaciones'],
+        'Comandas': ['mesa', 'mozo', 'destino', 'items', 'observaciones', 'estado', 'ts', 'deliveryId']
+      };
+
+      async function runTests() {
+        resultsEl.innerHTML = '';
+        await DBAppwrite.init();
+        if (!DBAppwrite.habilitado) {
+          resultsEl.innerHTML = '<div class="fail">❌ Appwrite no habilitado.</div>';
+          return;
+        }
+
+        var endpoint = localStorage.getItem('appwrite_endpoint') || 'https://tor.cloud.appwrite.io/v1';
+        var projectId = localStorage.getItem('appwrite_project_id');
+        var apiKey = localStorage.getItem('appwrite_api_key');
+        var databaseId = '6a0275cb0022ebf7d30d';
+        var colecciones = ['Mesas', 'Pedidos', 'Comandas'];
+
+        for (var i = 0; i < colecciones.length; i++) {
+          var coleccion = colecciones[i];
+          resultsEl.innerHTML += '<h2>' + coleccion + '</h2>';
+          try {
+            var url = endpoint + '/databases/' + databaseId + '/collections/' + coleccion + '/attributes';
+            var resp = await fetch(url, {
+              headers: {
+                'X-Appwrite-Project': projectId,
+                'X-Appwrite-Key': apiKey
+              }
+            });
+            var data = await resp.json();
+            var atributosReales = data.attributes || [];
+            
+            var esperados = ATRIBUTOS_ESPERADOS[coleccion] || [];
+            var nombresReales = atributosReales.map(function(a) { return a.key; });
+
+            var html = '<table><tr><th>Atributo</th><th>Tipo</th><th>Size</th><th>Requerido</th><th>¿Esperado?</th></tr>';
+            for (var j = 0; j < atributosReales.length; j++) {
+              var attr = atributosReales[j];
+              var esEsperado = esperados.indexOf(attr.key) !== -1;
+              var clase = esEsperado ? 'pass' : 'warn';
+              html += '<tr class="' + clase + '"><td>' + attr.key + '</td><td>' + attr.type + '</td><td>' + (attr.size || '-') + '</td><td>' + (attr.required ? 'Sí' : 'No') + '</td><td>' + (esEsperado ? '✔ Sí' : '⚠ No esperado') + '</td></tr>';
+            }
+            // Verificar atributos faltantes
+            for (var k = 0; k < esperados.length; k++) {
+              if (nombresReales.indexOf(esperados[k]) === -1) {
+                html += '<tr class="fail"><td>' + esperados[k] + '</td><td colspan="3">FALTANTE</td><td>✘ La app lo necesita</td></tr>';
+              }
+            }
+            html += '</table>';
+            resultsEl.innerHTML += html;
+          } catch(e) {
+            resultsEl.innerHTML += '<div class="fail">Error al obtener atributos de ' + coleccion + ': ' + e.message + '</div>';
+          }
+        }
+      }
+
+      window.addEventListener('load', function() {
+        setTimeout(runTests, 1000);
+      });
+    })();
+  </script>
+</body>
+</html>
