@@ -1,9 +1,9 @@
 /* ================================================================
-   Raíz — MÓDULO: db.js (Orquestador v5.2 – Configuración dinámica)
+   Raíz — MÓDULO: db.js (Orquestador v5.3 – mesas ordenadas)
    Propósito: Appwrite es la única fuente de verdad. La configuración
               de zonas se carga desde Appwrite (con fallback local).
               Las mesas se generan según la configuración si Appwrite
-              está vacío.
+              está vacío y siempre se ordenan por número.
    ================================================================ */
 var DB = (function() {
   const core = DBCore;
@@ -19,17 +19,10 @@ var DB = (function() {
     ...shim
   };
 
-  /**
-   * Inicializa la base de datos. Carga configuración desde Appwrite
-   * (o localStorage si Appwrite está vacío). Luego carga el resto de
-   * colecciones. Si no hay mesas en Appwrite, las genera a partir de
-   * la configuración y las marca para sincronizar con el puente.
-   */
   combined.init = async function() {
     try {
       Logger.info("[DB] Iniciando carga de datos (Appwrite)...");
 
-      // 1. Inicializar Appwrite
       var appwriteOk = false;
       if (appwrite && appwrite.init) {
         appwriteOk = await appwrite.init();
@@ -41,13 +34,11 @@ var DB = (function() {
         return false;
       }
 
-      // 2. Cargar configuración (zonas, nombre local, etc.)
+      // Cargar configuración desde Appwrite (o localStorage si no existe)
       await this._cargarConfiguracion();
 
-      // 3. Cargar mozos locales (obsoleto pero se mantiene)
       this._cargarMozosLocal();
 
-      // 4. Cargar datos desde Appwrite
       Logger.info('[DB] Cargando datos desde Appwrite...');
       try {
         var prodAppwrite = await appwrite.listar('productos');
@@ -74,11 +65,10 @@ var DB = (function() {
 
         var mesasAppwrite = await appwrite.listar('mesas');
         if (mesasAppwrite.length > 0) {
-          // Appwrite tiene mesas → fuente de verdad
           this.mesas = mesasAppwrite.map(m => this._normalizarMesa(m));
+          this.mesas.sort((a, b) => a.numero - b.numero); // ← Ordenar siempre
           Logger.info('[DB] ' + this.mesas.length + ' mesas cargadas desde Appwrite.');
         } else {
-          // Appwrite está vacío → generar mesas desde configuración
           Logger.info('[DB] Sin mesas en Appwrite. Generando desde config.zonas...');
           this.mesas = [];
           var zonas = this.config.zonas || [{ nombre: 'salon', cantidad: 12 }];
@@ -93,6 +83,7 @@ var DB = (function() {
               numero++;
             }
           }
+          this.mesas.sort((a, b) => a.numero - b.numero); // ← Ordenar también las generadas
           Logger.info('[DB] ' + this.mesas.length + ' mesas iniciales generadas localmente.');
           this._mesasPendientesSync = true;
         }
@@ -138,10 +129,6 @@ var DB = (function() {
     }
   };
 
-  /**
-   * Carga la configuración desde Appwrite (colección Configuracion).
-   * Si no existe, usa el fallback local (localStorage / DB.config por defecto).
-   */
   combined._cargarConfiguracion = async function() {
     if (typeof appwrite !== 'undefined' && appwrite.habilitado) {
       try {
@@ -150,7 +137,6 @@ var DB = (function() {
         if (docGlobal && docGlobal.valor) {
           this.config = JSON.parse(docGlobal.valor);
           Logger.info('[DB] Configuración cargada desde Appwrite.');
-          // Asegurar que exista el array de zonas
           if (!this.config.zonas) {
             this.config.zonas = [{ nombre: 'salon', cantidad: 12 }];
           }
@@ -160,7 +146,6 @@ var DB = (function() {
         Logger.warn('[DB] No se pudo cargar configuración desde Appwrite, usando local.');
       }
     }
-    // Fallback: cargar desde localStorage (lo que ya existía)
     this._cargarConfigLocal();
     if (!this.config.zonas) {
       this.config.zonas = [{ nombre: 'salon', cantidad: 12 }];
@@ -179,9 +164,6 @@ var DB = (function() {
     return 'esp_taberna';
   };
 
-  /**
-   * Cierra un pedido. Solo actualiza en Appwrite.
-   */
   combined.cerrarPedido = async function(id, formaPago, total, descuento) {
     const pedido = this.pedidos.find(p => p.id === id);
     if (!pedido) {
