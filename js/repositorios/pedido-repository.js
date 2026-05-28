@@ -1,5 +1,8 @@
 /* ================================================================
-   PubPOS — REPOSITORIO: pedido-repository.js (v1.9 – liberarMesa)
+   Raíz — REPOSITORIO: pedido-repository.js (v2.0 – Appwrite directo)
+   Propósito: Implementación local del repositorio de pedidos.
+              Cada método que modifica datos sincroniza directamente
+              con Appwrite después de actualizar el estado local.
    ================================================================ */
 const PedidoRepository = {
   async crearPedidoMesa(datos) { throw new Error('No implementado'); },
@@ -13,6 +16,84 @@ const PedidoRepository = {
 };
 
 const PedidoRepositoryLocal = (() => {
+
+  // ── Utilidades de sincronización con Appwrite ──────────
+  function _normalizarFecha(valor) {
+    if (!valor) return null;
+    if (typeof valor === 'number') return new Date(valor).toISOString();
+    var str = String(valor);
+    var parsed = new Date(str);
+    if (!isNaN(parsed.getTime())) return parsed.toISOString();
+    return str.substring(0, 100);
+  }
+
+  function _sanitizarMesa(m) {
+    return {
+      numero: m.numero,
+      estado: String(m.estado || 'libre'),
+      pedidoId: String(m.pedidoId || '').substring(0, 50),
+      items: Array.isArray(m.items) ? JSON.stringify(m.items).substring(0, 5000) : String(m.items || '[]').substring(0, 5000),
+      mozo: String(m.mozo || '').substring(0, 100),
+      comensales: Number(m.comensales) || 1,
+      abiertaEn: _normalizarFecha(m.abiertaEn),
+      observaciones: String(m.observaciones || '').substring(0, 500),
+      zona: String(m.zona || 'salon').substring(0, 50),
+      mesasFusionadas: Array.isArray(m.mesasFusionadas) ? JSON.stringify(m.mesasFusionadas).substring(0, 500) : String(m.mesasFusionadas || '').substring(0, 500),
+      esVirtual: Boolean(m.esVirtual)
+    };
+  }
+
+  function _sanitizarPedido(p) {
+    var data = Object.assign({}, p);
+    delete data.id;
+    if (Array.isArray(data.items)) data.items = JSON.stringify(data.items).substring(0, 5000);
+    else data.items = String(data.items || '[]').substring(0, 5000);
+    return data;
+  }
+
+  function _sanitizarComanda(c) {
+    var data = Object.assign({}, c);
+    delete data.id;
+    if (Array.isArray(data.items)) data.items = JSON.stringify(data.items).substring(0, 5000);
+    else data.items = String(data.items || '[]').substring(0, 5000);
+    return data;
+  }
+
+  async function _guardarEnAppwrite(coleccion, id, datos, esNuevo) {
+    if (!window.DBAppwrite || !DBAppwrite.habilitado) return;
+    try {
+      if (esNuevo) {
+        await DBAppwrite.crear(coleccion, id, datos);
+      } else {
+        await DBAppwrite.actualizar(coleccion, id, datos);
+      }
+    } catch (e) {
+      if (esNuevo && e.code === 409) {
+        try { await DBAppwrite.actualizar(coleccion, id, datos); } catch (e2) {}
+      } else if (!esNuevo && e.code === 404) {
+        try { await DBAppwrite.crear(coleccion, id, datos); } catch (e2) {}
+      } else if (e.code !== 409) {
+        Logger.error('[Repo] Error al guardar ' + coleccion + ' ' + id + ':', e);
+      }
+    }
+  }
+
+  async function _syncMesa(mesa) {
+    if (!mesa || mesa.esVirtual) return;
+    await _guardarEnAppwrite('mesas', String(mesa.numero), _sanitizarMesa(mesa), false);
+  }
+
+  async function _syncPedido(pedido, esNuevo) {
+    if (!pedido || !pedido.id) return;
+    await _guardarEnAppwrite('pedidos', pedido.id, _sanitizarPedido(pedido), esNuevo);
+  }
+
+  async function _syncComanda(comanda, esNuevo) {
+    if (!comanda || !comanda.id) return;
+    await _guardarEnAppwrite('comandas', comanda.id, _sanitizarComanda(comanda), esNuevo);
+  }
+
+  // ── MÉTODOS DEL REPOSITORIO ────────────────────────────
 
   async function abrirMesa(numeroMesa, mozo, comensales) {
     if (!window.DB || !DB.getMesa) throw new Error('DB.core no disponible');
@@ -35,26 +116,9 @@ const PedidoRepositoryLocal = (() => {
     mesa.pedidoId = pedidoLocal.id;
     DB.saveMesas();
 
-    const pedidoParaSync = {
-      id:          pedidoLocal.id,
-      mesa:        pedidoLocal.mesa,
-      mozo:        pedidoLocal.mozo || 'Sin mozo',
-      comensales:  pedidoLocal.comensales || 1,
-      estado:      pedidoLocal.estado || 'abierta',
-      items:       Array.isArray(pedidoLocal.items) ? JSON.stringify(pedidoLocal.items) : (pedidoLocal.items || '[]'),
-      total:       pedidoLocal.total || 0,
-      created_at:  pedidoLocal.created_at,
-      updated_at:  pedidoLocal.created_at
-    };
-
-    if (typeof DB.syncGuardarPedido === 'function') {
-      try {
-        await DB.syncGuardarPedido(pedidoParaSync);
-        Logger.info('[PedidoRepo] Pedido sincronizado con Sheets.');
-      } catch (e) {
-        Logger.warn('[PedidoRepo] Error al sincronizar con Sheets. Encolado.', e);
-      }
-    }
+    // Sincronizar con Appwrite
+    await _syncMesa(mesa);
+    await _syncPedido(pedidoLocal, true);
 
     return pedidoLocal;
   }
@@ -89,65 +153,42 @@ const PedidoRepositoryLocal = (() => {
     };
 
     const comandasCreadas = [];
-    const ticketsGenerados = { cocina: null, barra: null };
 
     if (cocinaItems.length && barraItems.length) {
-      const comCocina = _crearComanda(cocinaItems, 'cocina');
-      const comBarra  = _crearComanda(barraItems,  'barra');
-      comandasCreadas.push(comCocina, comBarra);
-      if (typeof Tickets !== 'undefined') {
-        ticketsGenerados.cocina = Tickets.generarComanda(comCocina, 'cocina');
-        ticketsGenerados.barra  = Tickets.generarComanda(comBarra,  'barra');
-      }
+      comandasCreadas.push(_crearComanda(cocinaItems, 'cocina'));
+      comandasCreadas.push(_crearComanda(barraItems,  'barra'));
     } else if (cocinaItems.length) {
-      const comCocina = _crearComanda(cocinaItems, 'cocina');
-      comandasCreadas.push(comCocina);
-      if (typeof Tickets !== 'undefined') ticketsGenerados.cocina = Tickets.generarComanda(comCocina, 'cocina');
+      comandasCreadas.push(_crearComanda(cocinaItems, 'cocina'));
     } else if (barraItems.length) {
-      const comBarra = _crearComanda(barraItems, 'barra');
-      comandasCreadas.push(comBarra);
-      if (typeof Tickets !== 'undefined') ticketsGenerados.barra = Tickets.generarComanda(comBarra, 'barra');
+      comandasCreadas.push(_crearComanda(barraItems,  'barra'));
     }
 
     DB.saveComandas();
-    if (typeof Store !== 'undefined') {
-      comandasCreadas.forEach(c => Store.dispatch({ type: 'COMANDA_AGREGADA', payload: c }));
+
+    // Actualizar pedido localmente
+    if (mesa.pedidoId && typeof DB.actualizarPedido === 'function') {
+      await DB.actualizarPedido(mesa.pedidoId, {
+        estado: 'en_proceso',
+        items: JSON.stringify(mesa.items),
+        total: calcularTotal(mesa.items),
+        mozo: mesa.mozo,
+        comensales: mesa.comensales,
+        observaciones: mesa.observaciones
+      });
     }
 
-    if (mesa.pedidoId && typeof DB.actualizarPedido === 'function') {
-      try {
-        const pedidoActualizado = await DB.actualizarPedido(mesa.pedidoId, {
-          estado: 'en_proceso',
-          items: JSON.stringify(mesa.items),
-          total: calcularTotal(mesa.items),
-          mozo: mesa.mozo,
-          comensales: mesa.comensales,
-          observaciones: mesa.observaciones
-        });
-        Logger.debug(`[PedidoRepo] Pedido ${mesa.pedidoId} actualizado localmente.`);
-
-        if (pedidoActualizado && typeof DB.syncGuardarPedido === 'function') {
-          try {
-            const pedidoParaSync = {
-              ...pedidoActualizado,
-              items: Array.isArray(pedidoActualizado.items) ? JSON.stringify(pedidoActualizado.items) : pedidoActualizado.items
-            };
-            await DB.syncGuardarPedido(pedidoParaSync);
-            Logger.info(`[PedidoRepo] Pedido ${mesa.pedidoId} sincronizado con Sheets.`);
-          } catch (syncError) {
-            Logger.warn('[PedidoRepo] Error al sincronizar pedido con Sheets. Encolado.', syncError);
-            if (typeof DB._encolarOperacion === 'function') {
-              DB._encolarOperacion('guardarPedido', { pedido: pedidoActualizado });
-            }
-            showToast('warning', 'Comanda enviada, pero no se pudo actualizar la hoja de cálculo. Se reintentará.');
-          }
-        }
-      } catch (e) {
-        Logger.warn('[PedidoRepo] No se pudo actualizar pedido:', e);
+    // Sincronizar con Appwrite: comandas y pedido actualizado
+    for (const c of comandasCreadas) {
+      await _syncComanda(c, true);
+    }
+    if (mesa.pedidoId) {
+      const pedidoActualizado = DB.pedidos.find(p => p.id === mesa.pedidoId);
+      if (pedidoActualizado) {
+        await _syncPedido(pedidoActualizado, false);
       }
     }
 
-    return { comandas: comandasCreadas, ticketsHTML: ticketsGenerados };
+    return { comandas: comandasCreadas, ticketsHTML: {} };
   }
 
   async function crearPedidoMesa(datos) {
@@ -156,27 +197,7 @@ const PedidoRepositoryLocal = (() => {
     const pedidoLocal = await DB.crearPedido(datos.mesa, datos.mozo, datos.comensales);
     if (!pedidoLocal) throw new Error('No se pudo crear el pedido localmente');
 
-    const pedidoParaSync = {
-      id:          pedidoLocal.id,
-      mesa:        pedidoLocal.mesa,
-      mozo:        pedidoLocal.mozo || 'Sin mozo',
-      comensales:  pedidoLocal.comensales || 1,
-      estado:      pedidoLocal.estado || 'abierta',
-      items:       Array.isArray(pedidoLocal.items) ? JSON.stringify(pedidoLocal.items) : (pedidoLocal.items || '[]'),
-      total:       pedidoLocal.total || 0,
-      created_at:  pedidoLocal.created_at,
-      updated_at:  pedidoLocal.created_at
-    };
-
-    if (typeof DB.syncGuardarPedido === 'function') {
-      try {
-        await DB.syncGuardarPedido(pedidoParaSync);
-        Logger.info('[PedidoRepo] Pedido sincronizado con Sheets.');
-      } catch (e) {
-        Logger.warn('[PedidoRepo] Error al sincronizar con Sheets. Encolado.', e);
-      }
-    }
-
+    await _syncPedido(pedidoLocal, true);
     return pedidoLocal;
   }
 
@@ -191,7 +212,27 @@ const PedidoRepositoryLocal = (() => {
     if (!pedido) throw new Error('Pedido no encontrado');
 
     await DB.cerrarPedido(id, datosCierre.formaPago, datosCierre.total, datosCierre.descuento || 0);
-    return DB.pedidos.find(p => p.id === id);
+    const pedidoCerrado = DB.pedidos.find(p => p.id === id);
+
+    if (pedidoCerrado) {
+      await _syncPedido(pedidoCerrado, false);
+
+      // Liberar la mesa asociada
+      const mesa = DB.mesas.find(m => m.pedidoId === id);
+      if (mesa && !mesa.esVirtual) {
+        mesa.estado = 'libre';
+        mesa.pedidoId = '';
+        mesa.items = [];
+        mesa.mozo = '';
+        mesa.comensales = 1;
+        mesa.observaciones = '';
+        DB.saveMesas();
+        await _syncMesa(mesa);
+        EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: 'libre' });
+      }
+    }
+
+    return pedidoCerrado;
   }
 
   async function obtenerTodos() {
@@ -212,14 +253,10 @@ const PedidoRepositoryLocal = (() => {
       Store.dispatch({ type: 'MESA_AGREGAR', payload: datosMesa });
     }
 
+    await _syncMesa(datosMesa);
     return datosMesa;
   }
 
-  /**
-   * Libera una mesa (individual o virtual) y persiste los cambios.
-   * @param {number|string} numeroMesa - Número de la mesa a liberar
-   * @returns {object} La mesa liberada
-   */
   async function liberarMesa(numeroMesa) {
     if (!window.DB || !DB.mesas) throw new Error('DB no disponible');
 
@@ -234,17 +271,26 @@ const PedidoRepositoryLocal = (() => {
     }
     DB.saveMesas();
 
-    // Sincronizar Store
     if (typeof Store !== 'undefined') {
       if (mesa.esVirtual) {
-        // Al liberar una virtual, las mesas originales vuelven a estado libre
         (mesa.mesasFusionadas || []).forEach(num => {
           Store.dispatch({ type: 'MESA_CAMBIAR_ESTADO', payload: { numero: num, estado: 'libre' } });
         });
-        // La virtual debe eliminarse del Store
         Store.dispatch({ type: 'MESA_ELIMINAR', payload: mesa.numero });
       } else {
         Store.dispatch({ type: 'MESA_CAMBIAR_ESTADO', payload: { numero: mesa.numero, estado: 'libre' } });
+      }
+    }
+
+    // Sincronizar la mesa liberada
+    if (!mesa.esVirtual) {
+      const mesaActualizada = DB.mesas.find(m => m.numero == numeroMesa);
+      if (mesaActualizada) await _syncMesa(mesaActualizada);
+    } else {
+      // Si era virtual, las mesas originales se liberaron, hay que sincronizarlas
+      for (const num of mesa.mesasFusionadas || []) {
+        const m = DB.mesas.find(x => x.numero === num);
+        if (m) await _syncMesa(m);
       }
     }
 
