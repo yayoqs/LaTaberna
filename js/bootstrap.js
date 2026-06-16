@@ -22,7 +22,7 @@ const Bootstrap = (() => {
     try {
       await DB.init();
       Logger.info('[Bootstrap] DB lista.');
-      // Activar el puente de escritura hacia Appwrite
+
     } catch (e) {
       Logger.error('[Bootstrap] Error en DB:', e);
       showToast('error', 'Error crítico al cargar los datos');
