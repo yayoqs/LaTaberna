@@ -1,0 +1,200 @@
+/**
+ * Pantalla de Eventos en Vivo del Cliente (v1.0.0)
+ *
+ * Estilos para la vista inmersiva de eventos.
+ * Mantiene coherencia visual con PantallaBienvenida.
+ */
+
+.view.active#view-eventos-cliente {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  position: relative;
+  background: #1a1a2e;
+}
+
+/* Fondo mesh animado */
+.eventos-fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(circle at 30% 40%, rgba(99,102,241,.2) 0%, transparent 50%),
+    radial-gradient(circle at 70% 60%, rgba(245,158,11,.15) 0%, transparent 50%),
+    radial-gradient(circle at 50% 80%, rgba(239,68,68,.15) 0%, transparent 50%);
+  animation: eventos-mesh 12s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+@keyframes eventos-mesh {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  100% { transform: translate3d(-10px, -10px, 0) scale(1.05); }
+}
+
+/* Header */
+.eventos-header {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding: 28px 24px 12px;
+  flex-shrink: 0;
+}
+.eventos-header h1 {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--color-text);
+  margin-bottom: 4px;
+}
+.eventos-sub {
+  font-size: 14px;
+  color: var(--color-text-sec);
+  font-style: italic;
+  margin-bottom: 10px;
+}
+.eventos-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(239,68,68,.15);
+  border: 1px solid rgba(239,68,68,.3);
+  border-radius: 99px;
+  padding: 6px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-danger);
+}
+.eventos-punto {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-danger);
+  animation: punto-vivo 1.2s ease-in-out infinite;
+}
+@keyframes punto-vivo {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .3; }
+}
+
+/* Contenido */
+.eventos-contenido {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0 20px 24px;
+  max-width: 600px;
+  width: 100%;
+  margin: 0 auto;
+  min-height: 0;
+}
+
+.eventos-card {
+  border-radius: var(--radius);
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
+}
+.eventos-card-grande {
+  flex: 1;
+}
+
+.eventos-card .card-glass {
+  background: rgba(26,26,36,.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: var(--radius);
+  padding: 28px 24px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.eventos-icono { font-size: 56px; }
+.eventos-card h2 { font-size: 22px; color: var(--color-text); }
+.eventos-descripcion { font-size: 14px; color: var(--color-text-sec); max-width: 400px; }
+
+/* Estado vacío */
+.eventos-vacio { text-align: center; }
+.eventos-vacio i { font-size: 48px; opacity: .25; display: block; margin-bottom: 16px; color: var(--color-text-muted); }
+.eventos-vacio h2 { margin-bottom: 8px; }
+.eventos-vacio p  { font-size: 14px; color: var(--color-text-muted); margin-bottom: 20px; }
+
+/* Ecualizador inactivo */
+.ecualizador.inactivo span { animation: none; opacity: .3; }
+
+/* Bingo */
+.eventos-bingo { width: 100%; }
+.bingo-ultimo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 20px;
+}
+.bingo-ultimo span { font-size: 13px; color: var(--color-text-muted); }
+.bingo-ultimo strong {
+  font-size: 64px;
+  font-weight: 800;
+  color: var(--color-accent);
+  line-height: 1;
+}
+.bingo-historial { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+.bingo-numero {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 8px 14px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+/* Karaoke */
+.eventos-karaoke { width: 100%; }
+.karaoke-letra {
+  font-size: 18px;
+  color: var(--color-text);
+  line-height: 1.8;
+  font-style: italic;
+  white-space: pre-line;
+}
+
+/* Votación */
+.eventos-votacion {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 300px;
+}
+.votacion-opcion {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--t);
+  text-align: center;
+}
+.votacion-opcion:hover {
+  border-color: var(--color-accent);
+  background: var(--color-hover);
+  color: var(--color-accent);
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+  .eventos-header h1 { font-size: 22px; }
+  .eventos-contenido { padding: 0 12px 20px; }
+  .eventos-card .card-glass { padding: 20px 16px; }
+  .bingo-ultimo strong { font-size: 48px; }
+  .karaoke-letra { font-size: 16px; }
+}

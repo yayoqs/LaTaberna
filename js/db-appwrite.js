@@ -1,8 +1,9 @@
 /* ================================================================
-   Raíz — MÓDULO: db-appwrite.js (v2.9 – Fase 1 completa)
-   Propósito: Cliente de Appwrite con autenticación anónima (sin API Key),
-              sin notificación a Sheets desde el frontend, y con
-              Realtime optimizado (actualiza solo el elemento modificado).
+   Raíz — MÓDULO: db-appwrite.js (v2.10 – Realtime dinámico)
+   Propósito: Cliente de Appwrite con autenticación anónima.
+              Realtime optimizado que solo actualiza el documento
+              modificado, y se suscribe automáticamente a todas
+              las colecciones definidas en COLECCIONES.
    ================================================================ */
 var DBAppwrite = (function() {
   var module = {};
@@ -22,7 +23,9 @@ var DBAppwrite = (function() {
     recetas: 'Recetas',
     pedidos_delivery: 'Pedidos_delivery',
     usuarios: 'Usuarios',
-    configuracion: 'Configuracion'
+    configuracion: 'Configuracion',
+    precargas_cliente: 'Precargas_cliente',
+    eventos_en_vivo: 'Eventos_en_vivo'
   };
 
   module.init = async function() {
@@ -143,23 +146,50 @@ var DBAppwrite = (function() {
     }
   };
 
+  // ── Función auxiliar para actualizar un array local (insertar o reemplazar) ──
+  function actualizarArrayLocal(nombreArray, datos, campoId) {
+    if (!window.DB) window.DB = {};
+    if (!window.DB[nombreArray]) window.DB[nombreArray] = [];
+    var idx = window.DB[nombreArray].findIndex(function(item) {
+      return item[campoId] === datos[campoId];
+    });
+    if (idx >= 0) {
+      window.DB[nombreArray][idx] = datos;
+    } else {
+      window.DB[nombreArray].push(datos);
+    }
+    // Guardar si existe el método
+    var metodoSave = 'save' + nombreArray.charAt(0).toUpperCase() + nombreArray.slice(1);
+    if (typeof window.DB[metodoSave] === 'function') {
+      window.DB[metodoSave]();
+    }
+  }
+
   var _realtimeCallbacks = [];
   module.suscribirRealtime = function(onCambio) {
     if (!module.habilitado || !module.client) return;
     _realtimeCallbacks.push(onCambio);
-    var canales = [
-      'databases.' + module.databaseId + '.collections.' + module.COLECCIONES.pedidos + '.documents',
-      'databases.' + module.databaseId + '.collections.' + module.COLECCIONES.comandas + '.documents',
-      'databases.' + module.databaseId + '.collections.' + module.COLECCIONES.mesas + '.documents'
-    ];
+
+    // Construir canales dinámicamente para TODAS las colecciones definidas
+    var canales = [];
+    var colecciones = Object.keys(module.COLECCIONES);
+    for (var i = 0; i < colecciones.length; i++) {
+      var nombreColeccion = module.COLECCIONES[colecciones[i]];
+      canales.push('databases.' + module.databaseId + '.collections.' + nombreColeccion + '.documents');
+    }
+
     try {
       var realtime = new Appwrite.Realtime(module.client);
       canales.forEach(function(canal) {
         realtime.subscribe(canal, function(payload) {
+          // Determinar el nombre corto de la colección desde el canal
           var coleccion = '';
-          if (canal.indexOf('Pedidos') !== -1) coleccion = 'pedidos';
-          else if (canal.indexOf('Comandas') !== -1) coleccion = 'comandas';
-          else if (canal.indexOf('Mesas') !== -1) coleccion = 'mesas';
+          for (var j = 0; j < colecciones.length; j++) {
+            if (canal.indexOf(module.COLECCIONES[colecciones[j]]) !== -1) {
+              coleccion = colecciones[j];
+              break;
+            }
+          }
 
           var tipo = 'update';
           if (payload.events.includes('create')) tipo = 'create';
@@ -168,7 +198,7 @@ var DBAppwrite = (function() {
           _realtimeCallbacks.forEach(function(cb) { cb(coleccion, tipo, payload.payload); });
         });
       });
-      Logger.info('[Appwrite] Suscripciones Realtime activas.');
+      Logger.info('[Appwrite] Suscripciones Realtime activas para ' + colecciones.length + ' colecciones.');
     } catch (e) {
       Logger.warn('[Appwrite] No se pudo activar Realtime:', e.message);
     }
@@ -177,91 +207,49 @@ var DBAppwrite = (function() {
   module.iniciarRealtime = function() {
     if (!module.habilitado) return;
     module.suscribirRealtime(function(coleccion, tipo, payload) {
-      // Optimización: actualizar solo el documento modificado, no toda la colección
       if (!payload || !payload.$id) return;
 
-      if (coleccion === 'pedidos') {
-        // Obtener solo el documento modificado
-        module.databases.getDocument(module.databaseId, module.COLECCIONES.pedidos, payload.$id)
-          .then(function(doc) {
-            var pedido = Object.assign({}, doc);
-            pedido.id = doc.$id;
-            pedido.items = typeof pedido.items === 'string' ? pedido.items : JSON.stringify(pedido.items);
-            delete pedido.$id;
-            delete pedido.$databaseId;
-            delete pedido.$collectionId;
-            delete pedido.$createdAt;
-            delete pedido.$updatedAt;
-            delete pedido.$permissions;
+      // Obtener solo el documento modificado, no toda la colección
+      module.databases.getDocument(module.databaseId, module.COLECCIONES[coleccion], payload.$id)
+        .then(function(doc) {
+          var datos = Object.assign({}, doc);
+          datos.id = doc.$id;
+          delete datos.$id;
+          delete datos.$databaseId;
+          delete datos.$collectionId;
+          delete datos.$createdAt;
+          delete datos.$updatedAt;
+          delete datos.$permissions;
 
-            var idx = window.DB.pedidos.findIndex(function(p) { return p.id === pedido.id; });
-            if (idx >= 0) {
-              window.DB.pedidos[idx] = pedido;
-            } else {
-              window.DB.pedidos.push(pedido);
-            }
-            window.DB.savePedidos();
-            if (typeof Store !== 'undefined') {
-              Store.dispatch({ type: 'PEDIDOS_INICIALIZAR', payload: window.DB.pedidos });
-            }
+          // Actualizar el array local correspondiente
+          if (coleccion === 'pedidos') {
+            datos.items = typeof datos.items === 'string' ? datos.items : JSON.stringify(datos.items);
+            actualizarArrayLocal('pedidos', datos, 'id');
+            if (typeof Store !== 'undefined') Store.dispatch({ type: 'PEDIDOS_INICIALIZAR', payload: window.DB.pedidos });
             EventBus.emit('sincronizacion:completada');
-          })
-          .catch(function(e) { Logger.warn('[Realtime] Error al obtener pedido:', e); });
-
-      } else if (coleccion === 'comandas') {
-        module.databases.getDocument(module.databaseId, module.COLECCIONES.comandas, payload.$id)
-          .then(function(doc) {
-            var comanda = Object.assign({}, doc);
-            comanda.id = doc.$id;
-            comanda.items = typeof comanda.items === 'string' ? JSON.parse(comanda.items) : comanda.items;
-            delete comanda.$id;
-            delete comanda.$databaseId;
-            delete comanda.$collectionId;
-            delete comanda.$createdAt;
-            delete comanda.$updatedAt;
-            delete comanda.$permissions;
-
-            var idx = window.DB.comandas.findIndex(function(c) { return c.id === comanda.id; });
-            if (idx >= 0) {
-              window.DB.comandas[idx] = comanda;
-            } else {
-              window.DB.comandas.push(comanda);
+          } else if (coleccion === 'comandas') {
+            datos.items = typeof datos.items === 'string' ? JSON.parse(datos.items) : datos.items;
+            actualizarArrayLocal('comandas', datos, 'id');
+            if (typeof Store !== 'undefined') Store.dispatch({ type: 'COMANDA_AGREGADA', payload: datos });
+            EventBus.emit('comanda:enviada', datos);
+          } else if (coleccion === 'mesas') {
+            if (typeof window.DB._normalizarMesa === 'function') {
+              datos = window.DB._normalizarMesa(datos);
             }
-            window.DB.saveComandas();
+            actualizarArrayLocal('mesas', datos, 'numero');
+            if (typeof Store !== 'undefined') Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: window.DB.mesas });
+            EventBus.emit('mesa:actualizada', { mesa: datos.numero, estado: datos.estado });
+          } else {
+            // Para cualquier otra colección, emitir un evento genérico
+            var eventoGenerico = coleccion + ':actualizada';
             if (typeof Store !== 'undefined') {
-              Store.dispatch({ type: 'COMANDA_AGREGADA', payload: comanda });
+              Store.dispatch({ type: coleccion.toUpperCase() + '_INICIALIZAR', payload: [datos] });
             }
-            EventBus.emit('comanda:enviada', comanda);
-          })
-          .catch(function(e) { Logger.warn('[Realtime] Error al obtener comanda:', e); });
-
-      } else if (coleccion === 'mesas') {
-        module.databases.getDocument(module.databaseId, module.COLECCIONES.mesas, payload.$id)
-          .then(function(doc) {
-            var mesa = Object.assign({}, doc);
-            mesa.id = doc.$id;
-            delete mesa.$id;
-            delete mesa.$databaseId;
-            delete mesa.$collectionId;
-            delete mesa.$createdAt;
-            delete mesa.$updatedAt;
-            delete mesa.$permissions;
-            mesa = window.DB._normalizarMesa(mesa);
-
-            var idx = window.DB.mesas.findIndex(function(m) { return m.numero === mesa.numero; });
-            if (idx >= 0) {
-              window.DB.mesas[idx] = mesa;
-            } else {
-              window.DB.mesas.push(mesa);
-            }
-            window.DB.saveMesas();
-            if (typeof Store !== 'undefined') {
-              Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: window.DB.mesas });
-            }
-            EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: mesa.estado });
-          })
-          .catch(function(e) { Logger.warn('[Realtime] Error al obtener mesa:', e); });
-      }
+            EventBus.emit(eventoGenerico, datos);
+            Logger.debug('[Realtime] Evento genérico emitido: ' + eventoGenerico);
+          }
+        })
+        .catch(function(e) { Logger.warn('[Realtime] Error al obtener documento de ' + coleccion + ':', e); });
     });
   };
 

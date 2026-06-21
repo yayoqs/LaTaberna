@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test B — Recetario Aislado (v1.0.2)</title>
+  <style>
+    body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
+    h1 { color: #f59e0b; }
+    .suite { margin-bottom: 24px; border-bottom: 1px solid #2e2e42; padding-bottom: 12px; }
+    .test { margin: 4px 0; padding: 4px 8px; border-radius: 4px; }
+    .pass { background: rgba(34,197,94,.2); }
+    .fail { background: rgba(239,68,68,.2); }
+    .summary { margin-top: 20px; font-weight: bold; }
+    .info { color: #94a3b8; font-size: 12px; margin: 2px 0; }
+    .error { color: #ef4444; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test B — Recetario Aislado (v1.0.2)</h1>
+  <p class="info">Valida que el recetario muestre recetas correctamente y no falle sin datos.</p>
+  <div id="results"></div>
+
+  <!-- Mocks tempranos -->
+  <script>
+    window.DBInventario = {
+      validarStockParaItems: function() { return { ok: true, faltantes: [] }; }
+    };
+    window.DBFusion = {
+      fusionarMesas: function() { return null; }
+    };
+  </script>
+
+  <!-- Dependencias -->
+  <script src="/js/utils.js"></script>
+  <script src="/js/lib/logger.js"></script>
+  <script src="/js/lib/eventBus.js"></script>
+  <script src="/js/lib/store.js"></script>
+  <script src="/js/lib/command-bus.js"></script>
+  <script src="/js/lib/deps.js"></script>
+  <script src="/js/dominio/resultado.js"></script>
+  <script src="/js/dominio/dinero.js"></script>
+  <script src="/js/dominio/cantidad.js"></script>
+  <script src="/js/db-core.js"></script>
+  <script src="/js/db-appwrite.js"></script>
+  <script src="/js/puente-appwrite.js"></script>
+  <script src="/js/db.js"></script>
+
+  <!-- Módulo bajo test -->
+  <script src="/js/modulos/interno/recetario.js"></script>
+
+  <script>
+    (function() {
+      var resultsEl = document.getElementById('results');
+      var passed = 0, failed = 0;
+
+      function assert(condition, msg) {
+        if (condition) {
+          passed++;
+          resultsEl.innerHTML += '<div class="test pass">✔ ' + msg + '</div>';
+        } else {
+          failed++;
+          resultsEl.innerHTML += '<div class="test fail">✘ ' + msg + '</div>';
+        }
+      }
+
+      function esperar(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+      }
+
+      async function runTests() {
+        resultsEl.innerHTML = '';
+        Logger.setLevel('ERROR');
+
+        // ── Configurar mocks ──────────────────────────
+        var recetasMock = [];
+
+        window.DBAppwrite = window.DBAppwrite || {};
+        window.DBAppwrite.listar = async function(coleccion) {
+          if (coleccion === 'recetas') {
+            return JSON.parse(JSON.stringify(recetasMock));
+          }
+          return [];
+        };
+
+        window.DB = window.DB || {};
+        DB.productos = [{ id: 'prod_1', nombre: 'Hamburguesa' }];
+        DB.ingredientes = [{ id: 'ing_a', nombre: 'Carne', unidad: 'g' }];
+
+        // ── Suite 1: Sin recetas ──────────────────────
+        resultsEl.innerHTML += '<div class="suite"><h2>1. Vista sin recetas</h2></div>';
+        recetasMock = [];
+        await Recetario.render();
+        await esperar(100);
+
+        var grid = document.getElementById('recetarioGrid');
+        assert(!!grid, 'El grid existe');
+        assert(grid.textContent.includes('No hay recetas'), 'Muestra mensaje de vacío');
+
+        // Limpiar para la siguiente suite
+        var mainViejo = document.getElementById('view-recetario');
+        if (mainViejo) mainViejo.remove();
+
+        // ── Suite 2: Con recetas ──────────────────────
+        resultsEl.innerHTML += '<div class="suite"><h2>2. Render con recetas</h2></div>';
+        recetasMock = [
+          { 
+            productoId: 'prod_1', 
+            ingredientes: [{ ingredienteId: 'ing_a', cantidad: 200, unidad: 'g' }], 
+            instrucciones: 'Cocinar 10 min' 
+          }
+        ];
+
+        await Recetario.render();
+        await esperar(100);
+
+        var tarjeta = document.querySelector('.receta-card');
+        assert(!!tarjeta, 'Aparece tarjeta de receta');
+        if (tarjeta) {
+          assert(tarjeta.textContent.includes('Hamburguesa'), 'Muestra nombre del producto');
+          assert(tarjeta.textContent.includes('Carne'), 'Muestra ingrediente');
+          assert(tarjeta.textContent.includes('200'), 'Muestra cantidad');
+        }
+
+        // ── Resumen ───────────────────────────────────
+        resultsEl.innerHTML += '<div class="summary">' + passed + ' pasaron, ' + failed + ' fallaron</div>';
+        if (failed === 0) {
+          resultsEl.innerHTML += '<div class="test pass">✔ Todos los tests del recetario pasaron.</div>';
+        }
+      }
+
+      window.addEventListener('load', function() {
+        runTests().catch(function(e) {
+          resultsEl.innerHTML += '<div class="error">Error en tests: ' + e.message + '</div>';
+          console.error(e);
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

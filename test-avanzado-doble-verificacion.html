@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>PubPOS – Test Avanzado de Doble Verificación</title>
+  <style>
+    body { font-family: monospace; background: #111827; color: #f9fafb; padding: 30px; line-height: 1.5; }
+    h1 { color: #f59e0b; border-bottom: 2px solid #374151; padding-bottom: 10px; margin-bottom: 20px; }
+    h2 { color: #60a5fa; margin-top: 25px; margin-bottom: 10px; }
+    .panel-controles { background: #1f2937; padding: 15px; border-radius: 8px; margin-bottom: 25px; border: 1px solid #4b5563; }
+    button { background: #f59e0b; color: #000; border: none; padding: 12px 24px; font-weight: bold; font-family: monospace; border-radius: 6px; cursor: pointer; font-size: 14px; }
+    button:hover { background: #d97706; }
+    .test-case { margin: 8px 0; padding: 10px 15px; border-radius: 6px; font-size: 13px; display: flex; justify-content: space-between; align-items: center; }
+    .pass { background: rgba(16, 185, 129, 0.15); border-left: 5px solid #10b981; color: #34d399; }
+    .fail { background: rgba(239, 68, 68, 0.15); border-left: 5px solid #ef4444; color: #f87171; }
+    .info { background: rgba(96, 165, 250, 0.15); border-left: 5px solid #60a5fa; color: #93c5fd; }
+    .summary { font-size: 16px; font-weight: bold; margin-top: 25px; padding: 15px; background: #1f2937; border-radius: 6px; border: 1px solid #374151; }
+    .badge { padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 11px; }
+    .badge-pass { background: #10b981; color: #fff; }
+    .badge-fail { background: #ef4444; color: #fff; }
+    .badge-info { background: #3b82f6; color: #fff; }
+  </style>
+</head>
+<body>
+
+  <h1>🧪 Banco de Pruebas: Doble Verificación Cruzada (E2E)</h1>
+  <p>Este entorno valida la bidireccionalidad en tiempo real entre el Frontend (Sesión Anónima), Appwrite Cloud y Google Sheets.</p>
+
+  <div class="panel-controles">
+    <strong>Controles del Analizador:</strong><br><br>
+    <button id="btnEjecutar">⚡ Iniciar Ciclo de Doble Verificación</button>
+  </div>
+
+  <div id="results"></div>
+
+  <script src="js/lib/logger.js"></script>
+  <script src="js/lib/eventBus.js"></script>
+  <script src="js/appwrite.min.js"></script>
+  <script src="js/db-appwrite.js"></script>
+  <script src="js/db-shim.js"></script>
+
+  <script>
+    // Inicializar mocks mínimos para evitar errores de entorno de ejecución en los scripts nativos
+    window.DB = {
+      pedidos: [],
+      comandas: [],
+      mesas: [],
+      savePedidos: function() { console.log('[Mock DB] Guardando pedidos'); },
+      saveComandas: function() { console.log('[Mock DB] Guardando comandas'); },
+      saveMesas: function() { console.log('[Mock DB] Guardando mesas'); },
+      _normalizarMesa: function(m) { return m; }
+    };
+    
+    // El Store simulado para interceptar los Dispatches del Realtime optimizado
+    window.Store = {
+      dispatch: function(action) {
+        console.log('[Mock Store] Dispatch detectado:', action);
+        EventBus.emit('store:dispatch', action);
+      }
+    };
+
+    const resultsEl = document.getElementById('results');
+    let passed = 0;
+    let failed = 0;
+
+    function imprimirLog(tipo, mensaje, statusBadge) {
+      const div = document.createElement('div');
+      div.className = `test-case ${tipo}`;
+      div.innerHTML = `<span>${mensaje}</span> <span class="badge badge-${tipo}">${statusBadge}</span>`;
+      resultsEl.appendChild(div);
+    }
+
+    function assert(condicion, mensaje) {
+      if (condicion) {
+        passed++;
+        imprimirLog('pass', `✔ ${mensaje}`, 'PASSED');
+      } else {
+        failed++;
+        imprimirLog('fail', `✘ ${mensaje}`, 'FAILED');
+      }
+    }
+
+    // Retardo controlado asíncrono
+    const esperar = ms => new Promise(res => setTimeout(res, ms));
+
+    document.getElementById('btnEjecutar').addEventListener('click', async () => {
+      resultsEl.innerHTML = '';
+      passed = 0;
+      failed = 0;
+
+      imprimirLog('info', 'Iniciando secuencia de verificación hidráulica de datos...', 'INFO');
+
+      // ── PASO 1: Inicialización de la Infraestructura ──
+      try {
+        const initOk = await DBAppwrite.init();
+        assert(initOk && DBAppwrite.habilitado, 'Inicialización de DBAppwrite con Sesión Anónima exitosa.');
+      } catch (e) {
+        assert(false, `Fallo crítico al inicializar sesión anónima: ${e.message}`);
+        return;
+      }
+
+      // Activar el Realtime optimizado v2.9 para la captura del Lazo Beta
+      DBAppwrite.iniciarRealtime();
+      imprimirLog('info', 'Canales de WebSockets de Appwrite abiertos y en escucha activa.', 'LISTEN');
+
+      const testMesaId = '99'; // ID de control de ingeniería
+      const marcaDeTiempo = 'E2E-' + Date.now();
+
+      // ── LAZO ALFA: App ➔ Appwrite ➔ Google Sheets ──
+      h2('Lazo Alfa: Verificación de Flujo de Escritura Síncrona');
+      
+      try {
+        imprimirLog('info', `Escribiendo documento de prueba en Appwrite (Mesa ${testMesaId})...`, 'EXEC');
+        const cambioAppwrite = await DBAppwrite.actualizar('mesas', testMesaId, {
+          estado: 'ocupada',
+          observaciones: marcaDeTiempo,
+          mozo: 'Bot de Diagnóstico'
+        });
+        
+        assert(cambioAppwrite !== null, 'El Servidor de Appwrite Cloud aceptó el cambio de la App de forma anónima.');
+
+        // Margen de tolerancia para que el Webhook de Appwrite viaje a la Nube de Google y ejecute Apps Script
+        imprimirLog('info', 'Esperando 4.5 segundos para la estabilización del Webhook en Google Cloud...', 'WAIT');
+        await esperar(4500);
+
+        // Consultar a Google Sheets si el cambio impactó físicamente el libro
+        imprimirLog('info', 'Consultando el estado de la celda directamente a la API de Google Sheets...', 'READ');
+        const respuestaGoogle = await DBShim.llamar('obtenerMesa', { numero: parseInt(testMesaId) });
+        
+        assert(respuestaGoogle && respuestaGoogle.observaciones === marcaDeTiempo, 
+          `Confirmación de Doble Vía exitosa: Google Sheets refleja la marca exacta: "${marcaDeTiempo}".`);
+
+      } catch (e) {
+        assert(false, `Error en el Lazo Alfa de comunicación: ${e.message}`);
+      }
+
+      // ── LAZO BETA: Google Sheets ➔ Appwrite ➔ App (Realtime) ──
+      h2('Lazo Beta: Emulación de Modificación desde Google Sheets (Tiempo Real)');
+
+      let realtimeCapturado = false;
+      let datosCapturados = null;
+
+      // Suscribirse temporalmente al bus de eventos para verificar que la app capturó el WebSocket
+      const removerListener = EventBus.on('mesa:actualizada', (data) => {
+        if (data.mesa === 999) { // El ID que gatilla la función de prueba en Apps Script
+          realtimeCapturado = true;
+          datosCapturados = data;
+        }
+      });
+
+      try {
+        imprimirLog('info', 'Gatillando el disparador remoto de Google Apps Script (testEscrituraAppwrite)...', 'TRIGGER');
+        
+        // Ejecutamos la función de prueba que el cliente ya tiene en su archivo de Google 'code.gs.txt'
+        const ejecucionRemota = await DBShim.llamar('testEscrituraAppwrite', {});
+        
+        imprimirLog('info', 'Orden enviada. Esperando captura en el WebSocket local de la App...', 'AWAIT_WS');
+        
+        // Damos un margen de 5 segundos para que la inyección se distribuya por WebSockets
+        let intentos = 0;
+        while (!realtimeCapturado && intentos < 10) {
+          await esperar(500);
+          intentos++;
+        }
+
+        assert(realtimeCapturado, 'El WebSocket optimizado de la v2.9 interceptó la mutación externa en tiempo real.');
+        if (realtimeCapturado) {
+          assert(datosCapturados.estado === 'libre', 'Los datos replicados en la app local mantienen la integridad estructural.');
+        }
+
+      } catch (e) {
+        assert(false, `Error en el Lazo Beta de comunicación: ${e.message}`);
+      } finally {
+        // Limpieza de memoria
+        removerListener();
+      }
+
+      // ── RESUMEN FINAL ──
+      const summaryDiv = document.createElement('div');
+      summaryDiv.className = 'summary';
+      summaryDiv.innerHTML = `⚙️ RESULTADO GLOBAL DEL DIAGNÓSTICO:<br>
+      <span style="color: #34d399">${passed} Pruebas exitosas</span> | 
+      <span style="color: #f87171">${failed} Pruebas fallidas</span><br><br>
+      ${failed === 0 ? '🚀 SISTEMA ESTABLE Y HOMOLOGADO PARA FASE 1.' : '⚠️ SE DETECTARON DISCREPANCIAS EN LOS LAZOS DE RED.'}`;
+      resultsEl.appendChild(summaryDiv);
+    });
+
+    function h2(texto) {
+      const el = document.createElement('h2');
+      el.textContent = texto;
+      resultsEl.appendChild(el);
+    }
+  </script>
+</body>
+</html>

@@ -26,8 +26,17 @@
   <link rel="stylesheet" href="css/reparto.css">
   <link rel="stylesheet" href="css/menu.css">
   <link rel="stylesheet" href="css/perfil.css">
+  <link rel="stylesheet" href="css/cliente-inicio.css">
+  <link rel="stylesheet" href="css/cliente-bienvenida.css">
+  <link rel="stylesheet" href="css/cliente-menu.css">
+  <link rel="stylesheet" href="css/cliente-orden.css">
+  <link rel="stylesheet" href="css/cliente-eventos.css">
+  <link rel="stylesheet" href="css/eventos-en-vivo.css">
   <link rel="stylesheet" href="css/responsive.css">
   <style>
+    /* Oculta el header por defecto para evitar parpadeo en la vista pública */
+    .app-header { display: none; }
+
     .item-persona-badge {
       font-size: 10px; background: var(--color-primary); color: white;
       padding: 2px 6px; border-radius: 99px; margin-left: 6px;
@@ -96,6 +105,9 @@
       <button class="nav-btn" data-view="eventos" onclick="App.showView('eventos')" data-rol="artista,eventos,admin,master">
         <i class="fas fa-calendar-alt"></i><span> Eventos</span>
       </button>
+      <button class="nav-btn" data-view="eventos-en-vivo" onclick="App.showView('eventos-en-vivo')" data-rol="artista,eventos,admin,master">
+        <i class="fas fa-broadcast-tower"></i><span> En Vivo</span>
+      </button>
       <button class="nav-btn" data-view="perfil" onclick="App.showView('perfil')" data-rol="mesero,admin,master,caja,cocina,barra,despensa,eventos,reparto,cliente,artista">
         <i class="fas fa-id-card"></i><span> Perfil</span>
       </button>
@@ -115,6 +127,7 @@
 
   <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
+  <!-- ========== SCRIPTS LEGACY (SIN type="module") ========== -->
   <script src="js/utils.js"></script>
   <script src="js/lib/logger.js"></script>
   <script src="js/lib/eventBus.js"></script>
@@ -126,7 +139,6 @@
   <script src="js/db-inventario.js"></script>
   <script src="js/db-fusion.js"></script>
   <script src="js/db-shim.js"></script>
-  <script src="js/init-appwrite.js"></script>
   <script src="js/db-appwrite.js"></script>
   <script src="js/db.js"></script>
   <script src="js/lib/loader.js"></script>
@@ -148,12 +160,14 @@
   <script src="js/comandos/enviar-comanda.js"></script>
   <script src="js/comandos/agregar-mesa.js"></script>
   <script src="js/comandos/liberar-mesa.js"></script>
+  <script src="js/comandos/completar-subcomanda.js"></script>
 
   <script src="js/repositorios/pedido-repository.js"></script>
 
   <script src="js/managers/pedido-manager.js"></script>
   <script src="js/managers/turno-manager.js"></script>
 
+  <!-- Vistas legacy (NO migradas a ES6) -->
   <script src="js/ui/mesas.js"></script>
   <script src="js/ui/carta.js"></script>
   <script src="js/ui/comanda.js"></script>
@@ -168,11 +182,21 @@
   <script src="js/ui/recetas.js"></script>
   <script src="js/ui/reparto.js"></script>
   <script src="js/ui/menu.js"></script>
-  <script src="js/ui/eventos.js"></script>
-  <script src="js/ui/perfil.js"></script>
+
+  <!-- Vistas legacy migradas a ES6 (sí llevan type="module") -->
+  <script type="module" src="js/ui/perfil.js"></script>
+  <script type="module" src="js/ui/eventos.js"></script>
 
   <script src="js/bootstrap.js"></script>
   <script src="js/app.js"></script>
+
+  <!-- ========== MÓDULOS ES6 NATIVOS ========== -->
+  <script type="module" src="js/modulos/interno/precarga-control.js"></script>
+  <script type="module" src="js/modulos/interno/recetario.js"></script>
+  <script type="module" src="js/modulos/admin/eventos-en-vivo.js"></script>
+
+  <!-- Módulo ES6 nativo de la Célula C (Frontend Cliente) -->
+  <script type="module" src="js/modulos/cliente/principal.js"></script>
 
 </body>
 </html>

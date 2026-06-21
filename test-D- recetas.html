@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test D – Recetas</title>
+  <style>
+    body { font-family: sans-serif; background: #111; color: #eee; padding: 20px; }
+    .test { margin: 10px 0; padding: 10px; border-left: 4px solid #666; }
+    .pass { border-color: #4caf50; }
+    .fail { border-color: #f44336; }
+    .info { color: #aaa; font-size: 12px; margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Test D – Recetas (v6.0)</h1>
+  <p class="info">Prueba las mejoras: búsqueda por ingrediente, cálculo de costo y exportación PDF.</p>
+  <div id="resultados"></div>
+
+  <script>
+    // ─── Stubs del sistema ───────────────────────────────
+    const Logger = { info: console.log, warn: console.warn, error: console.error };
+    const EventBus = {
+      events: {},
+      on(ev, cb) { (this.events[ev] = this.events[ev] || []).push(cb); },
+      emit(ev, data) { (this.events[ev] || []).forEach(cb => cb(data)); }
+    };
+    const Store = {
+      state: {},
+      getState() { return this.state; },
+      subscribe() {}
+    };
+    const Auth = {
+      _rol: 'admin',
+      getRol() { return this._rol; },
+      getNombre() { return 'Test'; }
+    };
+    let toastMessages = [];
+    function showToast(tipo, msg) { toastMessages.push({tipo, msg}); }
+
+    // Mock mínimo de DB
+    const DB = {
+      recetas: [],
+      productos: [],
+      ingredientes: [],
+      saveRecetas() {},
+      syncGuardarReceta() {}
+    };
+
+    // Datos de prueba
+    const productoHamburguesa = {
+      id: 'prod1', nombre: 'Hamburguesa', precio: 1500,
+      categoria: 'Comidas', destino: 'cocina', activo: true
+    };
+    const ingredientePan = {
+      id: 'ing1', nombre: 'Pan de hamburguesa', stock: 50,
+      stock_minimo: 5, unidad: 'u', categoria: 'cocina', valor_unitario: 100
+    };
+    const ingredienteCarne = {
+      id: 'ing2', nombre: 'Carne molida', stock: 20,
+      stock_minimo: 2, unidad: 'kg', categoria: 'cocina', valor_unitario: 500
+    };
+    const recetaHamburguesa = {
+      id: 'rec1',
+      productoId: 'prod1',
+      ingredientes: [
+        { ingredienteId: 'ing1', cantidad: 1 },
+        { ingredienteId: 'ing2', cantidad: 0.2 }
+      ],
+      instrucciones: '1. Cocinar carne\n2. Armar hamburguesa'
+    };
+
+    // Poblar estado
+    Store.state = {
+      productos: [productoHamburguesa],
+      ingredientes: [ingredientePan, ingredienteCarne],
+      recetas: [recetaHamburguesa]
+    };
+    DB.productos = [productoHamburguesa];
+    DB.ingredientes = [ingredientePan, ingredienteCarne];
+    DB.recetas = [recetaHamburguesa];
+    window.fmtMoney = (val) => `$${val.toFixed(0)}`;
+  </script>
+
+  <!-- Cargar el módulo real -->
+  <script src="js/ui/recetas.js"></script>
+
+  <script>
+    function assert(cond, desc) {
+      const div = document.createElement('div');
+      div.className = 'test ' + (cond ? 'pass' : 'fail');
+      div.textContent = (cond ? '✔' : '✘') + ' ' + desc;
+      document.getElementById('resultados').appendChild(div);
+    }
+
+    async function iniciarTests() {
+      // Test 1: Renderizado de la vista
+      EventBus.emit('vista:cambiada', 'recetas');
+      await new Promise(r => setTimeout(r, 100));
+      assert(document.getElementById('view-recetas') !== null, '[Render] La vista de recetas se crea correctamente');
+      const tarjetas = document.querySelectorAll('.receta-card');
+      assert(tarjetas.length === 1, '[Render] Aparece 1 tarjeta de receta (Hamburguesa)');
+
+      // Test 2: Búsqueda por ingrediente
+      // Simular búsqueda por "Carne"
+      document.getElementById('recetasIngredienteSearch').value = 'Carne';
+      Recetas.filtrarPorIngrediente();
+      await new Promise(r => setTimeout(r, 100));
+      let tarjetasFiltradas = document.querySelectorAll('.receta-card');
+      assert(tarjetasFiltradas.length === 1, '[Búsqueda] Filtrar por ingrediente "Carne" devuelve la receta de Hamburguesa');
+
+      // Buscar un ingrediente que no existe
+      document.getElementById('recetasIngredienteSearch').value = 'Lechuga';
+      Recetas.filtrarPorIngrediente();
+      await new Promise(r => setTimeout(r, 100));
+      tarjetasFiltradas = document.querySelectorAll('.receta-card');
+      assert(tarjetasFiltradas.length === 0, '[Búsqueda] Filtrar por "Lechuga" (inexistente) no muestra recetas');
+
+      // Limpiar filtro
+      document.getElementById('recetasIngredienteSearch').value = '';
+      Recetas.filtrarPorIngrediente();
+      await new Promise(r => setTimeout(r, 100));
+
+      // Test 3: Modal de detalle con costo estimado
+      Recetas.mostrarDetalle('prod1');
+      await new Promise(r => setTimeout(r, 100));
+      const seccionCosto = document.getElementById('detalleCosto');
+      assert(seccionCosto !== null, '[Detalle] Sección de costo estimado visible en el modal');
+
+      // Verificar costo total: pan 1×$100 + carne 0.2×$500 = $200
+      assert(seccionCosto.textContent.includes('$200'), '[Costo] Costo total calculado correctamente ($200)');
+
+      // Verificar que los ingredientes aparecen en el detalle
+      const textoIngredientes = document.getElementById('detalleIngredientes').textContent;
+      assert(textoIngredientes.includes('Pan de hamburguesa'), '[Detalle] Ingrediente "Pan de hamburguesa" listado');
+      assert(textoIngredientes.includes('Carne molida'), '[Detalle] Ingrediente "Carne molida" listado');
+
+      // Test 4: Exportación a PDF
+      let ventanaAbierta = false;
+      let impreso = false;
+      const originalOpen = window.open;
+      window.open = function() {
+        ventanaAbierta = true;
+        return {
+          document: { write: function(){}, close: function(){} },
+          focus: function(){},
+          print: function(){ impreso = true; },
+          close: function(){}
+        };
+      };
+      Recetas.exportarRecetaPDF('prod1');
+      assert(ventanaAbierta, '[PDF] Se abre ventana de impresión');
+      assert(impreso, '[PDF] Se invoca window.print() para exportar');
+      window.open = originalOpen;
+
+      // Cerrar modal
+      Recetas.cerrarDetalle();
+      await new Promise(r => setTimeout(r, 100));
+      const modalCerrado = document.getElementById('modalRecetaDetalle');
+      assert(modalCerrado.style.display === 'none', '[Modal] El modal de detalle se cierra correctamente');
+
+      console.log('Todos los tests de recetas finalizados correctamente.');
+    }
+
+    window.addEventListener('load', () => {
+      setTimeout(iniciarTests, 200);
+    });
+  </script>
+</body>
+</html>

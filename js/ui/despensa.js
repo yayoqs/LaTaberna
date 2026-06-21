@@ -1,18 +1,20 @@
 /* ================================================================
-   PubPOS — MÓDULO: despensa.js (v11.1 – JSDoc completo)
+   PubPOS — MÓDULO: despensa.js (v12.0 – mejoras: filtros avanzados,
+   ordenamiento múltiple, exportación PDF, paginación movimientos)
    Propósito: Gestión de inventario (ingredientes, movimientos, alertas).
               Obtiene los datos del Store y se re‑renderiza automáticamente.
    ================================================================ */
 
 const Despensa = (() => {
 
-  let _ordenColumna = null;
-  let _ordenDireccion = 1;
+  let _ordenColumnas = [];       // array de {columna, direccion}
   let _categoriaFiltro = 'todas';
+  let _paginaMovimientos = 0;    // control de paginación
+  const _MOVS_POR_PAGINA = 10;
 
   /* ── CREACIÓN DINÁMICA DE LA VISTA ───────────────────────── */
   function _asegurarVista() {
-    if ($id('view-despensa')) return;
+    if (document.getElementById('view-despensa')) return;
 
     const main = document.createElement('main');
     main.id = 'view-despensa';
@@ -21,7 +23,7 @@ const Despensa = (() => {
       <div class="view-toolbar">
         <h2><i class="fas fa-boxes"></i> Despensa — Inventario</h2>
         <div class="toolbar-actions">
-          <div style="display:flex; align-items:center; gap:8px;">
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
             <select id="despensaCatFilter" onchange="Despensa.filtrarPorCategoria(this.value)">
               <option value="todas">Todas las categorías</option>
               <option value="cocina">Cocina</option>
@@ -30,12 +32,23 @@ const Despensa = (() => {
             </select>
             <input type="text" id="ingredienteSearch" placeholder="Buscar ingrediente..." 
                    oninput="Despensa._buscar()">
+            <label style="display:flex; align-items:center; gap:4px; font-size:12px; color:var(--color-text-muted);">
+              <input type="checkbox" id="filtroBajoMinimo" onchange="Despensa._aplicarFiltros()"> Bajo mínimo
+            </label>
+            <label style="display:flex; align-items:center; gap:4px; font-size:12px; color:var(--color-text-muted);">
+              <input type="checkbox" id="filtroConValor" onchange="Despensa._aplicarFiltros()"> Con valor > 0
+            </label>
+            <input type="text" id="filtroUbicacion" placeholder="Filtrar ubicación..." 
+                   oninput="Despensa._aplicarFiltros()" style="width:140px;">
           </div>
           <button class="btn-primary" onclick="Despensa.mostrarModalIngrediente()">
             <i class="fas fa-plus"></i> Nuevo Ingrediente
           </button>
           <button class="btn-secondary" onclick="Despensa.exportarIngredientes()">
-            <i class="fas fa-download"></i> Exportar
+            <i class="fas fa-download"></i> Exportar CSV
+          </button>
+          <button class="btn-secondary" onclick="Despensa.exportarPDF()">
+            <i class="fas fa-print"></i> Exportar PDF
           </button>
         </div>
       </div>
@@ -45,13 +58,13 @@ const Despensa = (() => {
           <table class="ingredientes-table" id="ingredientesTable">
             <thead>
               <tr>
-                <th onclick="Despensa.ordenarTabla('nombre')">Ingrediente <i class="fas fa-sort"></i></th>
-                <th onclick="Despensa.ordenarTabla('categoria')">Cat. <i class="fas fa-sort"></i></th>
-                <th onclick="Despensa.ordenarTabla('stock')">Stock <i class="fas fa-sort"></i></th>
-                <th onclick="Despensa.ordenarTabla('unidad')">Uni. <i class="fas fa-sort"></i></th>
-                <th onclick="Despensa.ordenarTabla('stock_minimo')">Mín. <i class="fas fa-sort"></i></th>
-                <th onclick="Despensa.ordenarTabla('ubicacion')">Ubicación <i class="fas fa-sort"></i></th>
-                <th onclick="Despensa.ordenarTabla('valor_unitario')">Valor Un. <i class="fas fa-sort"></i></th>
+                <th onclick="Despensa.ordenarTabla('nombre', event)">Ingrediente <i class="fas fa-sort"></i></th>
+                <th onclick="Despensa.ordenarTabla('categoria', event)">Cat. <i class="fas fa-sort"></i></th>
+                <th onclick="Despensa.ordenarTabla('stock', event)">Stock <i class="fas fa-sort"></i></th>
+                <th onclick="Despensa.ordenarTabla('unidad', event)">Uni. <i class="fas fa-sort"></i></th>
+                <th onclick="Despensa.ordenarTabla('stock_minimo', event)">Mín. <i class="fas fa-sort"></i></th>
+                <th onclick="Despensa.ordenarTabla('ubicacion', event)">Ubicación <i class="fas fa-sort"></i></th>
+                <th onclick="Despensa.ordenarTabla('valor_unitario', event)">Valor Un. <i class="fas fa-sort"></i></th>
                 <th>Valor Total</th>
                 <th>Acciones</th>
               </tr>
@@ -62,6 +75,7 @@ const Despensa = (() => {
         <div class="despensa-sidebar">
           <h4><i class="fas fa-history"></i> Últimos movimientos</h4>
           <div id="movimientosList"></div>
+          <div id="movimientosPaginador" style="margin-top:8px;"></div>
           <h4><i class="fas fa-exclamation-triangle" style="color:var(--color-warning);"></i> Alertas Stock Bajo</h4>
           <div id="alertasStockList"></div>
           <button class="btn-secondary" onclick="Despensa.ajusteRapido()" style="width:100%;">
@@ -70,7 +84,7 @@ const Despensa = (() => {
         </div>
       </div>
     `;
-    const referencia = $id('toastContainer') || document.body.lastChild;
+    const referencia = document.getElementById('toastContainer') || document.body.lastChild;
     document.body.insertBefore(main, referencia);
   }
 
@@ -84,7 +98,7 @@ const Despensa = (() => {
   }
 
   function _renderResumen() {
-    const cont = $id('inventarioResumen');
+    const cont = document.getElementById('inventarioResumen');
     if (!cont) return;
 
     const ingredientes = Store.getState().ingredientes || [];
@@ -104,13 +118,15 @@ const Despensa = (() => {
   /** @param {string} cat */
   function filtrarPorCategoria(cat) {
     _categoriaFiltro = cat;
-    _renderTablaIngredientes();
-    _renderResumen();
+    _aplicarFiltros();
   }
 
   function _buscar() {
-    _ordenColumna = null;
-    _ordenDireccion = 1;
+    _ordenColumnas = [];
+    _aplicarFiltros();
+  }
+
+  function _aplicarFiltros() {
     _renderTablaIngredientes();
     _renderResumen();
   }
@@ -141,17 +157,36 @@ const Despensa = (() => {
       );
     }
 
-    if (_ordenColumna) {
+    // Filtros avanzados (checkboxes + ubicación)
+    const filtroBajo = document.getElementById('filtroBajoMinimo')?.checked;
+    const filtroValor = document.getElementById('filtroConValor')?.checked;
+    const filtroUbicacion = (document.getElementById('filtroUbicacion')?.value || '').trim().toLowerCase();
+
+    if (filtroBajo) {
+      ingredientes = ingredientes.filter(i => i.stock <= i.stock_minimo);
+    }
+    if (filtroValor) {
+      ingredientes = ingredientes.filter(i => (i.valor_unitario || 0) > 0);
+    }
+    if (filtroUbicacion) {
+      ingredientes = ingredientes.filter(i => (i.ubicacion || '').toLowerCase().includes(filtroUbicacion));
+    }
+
+    // Ordenamiento múltiple
+    if (_ordenColumnas.length > 0) {
       ingredientes.sort((a, b) => {
-        let valA = a[_ordenColumna];
-        let valB = b[_ordenColumna];
-        if (typeof valA === 'string') valA = valA.toLowerCase();
-        if (typeof valB === 'string') valB = valB.toLowerCase();
-        if (valA < valB) return -1 * _ordenDireccion;
-        if (valA > valB) return 1 * _ordenDireccion;
+        for (const ord of _ordenColumnas) {
+          let valA = a[ord.columna];
+          let valB = b[ord.columna];
+          if (typeof valA === 'string') valA = valA.toLowerCase();
+          if (typeof valB === 'string') valB = valB.toLowerCase();
+          if (valA < valB) return -1 * ord.direccion;
+          if (valA > valB) return 1 * ord.direccion;
+        }
         return 0;
       });
     } else {
+      // Orden por defecto: críticos primero
       ingredientes.sort((a, b) => {
         const critA = a.stock <= a.stock_minimo ? 1 : 0;
         const critB = b.stock <= b.stock_minimo ? 1 : 0;
@@ -197,28 +232,54 @@ const Despensa = (() => {
     }).join('');
   }
 
-  /** Ordena la tabla por la columna indicada */
-  function ordenarTabla(columna) {
-    if (_ordenColumna === columna) {
-      _ordenDireccion *= -1;
+  /** Ordena la tabla por la columna indicada, con soporte Shift+clic */
+  function ordenarTabla(columna, event) {
+    if (event && event.shiftKey) {
+      // Agregar/quitar orden secundario
+      const existente = _ordenColumnas.findIndex(o => o.columna === columna);
+      if (existente >= 0) {
+        // Invertir dirección o eliminar
+        if (_ordenColumnas[existente].direccion === 1) {
+          _ordenColumnas[existente].direccion = -1;
+        } else {
+          _ordenColumnas.splice(existente, 1);
+        }
+      } else {
+        _ordenColumnas.push({ columna, direccion: 1 });
+      }
     } else {
-      _ordenColumna = columna;
-      _ordenDireccion = 1;
+      // Orden simple o reemplazar
+      if (_ordenColumnas.length === 1 && _ordenColumnas[0].columna === columna) {
+        _ordenColumnas[0].direccion *= -1;
+      } else {
+        _ordenColumnas = [{ columna, direccion: 1 }];
+      }
     }
     _renderTablaIngredientes();
   }
 
   function _renderMovimientos() {
     const cont = document.getElementById('movimientosList');
+    const paginador = document.getElementById('movimientosPaginador');
     if (!cont) return;
+
     const movs = Store.getState().movimientos || DB.movimientos || [];
-    const recientes = [...movs].reverse().slice(0, 10);
-    if (!recientes.length) {
+    const recientes = [...movs].reverse();
+    
+    // Paginación
+    const totalMovs = recientes.length;
+    const inicio = 0;
+    const fin = (_paginaMovimientos + 1) * _MOVS_POR_PAGINA;
+    const movsPaginados = recientes.slice(inicio, Math.min(fin, totalMovs));
+
+    if (!movsPaginados.length) {
       cont.innerHTML = `<p style="color:var(--color-text-muted);">Sin movimientos</p>`;
+      if (paginador) paginador.innerHTML = '';
       return;
     }
-    cont.innerHTML = recientes.map(mov => {
-      const ing = DB.ingredientes.find(i => i.id === mov.ingredienteId);
+
+    cont.innerHTML = movsPaginados.map(mov => {
+      const ing = (Store.getState().ingredientes || DB.ingredientes || []).find(i => i.id === mov.ingredienteId);
       const nombre = ing ? ing.nombre : mov.ingredienteId;
       const signo = mov.cantidad >= 0 ? '+' : '';
       const clase = mov.cantidad >= 0 ? 'success' : 'danger';
@@ -231,6 +292,18 @@ const Despensa = (() => {
           <div style="font-size:10px; color:var(--color-text-muted);">${mov.motivo} · ${new Date(mov.fecha).toLocaleString()}</div>
         </div>`;
     }).join('');
+
+    // Paginador
+    if (paginador && totalMovs > fin) {
+      paginador.innerHTML = `<button class="btn-ajuste" onclick="Despensa._mostrarMasMovimientos()" style="width:100%;">Ver más (${totalMovs - fin} restantes)</button>`;
+    } else if (paginador) {
+      paginador.innerHTML = '';
+    }
+  }
+
+  function _mostrarMasMovimientos() {
+    _paginaMovimientos++;
+    _renderMovimientos();
   }
 
   function _renderAlertasStock() {
@@ -383,6 +456,51 @@ const Despensa = (() => {
     URL.revokeObjectURL(url);
   }
 
+  /** Exporta los ingredientes a PDF usando window.print() */
+  function exportarPDF() {
+    const ingredientes = Store.getState().ingredientes || DB.ingredientes || [];
+    
+    // Construir HTML para impresión
+    const html = `
+      <html>
+      <head><title>Inventario</title>
+      <style>
+        body { font-family: sans-serif; padding: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border: 1px solid #ccc; padding: 6px; text-align: left; font-size: 12px; }
+        th { background: #f5f5f5; }
+      </style>
+      </head>
+      <body>
+        <h1>Inventario — ${new Date().toLocaleDateString()}</h1>
+        <table>
+          <thead><tr><th>Ingrediente</th><th>Cat.</th><th>Stock</th><th>Uni.</th><th>Mín.</th><th>Ubicación</th><th>Valor Un.</th><th>Valor Total</th></tr></thead>
+          <tbody>
+            ${ingredientes.map(i => `
+              <tr>
+                <td>${i.nombre}</td>
+                <td>${i.categoria || ''}</td>
+                <td>${i.stock}</td>
+                <td>${i.unidad}</td>
+                <td>${i.stock_minimo}</td>
+                <td>${i.ubicacion || ''}</td>
+                <td>${i.valor_unitario || ''}</td>
+                <td>${(i.stock * (i.valor_unitario || 0)).toFixed(2)}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+
+    const ventana = window.open('', '_blank', 'width=800,height=600');
+    ventana.document.write(html);
+    ventana.document.close();
+    ventana.focus();
+    ventana.print();
+    ventana.close();
+  }
+
   function _initListeners() {
     Store.subscribe((state, action) => {
       if (action.type.startsWith('INGREDIENTE') || action.type.startsWith('MOVIMIENTO')) {
@@ -394,7 +512,10 @@ const Despensa = (() => {
       setTimeout(render, 100);
     });
     EventBus.on('vista:cambiada', (vista) => {
-      if (vista === 'despensa') render();
+      if (vista === 'despensa') {
+        _paginaMovimientos = 0; // resetear paginación al entrar
+        render();
+      }
     });
   }
 
@@ -404,13 +525,16 @@ const Despensa = (() => {
     render,
     filtrarPorCategoria,
     _buscar,
+    _aplicarFiltros,
     mostrarModalIngrediente,
     cerrarModalIngrediente,
     guardarIngrediente,
     editarIngrediente,
     ajusteRapido,
     exportarIngredientes,
-    ordenarTabla
+    exportarPDF,
+    ordenarTabla,
+    _mostrarMasMovimientos
   };
 })();
 

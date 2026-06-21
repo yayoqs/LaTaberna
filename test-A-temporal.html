@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test A Temporal — Suite completarSubcomanda (FINAL)</title>
+  <style>
+    body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
+    h1 { color: #f59e0b; }
+    .suite { margin-bottom: 24px; border-bottom: 1px solid #2e2e42; padding-bottom: 12px; }
+    .test { margin: 4px 0; padding: 4px 8px; border-radius: 4px; }
+    .pass { background: rgba(34,197,94,.2); }
+    .fail { background: rgba(239,68,68,.2); }
+    .summary { margin-top: 20px; font-weight: bold; }
+    .error { color: #ef4444; margin-bottom: 16px; }
+    .info { color: #94a3b8; font-size: 12px; margin: 2px 0; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test A Temporal — Suite completarSubcomanda (FINAL)</h1>
+  <p class="info">Parchea los métodos de DBAppwrite real para simular la subcomanda.</p>
+  <div id="results"></div>
+
+  <script src="/js/utils.js"></script>
+  <script src="/js/lib/logger.js"></script>
+  <script src="/js/lib/eventBus.js"></script>
+  <script src="/js/lib/store.js"></script>
+  <script src="/js/lib/command-bus.js"></script>
+  <script src="/js/lib/deps.js"></script>
+  <script src="/js/dominio/resultado.js"></script>
+  <script src="/js/dominio/dinero.js"></script>
+  <script src="/js/dominio/cantidad.js"></script>
+  <script src="/js/dominio/direccion.js"></script>
+  <script src="/js/dominio/pedido.js"></script>
+  <script src="/js/dominio/delivery.js"></script>
+  <script src="/js/dominio/ingrediente.js"></script>
+  <script src="/js/db-core.js"></script>
+  <script src="/js/repositorios/pedido-repository.js"></script>
+  <script src="/js/comandos/crear-pedido-mesa.js"></script>
+  <script src="/js/comandos/enviar-comanda.js"></script>
+  <script src="/js/comandos/agregar-mesa.js"></script>
+  <script src="/js/comandos/liberar-mesa.js"></script>
+  <script src="/js/comandos/completar-subcomanda.js"></script>
+  <script src="/js/auth.js"></script>
+
+  <script>
+    (function() {
+      var resultsEl = document.getElementById('results');
+      var passed = 0, failed = 0;
+
+      function assert(condition, msg) {
+        if (condition) {
+          passed++;
+          resultsEl.innerHTML += '<div class="test pass">✔ ' + msg + '</div>';
+        } else {
+          failed++;
+          resultsEl.innerHTML += '<div class="test fail">✘ ' + msg + '</div>';
+        }
+      }
+
+      window.showToast = function(){};
+
+      async function runTests() {
+        Logger.setLevel('ERROR');
+
+        // ── Garantizar que DBAppwrite existe ─────────────
+        if (typeof window.DBAppwrite === 'undefined') {
+          window.DBAppwrite = {};
+        }
+
+        resultsEl.innerHTML += '<div class="suite"><h2>Comando: completarSubcomanda (parche de métodos)</h2></div>';
+
+        var comandaMock = {
+          id: 'com_sub_1',
+          estado: 'nueva',
+          destino: 'ambos',
+          subcomandas: null,
+          mesa: 10,
+          items: '[]'
+        };
+
+        var originalListar = DBAppwrite.listar;
+        var originalActualizar = DBAppwrite.actualizar;
+
+        DBAppwrite.listar = async function(col) {
+          if (col === 'comandas') return [comandaMock];
+          return [];
+        };
+        DBAppwrite.actualizar = async function(col, id, cambios) {
+          if (col === 'comandas' && id === 'com_sub_1') {
+            if (cambios.subcomandas !== undefined) {
+              comandaMock.subcomandas = cambios.subcomandas;
+            }
+            if (cambios.estado) {
+              comandaMock.estado = cambios.estado;
+            }
+            return Object.assign({}, comandaMock);
+          }
+          return null;
+        };
+
+        var eventosEmitidos = [];
+        function listenerComanda(data) { eventosEmitidos.push(data); }
+        EventBus.on('comanda:subcomanda_completada', listenerComanda);
+        EventBus.on('comanda:completada', listenerComanda);
+
+        // Marcar cocina
+        var res1 = await CommandBus.ejecutar({
+          type: 'completarSubcomanda',
+          datos: { idOriginal: 'com_sub_1', destino: 'cocina' }
+        });
+        assert(res1.exito === true, 'Subcomanda cocina completada exitosamente');
+        assert(res1.data.ambasListas === false, 'No están ambas listas aún');
+
+        // Marcar barra → debe completar la comanda
+        var res2 = await CommandBus.ejecutar({
+          type: 'completarSubcomanda',
+          datos: { idOriginal: 'com_sub_1', destino: 'barra' }
+        });
+        assert(res2.exito === true, 'Subcomanda barra completada exitosamente');
+        assert(res2.data.ambasListas === true, 'Ambas subcomandas están listas');
+
+        // Verificar estado final del mock
+        assert(comandaMock.estado === 'completada', 'Comanda principal en estado completada');
+
+        // Verificar eventos emitidos
+        assert(eventosEmitidos.length === 3, 'Se emitieron exactamente 3 eventos');
+        var eventosSubcomanda = eventosEmitidos.filter(function(e) { return e.destino && !e.mesa; });
+        var eventosCompletada = eventosEmitidos.filter(function(e) { return e.mesa === 10; });
+        assert(eventosSubcomanda.length === 2, '2 eventos de subcomanda');
+        assert(eventosCompletada.length === 1, '1 evento de comanda completada');
+
+        // Restaurar
+        DBAppwrite.listar = originalListar;
+        DBAppwrite.actualizar = originalActualizar;
+        EventBus.off('comanda:subcomanda_completada', listenerComanda);
+        EventBus.off('comanda:completada', listenerComanda);
+
+        resultsEl.innerHTML += '<div class="summary">' + passed + ' pasaron, ' + failed + ' fallaron</div>';
+        if (failed === 0) {
+          resultsEl.innerHTML += '<div class="test pass">✔ Suite completarSubcomanda pasó correctamente.</div>';
+        } else {
+          resultsEl.innerHTML += '<div class="info">Alguna assertion falló. Revisar la consola.</div>';
+        }
+      }
+
+      window.addEventListener('load', function() {
+        runTests().catch(function(e) {
+          resultsEl.innerHTML += '<div class="error">Error en tests: ' + e.message + '</div>';
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

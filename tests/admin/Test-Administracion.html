@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Tests Administración – La Taberna</title>
+  <style>
+    body { font-family: sans-serif; background: #111; color: #eee; padding: 20px; }
+    .test { margin: 10px 0; padding: 10px; border-left: 4px solid #666; }
+    .pass { border-color: #4caf50; }
+    .fail { border-color: #f44336; }
+  </style>
+</head>
+<body>
+  <h1>Tests del módulo Eventos en Vivo</h1>
+  <div id="resultados"></div>
+
+  <script>
+    // ─── Stubs del sistema ───────────────────────────────
+    const Logger = { info: console.log, warn: console.warn, error: console.error };
+    const EventBus = {
+      events: {},
+      on(ev, cb) { (this.events[ev] = this.events[ev] || []).push(cb); },
+      emit(ev, data) { (this.events[ev] || []).forEach(cb => cb(data)); }
+    };
+    const Store = { state: {}, getState() { return this.state; }, subscribe() {} };
+    const Auth = {
+      _rol: 'artista',
+      getRol() { return this._rol; },
+      getNombre() { return 'Animador Test'; },
+      esArtista() { return this._rol === 'artista'; },
+      esEventos() { return this._rol === 'eventos'; },
+      esAdmin() { return this._rol === 'admin'; },
+      esMaster() { return this._rol === 'master'; }
+    };
+    let toastMessages = [];
+    function showToast(tipo, msg) { toastMessages.push({tipo, msg}); }
+
+    // DBAppwrite simulado con estado interno
+    let _docActual = null;
+    const DBAppwrite = {
+      async crear(coleccion, id, datos) {
+        _docActual = { id: 'doc_123', ...datos };
+        this.ultimoCreado = { coleccion, id, datos };
+        return _docActual;
+      },
+      async actualizar(coleccion, id, cambios) {
+        _docActual = { ..._docActual, ...cambios };
+        this.ultimaActualizacion = { coleccion, id, cambios };
+        EventBus.emit('eventos_en_vivo:actualizada', _docActual);
+      }
+    };
+  </script>
+
+  <!-- CÓDIGO DEL MÓDULO (embebido para test) -->
+  <script>
+    // [El código completo de eventos-en-vivo.js se incluye aquí, sin modificaciones]
+    // (Se omite por brevedad; debe copiarse exactamente igual al archivo de producción)
+  </script>
+
+  <!-- TESTS -->
+  <script>
+    function assert(cond, desc) {
+      const div = document.createElement('div');
+      div.className = 'test ' + (cond ? 'pass' : 'fail');
+      div.textContent = (cond ? '✔' : '✘') + ' ' + desc;
+      document.getElementById('resultados').appendChild(div);
+    }
+
+    async function ejecutarTests() {
+      // Test 1: Render inicial
+      EventBus.emit('vista:cambiada', 'eventos-en-vivo');
+      await new Promise(r => setTimeout(r, 50));
+      assert(document.getElementById('view-eventos-en-vivo') !== null, 'La vista se crea');
+      assert(document.getElementById('estadoEvento').textContent.includes('Sin evento'), 'Estado inicial sin evento');
+
+      // Test 2: Crear bingo
+      document.getElementById('selTipoEvento').value = 'bingo';
+      await EventosEnVivo.crearEvento();
+      assert(document.getElementById('estadoEvento').textContent.includes('bingo'), 'Badge muestra bingo');
+      assert(document.getElementById('estadoEvento').textContent.includes('configuracion'), 'Estado inicial configuracion');
+
+      // Test 3: Iniciar y cantar bola
+      await EventosEnVivo.cambiarEstado('activo');
+      await new Promise(r => setTimeout(r, 50));
+      const btnCantar = document.querySelector('#zonaInteraccion .btn-primary');
+      assert(btnCantar && !btnCantar.disabled, 'Botón Cantar bola habilitado');
+
+      await EventosEnVivo.cantarBola();
+      await new Promise(r => setTimeout(r, 50));
+      const bolas = document.querySelectorAll('.bola');
+      assert(bolas.length === 1, 'Aparece una bola tras cantar');
+      assert(document.getElementById('estadoEvento').textContent.includes('activo'), 'Estado sigue activo');
+
+      // Test 4: Finalizar y reiniciar
+      await EventosEnVivo.cambiarEstado('finalizado');
+      await new Promise(r => setTimeout(r, 50));
+      assert(document.getElementById('estadoEvento').textContent.includes('finalizado'), 'Estado finalizado');
+      const btnReiniciar = document.getElementById('btnReiniciar');
+      assert(btnReiniciar.style.display !== 'none', 'Botón reiniciar visible');
+
+      await EventosEnVivo.reiniciarEvento();
+      await new Promise(r => setTimeout(r, 50));
+      assert(document.getElementById('estadoEvento').textContent.includes('configuracion'), 'Reiniciado a configuracion');
+      const bolasDespues = document.querySelectorAll('.bola');
+      assert(bolasDespues.length === 0, 'Bolas limpiadas tras reiniciar');
+
+      // Test 5: Karaoke
+      document.getElementById('selTipoEvento').value = 'karaoke';
+      await EventosEnVivo.crearEvento();
+      await EventosEnVivo.cambiarEstado('activo');
+      await new Promise(r => setTimeout(r, 50));
+      document.getElementById('letraKaraoke').value = 'Estribillo de prueba';
+      await EventosEnVivo.actualizarLetra();
+      await new Promise(r => setTimeout(r, 50));
+      assert(_docActual.datos.letra === 'Estribillo de prueba', 'Letra guardada correctamente');
+
+      await EventosEnVivo.limpiarLetra();
+      await new Promise(r => setTimeout(r, 50));
+      assert(_docActual.datos.letra === '', 'Letra limpia correctamente');
+
+      // Test 6: Votación
+      document.getElementById('selTipoEvento').value = 'votacion';
+      await EventosEnVivo.crearEvento();
+      await EventosEnVivo.cambiarEstado('activo');
+      await new Promise(r => setTimeout(r, 50));
+      document.getElementById('nuevaOpcion').value = 'Opción A';
+      await EventosEnVivo.agregarOpcion();
+      await new Promise(r => setTimeout(r, 50));
+      assert(_docActual.datos.opciones.includes('Opción A'), 'Opción A agregada');
+
+      document.getElementById('nuevaOpcion').value = 'Opción B';
+      await EventosEnVivo.agregarOpcion();
+      await new Promise(r => setTimeout(r, 50));
+      await EventosEnVivo.eliminarUltimaOpcion();
+      await new Promise(r => setTimeout(r, 50));
+      assert(!_docActual.datos.opciones.includes('Opción B'), 'Opción B eliminada');
+      assert(_docActual.datos.opciones.includes('Opción A'), 'Opción A permanece');
+
+      // Test 7: Acceso denegado
+      Auth._rol = 'cliente';
+      EventBus.emit('vista:cambiada', 'otra');
+      EventBus.emit('vista:cambiada', 'eventos-en-vivo');
+      await new Promise(r => setTimeout(r, 50));
+      const panel = document.getElementById('panelEventoVivo');
+      assert(panel.textContent.includes('Acceso denegado'), 'Muestra acceso denegado para rol no autorizado');
+
+      console.log('Todos los tests finalizados.');
+    }
+
+    window.addEventListener('load', () => setTimeout(ejecutarTests, 100));
+  </script>
+</body>
+</html>

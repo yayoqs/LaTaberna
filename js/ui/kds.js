@@ -1,8 +1,9 @@
 /* ================================================================
-   PubPOS — MÓDULO: kds.js (v4.4 – logging unificado + JSDoc)
-   Propósito: Monitor de cocina (KDS). Muestra las comandas activas
-              filtradas por rol. Se actualiza automáticamente desde
-              el Store y también escucha eventos de comandas enviadas.
+   PubPOS — MÓDULO: kds.js (v4.6 – botón de pánico y acceso a recetario)
+   Propósito: Monitor de cocina (KDS). Muestra comandas activas.
+   Novedades v4.6:
+   - Botón de pánico por ítem para admin/master.
+   - Acceso al recetario desde el toolbar (llama a Recetario.render()).
    ================================================================ */
 const KDS = (() => {
   const MINUTOS_URGENTE = 15;
@@ -21,6 +22,9 @@ const KDS = (() => {
           <button class="btn-secondary" onclick="KDS.refresh()">
             <i class="fas fa-sync-alt"></i> Actualizar
           </button>
+          <button class="btn-secondary" onclick="window.Recetario.render()">
+            <i class="fas fa-book-open"></i> Recetario
+          </button>
         </div>
       </div>
       <div id="cocinaKDS" class="kds-grid"></div>
@@ -29,9 +33,6 @@ const KDS = (() => {
     document.body.insertBefore(main, referencia);
   }
 
-  /**
-   * Refresca la vista de KDS con las comandas activas del Store.
-   */
   function refresh() {
     _asegurarVista();
     const cont = $id('cocinaKDS');
@@ -43,6 +44,39 @@ const KDS = (() => {
     let comandas = Store.getState().comandas || [];
     comandas = comandas.filter(c => c && Array.isArray(c.items));
 
+    const procesadas = [];
+    comandas.forEach(c => {
+      if (c.destino === 'ambos') {
+        const itemsCocina = c.items.filter(it => it.destino === 'cocina' || it.destino === 'ambos');
+        const itemsBarra = c.items.filter(it => it.destino === 'barra' || it.destino === 'ambos');
+
+        if (itemsCocina.length > 0) {
+          procesadas.push({
+            ...c,
+            id: c.id + '_cocina',
+            destino: 'cocina',
+            items: itemsCocina,
+            _originalId: c.id,
+            _grupo: c.observaciones || 'Combo'
+          });
+        }
+        if (itemsBarra.length > 0) {
+          procesadas.push({
+            ...c,
+            id: c.id + '_barra',
+            destino: 'barra',
+            items: itemsBarra,
+            _originalId: c.id,
+            _grupo: c.observaciones || 'Combo'
+          });
+        }
+      } else {
+        procesadas.push(c);
+      }
+    });
+
+    comandas = procesadas;
+
     comandas = comandas.filter(c => {
       if (c.estado === 'lista') {
         return (ahora - c.ts) < MINUTOS_OCULTAR_LISTA * 60 * 1000;
@@ -51,9 +85,9 @@ const KDS = (() => {
     });
 
     if (rol === 'cocina') {
-      comandas = comandas.filter(c => c.destino === 'cocina' || c.destino === 'ambos');
+      comandas = comandas.filter(c => c.destino === 'cocina');
     } else if (rol === 'barra') {
-      comandas = comandas.filter(c => c.destino === 'barra' || c.destino === 'ambos');
+      comandas = comandas.filter(c => c.destino === 'barra');
     }
 
     Logger.debug(`[KDS] ${comandas.length} comandas activas en Store.`);
@@ -66,38 +100,29 @@ const KDS = (() => {
     cont.innerHTML = comandas.map(_htmlKdsCard).join('');
   }
 
-  /** @returns {string} HTML de una tarjeta de comanda */
   function _htmlKdsCard(c) {
     const minutos = Math.floor((Date.now() - c.ts) / 60000);
     const urgente = minutos > MINUTOS_URGENTE;
     const tiempoTxt = minutos === 0 ? 'Ahora' : `Hace ${minutos} min`;
-    const destLabel = { cocina: 'Cocina', barra: 'Barra', ambos: 'Cocina + Barra' }[c.destino] || c.destino;
+    const destLabel = { cocina: 'Cocina', barra: 'Barra' }[c.destino] || c.destino;
     const destCss = c.destino === 'barra' ? 'barra' : 'cocina';
     const esDelivery = !!c.deliveryId;
     const etiquetaDelivery = esDelivery ? `<span class="kds-destino-tag" style="background:rgba(34,197,94,.2);color:var(--color-success);">Delivery</span>` : '';
+    const etiquetaGrupo = c._grupo ? `<span class="kds-grupo-tag"><i class="fas fa-layer-group"></i> ${c._grupo}</span>` : '';
+
+    const rol = Auth.getRol();
+    const puedePanico = rol === 'admin' || rol === 'master';
 
     const items = c.items || [];
     const itemsHTML = items.map(it => {
-      const receta = DB.recetas?.find(r => r.productoId == it.prodId);
-      let recetaHTML = '';
-      if (receta && receta.ingredientes && receta.ingredientes.length) {
-        recetaHTML = receta.ingredientes.map(ing => {
-          const ingData = DB.ingredientes.find(i => i.id == ing.ingredienteId);
-          return ingData
-            ? `<li>${ingData.nombre}: ${ing.cantidad} ${ingData.unidad}</li>`
-            : '';
-        }).join('');
-        recetaHTML = `<details style="font-size:11px;margin-top:4px;"><summary>📋 Receta</summary><ul>${recetaHTML}</ul></details>`;
-      }
-
       const icono = it.enviadoA === 'barra' ? '🍹' : '🍳';
+      const botonPanico = puedePanico ? `<button class="kds-panico-btn" title="Marcar como agotado" onclick="KDS._panico('${it.prodId}')"><i class="fas fa-exclamation-triangle"></i></button>` : '';
       return `
         <div class="kds-item">
           <span class="kds-qty">${it.qty}</span>
           <div>
-            <div class="kds-item-name">${it.nombre} ${icono}</div>
+            <div class="kds-item-name">${it.nombre} ${icono} ${botonPanico}</div>
             ${it.obs ? `<div class="kds-item-obs"><i class="fas fa-exclamation-circle"></i> ${it.obs}</div>` : ''}
-            ${recetaHTML}
           </div>
         </div>`;
     }).join('');
@@ -115,7 +140,7 @@ const KDS = (() => {
     return `
       <article class="kds-card ${c.estado}" id="kds-${c.id}">
         <div class="kds-header">
-          <div class="kds-mesa"><i class="fas fa-chair"></i> ${c.mesa} ${etiquetaDelivery} <span class="kds-mozo">${c.mozo}</span></div>
+          <div class="kds-mesa"><i class="fas fa-chair"></i> ${c.mesa} ${etiquetaDelivery} ${etiquetaGrupo} <span class="kds-mozo">${c.mozo}</span></div>
           <div class="kds-meta"><span class="kds-destino-tag ${destCss}">${destLabel}</span><span class="kds-time${urgente ? ' urgente' : ''}">${tiempoTxt}</span></div>
         </div>
         <div class="kds-items">${itemsHTML}</div>
@@ -124,19 +149,61 @@ const KDS = (() => {
       </article>`;
   }
 
-  /**
-   * Cambia el estado de una comanda en el Store y notifica a otros módulos.
-   * @param {string} id - ID de la comanda
-   * @param {string} estado - Nuevo estado ('en-proceso' o 'lista')
-   */
+  function _panico(prodId) {
+    if (!confirm('¿Marcar este producto como NO disponible?')) return;
+    DBAppwrite.actualizar('productos', prodId, { disponible: false })
+      .then(() => showToast('success', 'Producto marcado como agotado.'))
+      .catch(err => Logger.error('[KDS] Error en botón de pánico:', err));
+  }
+
   function _setEstado(id, estado) {
     const comandas = Store.getState().comandas || [];
-    const c = comandas.find(x => x.id === id);
+    let c = comandas.find(x => x.id === id);
+
+    if (!c && (id.endsWith('_cocina') || id.endsWith('_barra'))) {
+      const idOriginal = id.replace(/_(cocina|barra)$/, '');
+      c = comandas.find(x => x.id === idOriginal);
+    }
+
     if (!c) return;
 
-    Store.dispatch({ type: 'COMANDA_ACTUALIZADA', payload: { id, cambios: { estado } } });
+    if (estado === 'en-proceso') {
+      Store.dispatch({ type: 'COMANDA_ACTUALIZADA', payload: { id, cambios: { estado } } });
+      const idx = DB.comandas.findIndex(x => x.id === id);
+      if (idx >= 0) {
+        DB.comandas[idx].estado = estado;
+        DB.saveComandas();
+      }
+      showToast('success', `<i class="fas fa-check"></i> ${c.mesa} → En proceso`);
+      return;
+    }
 
     if (estado === 'lista') {
+      if (id.endsWith('_cocina') || id.endsWith('_barra')) {
+        const idOriginal = id.replace(/_(cocina|barra)$/, '');
+        const destino = id.endsWith('_cocina') ? 'cocina' : 'barra';
+
+        CommandBus.ejecutar({
+          type: 'completarSubcomanda',
+          datos: { idOriginal, destino }
+        }).then(resultado => {
+          if (resultado.exito) {
+            showToast('success', `<i class="fas fa-check"></i> ${c.mesa} → ${destino} LISTA ✓`);
+            if (resultado.ambasListas) {
+              showToast('success', `<i class="fas fa-check-double"></i> Comanda completada en ambos destinos`);
+            }
+            setTimeout(refresh, 300);
+          } else {
+            showToast('error', 'Error al marcar como listo');
+          }
+        }).catch(err => {
+          Logger.error('[KDS] Error en completarSubcomanda:', err);
+        });
+        return;
+      }
+
+      Store.dispatch({ type: 'COMANDA_ACTUALIZADA', payload: { id, cambios: { estado } } });
+
       const mesa = DB.getMesa(c.mesa);
       if (mesa && mesa.estado === 'ocupada') {
         mesa.estado = 'esperando';
@@ -149,15 +216,15 @@ const KDS = (() => {
         EventBus.emit('delivery:listo', { deliveryId: c.deliveryId, comandaId: id, estado: 'listo' });
         Logger.info(`[KDS] Delivery listo: ${c.deliveryId}`);
       }
-    }
 
-    const idx = DB.comandas.findIndex(x => x.id === id);
-    if (idx >= 0) {
-      DB.comandas[idx].estado = estado;
-      DB.saveComandas();
-    }
+      const idx = DB.comandas.findIndex(x => x.id === id);
+      if (idx >= 0) {
+        DB.comandas[idx].estado = estado;
+        DB.saveComandas();
+      }
 
-    showToast('success', `<i class="fas fa-check"></i> ${c.mesa} → ${estado === 'lista' ? 'LISTA ✓' : 'En proceso'}`);
+      showToast('success', `<i class="fas fa-check"></i> ${c.mesa} → LISTA ✓`);
+    }
   }
 
   function _initListeners() {
@@ -183,7 +250,7 @@ const KDS = (() => {
 
   _initListeners();
 
-  return { refresh, _setEstado };
+  return { refresh, _setEstado, _panico };
 })();
 
 window.KDS = KDS;

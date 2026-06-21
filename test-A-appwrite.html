@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test A — Diagnóstico Appwrite</title>
+  <style>
+    body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
+    h1 { color: #f59e0b; }
+    h2 { color: #94a3b8; margin-top: 24px; }
+    .suite { margin-bottom: 16px; border-bottom: 1px solid #2e2e42; padding-bottom: 8px; }
+    .test { margin: 4px 0; padding: 4px 8px; border-radius: 4px; }
+    .pass { background: rgba(34,197,94,.2); }
+    .fail { background: rgba(239,68,68,.2); }
+    .summary { margin-top: 20px; font-weight: bold; }
+    .info { color: #94a3b8; font-size: 12px; margin: 2px 0; }
+    button { margin-top: 16px; padding: 12px 24px; background: #f59e0b; color: #000; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test A — Diagnóstico Appwrite</h1>
+  <p class="info">Verifica conexión, listado de colecciones, CRUD e integración con Store (sesión anónima).</p>
+  <div id="results"></div>
+  <button onclick="location.reload()">🔄 Ejecutar de nuevo</button>
+
+  <script src="/js/utils.js"></script>
+  <script src="/js/lib/logger.js"></script>
+  <script src="/js/lib/eventBus.js"></script>
+  <script src="/js/lib/store.js"></script>
+  <script src="/js/appwrite.min.js"></script>
+  <script src="/js/db-appwrite.js"></script>
+  <script src="/js/db-core.js"></script>
+  <script src="/js/db-inventario.js"></script>
+  <script src="/js/db-fusion.js"></script>
+  <script src="/js/db-shim.js"></script>
+  <script src="/js/db.js"></script>
+
+  <script>
+    (function() {
+      var resultsEl = document.getElementById('results');
+      var passed = 0, failed = 0;
+
+      function assert(condition, msg) {
+        if (condition) {
+          passed++;
+          resultsEl.innerHTML += '<div class="test pass">✔ ' + msg + '</div>';
+        } else {
+          failed++;
+          resultsEl.innerHTML += '<div class="test fail">✘ ' + msg + '</div>';
+        }
+      }
+
+      async function runTests() {
+        resultsEl.innerHTML = '';
+        Logger.setLevel('ERROR');
+
+        // ── Suite 1: Inicializar DBAppwrite (sesión anónima) ──
+        resultsEl.innerHTML += '<h2>1. Inicializar DBAppwrite</h2>';
+        var appwriteOk = await DBAppwrite.init();
+        assert(appwriteOk === true, 'DBAppwrite.init() exitoso');
+        assert(DBAppwrite.habilitado === true, 'DBAppwrite.habilitado = true');
+        if (!appwriteOk) {
+          resultsEl.innerHTML += '<div class="fail">No se pudo conectar a Appwrite. Revisa endpoint y projectId en localStorage.</div>';
+          return;
+        }
+
+        // ── Suite 2: Listar colecciones ──────────────────────
+        resultsEl.innerHTML += '<h2>2. Listar colecciones</h2>';
+        var colecciones = ['productos','pedidos','mesas','comandas','ingredientes','recetas','pedidos_delivery','usuarios','configuracion','precargas_cliente','eventos_en_vivo'];
+        for (var i = 0; i < colecciones.length; i++) {
+          try {
+            var lista = await DBAppwrite.listar(colecciones[i]);
+            assert(Array.isArray(lista), colecciones[i] + ': ' + lista.length + ' documentos');
+          } catch(e) {
+            assert(false, colecciones[i] + ': Error - ' + e.message);
+          }
+        }
+
+        // ── Suite 3: CRUD básico ─────────────────────────────
+        resultsEl.innerHTML += '<h2>3. CRUD básico en pedidos</h2>';
+        try {
+          var doc = {
+            mesa: 999, mozo: 'Test', comensales: 1, estado: 'abierta',
+            items: '[]', total: 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          var creado = await DBAppwrite.crear('pedidos', 'unique()', doc);
+          assert(!!creado && !!creado.id, 'Documento creado: ' + (creado ? creado.id : 'falló'));
+          var leido = await DBAppwrite.listar('pedidos').then(l => l.find(p => p.id === creado.id));
+          assert(leido && leido.mesa === 999, 'Lectura correcta');
+          await DBAppwrite.eliminar('pedidos', creado.id);
+          assert(true, 'Documento eliminado');
+        } catch(e) {
+          assert(false, 'Error CRUD: ' + e.message);
+        }
+
+        // ── Suite 4: Integración con Store ───────────────────
+        resultsEl.innerHTML += '<h2>4. Integración Appwrite → Store</h2>';
+        window.Auth = window.Auth || { getEspacioActivo: function() { return { id: 'esp_taberna' }; } };
+        window.PedidoManager = window.PedidoManager || { getTurnoActual: function() { return { id: 'test', estado: 'abierto' }; }, registrar: function() {} };
+
+        var productos = await DBAppwrite.listar('productos');
+        var pedidos = await DBAppwrite.listar('pedidos');
+        var mesas = await DBAppwrite.listar('mesas');
+        var ingredientes = await DBAppwrite.listar('ingredientes');
+        var recetas = await DBAppwrite.listar('recetas');
+
+        DB.productos = productos.map(p => DB._normalizarProducto(p));
+        DB.pedidos = pedidos;
+        DB.mesas = mesas.length ? mesas.map(m => DB._normalizarMesa(m)) : DB.mesas;
+        DB.ingredientes = ingredientes.map(i => DB._normalizarIngrediente(i));
+        DB.recetas = recetas;
+
+        Store.dispatch({ type: 'PRODUCTOS_INICIALIZAR', payload: DB.productos });
+        Store.dispatch({ type: 'PEDIDOS_INICIALIZAR', payload: DB.pedidos });
+        Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
+        Store.dispatch({ type: 'INGREDIENTES_INICIALIZAR', payload: DB.ingredientes });
+        Store.dispatch({ type: 'RECETAS_INICIALIZAR', payload: DB.recetas });
+
+        var state = Store.getState();
+        assert(state.productos.length === productos.length, 'Store tiene ' + state.productos.length + ' productos');
+        assert(state.pedidos.length === pedidos.length, 'Store tiene ' + state.pedidos.length + ' pedidos');
+        assert(state.ingredientes.length === ingredientes.length, 'Store tiene ingredientes');
+        assert(state.recetas.length === recetas.length, 'Store tiene recetas');
+
+        if (productos.length === 0 && pedidos.length === 0 && mesas.length === 0) {
+          resultsEl.innerHTML += '<div class="info">⚠️ Todas las colecciones están vacías. ¿Ejecutaste la migración inicial?</div>';
+        }
+
+        // ── Resumen ──────────────────────────────────────────
+        resultsEl.innerHTML += '<h2>Resultado</h2>';
+        resultsEl.innerHTML += '<p>' + passed + ' pasaron, ' + failed + ' fallaron.</p>';
+        if (failed === 0) {
+          resultsEl.innerHTML += '<div class="test pass">✔ Appwrite operativo y Store sincronizado.</div>';
+        }
+      }
+
+      window.addEventListener('load', function() {
+        setTimeout(runTests, 500);
+      });
+    })();
+  </script>
+</body>
+</html>

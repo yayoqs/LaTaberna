@@ -1,12 +1,13 @@
 /* ================================================================
-   Raíz — MÓDULO: config.js (v4.2 completa – Appwrite sync + ajuste de mesas)
+   Raíz — MÓDULO: config.js (v5.0 – mejoras: validación de zonas,
+   vista previa de imagen, autoajuste de precio, UI actualizada)
    Propósito: Vista de configuración (productos, mozos, zonas, stock).
               Lee del Store y persiste cambios en DB y Appwrite.
               Al guardar, ajusta la cantidad de mesas según las zonas.
    ================================================================ */
 const Config = (() => {
   function _asegurarVista() {
-    if ($id('view-config')) return;
+    if (document.getElementById('view-config')) return;
 
     const main = document.createElement('main');
     main.id = 'view-config';
@@ -69,7 +70,6 @@ const Config = (() => {
             </div>
           </div>
         </section>
-        <!-- 🔐 Gestión de Contraseñas (solo master) -->
         <section class="config-card" id="usuariosCard" style="display:none;">
           <h3><i class="fas fa-key"></i> Contraseñas de Usuarios</h3>
           <div class="local-config">
@@ -79,7 +79,7 @@ const Config = (() => {
         </section>
       </div>
     `;
-    const referencia = $id('toastContainer') || document.body.lastChild;
+    const referencia = document.getElementById('toastContainer') || document.body.lastChild;
     document.body.insertBefore(main, referencia);
   }
 
@@ -89,19 +89,19 @@ const Config = (() => {
     const config = Store.getState().config || DB.config || {};
     if (config.cantidadMesas && !config.zonas) {
       config.zonas = [
-        { nombre: 'salon',   cantidad: config.cantidadMesas },
+        { nombre: 'salon',   cantidad: 12 },
         { nombre: 'terraza', cantidad: 0 }
       ];
       delete config.cantidadMesas;
       DB.saveConfig();
     }
-    $id('cfgNombreLocal').value = config.nombreLocal || '';
-    $id('cfgDireccion').value = config.direccion || '';
-    $id('cfgCuit').value = config.cuit || '';
-    $id('cfgPie').value = config.pieTicket || '';
+    document.getElementById('cfgNombreLocal').value = config.nombreLocal || '';
+    document.getElementById('cfgDireccion').value = config.direccion || '';
+    document.getElementById('cfgCuit').value = config.cuit || '';
+    document.getElementById('cfgPie').value = config.pieTicket || '';
 
     const bloquear = config.bloquearStockInsuficiente !== false;
-    const chk = $id('cfgBloquearStock');
+    const chk = document.getElementById('cfgBloquearStock');
     if (chk) chk.checked = bloquear;
 
     _renderZonas();
@@ -112,7 +112,7 @@ const Config = (() => {
 
   // ── USUARIOS (solo master) ────────────────────────────────
   function _renderUsuarios() {
-    const card = $id('usuariosCard');
+    const card = document.getElementById('usuariosCard');
     if (!card) return;
 
     if (typeof Auth !== 'undefined' && Auth.esMasterReal && Auth.esMasterReal()) {
@@ -122,7 +122,7 @@ const Config = (() => {
       return;
     }
 
-    const lista = $id('usuariosLista');
+    const lista = document.getElementById('usuariosLista');
     if (!lista) return;
 
     let usuarios = [];
@@ -175,7 +175,7 @@ const Config = (() => {
 
   // ── ZONAS ─────────────────────────────────────────────────
   function _renderZonas() {
-    const container = $id('zonasContainer');
+    const container = document.getElementById('zonasContainer');
     if (!container) return;
     const config = Store.getState().config || {};
     const zonas = config.zonas || [];
@@ -210,44 +210,53 @@ const Config = (() => {
 
   function eliminarZona(idx) {
     const config = Store.getState().config || {};
-    if (!config.zonas || config.zonas.length <= 1) { showToast('error', 'Debe existir al menos una zona.'); return; }
+    if (!config.zonas || config.zonas.length <= 1) {
+      showToast('error', 'Debe existir al menos una zona.');
+      return;
+    }
     if (!confirm(`¿Eliminar la zona "${config.zonas[idx].nombre}"?`)) return;
     config.zonas.splice(idx, 1);
     _renderZonas();
   }
 
-  /** Guarda la configuración general, incluyendo sincronización con Appwrite y ajuste de mesas */
+  /** Guarda la configuración general */
   async function guardar() {
-    const zonasContainer = $id('zonasContainer');
+    const zonasContainer = document.getElementById('zonasContainer');
     let config = Store.getState().config || {};
 
     if (zonasContainer) {
       const filas = zonasContainer.querySelectorAll('div');
-      config.zonas = Array.from(filas).map(fila => {
+      const zonasNuevas = Array.from(filas).map(fila => {
         const inputs = fila.querySelectorAll('input');
         return {
-          nombre: inputs[0]?.value || 'sin_nombre',
+          nombre: inputs[0]?.value.trim() || 'sin_nombre',
           cantidad: parseInt(inputs[1]?.value) || 0
         };
       });
+
+      // Validar al menos una zona
+      if (zonasNuevas.length === 0) {
+        showToast('error', 'Debe existir al menos una zona.');
+        return;
+      }
+      config.zonas = zonasNuevas;
     }
+
     config = {
       ...config,
-      nombreLocal: $val('cfgNombreLocal'),
-      direccion: $val('cfgDireccion'),
-      cuit: $val('cfgCuit'),
-      pieTicket: $val('cfgPie'),
+      nombreLocal: document.getElementById('cfgNombreLocal').value.trim(),
+      direccion: document.getElementById('cfgDireccion').value.trim(),
+      cuit: document.getElementById('cfgCuit').value.trim(),
+      pieTicket: document.getElementById('cfgPie').value.trim(),
       zonas: config.zonas || [{ nombre: 'salon', cantidad: 12 }],
-      bloquearStockInsuficiente: $id('cfgBloquearStock')?.checked ?? true
+      bloquearStockInsuficiente: document.getElementById('cfgBloquearStock')?.checked ?? true
     };
     delete config.cantidadMesas;
 
-    // Guardar en memoria y localStorage
     DB.config = config;
     DB.saveConfig();
     DB.saveMesas();
 
-    // Ajustar cantidad de mesas según nuevas zonas
     if (typeof DB.sincronizarMesasConConfig === 'function') {
       await DB.sincronizarMesasConConfig();
     }
@@ -255,7 +264,7 @@ const Config = (() => {
     if (window.Mesas) Mesas.render();
     showToast('success', '<i class="fas fa-check-circle"></i> Configuración guardada');
 
-    // Sincronizar configuración con Appwrite
+    // Sincronizar con Appwrite
     if (typeof DBAppwrite !== 'undefined' && DBAppwrite.habilitado) {
       try {
         var datosConfig = {
@@ -280,7 +289,7 @@ const Config = (() => {
   // ── PRODUCTOS ─────────────────────────────────────────────
   function renderProductos() {
     _asegurarVista();
-    const cont = $id('productosLista');
+    const cont = document.getElementById('productosLista');
     if (!cont) return;
     const todos = Store.getState().productos || [];
     if (!todos.length) {
@@ -307,7 +316,7 @@ const Config = (() => {
   }
 
   function abrirModalProducto(prod = null) {
-    let modal = $id('modalProducto');
+    let modal = document.getElementById('modalProducto');
     if (!modal) {
       modal = document.createElement('div');
       modal.id = 'modalProducto';
@@ -319,11 +328,12 @@ const Config = (() => {
           <div class="modal-small-body">
             <input type="hidden" id="prodId">
             <label for="prodNombre">Nombre *</label><input type="text" id="prodNombre" placeholder="Nombre del producto" autocomplete="off">
-            <label for="prodPrecio">Precio *</label><input type="number" id="prodPrecio" placeholder="0.00" min="0" step="0.01">
+            <label for="prodPrecio">Precio *</label><input type="number" id="prodPrecio" placeholder="0.00" min="0" step="0.01" onchange="Config._autoajustarPrecio()">
             <label for="prodCategoria">Categoría *</label><select id="prodCategoria"><option>Bebidas</option><option>Cervezas</option><option>Cocteles</option><option>Vinos</option><option>Entradas</option><option>Comidas</option><option>Postres</option></select>
             <label for="prodDestino">Destino Comanda *</label><select id="prodDestino"><option value="barra">Barra</option><option value="cocina">Cocina</option><option value="ambos">Ambos</option></select>
             <label for="prodDescripcion">Descripción</label><input type="text" id="prodDescripcion" placeholder="Descripción breve (opcional)">
-            <label for="prodImagen">Imagen (URL)</label><input type="text" id="prodImagen" placeholder="https://... (opcional)">
+            <label for="prodImagen">Imagen (URL)</label><input type="text" id="prodImagen" placeholder="https://... (opcional)" oninput="Config._vistaPreviaImagen()">
+            <div id="vistaPreviaImagen" style="margin-top:8px; max-width:200px;"></div>
             <div class="prod-activo-row"><label for="prodActivo">Activo</label><input type="checkbox" id="prodActivo" checked></div>
             <div class="modal-small-footer"><button class="btn-secondary" onclick="Config.cerrarModalProducto()">Cancelar</button><button class="btn-primary" onclick="Config.guardarProducto()"><i class="fas fa-save"></i> Guardar</button></div>
           </div>
@@ -331,33 +341,54 @@ const Config = (() => {
       document.body.appendChild(modal);
     }
 
-    $id('productoModalTitulo').textContent = prod ? 'Editar Producto' : 'Nuevo Producto';
-    $id('prodId').value = prod?.id || '';
-    $id('prodNombre').value = prod?.nombre || '';
-    $id('prodPrecio').value = prod?.precio || '';
-    $id('prodCategoria').value = prod?.categoria || 'Comidas';
-    $id('prodDestino').value = prod?.destino || 'cocina';
-    $id('prodDescripcion').value = prod?.descripcion || '';
-    $id('prodImagen').value = prod?.imagen || '';
-    $id('prodActivo').checked = prod ? (prod.activo !== false) : true;
+    document.getElementById('productoModalTitulo').textContent = prod ? 'Editar Producto' : 'Nuevo Producto';
+    document.getElementById('prodId').value = prod?.id || '';
+    document.getElementById('prodNombre').value = prod?.nombre || '';
+    document.getElementById('prodPrecio').value = prod?.precio || '';
+    document.getElementById('prodCategoria').value = prod?.categoria || 'Comidas';
+    document.getElementById('prodDestino').value = prod?.destino || 'cocina';
+    document.getElementById('prodDescripcion').value = prod?.descripcion || '';
+    document.getElementById('prodImagen').value = prod?.imagen || '';
+    document.getElementById('prodActivo').checked = prod ? (prod.activo !== false) : true;
+    _vistaPreviaImagen();
     modal.style.display = 'flex';
   }
 
-  function cerrarModalProducto() { $id('modalProducto').style.display = 'none'; }
+  function cerrarModalProducto() { document.getElementById('modalProducto').style.display = 'none'; }
+
+  function _autoajustarPrecio() {
+    const precioInput = document.getElementById('prodPrecio');
+    if (!precioInput) return;
+    let valor = parseFloat(precioInput.value);
+    if (isNaN(valor) || valor < 0) {
+      precioInput.value = '0';
+    }
+  }
+
+  function _vistaPreviaImagen() {
+    const url = document.getElementById('prodImagen')?.value.trim() || '';
+    const contenedor = document.getElementById('vistaPreviaImagen');
+    if (!contenedor) return;
+    if (url) {
+      contenedor.innerHTML = `<img src="${url}" alt="Vista previa" style="max-width:200px; max-height:200px; border-radius:8px; border:1px solid var(--color-border);" onerror="this.style.display='none'">`;
+    } else {
+      contenedor.innerHTML = '';
+    }
+  }
 
   async function guardarProducto() {
-    const nombre = $val('prodNombre');
-    const precio = parseFloat($id('prodPrecio')?.value);
+    const nombre = document.getElementById('prodNombre').value.trim();
+    const precio = parseFloat(document.getElementById('prodPrecio')?.value) || 0;
     if (!nombre) { showToast('error', 'Nombre obligatorio'); return; }
-    if (!precio || precio <= 0) { showToast('error', 'Precio mayor a 0'); return; }
-    const id = $val('prodId') || `prod_${Date.now()}_${Math.random().toString(36).substr(2,6)}`;
+    if (precio < 0) { showToast('error', 'Precio no puede ser negativo'); return; }
+    const id = document.getElementById('prodId').value || `prod_${Date.now()}_${Math.random().toString(36).substr(2,6)}`;
     const producto = {
       id, nombre, precio,
-      categoria: $id('prodCategoria')?.value || 'General',
-      destino: $id('prodDestino')?.value || 'cocina',
-      descripcion: $val('prodDescripcion'),
-      imagen: $val('prodImagen'),
-      activo: $id('prodActivo')?.checked ?? true
+      categoria: document.getElementById('prodCategoria')?.value || 'General',
+      destino: document.getElementById('prodDestino')?.value || 'cocina',
+      descripcion: document.getElementById('prodDescripcion').value.trim(),
+      imagen: document.getElementById('prodImagen').value.trim(),
+      activo: document.getElementById('prodActivo')?.checked ?? true
     };
     try {
       await DB.syncGuardarProducto(producto);
@@ -388,7 +419,7 @@ const Config = (() => {
 
   // ── MOZOS ────────────────────────────────────────────────
   function renderMozos() {
-    const container = $id('mozosLista');
+    const container = document.getElementById('mozosLista');
     if (!container) return;
     const mozos = Store.getState().mozos || [];
     container.innerHTML = mozos.map((m, idx) => `
@@ -403,11 +434,11 @@ const Config = (() => {
   }
 
   function agregarMozo() {
-    const nombre = $val('nuevoMozoNombre');
+    const nombre = document.getElementById('nuevoMozoNombre').value.trim();
     if (!nombre) return;
     DB.mozos.push({ id: 'mozo_' + Date.now(), nombre, activo: true });
     DB.saveMozos();
-    $id('nuevoMozoNombre').value = '';
+    document.getElementById('nuevoMozoNombre').value = '';
     showToast('success', 'Mozo añadido');
   }
 
@@ -448,7 +479,9 @@ const Config = (() => {
       agregarZona,
       eliminarZona,
       _updateZona,
-      _mostrarCambiarPassword
+      _mostrarCambiarPassword,
+      _autoajustarPrecio,
+      _vistaPreviaImagen
     };
   })();
 

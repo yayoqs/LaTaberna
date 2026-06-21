@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Célula C — Frontend Cliente</title>
+  <style>
+    body { font-family: system-ui, sans-serif; padding: 20px; background: #0f0f14; color: #f1f5f9; }
+    h1 { color: #f59e0b; }
+    .resultado { padding: 10px; margin: 6px 0; border-radius: 6px; }
+    .ok { background: rgba(34,197,94,.15); border-left: 4px solid #22c55e; }
+    .fallo { background: rgba(239,68,68,.15); border-left: 4px solid #ef4444; }
+    .info { background: rgba(99,102,241,.15); border-left: 4px solid #6366f1; }
+    pre { margin: 0; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Tests — Célula C (Frontend Cliente)</h1>
+  <div id="resultados"></div>
+
+  <script type="module">
+    import { PantallaInicio } from '../js/modulos/cliente/pantalla-inicio.js';
+    import { PantallaBienvenida } from '../js/modulos/cliente/pantalla-bienvenida.js';
+    import { MenuDigital } from '../js/modulos/cliente/menu-digital.js';
+    import { Orden } from '../js/modulos/cliente/orden.js';
+    import { PantallaEventos } from '../js/modulos/cliente/pantalla-eventos.js';
+
+    const resultados = document.getElementById('resultados');
+    let pasaron = 0;
+    let fallaron = 0;
+
+    function log(tipo, mensaje) {
+      const div = document.createElement('div');
+      div.className = `resultado ${tipo}`;
+      div.innerHTML = `<pre>${mensaje}</pre>`;
+      resultados.appendChild(div);
+      if (tipo === 'ok') pasaron++;
+      if (tipo === 'fallo') fallaron++;
+    }
+
+    function assert(condicion, descripcion) {
+      if (condicion) {
+        log('ok', `✅ ${descripcion}`);
+      } else {
+        log('fallo', `❌ ${descripcion}`);
+      }
+    }
+
+    // ── Tests de PantallaInicio ──────────────────────────
+    log('info', '── PantallaInicio ──');
+
+    let vistaInicio = PantallaInicio.render();
+    assert(vistaInicio !== null, 'render() devuelve una vista');
+    assert(vistaInicio.id === 'view-inicio', 'La vista tiene id view-inicio');
+    assert(vistaInicio.classList.contains('view'), 'La vista tiene clase view');
+
+    const btnLogin = vistaInicio.querySelector('#btnMostrarLogin');
+    const btnRegistro = vistaInicio.querySelector('#btnMostrarRegistro');
+    assert(btnLogin !== null, 'Botón Iniciar sesión existe');
+    assert(btnRegistro !== null, 'Botón Registrarse existe');
+
+    PantallaInicio.mostrar();
+    assert(vistaInicio.classList.contains('active'), 'mostrar() agrega clase active');
+    PantallaInicio.ocultar();
+    assert(!vistaInicio.classList.contains('active'), 'ocultar() quita clase active');
+
+    // ── Tests de PantallaBienvenida ──────────────────────
+    log('info', '── PantallaBienvenida ──');
+
+    let vistaBienvenida = PantallaBienvenida.render();
+    assert(vistaBienvenida !== null, 'render() devuelve una vista');
+    assert(vistaBienvenida.id === 'view-bienvenida', 'La vista tiene id view-bienvenida');
+
+    const inputMesa = vistaBienvenida.querySelector('#inputMesa');
+    const btnGuardarMesa = vistaBienvenida.querySelector('#btnGuardarMesa');
+    assert(inputMesa !== null, 'Input de mesa existe');
+    assert(btnGuardarMesa !== null, 'Botón Confirmar mesa existe');
+
+    assert(PantallaBienvenida.obtenerMesa() === null, 'obtenerMesa() devuelve null sin mesa guardada');
+    assert(PantallaBienvenida.permitePrepedidos() === false, 'permitePrepedidos() es false por defecto');
+
+    PantallaBienvenida.mostrar();
+    assert(vistaBienvenida.classList.contains('active'), 'mostrar() agrega clase active');
+    PantallaBienvenida.ocultar();
+    assert(!vistaBienvenida.classList.contains('active'), 'ocultar() quita clase active');
+
+    // ── Tests de Orden ───────────────────────────────────
+    log('info', '── Orden ──');
+
+    Orden.vaciar();
+    assert(Orden.obtenerItems().length === 0, 'vaciar() deja la orden vacía');
+    assert(Orden.obtenerTotal() === 0, 'obtenerTotal() es 0 con orden vacía');
+
+    const productoA = { id: 'prod_1', nombre: 'Hamburguesa', precio: 1500, categoria: 'platos', destino: 'cocina' };
+    const productoB = { id: 'prod_2', nombre: 'Cerveza', precio: 800, categoria: 'bebidas', destino: 'barra' };
+
+    Orden.agregarItem(productoA);
+    assert(Orden.obtenerItems().length === 1, 'agregarItem() agrega un ítem');
+    assert(Orden.obtenerItems()[0].qty === 1, 'Cantidad inicial es 1');
+    assert(Orden.obtenerItems()[0].obs === '', 'Observación inicial es vacía');
+
+    Orden.agregarItem(productoA);
+    assert(Orden.obtenerItems().length === 1, 'agregarItem() duplicado no crea nuevo ítem');
+    assert(Orden.obtenerItems()[0].qty === 2, 'agregarItem() duplicado incrementa cantidad');
+
+    Orden.agregarItem(productoB);
+    assert(Orden.obtenerItems().length === 2, 'agregarItem() de otro producto agrega ítem distinto');
+
+    assert(Orden.obtenerTotal() === 1500*2 + 800, 'obtenerTotal() calcula correctamente');
+
+    Orden.modificarCantidad('prod_1', 0);
+    assert(Orden.obtenerItems().length === 1, 'modificarCantidad() a 0 elimina el ítem');
+
+    Orden.modificarObservacion('prod_2', 'bien fría');
+    assert(Orden.obtenerItems()[0].obs === 'bien fría', 'modificarObservacion() actualiza la observación');
+
+    Orden.quitarItem('prod_2');
+    assert(Orden.obtenerItems().length === 0, 'quitarItem() elimina el ítem');
+    assert(Orden.obtenerTotal() === 0, 'obtenerTotal() vuelve a 0 tras quitar todo');
+
+    // ── Tests de MenuDigital ─────────────────────────────
+    log('info', '── MenuDigital ──');
+
+    let vistaMenu = MenuDigital.render();
+    assert(vistaMenu !== null, 'render() devuelve una vista');
+    assert(vistaMenu.id === 'view-menu-digital', 'La vista tiene id view-menu-digital');
+
+    const buscador = vistaMenu.querySelector('#menuDigitalSearch');
+    assert(buscador !== null, 'Buscador existe');
+
+    const panelOrden = document.getElementById('panelOrden');
+    assert(panelOrden !== null, 'Panel de orden se crea en el DOM');
+    assert(panelOrden.classList.contains('orden-panel'), 'Panel de orden tiene clase orden-panel');
+    assert(panelOrden.classList.contains('oculto'), 'Panel de orden empieza oculto');
+
+    // Llamamos a mostrar() para que se rellene la grilla
+    MenuDigital.mostrar();
+
+    const grid = vistaMenu.querySelector('#menuDigitalGrid');
+    assert(grid !== null, 'Grilla de productos existe');
+    // Sin Store definido, productos será array vacío → mensaje de "No se encontraron"
+    assert(grid.innerHTML.includes('No se encontraron productos'), 'Grilla muestra mensaje vacío sin productos');
+
+    assert(vistaMenu.classList.contains('active'), 'mostrar() agrega clase active');
+    MenuDigital.ocultar();
+    assert(!vistaMenu.classList.contains('active'), 'ocultar() quita clase active');
+
+    // ── Tests de PantallaEventos ─────────────────────────
+    log('info', '── PantallaEventos ──');
+
+    let vistaEventos = PantallaEventos.render();
+    assert(vistaEventos !== null, 'render() devuelve una vista');
+    assert(vistaEventos.id === 'view-eventos-cliente', 'La vista tiene id view-eventos-cliente');
+
+    const eventosContenido = vistaEventos.querySelector('#eventosContenido');
+    assert(eventosContenido !== null, 'Contenedor de eventos existe');
+
+    PantallaEventos.mostrar();
+    assert(vistaEventos.classList.contains('active'), 'mostrar() agrega clase active');
+    // Sin eventos activos en el Store (inexistente), debe mostrar mensaje
+    assert(eventosContenido.innerHTML.includes('No hay eventos activos'), 'Muestra mensaje sin eventos activos');
+    PantallaEventos.ocultar();
+    assert(!vistaEventos.classList.contains('active'), 'ocultar() quita clase active');
+
+    // ── Limpieza del DOM ─────────────────────────────────
+    document.body.removeChild(vistaInicio);
+    document.body.removeChild(vistaBienvenida);
+    document.body.removeChild(vistaMenu);
+    document.body.removeChild(vistaEventos);
+    if (panelOrden) document.body.removeChild(panelOrden);
+
+    // ── Resumen ──────────────────────────────────────────
+    log('info', `── Resultado: ${pasaron} pasaron, ${fallaron} fallaron ──`);
+    if (fallaron === 0) {
+      log('ok', '🎉 Todos los tests pasaron. Módulos de Célula C operativos.');
+    } else {
+      log('fallo', `⚠️ ${fallaron} test(s) fallaron. Revisar antes del PR.`);
+    }
+  </script>
+</body>
+</html>

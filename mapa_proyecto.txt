@@ -1,0 +1,1156 @@
+=== MAPA DE ARQUITECTURA DEL PROYECTO ===
+
+    📄 Test-B-kds-2.html
+        🔹 var resultsEl = document.getElementById('results');
+        🔹 function assert(condition, msg) {
+        🔹 function esperar(ms) {
+        🔹 var vistaRecetario = document.getElementById('view-recetario');
+        🔹 assert(!!document.getElementById('kds-com_ambos_cocina'), 'Tarjeta virtual de cocina visible');
+        🔹 assert(!!document.getElementById('kds-com_ambos_barra'), 'Tarjeta virtual de barra visible');
+        🔹 assert(document.getElementById('kds-com_ambos') === null, 'Original no se renderiza');
+        🔹 var tarjetaNueva = document.getElementById('kds-com_cambio');
+        🔹 var tarjetaEnProceso = document.getElementById('kds-com_cambio');
+        🔹 window.addEventListener('load', function() {
+📁 Vendor/
+    📁 fontawesome/
+        📁 css/
+        📁 webfonts/
+📁 css/
+📁 docs/
+📁 functions/
+    📁 sync-pedidos-a-sheets/
+            📄 index.js
+    📄 index.html
+        🔹 const pista = document.getElementById('vitrinaPista');
+        🔹 pista.addEventListener('scroll', function() {
+📁 js/
+        📄 app.js
+            🔹 const actualizar = () => {
+            🔹 const fechaEl = document.getElementById('currentDate');
+            🔹 const horaEl = document.getElementById('currentTime');
+            🔹 function setRealVH() {
+            🔹 window.addEventListener('resize', setRealVH);
+            🔹 window.addEventListener('orientationchange', setRealVH);
+            🔹 document.addEventListener('focusin', (e) => {
+            🔹 window.addEventListener('online', () => {
+            🔹 window.addEventListener('offline', () => {
+            🔹 const badge = document.getElementById('syncPendingBadge');
+            🔹 const countSpan = document.getElementById('syncPendingCount');
+            🔹 const indicator = document.getElementById('syncStatusIndicator');
+        📄 appwrite.min.js
+            🔹 function __awaiter(thisArg, _arguments, P, generator) {
+            🔹 function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
+            🔹 function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
+            🔹 function __classPrivateFieldGet(receiver, state, kind, f) {
+            🔹 class ID {
+            🔹 function getDefaultExportFromCjs (x) {
+            🔹 function requireBignumber () {
+            🔹 function clone(configObject) {
+            🔹 function BigNumber(v, b) {
+            🔹 function toBaseOut(str, baseIn, baseOut, alphabet) {
+            🔹 function multiply(x, k, base) {
+            🔹 function compare(a, b, aL, bL) {
+            🔹 function subtract(a, b, aL, base) {
+            🔹 function format(n, i, rm, id) {
+            🔹 function maxOrMin(args, n) {
+            🔹 function normalise(n, c, e) {
+            🔹 function round(x, sd, rm, r) {
+            🔹 function valueOf(n) {
+            🔹 function bitFloor(n) {
+            🔹 function coeffToString(a) {
+            🔹 function compare(x, y) {
+            🔹 function intCheck(n, min, max, name) {
+            🔹 function isOdd(n) {
+            🔹 function toExponential(str, e) {
+            🔹 function toFixedPoint(str, e, z) {
+            🔹 function requireStringify () {
+            🔹 function or an array of strings.
+            🔹 function f(n) {
+            🔹 function quote(string) {
+            🔹 function str(key, holder) {
+            🔹 function requireParse () {
+            🔹 function requireJsonBigint () {
+            🔹 class Query {
+            🔹 function isBigNumber(value) {
+            🔹 function reviver(_key, value) {
+            🔹 class AppwriteException extends Error {
+            🔹 class Client {
+            🔹 this.realtime.socket.addEventListener('message', this.realtime.onMessage);
+            🔹 this.realtime.socket.addEventListener('open', _event => {
+            🔹 this.realtime.socket.addEventListener('close', event => {
+            🔹 const isSubscribed = data.channels.some(channel => this.realtime.channels.has(channel));
+            🔹 const channelStrings = channelArray.map(ch => {
+            🔹 class Service {
+            🔹 class Account {
+            🔹 class Avatars {
+            🔹 class Databases {
+            🔹 class Functions {
+            🔹 class Graphql {
+            🔹 class Locale {
+            🔹 class Messaging {
+            🔹 class Storage {
+            🔹 class TablesDB {
+            🔹 class Teams {
+            🔹 class Realtime {
+            🔹 socket.addEventListener('open', () => {
+            🔹 socket.addEventListener('message', (event) => {
+            🔹 socket.addEventListener('close', (event) => __awaiter(this, void 0, void 0, function* () {
+            🔹 socket.addEventListener('error', (event) => {
+            🔹 this.socket.addEventListener('close', () => {
+            🔹 const ids = subscriptionIds.filter(id => typeof id === 'string' && id.length > 0);
+            🔹 const channelStrings = channelArray.map(ch => this.channelToString(ch));
+            🔹 const unsubscribe = () => __awaiter(this, void 0, void 0, function* () {
+            🔹 const update = (changes) => __awaiter(this, void 0, void 0, function* () {
+            🔹 const nextChannelStrings = changes.channels.map(ch => this.channelToString(ch));
+            🔹 const close = () => __awaiter(this, void 0, void 0, function* () {
+            🔹 class Permission {
+            🔹 class Role {
+            🔹 function normalize(id) {
+            🔹 class Channel {
+            🔹 class Operator {
+        📄 auth.js
+            🔹 const Auth = (() => {
+            🔹 function _guardarUsuarios() {
+            🔹 function init() {
+            🔹 function getDefaultView() {
+            🔹 const usuario = _usuarios.find(u => u.nombre === nombre && u.hash === hashIngresado);
+            🔹 function logout() {
+            🔹 function mostrarLogin() {
+            🔹 function cerrarModalLogin() {
+            🔹 const usuario = document.getElementById('loginUsuario')?.value.trim() || '';
+            🔹 const password = document.getElementById('loginPassword')?.value.trim() || '';
+            🔹 const userInput = document.getElementById('loginUsuario');
+            🔹 const passInput = document.getElementById('loginPassword');
+            🔹 const idx = _usuarios.findIndex(u => u.nombre === nombreUsuario);
+            🔹 const existe = _usuarios.find(u => u.nombre === nombre);
+            🔹 function getRolEfectivo() {
+            🔹 const espacio = _usuarioActual.espacios?.find(e => e.id === _usuarioActual.espacioActivoId);
+            🔹 function tienePermiso(permiso) {
+            🔹 function getRol() { return _usuarioActual?.rol || null; }
+            🔹 function getNombre() { return _usuarioActual?.nombre || ''; }
+            🔹 function getUsuarioActual() {
+            🔹 function getEspacios() {
+            🔹 function getEspacioActivo() {
+            🔹 function cambiarEspacio(espacioId) {
+            🔹 const espacio = _usuarioActual?.espacios?.find(e => e.id === espacioId);
+            🔹 function actualizarNombre(nuevoNombre) {
+            🔹 function esMasterReal() { return _usuarioActual?.rol === 'master'; }
+            🔹 function esMaster() { return _usuarioActual?.rol === 'master' && !_rolSimulado; }
+            🔹 function esAdmin() { const r = getRolEfectivo(); return r === 'admin' || r === 'master'; }
+            🔹 function puede(permiso) { return tienePermiso(permiso); }
+            🔹 function puedeEliminarItemEnviado() { return tienePermiso('eliminarItemEnviado'); }
+            🔹 function puedeCerrarMesa() { return tienePermiso('cerrarMesa'); }
+            🔹 function puedeAccederCaja() { return tienePermiso('accederCaja'); }
+            🔹 function puedeAccederCocina() { return tienePermiso('accederCocina'); }
+            🔹 function puedeCambiarEstadoComanda() { return tienePermiso('cambiarEstadoComanda'); }
+            🔹 function puedeEditarProductos() { return tienePermiso('editarProductos'); }
+            🔹 function puedeEditarPrecios() { return tienePermiso('editarPrecios'); }
+            🔹 function puedeAccederRecetas() {
+            🔹 function puedeAccederReparto() {
+            🔹 function puedeAccederMenu() { return getRolEfectivo() !== null; }
+            🔹 function puedeAccederEventos() {
+            🔹 function puedeAccederPerfil() { return getRolEfectivo() !== null; }
+            🔹 function aplicarRestriccionesUI() {
+            🔹 const userEl = document.getElementById('usuarioActualDisplay');
+            🔹 const roles = el.dataset.rol.split(',').map(r => r.trim());
+            🔹 function _renderSelectorEspacio() {
+            🔹 const container = document.getElementById('espacioSelectorContainer');
+            🔹 function _cambiarRolSimulado(rol) {
+            🔹 document.addEventListener('DOMContentLoaded', function() {
+        📄 bootstrap.js
+            🔹 const Bootstrap = (() => {
+            🔹 const idx = (DB.pedidosDelivery || []).findIndex(p => p.id === datos.id);
+            🔹 document.addEventListener('DOMContentLoaded', function() {
+    📁 comandos/
+            📄 agregar-mesa.js
+                🔹 function crearComandoAgregarMesa(datos) {
+            📄 completar-subcomanda.js
+                🔹 const comanda = comandas.find(c => c.id === idOriginal);
+            📄 crear-pedido-mesa.js
+                🔹 function crearComandoPedidoMesa(datos) {
+            📄 enviar-comanda.js
+                🔹 function crearComandoEnviarComanda(datos) {
+                🔹 const faltantes = resultadoStock.faltantes.map(f =>
+                🔹 const faltantes = resultadoStock.faltantes.map(f =>
+            📄 liberar-mesa.js
+                🔹 function crearComandoLiberarMesa(datos) {
+        📄 db-appwrite.js
+            🔹 function actualizarArrayLocal(nombreArray, datos, campoId) {
+        📄 db-core.js
+            🔹 const mesasReales = this.mesas.filter(m => !m.esVirtual);
+            🔹 let maxNumero = Math.max(0, ...mesasReales.map(m => m.numero));
+            🔹 const idx = this.pedidos.findIndex(p => p.id === id);
+            🔹 const idx = this.pedidosDelivery.findIndex(p => p.id === id);
+            🔹 function mesaVacia(num, zona = 'salon') {
+        📄 db-fusion.js
+            🔹 const mesasSeleccionadas = numeros.map(num => this.getMesa(num)).filter(m => m);
+            🔹 const original = this.mesas.find(m => m.numero === num && !m.esVirtual);
+            🔹 const idx = this.mesas.findIndex(mesa => mesa.numero === m.numero);
+            🔹 const idx = this.mesas.findIndex(m => m.numero === num);
+            🔹 const idxVirtual = this.mesas.findIndex(m => m.numero === mesaVirtual.numero);
+        📄 db-inventario.js
+            🔹 const receta = this.recetas.find(r => r.productoId === productoId);
+            🔹 const ingrediente = this.ingredientes.find(i => i.id === ing.ingredienteId);
+            🔹 const receta = this.recetas.find(r => r.productoId === productoId);
+            🔹 const ingrediente = this.ingredientes.find(i => i.id === ingReceta.ingredienteId);
+            🔹 const ingrediente = this.ingredientes.find(i => i.id === ingredienteId);
+            🔹 const receta = this.recetas.find(r => r.productoId == item.prodId);
+            🔹 const ingData = this.ingredientes.find(i => i.id === ingReceta.ingredienteId);
+        📄 db-shim.js
+        📄 db.js
+            🔹 const pedido = this.pedidos.find(p => p.id === id);
+    📁 dominio/
+            📄 cantidad.js
+                🔹 class Cantidad {
+                🔹 function crearCantidad(valor) {
+            📄 delivery.js
+                🔹 class Delivery {
+                🔹 const existente = this._items.find(it => it.nombre === nombre);
+            📄 dinero.js
+                🔹 class Dinero {
+                🔹 function crearDinero(monto) {
+            📄 direccion.js
+                🔹 class Direccion {
+                🔹 function crearDireccion(calle, numero, depto, referencia, telefono) {
+            📄 ingrediente.js
+                🔹 class Ingrediente {
+                🔹 function reconstruirIngrediente(datos) {
+            📄 pedido.js
+                🔹 class PedidoAgregado {
+                🔹 const existente = this._items.find(it => it.nombre === nombre);
+            📄 resultado.js
+                🔹 class Resultado {
+    📁 lib/
+            📄 command-bus.js
+                🔹 const CommandBus = (() => {
+                🔹 function registrar(commandType, handler) {
+            📄 deps.js
+                🔹 const Deps = (() => {
+                🔹 function registrar(nombre, instancia) {
+                🔹 function obtener(nombre) {
+                🔹 function existe(nombre) {
+            📄 eventBus.js
+                🔹 const EventBus = (() => {
+                🔹 function on(eventType, callback) {
+                🔹 function emit(event, datos) {
+                🔹 function off(eventType, callback) {
+                🔹 function listar() {
+                🔹 function _nombreEvento(eventType) {
+            📄 loader.js
+                🔹 function verificar() {
+                🔹 function cuandoListo(cb) {
+            📄 logger.js
+                🔹 const Logger = (() => {
+                🔹 function setLevel(level) {
+                🔹 function setCollect(active = true) {
+                🔹 function getLogs() {
+                🔹 function clear() {
+                🔹 function debug(message, ...args) {
+                🔹 function info(message, ...args) {
+                🔹 function warn(message, ...args) {
+                🔹 function error(message, ...args) {
+                🔹 function _log(level, levelName, message, args) {
+                🔹 const ErrorHandler = (() => {
+                🔹 function init() {
+                🔹 window.addEventListener('error', (event) => {
+                🔹 window.addEventListener('unhandledrejection', (event) => {
+            📄 store.js
+                🔹 const Store = (() => {
+                🔹 function getState() {
+                🔹 function dispatch(action) {
+                🔹 function subscribe(fn) {
+                🔹 function rootReducer(currentState, action) {
+                🔹 function mesasReducer(mesas, action) {
+                🔹 function pedidosReducer(pedidos, action) {
+                🔹 function deliveryReducer(deliveries, action) {
+                🔹 function comandasReducer(comandas, action) {
+                🔹 function productosReducer(productos, action) {
+                🔹 function ingredientesReducer(ingredientes, action) {
+                🔹 function recetasReducer(recetas, action) {
+                🔹 function mozosReducer(mozos, action) {
+                🔹 function configReducer(config, action) {
+                🔹 function espaciosReducer(espacios, action) {
+                🔹 function espacioActivoReducer(espacioActivo, action) {
+    📁 managers/
+            📄 pedido-manager.js
+                🔹 const PedidoManager = (() => {
+                🔹 function init(options = {}) {
+                🔹 function _iniciarNuevoTurno() {
+                🔹 function _cargarAuditLog() {
+                🔹 function _guardarAuditLog() {
+                🔹 function _registrarAuditoria(tipo, datos) {
+                🔹 function agregarItemAPedido(pedidoId, item) {
+                🔹 function crearPedidoDelivery(datos) {
+                🔹 function enviarPedidoDeliveryACocina(deliveryId) {
+                🔹 const pedido = DB.pedidosDelivery.find(p => p.id === deliveryId);
+            📄 turno-manager.js
+                🔹 const TurnoManager = (() => {
+                🔹 function _resetearLocalStorage() {
+                🔹 const idx = DB.mesas.findIndex(x => x.numero === m.numero);
+                🔹 function obtenerEstado() {
+    📁 modulos/
+        📁 admin/
+                📄 eventos-en-vivo.js
+                    🔹 const EventosEnVivo = (() => {
+                    🔹 function _asegurarVista() {
+                    🔹 if (document.getElementById('view-eventos-en-vivo')) return;
+                    🔹 const referencia = document.getElementById('toastContainer') || document.body.lastChild;
+                    🔹 function _usuarioAutorizado() {
+                    🔹 function render() {
+                    🔹 document.getElementById('panelEventoVivo').innerHTML =
+                    🔹 function _actualizarUI() {
+                    🔹 const badge = document.getElementById('estadoEvento');
+                    🔹 const zona = document.getElementById('zonaInteraccion');
+                    🔹 const btnIniciar = document.getElementById('btnIniciar');
+                    🔹 const btnPausar = document.getElementById('btnPausar');
+                    🔹 const btnFinalizar = document.getElementById('btnFinalizar');
+                    🔹 const btnReiniciar = document.getElementById('btnReiniciar');
+                    🔹 const btnCrear = document.getElementById('btnCrearEvento');
+                    🔹 function _renderInterfazBingo(datos, estado) {
+                    🔹 const zona = document.getElementById('zonaInteraccion');
+                    🔹 function _renderInterfazKaraoke(datos, estado) {
+                    🔹 const zona = document.getElementById('zonaInteraccion');
+                    🔹 function _renderInterfazVotacion(datos, estado) {
+                    🔹 const zona = document.getElementById('zonaInteraccion');
+                    🔹 const tipo = document.getElementById('selTipoEvento').value;
+                    🔹 const letra = document.getElementById('letraKaraoke')?.value || '';
+                    🔹 const ta = document.getElementById('letraKaraoke');
+                    🔹 const input = document.getElementById('nuevaOpcion');
+                    🔹 function _suscribirTiempoReal() {
+                    🔹 function _init() {
+        📁 cliente/
+                📄 menu-digital.js
+                    🔹 const MenuDigital = (() => {
+                    🔹 function render() {
+                    🔹 document.getElementById('menuDigitalSearch').addEventListener('input', () => {
+                    🔹 _terminoBusqueda = document.getElementById('menuDigitalSearch')?.value?.trim() || '';
+                    🔹 document.getElementById('btnToggleOrden').addEventListener('click', _togglePanelOrden);
+                    🔹 function _crearPanelOrden() {
+                    🔹 document.getElementById('btnConfirmarOrden').addEventListener('click', _confirmarOrden);
+                    🔹 function _togglePanelOrden() {
+                    🔹 function _renderizarItemsOrden() {
+                    🔹 const container = document.getElementById('ordenItems');
+                    🔹 const totalEl = document.getElementById('ordenTotal');
+                    🔹 btn.addEventListener('click', () => {
+                    🔹 const item = items.find(i => i.prodId === id);
+                    🔹 input.addEventListener('input', () => {
+                    🔹 btn.addEventListener('click', () => {
+                    🔹 function _actualizarContador() {
+                    🔹 const totalCantidad = items.reduce((sum, i) => sum + i.qty, 0);
+                    🔹 const contador = document.getElementById('contadorOrden');
+                    🔹 function _mostrarToast(tipo, mensaje) {
+                    🔹 const contenedor = document.getElementById('toastContainer');
+                    🔹 function mostrar() {
+                    🔹 const viewMenu = document.getElementById('view-menu');
+                    🔹 function ocultar() {
+                    🔹 function _actualizarEstado() {
+                    🔹 document.getElementById('menuEstadoCliente').textContent = `👤 ${nombre}`;
+                    🔹 document.getElementById('menuEstadoMesa').textContent = `🪑 Mesa ${mesa}`;
+                    🔹 function _verificarPermiso() {
+                    🔹 const banner = document.getElementById('menuBannerEspera');
+                    🔹 function _renderCategorias() {
+                    🔹 const container = document.getElementById('menuDigitalCategorias');
+                    🔹 btn.addEventListener('click', () => {
+                    🔹 function _renderProductos() {
+                    🔹 const grid = document.getElementById('menuDigitalGrid');
+                    🔹 let productos = (window.Store?.getState?.().productos || []).filter(p => p.activo !== false);
+                    🔹 btn.addEventListener('click', () => {
+                    🔹 function _getColorFromName(nombre) {
+                    🔹 function _initRealtime() {
+                📄 orden.js
+                    🔹 const Orden = (() => {
+                    🔹 function agregarItem(producto) {
+                    🔹 const existente = _items.find(item => item.prodId === producto.id);
+                    🔹 function quitarItem(prodId) {
+                    🔹 function modificarCantidad(prodId, nuevaCantidad) {
+                    🔹 const item = _items.find(item => item.prodId === prodId);
+                    🔹 function modificarObservacion(prodId, obs) {
+                    🔹 const item = _items.find(item => item.prodId === prodId);
+                    🔹 function vaciar() {
+                    🔹 function obtenerItems() {
+                    🔹 function obtenerTotal() {
+                📄 pantalla-bienvenida.js
+                    🔹 const PantallaBienvenida = (() => {
+                    🔹 function render() {
+                    🔹 function _configurarEventos() {
+                    🔹 document.getElementById('btnGuardarMesa').addEventListener('click', _guardarMesa);
+                    🔹 document.getElementById('cardGastronomica').addEventListener('click', _irAlMenu);
+                    🔹 document.getElementById('cardEntretenimiento').addEventListener('click', _irAEventos);
+                    🔹 function _guardarMesa() {
+                    🔹 const input = document.getElementById('inputMesa');
+                    🔹 document.getElementById('estadoMesa').textContent = 'Ingresá un número válido.';
+                    🔹 function _verificarPermisoMesa() {
+                    🔹 const mesaActual = mesas.find(m => m.numero === _mesa);
+                    🔹 document.getElementById('estadoMesa').textContent = '✅ ¡Mesa activada! Podés armar tu pedido.';
+                    🔹 function obtenerMesa() { return _mesa; }
+                    🔹 function permitePrepedidos() { return _permitePrepedidos; }
+                    🔹 function _actualizarMensaje() {
+                    🔹 const headerEl = document.getElementById('bienvenidaMensaje');
+                    🔹 const subEl = document.getElementById('bienvenidaSub');
+                    🔹 function _verificarEventos() {
+                    🔹 const activo = eventos.find(e => e.estado === 'activo');
+                    🔹 const ecualizador = document.getElementById('ecualizador');
+                    🔹 const mensaje = document.getElementById('mensajeEvento');
+                    🔹 function _irAlMenu() {
+                    🔹 document.getElementById('estadoMesa').textContent = 'Primero ingresá el número de mesa.';
+                    🔹 document.getElementById('estadoMesa').textContent = 'Esperá a que el garzón active tu mesa.';
+                    🔹 function _irAEventos() {
+                    🔹 function mostrar() {
+                    🔹 const viewMenu = document.getElementById('view-menu');
+                    🔹 function ocultar() {
+                    🔹 function _initRealtime() {
+                📄 pantalla-eventos.js
+                    🔹 const PantallaEventos = (() => {
+                    🔹 function render() {
+                    🔹 function mostrar() {
+                    🔹 const viewEventos = document.getElementById('view-eventos');
+                    🔹 function ocultar() {
+                    🔹 function _renderizarEvento() {
+                    🔹 const container = document.getElementById('eventosContenido');
+                    🔹 const badge = document.getElementById('eventosBadge');
+                    🔹 const sub = document.getElementById('eventosSub');
+                    🔹 const activo = eventos.find(e => e.estado === 'activo');
+                    🔹 function _mostrarSinEvento(container, badge, sub) {
+                    🔹 function _mostrarEventoActivo(container, badge, sub, evento) {
+                    🔹 btn.addEventListener('click', () => {
+                    🔹 function _renderBingo(evento) {
+                    🔹 function _renderKaraoke(evento) {
+                    🔹 function _renderVotacion(evento) {
+                    🔹 function _iconoEvento(tipo) {
+                    🔹 function _initRealtime() {
+                📄 pantalla-inicio.js
+                    🔹 const PantallaInicio = (() => {
+                    🔹 function render() {
+                    🔹 document.getElementById('btnMostrarLogin').addEventListener('click', _mostrarLogin);
+                    🔹 document.getElementById('btnMostrarRegistro').addEventListener('click', _mostrarRegistro);
+                    🔹 document.getElementById('inicioOverlay').addEventListener('click', (e) => {
+                    🔹 function _mostrarLogin() {
+                    🔹 const modal = document.getElementById('inicioModal');
+                    🔹 const overlay = document.getElementById('inicioOverlay');
+                    🔹 document.getElementById('btnLogin').addEventListener('click', _hacerLogin);
+                    🔹 function _mostrarRegistro() {
+                    🔹 const modal = document.getElementById('inicioModal');
+                    🔹 const overlay = document.getElementById('inicioOverlay');
+                    🔹 document.getElementById('btnRegistrar').addEventListener('click', _hacerRegistro);
+                    🔹 const nombre = document.getElementById('loginUsuario')?.value?.trim();
+                    🔹 const password = document.getElementById('loginPassword')?.value?.trim();
+                    🔹 const errorEl = document.getElementById('loginError');
+                    🔹 const nombre = document.getElementById('regUsuario')?.value?.trim();
+                    🔹 const password = document.getElementById('regPassword')?.value?.trim();
+                    🔹 const errorEl = document.getElementById('regError');
+                    🔹 const modal = document.getElementById('inicioModal');
+                    🔹 document.getElementById('btnIrLogin').addEventListener('click', _mostrarLogin);
+                    🔹 function _cerrarModal() {
+                    🔹 document.getElementById('inicioOverlay').style.display = 'none';
+                    🔹 function mostrar() {
+                    🔹 function ocultar() {
+                📄 principal.js
+        📁 interno/
+                📄 precarga-control.js
+                    🔹 const PrecargaControl = (() => {
+                    🔹 function _onPrecargaEnviada(data) {
+                📄 recetario.js
+                    🔹 const Recetario = (() => {
+                    🔹 function _asegurarVista() {
+                    🔹 if (document.getElementById('view-recetario')) return;
+                    🔹 const grid = document.getElementById('recetarioGrid');
+                    🔹 const producto = (window.DB?.productos || []).find(p => p.id === receta.productoId);
+                    🔹 const ingData = (window.DB?.ingredientes || []).find(i => i.id === ing.ingredienteId);
+    📁 repositorios/
+            📄 pedido-repository.js
+                🔹 const PedidoRepositoryLocal = (() => {
+                🔹 function _normalizarFecha(valor) {
+                🔹 function _sanitizarMesa(m) {
+                🔹 function _sanitizarPedido(p) {
+                🔹 function _sanitizarComanda(c) {
+                🔹 const _crearComanda = (items, destinoKds) => {
+                🔹 const pedidoActualizado = DB.pedidos.find(p => p.id === mesa.pedidoId);
+                🔹 const pedido = DB.pedidos.find(p => p.id === id);
+                🔹 const pedidoCerrado = DB.pedidos.find(p => p.id === id);
+                🔹 const mesa = DB.mesas.find(m => m.pedidoId === id);
+                🔹 const existente = DB.mesas.find(m => m.numero === datosMesa.numero);
+                🔹 const mesa = DB.mesas.find(m => m.numero == numeroMesa);
+                🔹 const idx = DB.mesas.findIndex(m => m.numero === mesa.numero);
+                🔹 const mesaActualizada = DB.mesas.find(m => m.numero == numeroMesa);
+                🔹 const m = DB.mesas.find(x => x.numero === num);
+        📄 roles.js
+    📁 servicios/
+            📄 delivery-service.js
+                🔹 const DeliveryService = (() => {
+                🔹 function configurar(repo) {
+                🔹 function _reconstruirDelivery(datos) {
+            📄 inventario-service.js
+                🔹 const InventarioService = (() => {
+                🔹 function configurar(repo) {
+                🔹 function validarStockParaItems(items) {
+                🔹 const receta = DB.recetas.find(r => r.productoId == item.prodId);
+                🔹 const ingData = DB.ingredientes.find(i => i.id === ingReceta.ingredienteId);
+            📄 pedido-service.js
+                🔹 const PedidoService = (() => {
+                🔹 function configurar(repo) { _pedidoRepo = repo; }
+                🔹 function _reconstruirPedido(datos) {
+    📁 ui/
+            📄 caja.js
+                🔹 const Caja = (() => {
+                🔹 function _asegurarVista() {
+                🔹 function render() {
+                🔹 const cerrados = pedidos.filter(p => p.estado === 'cerrada');
+                🔹 const abiertos = pedidos.filter(p => p.estado !== 'cerrada' && p.estado !== 'cancelada');
+                🔹 const totalVentas = cerrados.reduce((s, p) => s + (p.total || 0), 0);
+                🔹 function _htmlStats(totalVentas, cerradas, promedio, abiertas) {
+                🔹 function _htmlFila(p) {
+                🔹 const cant = items.reduce((s, it) => s + it.qty, 0);
+                🔹 function _initListeners() {
+            📄 carta.js
+                🔹 const Carta = (() => {
+                🔹 function render() {
+                🔹 function _renderCategorias() {
+                🔹 function setCategoria(cat) {
+                🔹 function filtrar() {
+                🔹 function _renderProductos() {
+                🔹 let productosFiltrados = (Store.getState().productos || []).filter(p => p.activo !== false);
+                🔹 function _htmlProducto(p) {
+                🔹 function seleccionarProducto(prodId) {
+                🔹 const producto = (Store.getState().productos || []).find(p => p.id === prodId);
+                🔹 function _initListeners() {
+            📄 cobro.js
+                🔹 const Cobro = (() => {
+                🔹 function _asegurarModalCierre() {
+                🔹 function abrirModalCierre() {
+                🔹 const obsInput = document.getElementById('comandaObs');
+                🔹 const modal = document.getElementById('modalCierre');
+                🔹 const ppContainer = document.getElementById('pagosParcialesContainer');
+                🔹 function _renderResumen() {
+                🔹 const resumenEl = document.getElementById('cierreResumen');
+                🔹 const ppContainer = document.getElementById('pagosParcialesContainer');
+                🔹 function _renderPagosParciales(porPersona) {
+                🔹 const container = document.getElementById('pagosParcialesContainer');
+                🔹 const pagoExistente = _pagosParciales.find(p => p.persona === persona);
+                🔹 function _inicializarPagosParciales() {
+                🔹 function actualizarFormaPagoPersona(persona, forma) {
+                🔹 const pago = _pagosParciales.find(p => p.persona === persona);
+                🔹 function actualizarMontoPersona(persona, montoStr) {
+                🔹 const pago = _pagosParciales.find(p => p.persona === persona);
+                🔹 function cobrarTodoJunto() {
+                🔹 const container = document.getElementById('pagosParcialesContainer');
+                🔹 document.getElementById('cierreDescuento').value = 0;
+                🔹 function selectPago(btn) {
+                🔹 function actualizarTotalCierre() {
+                🔹 function _actualizarTotalFinal() {
+                🔹 const descuentoInput = document.getElementById('cierreDescuento');
+                🔹 const totalEl = document.getElementById('cierreTotalFinal');
+                🔹 const ppContainer = document.getElementById('pagosParcialesContainer');
+                🔹 const sumaPagos = pagos.reduce((s, p) => s + p.monto, 0);
+                🔹 const descuentoInput = document.getElementById('cierreDescuento');
+                🔹 descuento: parseFloat(document.getElementById('cierreDescuento')?.value) || 0
+                🔹 const pedidoCerrado = DB.pedidos.find(p => p.id === _mesaACerrar.pedidoId);
+                🔹 const idx = DB.mesas.findIndex(m => m.numero === _mesaACerrar.numero);
+                🔹 function cerrarModalCierre() {
+                🔹 const modal = document.getElementById('modalCierre');
+            📄 comanda.js
+                🔹 const Comanda = (() => {
+                🔹 function setMesaActiva(mesa) {
+                🔹 function _sincronizarCamposHeader() {
+                🔹 const selMozo = document.getElementById('comandaMozo');
+                🔹 const inpComensales = document.getElementById('comandaComensales');
+                🔹 const inpObs = document.getElementById('comandaObs');
+                🔹 function _renderSelectorPersona() {
+                🔹 const container = document.getElementById('personaActivaContainer');
+                🔹 function setPersonaActiva(nombre) {
+                🔹 function agregarPersona() {
+                🔹 function agregarItem(producto) {
+                🔹 function cambiarCantidad(idx, delta) {
+                🔹 function setObservacion(idx, valor) {
+                🔹 function quitarItem(idx) {
+                🔹 function setMozo(mozo) {
+                🔹 function setComensales(cant) {
+                🔹 function setObservacionGeneral(obs) {
+                🔹 function _guardarYRenderizar() {
+                🔹 function render() {
+                🔹 function _render() {
+                🔹 const contenedor = document.getElementById('comandaItems');
+                🔹 const subtotalEl = document.getElementById('subtotalDisplay');
+                🔹 function _htmlItem(item, idx) {
+                🔹 function _initEventListeners() {
+            📄 config.js
+                🔹 const Config = (() => {
+                🔹 function _asegurarVista() {
+                🔹 if (document.getElementById('view-config')) return;
+                🔹 const referencia = document.getElementById('toastContainer') || document.body.lastChild;
+                🔹 function cargar() {
+                🔹 document.getElementById('cfgNombreLocal').value = config.nombreLocal || '';
+                🔹 document.getElementById('cfgDireccion').value = config.direccion || '';
+                🔹 document.getElementById('cfgCuit').value = config.cuit || '';
+                🔹 document.getElementById('cfgPie').value = config.pieTicket || '';
+                🔹 const chk = document.getElementById('cfgBloquearStock');
+                🔹 function _renderUsuarios() {
+                🔹 const card = document.getElementById('usuariosCard');
+                🔹 const lista = document.getElementById('usuariosLista');
+                🔹 function _renderZonas() {
+                🔹 const container = document.getElementById('zonasContainer');
+                🔹 function _updateZona(idx, campo, valor) {
+                🔹 function agregarZona() {
+                🔹 function eliminarZona(idx) {
+                🔹 const zonasContainer = document.getElementById('zonasContainer');
+                🔹 const zonasNuevas = Array.from(filas).map(fila => {
+                🔹 nombreLocal: document.getElementById('cfgNombreLocal').value.trim(),
+                🔹 direccion: document.getElementById('cfgDireccion').value.trim(),
+                🔹 cuit: document.getElementById('cfgCuit').value.trim(),
+                🔹 pieTicket: document.getElementById('cfgPie').value.trim(),
+                🔹 bloquearStockInsuficiente: document.getElementById('cfgBloquearStock')?.checked ?? true
+                🔹 function renderProductos() {
+                🔹 const cont = document.getElementById('productosLista');
+                🔹 function _htmlProdConfigItem(p) {
+                🔹 function abrirModalProducto(prod = null) {
+                🔹 let modal = document.getElementById('modalProducto');
+                🔹 document.getElementById('prodId').value = prod?.id || '';
+                🔹 document.getElementById('prodNombre').value = prod?.nombre || '';
+                🔹 document.getElementById('prodPrecio').value = prod?.precio || '';
+                🔹 document.getElementById('prodCategoria').value = prod?.categoria || 'Comidas';
+                🔹 document.getElementById('prodDestino').value = prod?.destino || 'cocina';
+                🔹 document.getElementById('prodDescripcion').value = prod?.descripcion || '';
+                🔹 document.getElementById('prodImagen').value = prod?.imagen || '';
+                🔹 document.getElementById('prodActivo').checked = prod ? (prod.activo !== false) : true;
+                🔹 function cerrarModalProducto() { document.getElementById('modalProducto').style.display = 'none'; }
+                🔹 function _autoajustarPrecio() {
+                🔹 const precioInput = document.getElementById('prodPrecio');
+                🔹 function _vistaPreviaImagen() {
+                🔹 const url = document.getElementById('prodImagen')?.value.trim() || '';
+                🔹 const contenedor = document.getElementById('vistaPreviaImagen');
+                🔹 const nombre = document.getElementById('prodNombre').value.trim();
+                🔹 const precio = parseFloat(document.getElementById('prodPrecio')?.value) || 0;
+                🔹 categoria: document.getElementById('prodCategoria')?.value || 'General',
+                🔹 destino: document.getElementById('prodDestino')?.value || 'cocina',
+                🔹 descripcion: document.getElementById('prodDescripcion').value.trim(),
+                🔹 imagen: document.getElementById('prodImagen').value.trim(),
+                🔹 activo: document.getElementById('prodActivo')?.checked ?? true
+                🔹 const prod = (Store.getState().productos || []).find(p => p.id === id);
+                🔹 function renderMozos() {
+                🔹 const container = document.getElementById('mozosLista');
+                🔹 function agregarMozo() {
+                🔹 const nombre = document.getElementById('nuevoMozoNombre').value.trim();
+                🔹 document.getElementById('nuevoMozoNombre').value = '';
+                🔹 function eliminarMozo(idx) {
+                🔹 function _initListeners() {
+            📄 cuenta.js
+                🔹 const Cuenta = (() => {
+                🔹 function pedirCuenta() {
+                🔹 const obsInput = document.getElementById('comandaObs');
+                🔹 const badge = document.getElementById('modalEstadoBadge');
+            📄 despensa.js
+                🔹 const Despensa = (() => {
+                🔹 function _asegurarVista() {
+                🔹 if (document.getElementById('view-despensa')) return;
+                🔹 const referencia = document.getElementById('toastContainer') || document.body.lastChild;
+                🔹 function render() {
+                🔹 function _renderResumen() {
+                🔹 const cont = document.getElementById('inventarioResumen');
+                🔹 const bajoMin = ingredientes.filter(i => i.stock <= i.stock_minimo).length;
+                🔹 const valorTotal = ingredientes.reduce((sum, i) => sum + (i.stock * (i.valor_unitario || 0)), 0);
+                🔹 function filtrarPorCategoria(cat) {
+                🔹 function _buscar() {
+                🔹 function _aplicarFiltros() {
+                🔹 function _renderTablaIngredientes() {
+                🔹 const tbody = document.getElementById('ingredientesBody');
+                🔹 const termino = (document.getElementById('ingredienteSearch')?.value || '').trim().toLowerCase();
+                🔹 const filtroBajo = document.getElementById('filtroBajoMinimo')?.checked;
+                🔹 const filtroValor = document.getElementById('filtroConValor')?.checked;
+                🔹 function ordenarTabla(columna, event) {
+                🔹 const existente = _ordenColumnas.findIndex(o => o.columna === columna);
+                🔹 function _renderMovimientos() {
+                🔹 const cont = document.getElementById('movimientosList');
+                🔹 const paginador = document.getElementById('movimientosPaginador');
+                🔹 function _mostrarMasMovimientos() {
+                🔹 function _renderAlertasStock() {
+                🔹 const cont = document.getElementById('alertasStockList');
+                🔹 const criticos = ingredientes.filter(i => i.stock <= i.stock_minimo);
+                🔹 function mostrarModalIngrediente(ingrediente = null) {
+                🔹 let modal = document.getElementById('modalIngrediente');
+                🔹 document.getElementById('ingId').value = ingrediente?.id || '';
+                🔹 document.getElementById('ingNombre').value = ingrediente?.nombre || '';
+                🔹 document.getElementById('ingCategoria').value = ingrediente?.categoria || 'general';
+                🔹 document.getElementById('ingStock').value = ingrediente?.stock || 0;
+                🔹 document.getElementById('ingUnidad').value = ingrediente?.unidad || 'kg';
+                🔹 document.getElementById('ingStockMin').value = ingrediente?.stock_minimo || 5;
+                🔹 document.getElementById('ingUbicacion').value = ingrediente?.ubicacion || '';
+                🔹 document.getElementById('ingValorUnitario').value = ingrediente?.valor_unitario || 0;
+                🔹 document.getElementById('ingTitulo').textContent = titulo;
+                🔹 function cerrarModalIngrediente() {
+                🔹 document.getElementById('modalIngrediente').style.display = 'none';
+                🔹 const id = document.getElementById('ingId').value;
+                🔹 const nombre = document.getElementById('ingNombre').value.trim();
+                🔹 stock: parseFloat(document.getElementById('ingStock').value) || 0,
+                🔹 unidad: document.getElementById('ingUnidad').value.trim() || 'u',
+                🔹 stock_minimo: parseFloat(document.getElementById('ingStockMin').value) || 0,
+                🔹 categoria: document.getElementById('ingCategoria').value,
+                🔹 ubicacion: document.getElementById('ingUbicacion').value.trim() || '',
+                🔹 valor_unitario: parseFloat(document.getElementById('ingValorUnitario').value) || 0
+                🔹 function editarIngrediente(id) {
+                🔹 const ing = DB.ingredientes.find(i => i.id == id);
+                🔹 const ing = DB.ingredientes.find(i => i.nombre.toLowerCase() === nombre.toLowerCase());
+                🔹 const ing = DB.ingredientes.find(i => i.id === ingredienteId);
+                🔹 function exportarIngredientes() {
+                🔹 function exportarPDF() {
+                🔹 function _initListeners() {
+            📄 eventos.js
+                🔹 const Eventos = (() => {
+                🔹 function _asegurarVista() {
+                🔹 if (document.getElementById('view-eventos')) return;
+                🔹 const referencia = document.getElementById('toastContainer') || document.body.lastChild;
+                🔹 const tbody = document.getElementById('eventosBody');
+                🔹 function mostrarFormulario() {
+                🔹 let modal = document.getElementById('modalEvento');
+                🔹 function cerrarFormulario() {
+                🔹 const modal = document.getElementById('modalEvento');
+                🔹 const fecha = document.getElementById('evtFecha').value.trim();
+                🔹 const tipo = document.getElementById('evtTipo').value;
+                🔹 const cliente = document.getElementById('evtCliente').value.trim();
+                🔹 const personas = parseInt(document.getElementById('evtPersonas')?.value) || 0;
+                🔹 const lugar = document.getElementById('evtLugar').value.trim();
+                🔹 const observaciones = document.getElementById('evtObs').value.trim();
+                🔹 function _initEventListeners() {
+            📄 kds.js
+                🔹 const KDS = (() => {
+                🔹 function _asegurarVista() {
+                🔹 function refresh() {
+                🔹 const itemsCocina = c.items.filter(it => it.destino === 'cocina' || it.destino === 'ambos');
+                🔹 const itemsBarra = c.items.filter(it => it.destino === 'barra' || it.destino === 'ambos');
+                🔹 function _htmlKdsCard(c) {
+                🔹 const itemsHTML = items.map(it => {
+                🔹 function _panico(prodId) {
+                🔹 function _setEstado(id, estado) {
+                🔹 let c = comandas.find(x => x.id === id);
+                🔹 const idx = DB.comandas.findIndex(x => x.id === id);
+                🔹 const idx = DB.comandas.findIndex(x => x.id === id);
+                🔹 function _initListeners() {
+            📄 menu.js
+                🔹 const Menu = (() => {
+                🔹 function _asegurarVista() {
+                🔹 function render() {
+                🔹 function _renderCategorias() {
+                🔹 function setCategoria(cat) {
+                🔹 function filtrar() {
+                🔹 function _renderProductos() {
+                🔹 let productos = (Store.getState().productos || []).filter(p => p.activo !== false);
+                🔹 function _getColorFromName(nombre) {
+                🔹 function mostrarDetalle(prodId) {
+                🔹 const producto = (state.productos || []).find(p => p.id == prodId);
+                🔹 const receta = (state.recetas || []).find(r => r.productoId == prodId);
+                🔹 const nombres = receta.ingredientes.map(ing => {
+                🔹 const ingData = (state.ingredientes || []).find(i => i.id == ing.ingredienteId);
+                🔹 function cerrarDetalle() {
+                🔹 function _initListeners() {
+            📄 mesas.js
+                🔹 const Mesas = (() => {
+                🔹 function _asegurarVista() {
+                🔹 function render() {
+                🔹 function _renderZoneButtons() {
+                🔹 const container = document.getElementById('zonaButtonsContainer');
+                🔹 function _getZonaColor(zonaNombre) {
+                🔹 const idx = zonas.findIndex(z => z.nombre === zonaNombre);
+                🔹 function setZona(zona) {
+                🔹 function _getEstadoComandas(mesaNumero) {
+                🔹 function _colorEstado(estado) {
+                🔹 function _renderGrid() {
+                🔹 card.addEventListener('mousedown', (e) => {
+                🔹 card.addEventListener('mouseup', (e) => {
+                🔹 card.addEventListener('mouseleave', () => {
+                🔹 card.addEventListener('touchstart', (e) => {
+                🔹 card.addEventListener('touchend', (e) => {
+                🔹 card.addEventListener('touchmove', () => {
+                🔹 function _mostrarPopover(mesa, card) {
+                🔹 const mesaComandas = comandas.filter(c => c.mesa == mesa.numero);
+                🔹 function toggleModoFusion() {
+                🔹 const btn = document.getElementById('btnFusionar');
+                🔹 function toggleSeleccionMesa(num, isChecked) {
+                🔹 function fusionarMesasSeleccionadas() {
+                🔹 const numeros = Array.from(_mesasSeleccionadas).sort((a,b) => a - b);
+                🔹 function agregarMesa() {
+                🔹 const maxNum = mesas.reduce((max, m) => Math.max(max, m.numero || 0), 0);
+                🔹 function labelEstado(estado) {
+                🔹 function setBadge(numMesa, cantidad, precargaId) {
+                🔹 function clearBadge(numMesa) {
+                🔹 function onPrecargaClick(numMesa) {
+                🔹 function _initListeners() {
+            📄 pedido-ui.js
+                🔹 function _asegurarModalPedido() {
+                🔹 function _mostrarModalApertura(mesa) {
+                🔹 function _cancelarApertura() {
+                🔹 function _abrirModalPedido(mesa) {
+                🔹 var tituloEl = document.getElementById('modalMesaTitulo');
+                🔹 var badgeEl = document.getElementById('modalEstadoBadge');
+                🔹 var modal = document.getElementById('modalPedido');
+                🔹 mesa.mozo = document.getElementById('mozoActivo')?.value || (DB.mozos[0]?.nombre || 'Mozo');
+                🔹 function cerrar() {
+                🔹 var modal = document.getElementById('modalPedido');
+                🔹 function _ejecutarEnvioComanda(mesa, pendientes, overrideStock) {
+                🔹 var mozoSelect = document.getElementById('comandaMozo');
+                🔹 var comensalesInput = document.getElementById('comandaComensales');
+                🔹 var obsInput = document.getElementById('comandaObs');
+                🔹 function _mostrarRevisarPendientes(mesa, pendientes) {
+                🔹 function crearOpciones(comandaTemp) {
+                🔹 function crearComandaTemp(items, destino) {
+                🔹 function _mostrarDialogoStockInsuficiente(mesa, pendientes, faltantes, mensaje) {
+                🔹 document.getElementById(modalId + '-close').onclick = closeModal;
+                🔹 document.getElementById(modalId + '-cancel').onclick = closeModal;
+                🔹 document.getElementById(modalId + '-force').onclick = async function() {
+                🔹 function _mostrarReimprimir(comandas) {
+                🔹 function _editarComandaCallback(comanda, htmlActual) {
+                🔹 function transferirMesa(mesaOrigenNum, mesaDestinoNum) {
+                🔹 function mostrarSelectorTransferencia() {
+            📄 perfil.js
+                🔹 const Perfil = (() => {
+                🔹 function _storageKey(usuario) {
+                🔹 function _asegurarVista() {
+                🔹 if (document.getElementById('view-perfil')) return;
+                🔹 const referencia = document.getElementById('toastContainer') || document.body.lastChild;
+                🔹 document.getElementById('perfilNombre').textContent = usuario.nombre;
+                🔹 document.getElementById('perfilRol').textContent = `Rol: ${usuario.rolEfectivo}`;
+                🔹 document.getElementById('perfilSimulacion').style.display = 'block';
+                🔹 document.getElementById('perfilSimulacion').textContent = `(Simulando: ${usuario.simulando})`;
+                🔹 document.getElementById('perfilSimulacion').style.display = 'none';
+                🔹 function _renderAvatar(nombre, fotoUrl) {
+                🔹 const avatarEl = document.getElementById('perfilAvatar');
+                🔹 function _renderDetalles(extras) {
+                🔹 const cont = document.getElementById('perfilDetalles');
+                🔹 function mostrarModalEditar() {
+                🔹 let modal = document.getElementById('modalEditarPerfil');
+                🔹 document.getElementById('editarPerfilNombre').value = usuario ? usuario.nombre : '';
+                🔹 document.getElementById('editarPerfilTelefono').value = extras.telefono || '';
+                🔹 document.getElementById('editarPerfilEmail').value = extras.email || '';
+                🔹 document.getElementById('editarPerfilFoto').value = extras.foto || '';
+                🔹 function cerrarModalEditar() {
+                🔹 const modal = document.getElementById('modalEditarPerfil');
+                🔹 const nuevoNombre = document.getElementById('editarPerfilNombre').value.trim();
+                🔹 const telefono = document.getElementById('editarPerfilTelefono').value.trim();
+                🔹 const email = document.getElementById('editarPerfilEmail').value.trim();
+                🔹 const foto = document.getElementById('editarPerfilFoto').value.trim();
+                🔹 function _cargarExtras(usuario) {
+                🔹 function _guardarExtras(usuario, datos) {
+                🔹 const docsContainer = document.getElementById('perfilDocsLista');
+            📄 recetas.js
+                🔹 const Recetas = (() => {
+                🔹 function _asegurarVista() {
+                🔹 if (document.getElementById('view-recetas')) return;
+                🔹 const referencia = document.getElementById('toastContainer') || document.body.lastChild;
+                🔹 function render() {
+                🔹 const grid = document.getElementById('recetasGrid');
+                🔹 let productos = (state.productos || []).filter(p => p.activo !== false);
+                🔹 const receta = recetas.find(r => r.productoId == prod.id);
+                🔹 const ingData = ingredientes.find(i => i.id == ing.ingredienteId);
+                🔹 const receta = recetas.find(r => r.productoId == prod.id);
+                🔹 const receta = recetas.find(r => r.productoId == prod.id);
+                🔹 function filtrar() {
+                🔹 _terminoBusqueda = document.getElementById('recetasSearch')?.value?.trim() || '';
+                🔹 function filtrarPorIngrediente() {
+                🔹 _terminoIngrediente = document.getElementById('recetasIngredienteSearch')?.value?.trim() || '';
+                🔹 function _getColorFromName(nombre) {
+                🔹 function _iconoPorCategoria(categoria) {
+                🔹 function mostrarDetalle(prodId) {
+                🔹 const producto = (state.productos || []).find(p => p.id == prodId);
+                🔹 const receta = (state.recetas || []).find(r => r.productoId == prodId);
+                🔹 let modal = document.getElementById('modalRecetaDetalle');
+                🔹 const ingData = ingredientesState.find(i => i.id == ing.ingredienteId);
+                🔹 document.getElementById('detalleIngredientes').innerHTML = htmlIng;
+                🔹 document.getElementById('detalleCosto').innerHTML = `
+                🔹 document.getElementById('detalleInstrucciones').innerHTML = `
+                🔹 function cerrarDetalle() {
+                🔹 const modal = document.getElementById('modalRecetaDetalle');
+                🔹 function editarRecetaDesdeDetalle(prodId) {
+                🔹 function exportarRecetaPDF(prodId) {
+                🔹 const producto = (state.productos || []).find(p => p.id == prodId);
+                🔹 const receta = (state.recetas || []).find(r => r.productoId == prodId);
+                🔹 const ingData = ingredientesState.find(i => i.id == ing.ingredienteId);
+                🔹 function _asegurarModalReceta() {
+                🔹 if (document.getElementById('modalReceta')) return;
+                🔹 function mostrarModalReceta(productoId = null) {
+                🔹 const selProd = document.getElementById('recProductoId');
+                🔹 const selIng = document.getElementById('recIngredienteId');
+                🔹 document.getElementById('recCantidad').value = '';
+                🔹 const recInst = document.getElementById('recInstrucciones');
+                🔹 const receta = (state.recetas || []).find(r => r.productoId == productoId);
+                🔹 document.getElementById('modalReceta').style.display = 'flex';
+                🔹 function cerrarModalReceta() {
+                🔹 const modal = document.getElementById('modalReceta');
+                🔹 function _mostrarRecetaActual() {
+                🔹 const productoId = document.getElementById('recProductoId').value;
+                🔹 const receta = (state.recetas || []).find(r => r.productoId == productoId);
+                🔹 const div = document.getElementById('recetaActual');
+                🔹 const recInst = document.getElementById('recInstrucciones');
+                🔹 const productoId = document.getElementById('recProductoId').value;
+                🔹 const insumoId = document.getElementById('recIngredienteId').value;
+                🔹 const cantidad = parseFloat(document.getElementById('recCantidad').value);
+                🔹 const instrucciones = document.getElementById('recInstrucciones')?.value?.trim() || '';
+                🔹 const recetaLocal = DB.recetas.find(r => r.productoId == productoId);
+                🔹 const receta = DB.recetas.find(r => r.productoId == productoId);
+                🔹 function _initListeners() {
+            📄 reparto.js
+                🔹 const Reparto = (() => {
+                🔹 function _asegurarVista() {
+                🔹 if (document.getElementById('view-reparto')) return;
+                🔹 const referencia = document.getElementById('toastContainer') || document.body.lastChild;
+                🔹 function render() {
+                🔹 const tbody = document.getElementById('repartoBody'); if (!tbody) return;
+                🔹 const ordenados = [...pedidos].sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+                🔹 const resumen = items.map(i => `${i.qty}x ${i.nombre}`).join(', ') || '—';
+                🔹 function filtrarPorEstado(estado) {
+                🔹 function mostrarModalNuevo() {
+                🔹 let modal = document.getElementById('modalReparto');
+                🔹 document.getElementById('repDireccion').value = '';
+                🔹 document.getElementById('repTelefono').value = '';
+                🔹 document.getElementById('repTotal').value = '0';
+                🔹 document.getElementById('repRepartidor').value = '';
+                🔹 document.getElementById('repObservaciones').value = '';
+                🔹 document.getElementById('repBusquedaProducto').value = '';
+                🔹 document.getElementById('repCantidad').value = 1;
+                🔹 document.getElementById('repResultadosBusqueda').style.display = 'none';
+                🔹 function _filtrarProductos() {
+                🔹 const prod = DB.productos.filter(p=>p.activo!==false && p.nombre.toLowerCase().includes(term));
+                🔹 function _seleccionarProducto(el) {
+                🔹 document.getElementById('repBusquedaProducto').value = el.dataset.nombre;
+                🔹 document.getElementById('repResultadosBusqueda').style.display = 'none';
+                🔹 document.getElementById('repCantidad').focus();
+                🔹 function _agregarItemAlPedido() {
+                🔹 const cant = parseInt(document.getElementById('repCantidad')?.value) || 1;
+                🔹 const prod = DB.productos.find(p=>p.id===_productoSeleccionado.id);
+                🔹 const existente = _itemsTemporales.find(it=>it.prodId===prod.id);
+                🔹 function _quitarItemTemporal(idx) { _itemsTemporales.splice(idx,1); _renderItemsTemporales(); }
+                🔹 function _renderItemsTemporales() {
+                🔹 const container=document.getElementById('repItemsLista'); if(!container) return;
+                🔹 const total=_itemsTemporales.reduce((sum,it)=>sum+it.precio*(it.qty||1),0);
+                🔹 document.getElementById('repTotal').value=total.toFixed(2);
+                🔹 const dir = document.getElementById('repDireccion').value.trim();
+                🔹 const tel = document.getElementById('repTelefono').value.trim();
+                🔹 const rep = document.getElementById('repRepartidor').value.trim();
+                🔹 const obs = document.getElementById('repObservaciones').value.trim();
+                🔹 const total = itemsListos.reduce((s,i)=>s+i.precio*i.qty,0);
+                🔹 const existeComanda = DB.comandas.find(c => c.deliveryId === deliveryId);
+                🔹 const ped = DB.pedidosDelivery.find(p=>p.id===deliveryId);
+                🔹 function _crearComandaParaDelivery(deliveryId) {
+                🔹 const ped = DB.pedidosDelivery.find(p => p.id === deliveryId);
+                🔹 const itemsParaComanda = ped.items.map(it => ({
+                🔹 function eliminarPedido(id) {
+                🔹 function editarItems(deliveryId) {
+                🔹 const ped = (Store.getState().pedidosDelivery || []).find(p => p.id === deliveryId);
+                🔹 let modal = document.getElementById('modalEditarItems');
+                🔹 document.getElementById('editBusquedaProducto').value = '';
+                🔹 document.getElementById('editCantidad').value = 1;
+                🔹 document.getElementById('editResultadosBusqueda').style.display = 'none';
+                🔹 function cerrarEditarItems() {
+                🔹 const modal = document.getElementById('modalEditarItems');
+                🔹 function _filtrarProductosEdicion() {
+                🔹 const input = document.getElementById('editBusquedaProducto');
+                🔹 const res = document.getElementById('editResultadosBusqueda');
+                🔹 const prod = DB.productos.filter(p => p.activo !== false && p.nombre.toLowerCase().includes(term));
+                🔹 function _seleccionarProductoEdicion(el) {
+                🔹 document.getElementById('editBusquedaProducto').value = el.dataset.nombre;
+                🔹 document.getElementById('editResultadosBusqueda').style.display = 'none';
+                🔹 document.getElementById('editCantidad').focus();
+                🔹 function _agregarItemEdicion() {
+                🔹 const cant = parseInt(document.getElementById('editCantidad')?.value) || 1;
+                🔹 const prod = DB.productos.find(p => p.id === _productoSeleccionado.id);
+                🔹 const existente = _itemsTemporales.find(it => it.prodId === prod.id);
+                🔹 document.getElementById('editBusquedaProducto').value = '';
+                🔹 document.getElementById('editCantidad').value = 1;
+                🔹 function _quitarItemEdicion(idx) {
+                🔹 function _renderItemsEdicion() {
+                🔹 const container = document.getElementById('editItemsLista');
+                🔹 document.getElementById('editTotal').value = '0';
+                🔹 const total = _itemsTemporales.reduce((sum, it) => sum + it.precio * (it.qty || 1), 0);
+                🔹 document.getElementById('editTotal').value = total.toFixed(2);
+                🔹 const nuevosItems = _itemsTemporales.map(it => ({
+                🔹 const total = nuevosItems.reduce((sum, i) => sum + i.precio * i.qty, 0);
+                🔹 function _getItemsTemporales() { return _itemsTemporales; }
+                🔹 function _setItemsTemporales(items) { _itemsTemporales = items; }
+                🔹 function _initListeners() {
+            📄 tickets.js
+                🔹 const Tickets = (() => {
+                🔹 const itemsHTML = items.map(it => `
+                🔹 const itemsHTML = grupos.map(g => `
+                🔹 const itemsHTML = grupos.map(g => `
+                🔹 document.getElementById(`${modalId}-close`).onclick = () => {
+                🔹 const modal = document.getElementById(lastId);
+                🔹 const closeBtn = document.getElementById(`${prefix}-close`);
+                🔹 const editBtn = document.getElementById(`${prefix}-editar`);
+                🔹 const extraBtn = document.getElementById(`${prefix}-extra`);
+                🔹 const printBtn = document.getElementById(`${prefix}-imprimir`);
+                🔹 const overlay = document.getElementById(prefix);
+                🔹 const contentDiv = document.getElementById(`${prefix}-content`);
+                🔹 const overlay = document.getElementById(prefix);
+                🔹 const contentDiv = document.getElementById(`${prefix}-content`);
+                🔹 function _agruparItems(items) {
+                🔹 function _imprimirEnVentana(contenido, titulo) {
+        📄 utils.js
+            🔹 function fmtMoney(n) {
+            🔹 function fmtMoneyTicket(n) {
+            🔹 function fmtFechaLarga() {
+            🔹 function fmtHoraCompleta() {
+            🔹 function fmtHoraCorta(ts) {
+            🔹 function fmtFechaCorta() {
+            🔹 function tiempoDesde(ts) {
+            🔹 function calcularTotal(items) {
+            🔹 function showToast(tipo, htmlMsg, ms = 3500) {
+            🔹 const cont  = document.getElementById('toastContainer');
+            🔹 /** Shortcut para document.getElementById */
+            🔹 function $id(id) { return document.getElementById(id); }
+            🔹 function $val(id) { return ($id(id)?.value || '').trim(); }
+    📄 test-A-appwrite.html
+        🔹 var resultsEl = document.getElementById('results');
+        🔹 function assert(condition, msg) {
+        🔹 window.addEventListener('load', function() {
+    📄 test-A-carga.html
+        🔹 var resultsEl = document.getElementById('results');
+        🔹 function assert(condition, msg) {
+        🔹 window.addEventListener('load', function() {
+    📄 test-A-core.html
+        🔹 var resultsEl = document.getElementById('results');
+        🔹 function assert(condition, msg) {
+        🔹 function handler(data) { eventoRecibido = data; }
+        🔹 function listenerComanda(data) { eventosEmitidos.push(data); }
+        🔹 window.addEventListener('load', function() {
+    📄 test-A-flujo.html
+        🔹 var resultsEl = document.getElementById('results');
+        🔹 function assert(condition, msg) {
+        🔹 function logSection(title, obj) {
+        🔹 window.addEventListener('load', function() {
+    📄 test-A-temporal.html
+        🔹 var resultsEl = document.getElementById('results');
+        🔹 function assert(condition, msg) {
+        🔹 function listenerComanda(data) { eventosEmitidos.push(data); }
+        🔹 window.addEventListener('load', function() {
+    📄 test-A-unitarios-dominio.html
+        🔹 const resultsEl = document.getElementById('results');
+        🔹 function assert(condition, msg) {
+        🔹 const faltantes = deps.filter(d => typeof window[d] === 'undefined');
+        🔹 let chain = ok1.encadenar(data => Resultado.ok(data.id * 2));
+        🔹 let chainFail = fail1.encadenar(data => Resultado.ok(99));
+        🔹 let chainEx = ok1.encadenar(() => { throw new Error('ups'); });
+    📄 test-B-kds.html
+        🔹 var resultsEl = document.getElementById('results');
+        🔹 function assert(condition, msg) {
+        🔹 function esperar(ms) {
+        🔹 var vistaRecetario = document.getElementById('view-recetario');
+        🔹 assert(!!document.getElementById('kds-com_ambos_cocina'), 'Tarjeta virtual de cocina visible');
+        🔹 assert(!!document.getElementById('kds-com_ambos_barra'), 'Tarjeta virtual de barra visible');
+        🔹 assert(document.getElementById('kds-com_ambos') === null, 'Original no se renderiza');
+        🔹 var tarjeta = document.getElementById('kds-com_urg2');
+        🔹 window.addEventListener('load', function() {
+    📄 test-B-mesas.html
+        🔹 var resultsEl = document.getElementById('results');
+        🔹 function assert(condition, msg) {
+        🔹 function esperar(ms) {
+        🔹 window.addEventListener('load', function() {
+    📄 test-B-precarga.html
+        🔹 var resultsEl = document.getElementById('results');
+        🔹 function assert(condition, msg) {
+        🔹 window.addEventListener('load', function() {
+    📄 test-B-recetario.html
+        🔹 var resultsEl = document.getElementById('results');
+        🔹 function assert(condition, msg) {
+        🔹 function esperar(ms) {
+        🔹 var grid = document.getElementById('recetarioGrid');
+        🔹 var mainViejo = document.getElementById('view-recetario');
+        🔹 window.addEventListener('load', function() {
+    📄 test-B-temporal.html
+        🔹 var resultsEl = document.getElementById('results');
+        🔹 function assert(condition, msg) {
+        🔹 function esperar(ms) {
+        🔹 var tarjeta = document.getElementById('kds-com_test');
+        🔹 tarjeta = document.getElementById('kds-com_test');
+        🔹 window.addEventListener('load', function() {
+    📄 test-C-cliente.html
+        🔹 const resultados = document.getElementById('resultados');
+        🔹 function log(tipo, mensaje) {
+        🔹 function assert(condicion, descripcion) {
+        🔹 const panelOrden = document.getElementById('panelOrden');
+    📄 test-D- recetas.html
+        🔹 function showToast(tipo, msg) { toastMessages.push({tipo, msg}); }
+        🔹 function assert(cond, desc) {
+        🔹 document.getElementById('resultados').appendChild(div);
+        🔹 document.getElementById('recetasIngredienteSearch').value = 'Carne';
+        🔹 document.getElementById('recetasIngredienteSearch').value = 'Lechuga';
+        🔹 document.getElementById('recetasIngredienteSearch').value = '';
+        🔹 const seccionCosto = document.getElementById('detalleCosto');
+        🔹 const textoIngredientes = document.getElementById('detalleIngredientes').textContent;
+        🔹 const modalCerrado = document.getElementById('modalRecetaDetalle');
+        🔹 window.addEventListener('load', () => {
+    📄 test-D- reparto.html
+        🔹 function showToast(tipo, msg) { toastMessages.push({tipo, msg}); }
+        🔹 const ped = this.pedidosDelivery.find(p => p.id === id);
+        🔹 function resultado(ok, seccion, mensaje) {
+        🔹 document.getElementById('resultados').appendChild(div);
+        🔹 document.getElementById('repartoEstadoFilter').value = 'pendiente';
+        🔹 document.getElementById('repartoEstadoFilter').value = 'todos';
+        🔹 const modal = document.getElementById('modalEditarItems');
+        🔹 const lista = document.getElementById('editItemsLista');
+        🔹 const actualizado = DB.pedidosDelivery.find(p => p.id === 'deliv_001');
+        🔹 let comandas = DB.comandas.filter(c => c.deliveryId === 'deliv_001');
+        🔹 const vista = document.getElementById('view-reparto');
+        🔹 window.addEventListener('load', () => setTimeout(iniciarTests, 200));
+    📄 test-D-config.html
+        🔹 function showToast(tipo, msg) { toastMessages.push({tipo, msg}); }
+        🔹 function resultado(ok, seccion, mensaje) {
+        🔹 document.getElementById('resultados').appendChild(div);
+        🔹 const zonasContainer = document.getElementById('zonasContainer');
+        🔹 const precioInput = document.getElementById('prodPrecio');
+        🔹 document.getElementById('prodImagen').value = 'https://via.placeholder.com/150';
+        🔹 document.getElementById('prodImagen').value = '';
+        🔹 const vista = document.getElementById('view-config');
+        🔹 window.addEventListener('load', () => setTimeout(iniciarTests, 200));
+    📄 test-D-eventos-en-vivo.html
+        🔹 function showToast(tipo, msg) { toastMessages.push({tipo, msg}); }
+        🔹 function assert(cond, desc) {
+        🔹 document.getElementById('resultados').appendChild(div);
+        🔹 assert(document.getElementById('view-eventos-en-vivo') !== null, 'La vista se crea');
+        🔹 document.getElementById('selTipoEvento').value = 'bingo';
+        🔹 const btnReiniciar = document.getElementById('btnReiniciar');
+        🔹 document.getElementById('selTipoEvento').value = 'karaoke';
+        🔹 document.getElementById('letraKaraoke').value = 'Estribillo de prueba';
+        🔹 document.getElementById('selTipoEvento').value = 'votacion';
+        🔹 document.getElementById('nuevaOpcion').value = 'Opción A';
+        🔹 document.getElementById('nuevaOpcion').value = 'Opción B';
+        🔹 const panel = document.getElementById('panelEventoVivo');
+        🔹 window.addEventListener('load', () => {
+    📄 test-D-eventos.html
+        🔹 function showToast(tipo, msg) { toastMessages.push({tipo, msg}); }
+        🔹 function resultado(ok, seccion, mensaje) {
+        🔹 document.getElementById('resultados').appendChild(div);
+        🔹 const vista = document.getElementById('view-eventos');
+        🔹 const modal = document.getElementById('modalEvento');
+        🔹 window.addEventListener('load', () => setTimeout(iniciarTests, 100));
+    📄 test-avanzado-doble-verificacion.html
+        🔹 const resultsEl = document.getElementById('results');
+        🔹 function imprimirLog(tipo, mensaje, statusBadge) {
+        🔹 function assert(condicion, mensaje) {
+        🔹 const esperar = ms => new Promise(res => setTimeout(res, ms));
+        🔹 document.getElementById('btnEjecutar').addEventListener('click', async () => {
+        🔹 const removerListener = EventBus.on('mesa:actualizada', (data) => {
+        🔹 function h2(texto) {
+📁 tests/
+    📁 admin/
+            📄 Test-Administracion.html
+                🔹 function showToast(tipo, msg) { toastMessages.push({tipo, msg}); }
+                🔹 function assert(cond, desc) {
+                🔹 document.getElementById('resultados').appendChild(div);
+                🔹 assert(document.getElementById('view-eventos-en-vivo') !== null, 'La vista se crea');
+                🔹 document.getElementById('selTipoEvento').value = 'bingo';
+                🔹 const btnReiniciar = document.getElementById('btnReiniciar');
+                🔹 document.getElementById('selTipoEvento').value = 'karaoke';
+                🔹 document.getElementById('letraKaraoke').value = 'Estribillo de prueba';
+                🔹 document.getElementById('selTipoEvento').value = 'votacion';
+                🔹 document.getElementById('nuevaOpcion').value = 'Opción A';
+                🔹 document.getElementById('nuevaOpcion').value = 'Opción B';
+                🔹 const panel = document.getElementById('panelEventoVivo');
+                🔹 window.addEventListener('load', () => setTimeout(ejecutarTests, 100));
+        📄 test.js
+            🔹 const resultsEl = document.getElementById('results');
+            🔹 function assert(condition, msg) {
+            🔹 let faltantes = dependencias.filter(d => d.global === undefined).map(d => d.nombre);
+            🔹 let chain = ok1.encadenar(data => Resultado.ok(data.id * 2));
+            🔹 let chainFail = fail1.encadenar(data => Resultado.ok(99));
+            🔹 let chainEx = ok1.encadenar(() => { throw new Error('ups'); });
+    📁 ui/
+            📄 test-B-precarga.html
+                🔹 var resultsEl = document.getElementById('results');
+                🔹 function assert(condition, msg) {
+                🔹 window.addEventListener('load', function() {

@@ -1,16 +1,17 @@
 /* ================================================================
-   PubPOS — MÓDULO: recetas.js (v5.1 – JSDoc completo)
-   Propósito: Vista de recetario. Obtiene productos y recetas del
-              Store y se re-renderiza automáticamente al cambiar
-              esos datos. Incluye modal de creación/edición de recetas.
+   PubPOS — MÓDULO: recetas.js (v6.0 – búsqueda por ingrediente,
+   cálculo de costos y exportación individual de receta a PDF)
+   Propósito: Vista de recetario con filtros mejorados, costos y
+              exportación. Obtiene datos del Store.
    ================================================================ */
 
 const Recetas = (() => {
 
   let _terminoBusqueda = '';
+  let _terminoIngrediente = '';
 
   function _asegurarVista() {
-    if ($id('view-recetas')) return;
+    if (document.getElementById('view-recetas')) return;
 
     const main = document.createElement('main');
     main.id = 'view-recetas';
@@ -23,12 +24,16 @@ const Recetas = (() => {
             <i class="fas fa-search"></i>
             <input type="text" id="recetasSearch" placeholder="Buscar receta..." oninput="Recetas.filtrar()">
           </div>
+          <div class="recetas-search" style="margin-left:8px;">
+            <i class="fas fa-boxes"></i>
+            <input type="text" id="recetasIngredienteSearch" placeholder="Buscar por ingrediente..." oninput="Recetas.filtrarPorIngrediente()">
+          </div>
           <button class="btn-secondary" onclick="Recetas.mostrarModalReceta()"><i class="fas fa-plus"></i> Nueva Receta</button>
         </div>
       </div>
       <div id="recetasGrid" class="recetas-grid"></div>
     `;
-    const referencia = $id('toastContainer') || document.body.lastChild;
+    const referencia = document.getElementById('toastContainer') || document.body.lastChild;
     document.body.insertBefore(main, referencia);
   }
 
@@ -37,7 +42,7 @@ const Recetas = (() => {
    */
   function render() {
     _asegurarVista();
-    const grid = $id('recetasGrid');
+    const grid = document.getElementById('recetasGrid');
     if (!grid) return;
 
     const state = Store.getState();
@@ -51,15 +56,32 @@ const Recetas = (() => {
     }
 
     const recetas = state.recetas || [];
-    productos = productos.filter(prod => {
-      const receta = recetas.find(r => r.productoId == prod.id);
-      return receta && receta.ingredientes && receta.ingredientes.length > 0;
-    });
+    const ingredientes = state.ingredientes || [];
 
+    // Filtro por nombre de producto
     if (_terminoBusqueda) {
       const term = _terminoBusqueda.toLowerCase();
       productos = productos.filter(p => p.nombre.toLowerCase().includes(term));
     }
+
+    // Filtro por ingrediente
+    if (_terminoIngrediente) {
+      const termIng = _terminoIngrediente.toLowerCase();
+      productos = productos.filter(prod => {
+        const receta = recetas.find(r => r.productoId == prod.id);
+        if (!receta || !receta.ingredientes) return false;
+        return receta.ingredientes.some(ing => {
+          const ingData = ingredientes.find(i => i.id == ing.ingredienteId);
+          return ingData && ingData.nombre.toLowerCase().includes(termIng);
+        });
+      });
+    }
+
+    // Solo mostrar productos que tengan receta con ingredientes
+    productos = productos.filter(prod => {
+      const receta = recetas.find(r => r.productoId == prod.id);
+      return receta && receta.ingredientes && receta.ingredientes.length > 0;
+    });
 
     if (!productos.length) {
       grid.innerHTML = `<div class="recetas-empty"><i class="fas fa-utensils"></i><p>No se encontraron recetas</p></div>`;
@@ -86,9 +108,15 @@ const Recetas = (() => {
     }).join('');
   }
 
-  /** Filtra recetas por término de búsqueda */
+  /** Filtra recetas por término de búsqueda de nombre */
   function filtrar() {
-    _terminoBusqueda = $id('recetasSearch')?.value?.trim() || '';
+    _terminoBusqueda = document.getElementById('recetasSearch')?.value?.trim() || '';
+    render();
+  }
+
+  /** Filtra recetas por ingrediente */
+  function filtrarPorIngrediente() {
+    _terminoIngrediente = document.getElementById('recetasIngredienteSearch')?.value?.trim() || '';
     render();
   }
 
@@ -111,7 +139,7 @@ const Recetas = (() => {
     return mapa[categoria] || 'fa-box';
   }
 
-  /** Muestra el modal de detalle de una receta */
+  /** Muestra el modal de detalle de una receta, ahora con cálculo de costo total */
   function mostrarDetalle(prodId) {
     const state = Store.getState();
     const producto = (state.productos || []).find(p => p.id == prodId);
@@ -123,7 +151,7 @@ const Recetas = (() => {
       return;
     }
 
-    let modal = $id('modalRecetaDetalle');
+    let modal = document.getElementById('modalRecetaDetalle');
     if (!modal) {
       modal = document.createElement('div');
       modal.id = 'modalRecetaDetalle';
@@ -137,10 +165,12 @@ const Recetas = (() => {
           </div>
           <div class="modal-body receta-detalle-body">
             <div id="detalleIngredientes"></div>
+            <div id="detalleCosto"></div>
             <div id="detalleInstrucciones"></div>
           </div>
           <div class="modal-footer">
             <button class="btn-secondary" onclick="Recetas.cerrarDetalle()">Cerrar</button>
+            <button class="btn-secondary" onclick="Recetas.exportarRecetaPDF('${prodId}')"><i class="fas fa-print"></i> Exportar PDF</button>
             <button class="btn-primary" onclick="Recetas.editarRecetaDesdeDetalle('${prodId}')"><i class="fas fa-edit"></i> Editar Receta</button>
           </div>
         </div>
@@ -148,15 +178,20 @@ const Recetas = (() => {
       document.body.appendChild(modal);
     }
 
-    $id('detalleTitulo').innerHTML = `<i class="fas fa-utensils"></i> ${producto.nombre}`;
+    document.getElementById('detalleTitulo').innerHTML = `<i class="fas fa-utensils"></i> ${producto.nombre}`;
+
+    const ingredientesState = state.ingredientes || [];
+    let costoTotal = 0;
 
     let htmlIng = '<h4><i class="fas fa-list-ul"></i> Ingredientes</h4><ul class="receta-ingredientes-lista">';
     receta.ingredientes.forEach(ing => {
-      const ingData = (state.ingredientes || []).find(i => i.id == ing.ingredienteId);
+      const ingData = ingredientesState.find(i => i.id == ing.ingredienteId);
       if (ingData) {
         const suficiente = ingData.stock >= ing.cantidad;
         const claseStock = suficiente ? 'stock-suficiente' : 'stock-insuficiente';
         const iconoCat = _iconoPorCategoria(ingData.categoria || 'general');
+        const costoIng = ing.cantidad * (ingData.valor_unitario || 0);
+        costoTotal += costoIng;
         htmlIng += `
           <li>
             <span class="ing-nombre"><i class="fas ${iconoCat}"></i> ${ingData.nombre}</span>
@@ -171,7 +206,13 @@ const Recetas = (() => {
       }
     });
     htmlIng += '</ul>';
-    $id('detalleIngredientes').innerHTML = htmlIng;
+    document.getElementById('detalleIngredientes').innerHTML = htmlIng;
+
+    // Mostrar costo total
+    document.getElementById('detalleCosto').innerHTML = `
+      <h4><i class="fas fa-dollar-sign"></i> Costo estimado</h4>
+      <p style="font-size:14px; font-weight:600;">Total: ${fmtMoney(costoTotal)}</p>
+    `;
 
     const instrucciones = receta.instrucciones || 'Sin instrucciones de preparación.';
     const pasosHTML = instrucciones
@@ -179,7 +220,7 @@ const Recetas = (() => {
       .filter(line => line.trim())
       .map((line, i) => `<div class="paso-item"><span class="paso-num">${i+1}</span><span class="paso-texto">${line}</span></div>`)
       .join('');
-    $id('detalleInstrucciones').innerHTML = `
+    document.getElementById('detalleInstrucciones').innerHTML = `
       <h4><i class="fas fa-tasks"></i> Preparación</h4>
       <div class="receta-pasos">${pasosHTML || '<p>Sin instrucciones.</p>'}</div>
     `;
@@ -189,7 +230,7 @@ const Recetas = (() => {
   }
 
   function cerrarDetalle() {
-    const modal = $id('modalRecetaDetalle');
+    const modal = document.getElementById('modalRecetaDetalle');
     if (modal) modal.style.display = 'none';
   }
 
@@ -198,9 +239,60 @@ const Recetas = (() => {
     Recetas.mostrarModalReceta(prodId);
   }
 
+  /** Exporta la receta actual a PDF (ventana de impresión) */
+  function exportarRecetaPDF(prodId) {
+    const state = Store.getState();
+    const producto = (state.productos || []).find(p => p.id == prodId);
+    if (!producto) return;
+    const receta = (state.recetas || []).find(r => r.productoId == prodId);
+    if (!receta) return;
+
+    const ingredientesState = state.ingredientes || [];
+    let costoTotal = 0;
+    let filasIngredientes = '';
+    receta.ingredientes.forEach(ing => {
+      const ingData = ingredientesState.find(i => i.id == ing.ingredienteId);
+      const nombre = ingData ? ingData.nombre : ing.ingredienteId;
+      const costo = ingData ? ing.cantidad * (ingData.valor_unitario || 0) : 0;
+      costoTotal += costo;
+      filasIngredientes += `<tr><td>${nombre}</td><td>${ing.cantidad} ${ingData ? ingData.unidad : ''}</td><td>${costo > 0 ? fmtMoney(costo) : '—'}</td></tr>`;
+    });
+
+    const html = `
+      <html>
+      <head><title>Receta: ${producto.nombre}</title>
+      <style>
+        body { font-family: sans-serif; padding: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+        th { background: #f5f5f5; }
+      </style>
+      </head>
+      <body>
+        <h1>${producto.nombre}</h1>
+        <h2>Ingredientes</h2>
+        <table>
+          <thead><tr><th>Ingrediente</th><th>Cantidad</th><th>Costo</th></tr></thead>
+          <tbody>${filasIngredientes}</tbody>
+        </table>
+        <p><strong>Costo total estimado: ${fmtMoney(costoTotal)}</strong></p>
+        <h2>Preparación</h2>
+        <p>${(receta.instrucciones || '').replace(/\n/g, '<br>')}</p>
+      </body>
+      </html>
+    `;
+
+    const ventana = window.open('', '_blank', 'width=800,height=600');
+    ventana.document.write(html);
+    ventana.document.close();
+    ventana.focus();
+    ventana.print();
+    ventana.close();
+  }
+
   /** Asegura que el modal de creación/edición de receta exista */
   function _asegurarModalReceta() {
-    if ($id('modalReceta')) return;
+    if (document.getElementById('modalReceta')) return;
 
     const modal = document.createElement('div');
     modal.id = 'modalReceta';
@@ -343,7 +435,7 @@ const Recetas = (() => {
   /* ── SUSCRIPCIÓN AL STORE ───────────────────────────────── */
   function _initListeners() {
     Store.subscribe((state, action) => {
-      if (action.type.startsWith('PRODUCTO') || action.type.startsWith('RECETA')) {
+      if (action.type.startsWith('PRODUCTO') || action.type.startsWith('RECETA') || action.type.startsWith('INGREDIENTE')) {
         render();
       }
     });
@@ -361,9 +453,11 @@ const Recetas = (() => {
   return {
     render,
     filtrar,
+    filtrarPorIngrediente,
     mostrarDetalle,
     cerrarDetalle,
     editarRecetaDesdeDetalle,
+    exportarRecetaPDF,
     mostrarModalReceta,
     cerrarModalReceta,
     guardarReceta,

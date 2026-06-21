@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-core.js (v3.2.6 – métodos de delivery incluidos)
+   PubPOS — MÓDULO: db-core.js (v3.2.8 – campo disponible en productos)
    ================================================================ */
 const DBCore = (function() {
   const module = {};
@@ -22,7 +22,8 @@ const DBCore = (function() {
       destino: this._validarDestino(p.destino),
       descripcion: this._validarString(p.descripcion, ''),
       activo: this._validarBooleano(p.activo, true),
-      imagen: this._validarString(p.imagen, '')
+      imagen: this._validarString(p.imagen, ''),
+      disponible: this._validarBooleano(p.disponible, true)   // ← NUEVO
     };
   };
 
@@ -38,7 +39,8 @@ const DBCore = (function() {
       observaciones: this._validarString(m.observaciones, ''),
       mesasFusionadas: m.mesasFusionadas || null,
       esVirtual: m.esVirtual || false,
-      zona: this._validarString(m.zona, (this.config.zonas && this.config.zonas[0]?.nombre) || 'salon')
+      zona: this._validarString(m.zona, (this.config.zonas && this.config.zonas[0]?.nombre) || 'salon'),
+      permite_prepedidos: this._validarBooleano(m.permite_prepedidos, false)
     };
   };
 
@@ -296,11 +298,6 @@ const DBCore = (function() {
   };
 
   /* ── GESTIÓN DE DELIVERY ─────────────────────────────────── */
-  /**
-   * Crea un nuevo pedido de delivery.
-   * @param {object} datos - { direccion, telefono, items, total, repartidor, observaciones, estado }
-   * @returns {object} El pedido creado
-   */
   module.crearPedidoDelivery = function(datos) {
     const nuevo = this._normalizarPedidoDelivery({
       ...datos,
@@ -312,12 +309,6 @@ const DBCore = (function() {
     return nuevo;
   };
 
-  /**
-   * Actualiza campos de un pedido de delivery.
-   * @param {string} id
-   * @param {object} cambios
-   * @returns {object|null}
-   */
   module.actualizarPedidoDelivery = function(id, cambios) {
     const idx = this.pedidosDelivery.findIndex(p => p.id === id);
     if (idx >= 0) {
@@ -327,10 +318,6 @@ const DBCore = (function() {
     return this.pedidosDelivery[idx] || null;
   };
 
-  /**
-   * Elimina un pedido de delivery.
-   * @param {string} id
-   */
   module.eliminarPedidoDelivery = function(id) {
     this.pedidosDelivery = this.pedidosDelivery.filter(p => p.id !== id);
     this.savePedidosDelivery();
@@ -339,6 +326,7 @@ const DBCore = (function() {
   return module;
 })();
 
+/* ── FÁBRICA DE MESA VACÍA ────────────────────────────── */
 function mesaVacia(num, zona = 'salon') {
   return {
     numero: num,
@@ -349,6 +337,7 @@ function mesaVacia(num, zona = 'salon') {
     comensales: 1,
     abiertaEn: null,
     observaciones: '',
-    zona: zona
+    zona: zona,
+    permite_prepedidos: false
   };
 }

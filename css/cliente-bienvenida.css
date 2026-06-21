@@ -1,0 +1,193 @@
+/**
+ * Pantalla de Bienvenida post-login (v1.2.0)
+ *
+ * Layout completamente flexible, sin medidas fijas ni vh.
+ * Las tarjetas se adaptan automáticamente al espacio disponible.
+ *
+ * @version 1.2.0
+ */
+
+.view.active#view-bienvenida {
+  display: flex;
+  flex-direction: column;
+  height: 100%; /* Se adapta al contenedor padre (.view.active) */
+  position: relative;
+  background: #1a1a2e;
+}
+
+/* Fondo mesh animado */
+.bienvenida-fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background:
+    radial-gradient(circle at 30% 40%, rgba(245,158,11,.25) 0%, transparent 50%),
+    radial-gradient(circle at 70% 60%, rgba(239,68,68,.2) 0%, transparent 50%),
+    radial-gradient(circle at 50% 80%, rgba(99,102,241,.15) 0%, transparent 50%);
+  animation: fondo-mesh 10s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+@keyframes fondo-mesh {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  100% { transform: translate3d(-10px, -10px, 0) scale(1.05); }
+}
+
+/* Header */
+.bienvenida-header {
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  padding: 20px 24px 8px;
+  flex-shrink: 0;
+}
+.bienvenida-header h1 {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--color-text);
+  margin-bottom: 4px;
+}
+.bienvenida-sub {
+  font-size: 14px;
+  color: var(--color-text-sec);
+  font-style: italic;
+}
+
+/* Contenedor principal: crece para ocupar el espacio restante */
+.bienvenida-contenido {
+  position: relative;
+  z-index: 1;
+  flex: 1;          /* Ocupa TODO el espacio disponible */
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 20px 16px;
+  max-width: 600px;
+  width: 100%;
+  margin: 0 auto;
+  min-height: 0;    /* Permite que flex: 1 reduzca su tamaño si es necesario */
+}
+
+/* Campo de mesa (tamaño natural) */
+.bienvenida-mesa {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.bienvenida-mesa label {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.bienvenida-mesa input {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  padding: 10px 12px;
+  font-size: 14px;
+  outline: none;
+  transition: var(--t);
+}
+.bienvenida-mesa input:focus { border-color: var(--color-accent); }
+.bienvenida-estado-mesa {
+  font-size: 12px;
+  color: var(--color-text-sec);
+}
+
+/* Contenedor de tarjetas: crece y distribuye espacio */
+.bienvenida-cards {
+  flex: 1;          /* Toma el espacio restante debajo del campo de mesa */
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+}
+
+/* Tarjetas flexibles, sin altura fija */
+.bienvenida-card {
+  border-radius: var(--radius);
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform .3s ease, box-shadow .3s ease;
+  flex-shrink: 0;
+}
+.bienvenida-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 28px rgba(0,0,0,.5);
+}
+.bienvenida-card-grande {
+  flex: 3;          /* 60% del espacio de tarjetas */
+  min-height: 0;
+}
+.bienvenida-card-chica {
+  flex: 2;          /* 40% del espacio de tarjetas */
+  min-height: 0;
+}
+
+.card-glass {
+  background: rgba(26,26,36,.7);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: var(--radius);
+  padding: 16px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+}
+
+.card-imagen {
+  width: 100%;
+  height: 100px;
+  background: var(--color-accent-dark);
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  color: rgba(255,255,255,.3);
+  flex-shrink: 0;
+}
+
+.card-texto h2 { font-size: 18px; color: var(--color-text); margin-bottom: 4px; }
+.card-texto p  { font-size: 12px; color: var(--color-text-sec); }
+
+/* Ecualizador animado */
+.ecualizador {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 30px;
+  margin-top: 8px;
+}
+.ecualizador span {
+  flex: 1;
+  background: var(--color-accent);
+  border-radius: 4px;
+  animation: eco 1.2s ease-in-out infinite alternate;
+}
+.ecualizador span:nth-child(1) { height: 60%; animation-delay: 0s; }
+.ecualizador span:nth-child(2) { height: 80%; animation-delay: .2s; }
+.ecualizador span:nth-child(3) { height: 40%; animation-delay: .4s; }
+.ecualizador span:nth-child(4) { height: 100%; animation-delay: .6s; }
+.ecualizador span:nth-child(5) { height: 70%; animation-delay: .8s; }
+@keyframes eco {
+  0%   { transform: translate3d(0, 0, 0); }
+  100% { transform: translate3d(0, -8px, 0); }
+}
+
+/* Responsive: letras más chicas en móvil */
+@media (max-width: 600px) {
+  .bienvenida-header h1 { font-size: 20px; }
+  .bienvenida-contenido { padding: 0 12px 12px; gap: 8px; }
+  .card-texto h2 { font-size: 16px; }
+}

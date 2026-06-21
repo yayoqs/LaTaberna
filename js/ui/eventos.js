@@ -1,10 +1,13 @@
 /* ================================================================
-   Raíz — MÓDULO: eventos.js (v1.3 – usa DB.llamar POST)
+   Raíz — MÓDULO: eventos.js (v2.0 – ES6 nativo)
+   Propósito: Gestión de eventos administrativos (carpetas Drive,
+              presupuestos, menús). Usa DB.llamar para comunicación
+              con Google Apps Script.
    ================================================================ */
 const Eventos = (() => {
 
   function _asegurarVista() {
-    if ($id('view-eventos')) return;
+    if (document.getElementById('view-eventos')) return;
 
     const main = document.createElement('main');
     main.id = 'view-eventos';
@@ -33,17 +36,16 @@ const Eventos = (() => {
         </table>
       </div>
     `;
-    const referencia = $id('toastContainer') || document.body.lastChild;
+    const referencia = document.getElementById('toastContainer') || document.body.lastChild;
     document.body.insertBefore(main, referencia);
   }
 
   async function render() {
     _asegurarVista();
-    const tbody = $id('eventosBody');
+    const tbody = document.getElementById('eventosBody');
     if (!tbody) return;
 
     try {
-      // Usar DB.llamar (POST) en lugar de fetch GET
       const respuesta = await DB.llamar('getEventos', {});
       let eventos = respuesta.eventos || [];
 
@@ -79,7 +81,7 @@ const Eventos = (() => {
   }
 
   function mostrarFormulario() {
-    let modal = $id('modalEvento');
+    let modal = document.getElementById('modalEvento');
     if (!modal) {
       modal = document.createElement('div');
       modal.id = 'modalEvento';
@@ -115,17 +117,17 @@ const Eventos = (() => {
   }
 
   function cerrarFormulario() {
-    const modal = $id('modalEvento');
+    const modal = document.getElementById('modalEvento');
     if (modal) modal.style.display = 'none';
   }
 
   async function guardarEvento() {
-    const fecha = $val('evtFecha');
-    const tipo = $val('evtTipo');
-    const cliente = $val('evtCliente');
-    const personas = parseInt($id('evtPersonas')?.value) || 0;
-    const lugar = $val('evtLugar');
-    const observaciones = $val('evtObs');
+    const fecha = document.getElementById('evtFecha').value.trim();
+    const tipo = document.getElementById('evtTipo').value;
+    const cliente = document.getElementById('evtCliente').value.trim();
+    const personas = parseInt(document.getElementById('evtPersonas')?.value) || 0;
+    const lugar = document.getElementById('evtLugar').value.trim();
+    const observaciones = document.getElementById('evtObs').value.trim();
 
     if (!fecha || !tipo || !cliente) {
       showToast('error', 'Completa fecha, tipo y cliente');
@@ -145,7 +147,6 @@ const Eventos = (() => {
 
     try {
       showToast('info', '<i class="fas fa-spinner fa-spin"></i> Creando carpeta y documentos...');
-      // Usar DB.llamar (POST) para crear el evento
       const respuesta = await DB.llamar('crearCarpetaEvento', datos);
       if (respuesta.error) {
         showToast('error', `Error: ${respuesta.error}`);
@@ -173,4 +174,8 @@ const Eventos = (() => {
   };
 })();
 
+// Compatibilidad global
 window.Eventos = Eventos;
+
+// Exportar como módulo ES6
+export default Eventos;

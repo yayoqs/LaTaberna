@@ -1,5 +1,7 @@
 /* ================================================================
-   PubPOS — MÓDULO: perfil.js (v2.3 – logging unificado + JSDoc)
+   PubPOS — MÓDULO: perfil.js (v3.0 – ES6 nativo)
+   Propósito: Vista de perfil de usuario con foto, datos y documentos.
+              Compatible con carga normal y como módulo ES6.
    ================================================================ */
 const Perfil = (() => {
 
@@ -9,7 +11,7 @@ const Perfil = (() => {
   }
 
   function _asegurarVista() {
-    if ($id('view-perfil')) return;
+    if (document.getElementById('view-perfil')) return;
 
     const main = document.createElement('main');
     main.id = 'view-perfil';
@@ -40,7 +42,7 @@ const Perfil = (() => {
         </section>
       </div>
     `;
-    const referencia = $id('toastContainer') || document.body.lastChild;
+    const referencia = document.getElementById('toastContainer') || document.body.lastChild;
     document.body.insertBefore(main, referencia);
   }
 
@@ -55,13 +57,13 @@ const Perfil = (() => {
     }
 
     const extras = _cargarExtras(usuario.nombre);
-    $id('perfilNombre').textContent = usuario.nombre;
-    $id('perfilRol').textContent = `Rol: ${usuario.rolEfectivo}`;
+    document.getElementById('perfilNombre').textContent = usuario.nombre;
+    document.getElementById('perfilRol').textContent = `Rol: ${usuario.rolEfectivo}`;
     if (usuario.simulando) {
-      $id('perfilSimulacion').style.display = 'block';
-      $id('perfilSimulacion').textContent = `(Simulando: ${usuario.simulando})`;
+      document.getElementById('perfilSimulacion').style.display = 'block';
+      document.getElementById('perfilSimulacion').textContent = `(Simulando: ${usuario.simulando})`;
     } else {
-      $id('perfilSimulacion').style.display = 'none';
+      document.getElementById('perfilSimulacion').style.display = 'none';
     }
 
     _renderAvatar(usuario.nombre, extras.foto);
@@ -70,7 +72,7 @@ const Perfil = (() => {
   }
 
   function _renderAvatar(nombre, fotoUrl) {
-    const avatarEl = $id('perfilAvatar');
+    const avatarEl = document.getElementById('perfilAvatar');
     if (!avatarEl) return;
 
     if (fotoUrl && fotoUrl.trim() !== '') {
@@ -88,7 +90,7 @@ const Perfil = (() => {
   }
 
   function _renderDetalles(extras) {
-    const cont = $id('perfilDetalles');
+    const cont = document.getElementById('perfilDetalles');
     if (!cont) return;
     let html = '';
     if (extras.telefono) html += `<div class="perfil-detalle-item"><i class="fas fa-phone"></i> ${extras.telefono}</div>`;
@@ -97,7 +99,7 @@ const Perfil = (() => {
   }
 
   function mostrarModalEditar() {
-    let modal = $id('modalEditarPerfil');
+    let modal = document.getElementById('modalEditarPerfil');
     if (!modal) {
       modal = document.createElement('div');
       modal.id = 'modalEditarPerfil';
@@ -122,16 +124,16 @@ const Perfil = (() => {
     }
 
     const usuario = Auth.getUsuarioActual();
-    $id('editarPerfilNombre').value = usuario ? usuario.nombre : '';
+    document.getElementById('editarPerfilNombre').value = usuario ? usuario.nombre : '';
     const extras = _cargarExtras(usuario ? usuario.nombre : '');
-    $id('editarPerfilTelefono').value = extras.telefono || '';
-    $id('editarPerfilEmail').value = extras.email || '';
-    $id('editarPerfilFoto').value = extras.foto || '';
+    document.getElementById('editarPerfilTelefono').value = extras.telefono || '';
+    document.getElementById('editarPerfilEmail').value = extras.email || '';
+    document.getElementById('editarPerfilFoto').value = extras.foto || '';
     modal.style.display = 'flex';
   }
 
   function cerrarModalEditar() {
-    const modal = $id('modalEditarPerfil');
+    const modal = document.getElementById('modalEditarPerfil');
     if (modal) modal.style.display = 'none';
   }
 
@@ -140,10 +142,10 @@ const Perfil = (() => {
     const usuario = Auth.getUsuarioActual();
     if (!usuario) { showToast('error', 'No hay sesión activa'); return; }
 
-    const nuevoNombre = $val('editarPerfilNombre');
-    const telefono = $val('editarPerfilTelefono');
-    const email = $val('editarPerfilEmail');
-    const foto = $val('editarPerfilFoto');
+    const nuevoNombre = document.getElementById('editarPerfilNombre').value.trim();
+    const telefono = document.getElementById('editarPerfilTelefono').value.trim();
+    const email = document.getElementById('editarPerfilEmail').value.trim();
+    const foto = document.getElementById('editarPerfilFoto').value.trim();
 
     if (!nuevoNombre) { showToast('error', 'El nombre no puede estar vacío'); return; }
 
@@ -165,7 +167,7 @@ const Perfil = (() => {
   }
 
   async function _cargarDocumentos() {
-    const docsContainer = $id('perfilDocsLista');
+    const docsContainer = document.getElementById('perfilDocsLista');
     if (!docsContainer) return;
     try {
       const respuesta = await DB.llamar('getDocumentosUsuario', { usuario: Auth.getNombre() });
@@ -191,4 +193,8 @@ const Perfil = (() => {
   return { render, mostrarModalEditar, cerrarModalEditar, guardarPerfil };
 })();
 
+// Compatibilidad global
 window.Perfil = Perfil;
+
+// Exportar como módulo ES6
+export default Perfil;

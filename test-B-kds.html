@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test B — KDS (Monitor de Cocina) – v4.6</title>
+  <style>
+    body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
+    h1 { color: #f59e0b; }
+    .suite { margin-bottom: 24px; border-bottom: 1px solid #2e2e42; padding-bottom: 12px; }
+    .test { margin: 4px 0; padding: 4px 8px; border-radius: 4px; }
+    .pass { background: rgba(34,197,94,.2); }
+    .fail { background: rgba(239,68,68,.2); }
+    .summary { margin-top: 20px; font-weight: bold; }
+    .info { color: #94a3b8; font-size: 12px; margin: 2px 0; }
+    .error { color: #ef4444; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test B — KDS (Monitor de Cocina) – v4.6</h1>
+  <p class="info">Valida botón de pánico, acceso al recetario, división de ambos, urgencia, cambio de estado y vista vacía.</p>
+  <div id="results"></div>
+
+  <!-- Mocks tempranos -->
+  <script>
+    window.DBInventario = {
+      validarStockParaItems: function() { return { ok: true, faltantes: [] }; }
+    };
+    window.DBFusion = {
+      fusionarMesas: function() { return null; }
+    };
+  </script>
+
+  <!-- Dependencias -->
+  <script src="/js/utils.js"></script>
+  <script src="/js/lib/logger.js"></script>
+  <script src="/js/lib/eventBus.js"></script>
+  <script src="/js/lib/store.js"></script>
+  <script src="/js/lib/command-bus.js"></script>
+  <script src="/js/lib/deps.js"></script>
+  <script src="/js/dominio/resultado.js"></script>
+  <script src="/js/dominio/dinero.js"></script>
+  <script src="/js/dominio/cantidad.js"></script>
+  <script src="/js/db-core.js"></script>
+  <script src="/js/db-inventario.js"></script>
+  <script src="/js/db-fusion.js"></script>
+  <script src="/js/db-shim.js"></script>
+  <script src="/js/db-appwrite.js"></script>
+  <script src="/js/db.js"></script>
+
+  <!-- Módulos a testear -->
+  <script src="/js/modulos/interno/recetario.js"></script>
+  <script src="/js/ui/kds.js"></script>
+
+  <script>
+    (function() {
+      var resultsEl = document.getElementById('results');
+      var passed = 0, failed = 0;
+
+      function assert(condition, msg) {
+        if (condition) {
+          passed++;
+          resultsEl.innerHTML += '<div class="test pass">✔ ' + msg + '</div>';
+        } else {
+          failed++;
+          resultsEl.innerHTML += '<div class="test fail">✘ ' + msg + '</div>';
+        }
+      }
+
+      function esperar(ms) {
+        return new Promise(function(resolve) { setTimeout(resolve, ms); });
+      }
+
+      async function runTests() {
+        resultsEl.innerHTML = '';
+        Logger.setLevel('ERROR');
+
+        // ── Configurar entorno ──────────────────────────
+        DB.config = { zonas: [{ nombre: 'salon', cantidad: 5 }] };
+        DB.mozos = [{ id: 'm1', nombre: 'Carlos', activo: true }];
+        DB.mesas = [
+          { numero: 1, estado: 'ocupada', zona: 'salon', items: [], mozo: 'Carlos', comensales: 2, pedidoId: 'p1', esVirtual: false }
+        ];
+        DB.pedidos = [];
+        DB.comandas = [];
+        DB.productos = [
+          { id: 'prod_a', nombre: 'Papas fritas', disponible: true }
+        ];
+        DB.recetas = [];
+        DB.ingredientes = [];
+        DB.saveMesas = function() {};
+        DB.saveComandas = function() {};
+        DB.getMesa = function(num) { return DB.mesas.find(m => m.numero == num); };
+
+        window.Auth = window.Auth || {};
+        Auth.getRol = function() { return this._rol || 'cocina'; };
+        Auth._rol = 'admin';
+        window.showToast = function() {};
+        window.confirm = function() { return true; };
+
+        // Mock de DBAppwrite
+        var ultimaActualizacion = null;
+        window.DBAppwrite = window.DBAppwrite || {};
+        DBAppwrite.actualizar = function(col, id, cambios) {
+          ultimaActualizacion = { col, id, cambios };
+          return Promise.resolve(true);
+        };
+        DBAppwrite.listar = function(col) {
+          if (col === 'recetas') return Promise.resolve(DB.recetas);
+          return Promise.resolve([]);
+        };
+
+        // Mock del Store
+        var comandasStore = [];
+        var originalGetState = Store.getState;
+        Store.getState = function() {
+          var state = originalGetState.call(Store);
+          state.comandas = comandasStore;
+          state.productos = DB.productos;
+          state.recetas = DB.recetas;
+          return state;
+        };
+
+        // Crear vista del KDS
+        var main = document.createElement('main');
+        main.id = 'view-cocina';
+        main.className = 'view';
+        main.innerHTML = '<div id="cocinaKDS" class="kds-grid"></div>';
+        document.body.appendChild(main);
+
+        var ahora = Date.now();
+
+        // ── Suite 1: Botón de pánico ────────────────────
+        resultsEl.innerHTML += '<div class="suite"><h2>1. Botón de pánico por ítem</h2></div>';
+        comandasStore = [{
+          id: 'com_1', mesa: '1', destino: 'cocina',
+          items: [{ prodId: 'prod_a', nombre: 'Papas fritas', qty: 2, obs: '', enviadoA: 'cocina', destino: 'cocina' }],
+          estado: 'nueva', ts: ahora, mozo: 'Carlos', observaciones: ''
+        }];
+        KDS.refresh();
+        await esperar(50);
+
+        var botonPanico = document.querySelector('.kds-panico-btn');
+        assert(!!botonPanico, 'Botón de pánico visible para admin');
+
+        if (botonPanico) {
+          botonPanico.click();
+          await esperar(50);
+          assert(ultimaActualizacion !== null, 'DBAppwrite.actualizar fue llamado');
+          assert(ultimaActualizacion.col === 'productos', 'Colección correcta: productos');
+          assert(ultimaActualizacion.id === 'prod_a', 'ID del producto correcto');
+          assert(ultimaActualizacion.cambios.disponible === false, 'disponible se cambió a false');
+        }
+
+        // ── Suite 2: Botón de pánico oculto ──────────────
+        resultsEl.innerHTML += '<div class="suite"><h2>2. Botón de pánico oculto para cocina</h2></div>';
+        Auth._rol = 'cocina';
+        KDS.refresh();
+        await esperar(50);
+        botonPanico = document.querySelector('.kds-panico-btn');
+        assert(botonPanico === null, 'Botón de pánico NO visible para cocina');
+        Auth._rol = 'admin';
+
+        // ── Suite 3: Acceso al recetario ──────────────────
+        resultsEl.innerHTML += '<div class="suite"><h2>3. Acceso al recetario</h2></div>';
+        DB.recetas = [
+          { productoId: 'prod_a', ingredientes: [{ ingredienteId: 'ing_a', cantidad: 200, unidad: 'g' }], instrucciones: 'Freir 5 min' }
+        ];
+        DB.productos = [{ id: 'prod_a', nombre: 'Papas fritas' }];
+        DB.ingredientes = [{ id: 'ing_a', nombre: 'Papa', unidad: 'g' }];
+
+        await Recetario.render();
+        await esperar(50);
+
+        var vistaRecetario = document.getElementById('view-recetario');
+        assert(!!vistaRecetario, 'La vista del recetario aparece');
+
+        var contenido = vistaRecetario ? vistaRecetario.textContent : '';
+        assert(contenido.includes('Papas fritas'), 'Muestra nombre del producto');
+        assert(contenido.includes('Papa'), 'Muestra ingrediente');
+        assert(contenido.includes('200'), 'Muestra cantidad');
+        assert(contenido.includes('Freir 5 min'), 'Muestra instrucciones');
+
+        // ── Suite 4: División de ambos ────────────────────
+        resultsEl.innerHTML += '<div class="suite"><h2>4. División de ambos</h2></div>';
+        comandasStore = [{
+          id: 'com_ambos', mesa: '1', destino: 'ambos',
+          items: [
+            { prodId: 'prod_a', nombre: 'Papas fritas', qty: 1, obs: '', enviadoA: 'cocina', destino: 'cocina' },
+            { prodId: 'prod_b', nombre: 'Mojito', qty: 2, obs: '', enviadoA: 'barra', destino: 'barra' }
+          ],
+          estado: 'nueva', ts: ahora, mozo: 'Carlos', observaciones: 'Tabla'
+        }];
+        KDS.refresh();
+        await esperar(50);
+        assert(!!document.getElementById('kds-com_ambos_cocina'), 'Tarjeta virtual de cocina visible');
+        assert(!!document.getElementById('kds-com_ambos_barra'), 'Tarjeta virtual de barra visible');
+        assert(document.getElementById('kds-com_ambos') === null, 'Original no se renderiza');
+
+        // ── Suite 5: Urgencia ─────────────────────────────
+        resultsEl.innerHTML += '<div class="suite"><h2>5. Urgencia</h2></div>';
+        var comUrgente = {
+          id: 'com_urg', mesa: '1', destino: 'cocina',
+          items: [{ prodId: 'prod_x', nombre: 'Hamburguesa', qty: 1, obs: '', enviadoA: 'cocina', destino: 'cocina' }],
+          estado: 'nueva', ts: ahora - 20 * 60 * 1000, mozo: 'Ana', observaciones: ''
+        };
+        comandasStore = [comUrgente];
+        KDS.refresh();
+        await esperar(50);
+        var tiempoEl = document.querySelector('.kds-time.urgente');
+        assert(!!tiempoEl, 'Comanda de 20 min tiene clase urgente');
+
+        // ── Suite 6: Cambio de estado ─────────────────────
+        resultsEl.innerHTML += '<div class="suite"><h2>6. Cambio de estado</h2></div>';
+        // Crear un objeto nuevo para evitar interferencias
+        var comUrgente2 = {
+          id: 'com_urg2', mesa: '1', destino: 'cocina',
+          items: [{ prodId: 'prod_x', nombre: 'Hamburguesa', qty: 1, obs: '', enviadoA: 'cocina', destino: 'cocina' }],
+          estado: 'nueva', ts: ahora - 20 * 60 * 1000, mozo: 'Ana', observaciones: ''
+        };
+        comandasStore = [comUrgente2];
+        KDS.refresh();
+        await esperar(50);
+        KDS._setEstado('com_urg2', 'en-proceso');
+        await esperar(100);
+        KDS.refresh();
+        await esperar(100);
+        var tarjeta = document.getElementById('kds-com_urg2');
+        if (tarjeta) {
+          assert(tarjeta.classList.contains('en-proceso'), 'Comanda pasa a en-proceso');
+        } else {
+          assert(false, 'No se encontró la tarjeta para verificar en-proceso');
+        }
+
+        // Marcar como lista
+        KDS._setEstado('com_urg2', 'lista');
+        await esperar(100);
+        KDS.refresh();
+        await esperar(100);
+        var mesa1 = DB.mesas[0];
+        assert(mesa1.estado === 'esperando', 'Mesa 1 pasa a esperando');
+
+        // ── Suite 7: Vista vacía ──────────────────────────
+        resultsEl.innerHTML += '<div class="suite"><h2>7. Vista vacía</h2></div>';
+        comandasStore = [];
+        KDS.refresh();
+        await esperar(50);
+        assert(!!document.querySelector('#cocinaKDS .kds-empty'), 'Muestra "Todo en orden"');
+
+        // ── Resumen ───────────────────────────────────────
+        resultsEl.innerHTML += '<div class="summary">' + passed + ' pasaron, ' + failed + ' fallaron</div>';
+        if (failed === 0) {
+          resultsEl.innerHTML += '<div class="test pass">✔ Todos los tests del KDS v4.6 pasaron.</div>';
+        }
+      }
+
+      window.addEventListener('load', function() {
+        runTests().catch(function(e) {
+          resultsEl.innerHTML += '<div class="error">Error en tests: ' + e.message + '</div>';
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

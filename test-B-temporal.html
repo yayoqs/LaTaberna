@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test B Temporal — Depuración KDS</title>
+  <style>
+    body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
+    h1 { color: #f59e0b; }
+    .suite { margin-bottom: 24px; border-bottom: 1px solid #2e2e42; padding-bottom: 12px; }
+    .test { margin: 4px 0; padding: 4px 8px; border-radius: 4px; }
+    .pass { background: rgba(34,197,94,.2); }
+    .fail { background: rgba(239,68,68,.2); }
+    .summary { margin-top: 20px; font-weight: bold; }
+    .info { color: #94a3b8; font-size: 12px; margin: 2px 0; }
+    .error { color: #ef4444; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test B Temporal — Depuración KDS</h1>
+  <p class="info">Herramienta temporal para depurar problemas en los tests del KDS.</p>
+  <div id="results"></div>
+
+  <!-- Mocks tempranos -->
+  <script>
+    window.DBInventario = { validarStockParaItems: function() { return { ok: true, faltantes: [] }; } };
+    window.DBFusion = { fusionarMesas: function() { return null; } };
+  </script>
+
+  <!-- Dependencias -->
+  <script src="/js/utils.js"></script>
+  <script src="/js/lib/logger.js"></script>
+  <script src="/js/lib/eventBus.js"></script>
+  <script src="/js/lib/store.js"></script>
+  <script src="/js/lib/command-bus.js"></script>
+  <script src="/js/lib/deps.js"></script>
+  <script src="/js/dominio/resultado.js"></script>
+  <script src="/js/dominio/dinero.js"></script>
+  <script src="/js/dominio/cantidad.js"></script>
+  <script src="/js/db-core.js"></script>
+  <script src="/js/db-inventario.js"></script>
+  <script src="/js/db-fusion.js"></script>
+  <script src="/js/db-shim.js"></script>
+  <script src="/js/db-appwrite.js"></script>
+  <script src="/js/db.js"></script>
+
+  <!-- Módulo KDS -->
+  <script src="/js/ui/kds.js"></script>
+
+  <script>
+    (function() {
+      var resultsEl = document.getElementById('results');
+      var passed = 0, failed = 0;
+
+      function assert(condition, msg) {
+        if (condition) {
+          passed++;
+          resultsEl.innerHTML += '<div class="test pass">✔ ' + msg + '</div>';
+        } else {
+          failed++;
+          resultsEl.innerHTML += '<div class="test fail">✘ ' + msg + '</div>';
+        }
+      }
+
+      function esperar(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+      }
+
+      async function runTests() {
+        resultsEl.innerHTML = '';
+        Logger.setLevel('ERROR');
+
+        // Configurar entorno mínimo
+        DB.config = { zonas: [{ nombre: 'salon', cantidad: 5 }] };
+        DB.mozos = [{ id: 'm1', nombre: 'Carlos', activo: true }];
+        DB.mesas = [
+          { numero: 1, estado: 'ocupada', zona: 'salon', items: [], mozo: 'Carlos', comensales: 2, pedidoId: 'p1', esVirtual: false }
+        ];
+        DB.pedidos = [];
+        DB.comandas = [];
+        DB.productos = [];
+        DB.saveMesas = function() {};
+        DB.saveComandas = function() {};
+        DB.getMesa = function(num) { return DB.mesas.find(m => m.numero == num); };
+
+        window.Auth = window.Auth || {};
+        Auth.getRol = function() { return 'admin'; };
+        window.showToast = function() {};
+
+        // Mock del Store
+        var comandasStore = [];
+        var originalGetState = Store.getState;
+        Store.getState = function() {
+          var state = originalGetState.call(Store);
+          state.comandas = comandasStore;
+          return state;
+        };
+        var originalDispatch = Store.dispatch;
+        Store.dispatch = function(action) {
+          if (action.type === 'COMANDA_ACTUALIZADA') {
+            var c = comandasStore.find(function(x) { return x.id === action.payload.id; });
+            if (c) Object.assign(c, action.payload.cambios);
+          }
+          originalDispatch.call(Store, action);
+        };
+
+        var ahora = Date.now();
+        var com = {
+          id: 'com_test', mesa: '1', destino: 'cocina',
+          items: [{ prodId: 'prod_x', nombre: 'Hamburguesa', qty: 1, obs: '', enviadoA: 'cocina', destino: 'cocina' }],
+          estado: 'nueva', ts: ahora - 2 * 60 * 1000, mozo: 'Ana', observaciones: ''
+        };
+        comandasStore = [com];
+
+        // Crear vista KDS
+        var main = document.createElement('main');
+        main.id = 'view-cocina';
+        main.className = 'view';
+        main.innerHTML = '<div id="cocinaKDS" class="kds-grid"></div>';
+        document.body.appendChild(main);
+
+        KDS.refresh();
+        await esperar(50);
+
+        var tarjeta = document.getElementById('kds-com_test');
+        console.log('[Temporal] Tarjeta inicial:', tarjeta ? tarjeta.outerHTML : 'null');
+        assert(!!tarjeta, 'Tarjeta visible inicialmente');
+
+        // Cambiar a en-proceso
+        KDS._setEstado('com_test', 'en-proceso');
+        await esperar(100);
+        KDS.refresh();
+        await esperar(100);
+
+        tarjeta = document.getElementById('kds-com_test');
+        console.log('[Temporal] Tarjeta tras en-proceso:', tarjeta ? tarjeta.outerHTML : 'null');
+        assert(!!tarjeta, 'Tarjeta sigue visible');
+        assert(tarjeta.classList.contains('en-proceso'), 'Clase en-proceso presente');
+
+        resultsEl.innerHTML += '<div class="summary">' + passed + ' pasaron, ' + failed + ' fallaron</div>';
+      }
+
+      window.addEventListener('load', function() {
+        runTests().catch(function(e) {
+          resultsEl.innerHTML += '<div class="error">Error en tests: ' + e.message + '</div>';
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

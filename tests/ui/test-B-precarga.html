@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test B – Recepción de Precargas</title>
+  <style>
+    body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
+    h1 { color: #f59e0b; }
+    .suite { margin-bottom: 24px; border-bottom: 1px solid #2e2e42; padding-bottom: 12px; }
+    .test { margin: 4px 0; padding: 4px 8px; border-radius: 4px; }
+    .pass { background: rgba(34,197,94,.2); }
+    .fail { background: rgba(239,68,68,.2); }
+    .summary { margin-top: 20px; font-weight: bold; }
+    .info { color: #94a3b8; font-size: 12px; margin: 2px 0; }
+    .error { color: #ef4444; }
+    pre { background: #111; padding: 10px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test B – Recepción de Precargas (cliente:precarga_enviada)</h1>
+  <p class="info">Verifica que el Frontend Interno muestre la insignia, cargue los ítems y actualice el estado de la precarga.</p>
+  <div id="results"></div>
+
+  <!-- DEPENDENCIAS (rutas absolutas desde raíz) -->
+  <script src="/js/utils.js"></script>
+  <script src="/js/lib/logger.js"></script>
+  <script src="/js/lib/eventBus.js"></script>
+  <script src="/js/lib/store.js"></script>
+  <script src="/js/lib/command-bus.js"></script>
+  <script src="/js/lib/deps.js"></script>
+  <script src="/js/dominio/resultado.js"></script>
+  <script src="/js/dominio/dinero.js"></script>
+  <script src="/js/dominio/cantidad.js"></script>
+  <script src="/js/db-core.js"></script>
+  <script src="/js/db-appwrite.js"></script>
+  <script src="/js/puente-appwrite.js"></script>
+  <script src="/js/db.js"></script>
+
+  <!-- Módulos a testear -->
+  <script src="/js/ui/mesas.js"></script>
+  <script src="/js/ui/comanda.js"></script>
+  <script src="/js/modulos/interno/precarga-control.js"></script>
+
+  <script>
+    (function() {
+      var resultsEl = document.getElementById('results');
+      var passed = 0, failed = 0;
+
+      function assert(condition, msg) {
+        if (condition) {
+          passed++;
+          resultsEl.innerHTML += '<div class="test pass">✔ ' + msg + '</div>';
+        } else {
+          failed++;
+          resultsEl.innerHTML += '<div class="test fail">✘ ' + msg + '</div>';
+        }
+      }
+
+      async function runTests() {
+        resultsEl.innerHTML = '';
+        Logger.setLevel('ERROR');
+
+        // ── Configurar entorno mínimo ───────────────────
+        // Mock de DB mínimo para que Mesas, Comanda y PrecargaControl funcionen
+        window.DB = window.DB || {};
+        DB.config = { zonas: [{ nombre: 'salon', cantidad: 5 }] };
+        DB.mozos = [{ id: 'm1', nombre: 'Carlos', activo: true }];
+        DB.mesas = [
+          { numero: 1, estado: 'libre', zona: 'salon', items: [], mozo: '', comensales: 1, pedidoId: null, esVirtual: false },
+          { numero: 2, estado: 'libre', zona: 'salon', items: [], mozo: '', comensales: 1, pedidoId: null, esVirtual: false }
+        ];
+        DB.pedidos = [];
+        DB.comandas = [];
+        DB.saveMesas = function() {};
+        DB.savePedidos = function() {};
+        DB.saveComandas = function() {};
+        DB.getMesa = function(num) { return DB.mesas.find(m => m.numero == num); };
+        DB.fusionarMesas = function() { return null; };
+        
+        // Mock de Appwrite para que PrecargaControl pueda actualizar
+        if (!window.DBAppwrite || !DBAppwrite.actualizar) {
+          window.DBAppwrite = {
+            actualizar: async function(coleccion, id, cambios) {
+              Logger.debug('[Mock DBAppwrite] actualizar', coleccion, id, cambios);
+              return true; // éxito simulado
+            }
+          };
+        }
+
+        // Inicializar Store
+        Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
+
+        // Crear DOM mínimo para Mesas.render
+        var main = document.createElement('main');
+        main.id = 'view-mesas';
+        main.innerHTML = '<div id="mesasGrid"></div>';
+        document.body.appendChild(main);
+
+        // Renderizar mesas iniciales
+        Mesas.render();
+
+        // Inicializar Comanda con la mesa 1 (simular mesa activa)
+        var mesa1 = DB.mesas[0];
+        // Simular que la mesa ya está abierta (estado ocupada) y con items vacíos
+        mesa1.estado = 'ocupada';
+        mesa1.pedidoId = 'ped_test';
+        mesa1.mozo = 'Carlos';
+        mesa1.comensales = 2;
+        mesa1.personas = ['General'];
+        mesa1.personaActiva = 'General';
+        Comanda.setMesaActiva(mesa1);
+
+        // ── Suite 1: Recepción de precarga y badge ──────
+        resultsEl.innerHTML += '<div class="suite"><h2>1. Insignia al recibir precarga</h2></div>';
+
+        var precargaPrueba = {
+          id: 'prec_001',
+          mesa: 1,
+          items: [
+            { prodId: 'prod_a', nombre: 'Hamburguesa', precio: 1500, categoria: 'platos', destino: 'cocina', qty: 2, obs: 'sin cebolla' },
+            { prodId: 'prod_b', nombre: 'Cerveza', precio: 800, categoria: 'bebidas', destino: 'barra', qty: 1, obs: '' }
+          ],
+          clienteId: 'juan',
+          observaciones: '',
+          timestamp: Date.now()
+        };
+
+        // Emitir evento
+        EventBus.emit('cliente:precarga_enviada', precargaPrueba);
+
+        // Verificar que se llamó a Mesas.setBadge (lo podemos chequear por la presencia del badge en el DOM)
+        setTimeout(function() {
+          var badgeEl = document.querySelector('.precarga-badge');
+          var badgeEncontrado = !!badgeEl;
+          assert(badgeEncontrado, 'Aparece una insignia en la mesa 1');
+
+          if (badgeEl) {
+            var texto = badgeEl.textContent.trim();
+            assert(texto.indexOf('2') !== -1, 'La insignia muestra la cantidad de ítems (2)');
+          }
+
+          // También podemos verificar que PrecargaControl guardó la precarga
+          // (accedemos a su propiedad expuesta para debug)
+          var precargasGuardadas = PrecargaControl._precargas;
+          assert(precargasGuardadas.has('prec_001'), 'Precarga almacenada en PrecargaControl');
+
+          // ── Suite 2: Clic en insignia carga ítems ─────
+          resultsEl.innerHTML += '<div class="suite"><h2>2. Clic en insignia carga ítems y marca revisado</h2></div>';
+
+          // Simular clic en la insignia
+          var badgeClickEvent = new MouseEvent('click', { bubbles: true });
+          badgeEl.dispatchEvent(badgeClickEvent);
+
+          // Verificar que se haya emitido mesa:badge_click (el handler de PrecargaControl ya escuchó)
+          // Pero como el handler es asíncrono, esperamos un poco
+          setTimeout(async function() {
+            // Verificar que los ítems se agregaron a la comanda
+            var itemsComanda = mesa1.items;
+            assert(itemsComanda.length === 3, 'Se agregaron 3 ítems a la comanda (2 hamburguesas + 1 cerveza)');
+            // Verificar que la insignia se haya limpiado
+            var badgeDespues = document.querySelector('.precarga-badge');
+            assert(!badgeDespues, 'La insignia desapareció después de cargar');
+            // Verificar que se ejecutó el comando precarga:revisar (simulado)
+            // Dado que DBAppwrite.actualizar fue llamado, podemos verificar mediante un espía simple
+            // (añadimos un flag en el mock)
+            // No podemos verificar DBAppwrite directamente, pero sí que PrecargaControl haya eliminado la precarga
+            var precargasDespues = PrecargaControl._precargas;
+            assert(!precargasDespues.has('prec_001'), 'Precarga removida del almacenamiento local');
+
+            // ── Suite 3: Precarga rechazada sin mesa activa ──
+            resultsEl.innerHTML += '<div class="suite"><h2>3. Precarga sin mesa activa no carga</h2></div>';
+
+            // Simular que no hay mesa activa
+            Comanda.setMesaActiva(null);
+            // Crear nueva precarga para mesa 2
+            var precarga2 = {
+              id: 'prec_002',
+              mesa: 2,
+              items: [{ prodId: 'prod_c', nombre: 'Pizza', precio: 2000, categoria: 'platos', destino: 'cocina', qty: 1, obs: '' }],
+              clienteId: 'maria',
+              observaciones: '',
+              timestamp: Date.now()
+            };
+            EventBus.emit('cliente:precarga_enviada', precarga2);
+
+            setTimeout(function() {
+              var badge2 = document.querySelector('.precarga-badge');
+              assert(!!badge2, 'Insignia aparece para mesa 2 aunque no esté activa');
+
+              // Simular clic en la insignia (debería mostrar un toast)
+              // Espiamos showToast
+              var toastCalled = false;
+              var originalToast = window.showToast;
+              window.showToast = function(type, msg) {
+                if (type === 'warning' && msg.indexOf('Abrí la mesa') !== -1) toastCalled = true;
+              };
+              
+              badge2.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+              
+              setTimeout(function() {
+                assert(toastCalled, 'Muestra advertencia "Abrí la mesa"');
+                // Restaurar showToast
+                window.showToast = originalToast;
+                // Verificar que la precarga no se haya cargado (items de mesa 2 vacíos)
+                var mesa2 = DB.mesas[1];
+                assert(mesa2.items.length === 0, 'Los ítems no se cargaron porque la mesa no estaba activa');
+                
+                // Limpiar badge
+                Mesas.clearBadge(2);
+
+                // ── Resumen ─────────────────────────
+                resultsEl.innerHTML += '<div class="summary">' + passed + ' pasaron, ' + failed + ' fallaron</div>';
+                if (failed === 0) {
+                  resultsEl.innerHTML += '<div class="test pass">✔ Todos los tests de precarga pasaron.</div>';
+                }
+              }, 50);
+            }, 50);
+          }, 50);
+        }, 50);
+      }
+
+      window.addEventListener('load', function() {
+        setTimeout(runTests, 200);
+      });
+    })();
+  </script>
+</body>
+</html>

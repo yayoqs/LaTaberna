@@ -1,5 +1,5 @@
 /* ================================================================
-   Raíz — MÓDULO: bootstrap.js (v3.1 – espera al Loader)
+   Raíz — MÓDULO: bootstrap.js (v3.2 – vista pública 'inicio')
    ================================================================ */
 const Bootstrap = (() => {
 
@@ -141,6 +141,11 @@ const Bootstrap = (() => {
         const vistaDefecto = Auth.getDefaultView();
         if (typeof App !== 'undefined' && App.showView) {
           App.showView(vistaDefecto);
+        }
+      } else {
+        // Sin sesión, mostrar la vista pública 'inicio'
+        if (typeof App !== 'undefined' && App.showView) {
+          App.showView('inicio');
         }
       }
     } catch (e) {

@@ -1,0 +1,136 @@
+/* ================================================================
+   La Taberna — CSS MODULAR
+   Archivo: css/eventos-en-vivo.css
+   Propósito: Estilos para el panel de eventos en vivo.
+   ================================================================ */
+
+.eventos-vivo-panel {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.estado-badge {
+  font-size: 18px;
+  font-weight: 700;
+  padding: 8px 20px;
+  border-radius: 24px;
+  text-align: center;
+  background: var(--color-hover);
+  color: var(--color-text-muted);
+  text-transform: capitalize;
+}
+
+.estado-badge.estado-configuracion {
+  background: var(--color-info);
+  color: white;
+}
+
+.estado-badge.estado-activo {
+  background: var(--color-success);
+  color: white;
+}
+
+.estado-badge.estado-pausado {
+  background: var(--color-warning);
+  color: black;
+}
+
+.estado-badge.estado-finalizado {
+  background: var(--color-text-muted);
+  color: white;
+}
+
+.zona-interaccion {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 20px;
+}
+
+/* Bingo */
+.ultima-bola {
+  font-size: 24px;
+  font-weight: bold;
+  color: var(--color-accent);
+  margin-bottom: 16px;
+}
+.ultima-bola span {
+  background: var(--color-accent);
+  color: black;
+  padding: 4px 16px;
+  border-radius: 12px;
+  margin-left: 8px;
+}
+
+.bolas-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.bola {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: black;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 16px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+/* Karaoke */
+.karaoke-panel label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.karaoke-panel textarea {
+  width: 100%;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  padding: 10px;
+  font-size: 14px;
+  resize: vertical;
+}
+
+.karaoke-botones {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+/* Votación */
+.votacion-lista {
+  list-style: none;
+  padding: 0;
+}
+
+.votacion-lista li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.votacion-agregar {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.votacion-agregar input {
+  flex: 1;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  padding: 6px 10px;
+}

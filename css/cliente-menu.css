@@ -1,0 +1,191 @@
+/**
+ * Menú Digital del Cliente (v1.0.1)
+ *
+ * Agrega el botón flotante para abrir el panel de la orden.
+ */
+
+.menu-estado {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 20px;
+  background: var(--color-card);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 13px;
+  color: var(--color-text-sec);
+  flex-shrink: 0;
+}
+
+.menu-banner-espera {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 14px 20px;
+  background: rgba(245,158,11,.1);
+  border-bottom: 1px solid rgba(245,158,11,.25);
+  color: var(--color-accent);
+  font-size: 14px;
+  flex-shrink: 0;
+  transition: opacity .3s ease, max-height .3s ease;
+}
+.menu-banner-espera i { font-size: 20px; }
+
+.menu-card-atenuado {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.btn-agregar-orden {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  background: var(--color-accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: #000;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--t);
+}
+.btn-agregar-orden:hover {
+  background: var(--color-accent-dark);
+  transform: translateY(-1px);
+}
+.btn-agregar-orden.btn-deshabilitado {
+  background: var(--color-hover);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* Botón flotante para abrir la orden */
+.btn-toggle-orden {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: var(--color-accent);
+  border: none;
+  border-radius: 50%;
+  width: 56px;
+  height: 56px;
+  color: #000;
+  font-size: 18px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(0,0,0,.4);
+  z-index: 150;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  transition: var(--t);
+}
+.btn-toggle-orden:hover {
+  background: var(--color-accent-dark);
+  transform: scale(1.05);
+}
+#contadorOrden {
+  background: #000;
+  color: var(--color-accent);
+  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  top: -4px;
+  right: -4px;
+}
+
+#view-menu-digital .menu-banner {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  padding: 16px 24px;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--color-border);
+}
+#view-menu-digital .menu-banner-content {
+  position: relative;
+  z-index: 1;
+}
+#view-menu-digital .menu-banner-content p {
+  font-size: 15px;
+  font-weight: 500;
+  color: rgba(255,255,255,.7);
+  margin-bottom: 12px;
+  font-style: italic;
+}
+#view-menu-digital .menu-banner-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 400px;
+  margin: 0 auto;
+  background: rgba(255,255,255,.1);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,.15);
+  border-radius: 24px;
+  padding: 8px 16px;
+  position: relative;
+  z-index: 1;
+  transition: var(--t);
+}
+#view-menu-digital .menu-banner-search:focus-within {
+  background: rgba(255,255,255,.15);
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(245,158,11,.2);
+}
+#view-menu-digital .menu-banner-search i { color: rgba(255,255,255,.5); font-size: 16px; }
+#view-menu-digital .menu-banner-search input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #fff;
+  font-size: 14px;
+}
+#view-menu-digital .menu-banner-search input::placeholder { color: rgba(255,255,255,.4); }
+#view-menu-digital .menu-categorias {
+  display: flex;
+  gap: 8px;
+  padding: 12px 20px;
+  overflow-x: auto;
+  flex-shrink: 0;
+  background: var(--color-card);
+  border-bottom: 1px solid var(--color-border);
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+#view-menu-digital .menu-categorias::-webkit-scrollbar { display: none; }
+#view-menu-digital .menu-grid {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  align-content: start;
+}
+
+@media (max-width: 600px) {
+  #view-menu-digital .menu-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 12px;
+    padding: 12px;
+  }
+  .btn-toggle-orden {
+    bottom: 16px;
+    right: 16px;
+    width: 48px;
+    height: 48px;
+    font-size: 16px;
+  }
+}

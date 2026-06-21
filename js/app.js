@@ -1,5 +1,6 @@
 /* ================================================================
-   PubPOS — MÓDULO: app.js (v5.5 – sync al cambiar vista)
+   PubPOS — MÓDULO: app.js (v5.7 – oculta header en vista pública
+              y lo restaura explícitamente con display: flex)
    ================================================================ */
 const App = {
   async init() {
@@ -56,12 +57,22 @@ const App = {
   },
 
   /**
-   * Vistas críticas que requieren sincronización al abrirlas.
+   * Vistas que no requieren autenticación.
    */
-  _vistasCriticas: ['mesas', 'cocina', 'caja', 'reparto'],
+  _vistasPublicas: ['inicio'],
 
   showView(nombre) {
-    if (!Auth.getRol()) { Auth.mostrarLogin(); return; }
+    // ── Control de header: ocultar en vista pública, mostrar con flex en el resto ─────
+    const header = document.querySelector('.app-header');
+    if (header) {
+      header.style.display = (nombre === 'inicio') ? 'none' : 'flex';
+    }
+
+    // Permitir acceso a vistas públicas sin sesión activa
+    if (!this._vistasPublicas.includes(nombre) && !Auth.getRol()) {
+      Auth.mostrarLogin();
+      return;
+    }
 
     // Validaciones de permisos (sin cambios)...
     if (nombre === 'caja' && !Auth.puedeAccederCaja()) { showToast('error', 'No tienes permiso para acceder a Caja'); return; }
@@ -110,12 +121,6 @@ const App = {
       Auth.aplicarRestriccionesUI();
     }
 
-    // ── Sincronización al abrir vistas críticas ──────────
-    if (this._vistasCriticas.includes(nombre) && typeof DB !== 'undefined' && DB.sincronizarTodo) {
-      Logger.debug(`[App] Sincronizando datos al abrir vista "${nombre}"...`);
-      DB.sincronizarTodo().catch(e => Logger.warn('[App] Error al sincronizar al cambiar vista:', e));
-    }
-
     // Renderizado de vistas (sin cambios)...
     if (nombre === 'mesas' && window.Mesas) Mesas.render();
     if (nombre === 'cocina' && window.KDS) KDS.refresh();
@@ -127,6 +132,7 @@ const App = {
     if (nombre === 'menu' && window.Menu) Menu.render();
     if (nombre === 'eventos' && window.Eventos) Eventos.render();
     if (nombre === 'perfil' && window.Perfil) Perfil.render();
+    // La vista 'inicio' es gestionada por la Célula C (PantallaInicio)
   },
 
   /** Monitorea la conexión a internet */
@@ -134,9 +140,6 @@ const App = {
     window.addEventListener('online', () => {
       showToast('success', '<i class="fas fa-wifi"></i> Conexión restablecida. Sincronizando...');
       Logger.info('[App] Conexión restablecida.');
-      if (typeof DB !== 'undefined' && DB.sincronizarTodo) {
-        DB.sincronizarTodo().catch(e => Logger.warn('[App] Error al sincronizar al reconectar:', e));
-      }
     });
 
     window.addEventListener('offline', () => {

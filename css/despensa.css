@@ -1,8 +1,8 @@
 /* ================================================================
    PubPOS — CSS MODULAR
-   Archivo: css/despensa.css
+   Archivo: css/despensa.css  (v12.0 – acompaña a despensa.js v12.0)
    Propósito: Estilos para la vista de Despensa (tabla de inventario,
-              resumen, sidebar, modales).
+              resumen, sidebar, filtros avanzados, paginador, modales).
    ================================================================ */
 
 /* ── RESUMEN SUPERIOR ─────────────────────────────────────── */
@@ -320,4 +320,41 @@
   border-radius: var(--radius-xs);
   font-size: 12px;
   width: 180px;
+}
+
+/* ── FILTROS AVANZADOS (v12.0) ────────────────────────────── */
+#filtroBajoMinimo,
+#filtroConValor {
+  accent-color: var(--color-accent);
+}
+
+#filtroUbicacion {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  padding: 6px 10px;
+  border-radius: var(--radius-xs);
+  font-size: 12px;
+  width: 140px;
+}
+
+/* ── PAGINADOR DE MOVIMIENTOS (v12.0) ─────────────────────── */
+#movimientosPaginador .btn-ajuste {
+  background: var(--color-hover);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xs);
+  color: var(--color-text-sec);
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--t);
+  width: 100%;
+  text-align: center;
+}
+
+#movimientosPaginador .btn-ajuste:hover {
+  background: var(--color-accent);
+  color: #000;
+  border-color: var(--color-accent);
 }

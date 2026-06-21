@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test A — Core (Comandos + Registro + Nuevos campos + completarSubcomanda)</title>
+  <style>
+    body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
+    h1 { color: #f59e0b; }
+    .suite { margin-bottom: 24px; border-bottom: 1px solid #2e2e42; padding-bottom: 12px; }
+    .test { margin: 4px 0; padding: 4px 8px; border-radius: 4px; }
+    .pass { background: rgba(34,197,94,.2); }
+    .fail { background: rgba(239,68,68,.2); }
+    .summary { margin-top: 20px; font-weight: bold; }
+    .error { color: #ef4444; margin-bottom: 16px; }
+    .info { color: #94a3b8; font-size: 12px; margin: 2px 0; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test A — Core (Comandos + Registro + Nuevos campos + completarSubcomanda)</h1>
+  <div id="results"></div>
+
+  <script src="/js/utils.js"></script>
+  <script src="/js/lib/logger.js"></script>
+  <script src="/js/lib/eventBus.js"></script>
+  <script src="/js/lib/store.js"></script>
+  <script src="/js/lib/command-bus.js"></script>
+  <script src="/js/lib/deps.js"></script>
+  <script src="/js/dominio/resultado.js"></script>
+  <script src="/js/dominio/dinero.js"></script>
+  <script src="/js/dominio/cantidad.js"></script>
+  <script src="/js/dominio/direccion.js"></script>
+  <script src="/js/dominio/pedido.js"></script>
+  <script src="/js/dominio/delivery.js"></script>
+  <script src="/js/dominio/ingrediente.js"></script>
+  <script src="/js/db-core.js"></script>
+  <script src="/js/repositorios/pedido-repository.js"></script>
+  <script src="/js/comandos/crear-pedido-mesa.js"></script>
+  <script src="/js/comandos/enviar-comanda.js"></script>
+  <script src="/js/comandos/agregar-mesa.js"></script>
+  <script src="/js/comandos/liberar-mesa.js"></script>
+  <script src="/js/comandos/completar-subcomanda.js"></script>
+  <script src="/js/auth.js"></script>
+
+  <script>
+    (function() {
+      var resultsEl = document.getElementById('results');
+      var passed = 0, failed = 0;
+
+      function assert(condition, msg) {
+        if (condition) {
+          passed++;
+          resultsEl.innerHTML += '<div class="test pass">✔ ' + msg + '</div>';
+        } else {
+          failed++;
+          resultsEl.innerHTML += '<div class="test fail">✘ ' + msg + '</div>';
+        }
+      }
+
+      window.showToast = function(){};
+
+      async function runTests() {
+        Logger.setLevel('ERROR');
+
+        // ── Configurar entorno base ──────────────────────
+        if (!window.DB) { window.DB = {}; }
+        DB.config = { zonas: [{ nombre: 'salon', cantidad: 5 }] };
+        DB.pedidos = [];
+        DB.comandas = [];
+        DB.mesas = [
+          { numero: 1, estado: 'libre', zona: 'salon', items: [], mozo: '', comensales: 1, abiertaEn: null, observaciones: '', pedidoId: null, esVirtual: false },
+          { numero: 2, estado: 'libre', zona: 'salon', items: [], mozo: '', comensales: 1, abiertaEn: null, observaciones: '', pedidoId: null, esVirtual: false }
+        ];
+        DB.mozos = [{ id: 'mozo_1', nombre: 'Trini', activo: true }];
+        DB.saveMesas = function() {};
+        DB.savePedidos = function() {};
+        DB.saveComandas = function() {};
+        DB.getMesa = function(num) { return DB.mesas.find(function(m) { return m.numero == num; }); };
+        DB.crearPedido = async function(mesa, mozo, comensales) {
+          var nuevo = {
+            id: 'ped_' + Date.now(), mesa: mesa, mozo: mozo, comensales: comensales,
+            estado: 'abierta', items: '[]', total: 0,
+            created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+          };
+          DB.pedidos.push(nuevo);
+          return nuevo;
+        };
+        DB.syncGuardarPedido = async function() { return true; };
+        DB.actualizarPedido = async function(id, cambios) {
+          var idx = DB.pedidos.findIndex(function(p) { return p.id === id; });
+          if (idx >= 0) { DB.pedidos[idx] = Object.assign({}, DB.pedidos[idx], cambios); }
+          return DB.pedidos[idx];
+        };
+        DB._encolarOperacion = function() {};
+
+        Deps.registrar('pedidoRepo', PedidoRepositoryLocal);
+
+        window.PedidoManager = {
+          getTurnoActual: function() { return { id: 'turno_test', estado: 'abierto' }; },
+          registrar: function() {}
+        };
+
+        Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
+
+        // ── Suite 1: Comando agregarMesa ─────────────────
+        resultsEl.innerHTML += '<div class="suite"><h2>Comando: agregarMesa</h2></div>';
+        var result = await CommandBus.ejecutar({ type: 'agregarMesa', datos: { numero: 3, zona: 'salon' } });
+        assert(result.exito === true, 'agregarMesa: crea mesa 3 exitosamente');
+        var mesa3 = DB.mesas.find(function(m) { return m.numero === 3; });
+        assert(!!mesa3, 'agregarMesa: mesa 3 existe en DB');
+        assert(mesa3.estado === 'libre', 'agregarMesa: mesa 3 está libre');
+
+        // ── Suite 2: Comando crearPedidoMesa ──────────────
+        resultsEl.innerHTML += '<div class="suite"><h2>Comando: crearPedidoMesa</h2></div>';
+        var resultFallo = await CommandBus.ejecutar({ type: 'crearPedidoMesa', datos: { numeroMesa: 99, mozo: 'Test', comensales: 2 } });
+        assert(!resultFallo.exito, 'crearPedidoMesa: falla si mesa no existe');
+        var resultOk = await CommandBus.ejecutar({ type: 'crearPedidoMesa', datos: { numeroMesa: 1, mozo: 'Trini', comensales: 2 } });
+        assert(resultOk.exito === true, 'crearPedidoMesa: crea pedido en mesa 1');
+        var mesa1 = DB.mesas.find(function(m) { return m.numero === 1; });
+        assert(mesa1.estado === 'ocupada', 'crearPedidoMesa: mesa 1 pasa a ocupada');
+        assert(mesa1.pedidoId !== null, 'crearPedidoMesa: mesa 1 tiene pedidoId');
+
+        // ── Suite 3: Comando liberarMesa ──────────────────
+        resultsEl.innerHTML += '<div class="suite"><h2>Comando: liberarMesa</h2></div>';
+        var resultLiberar = await CommandBus.ejecutar({ type: 'liberarMesa', datos: { numeroMesa: 1 } });
+        assert(resultLiberar.exito === true, 'liberarMesa: libera mesa 1');
+        var mesa1libre = DB.mesas.find(function(m) { return m.numero === 1; });
+        assert(mesa1libre.estado === 'libre', 'liberarMesa: mesa 1 vuelve a libre');
+
+        // ── Suite 4: Comando enviarComanda ────────────────
+        resultsEl.innerHTML += '<div class="suite"><h2>Comando: enviarComanda</h2></div>';
+        var mesa2 = DB.mesas.find(function(m) { return m.numero === 2; });
+        mesa2.items = [{ prodId: 'prod_test', nombre: 'Hamburguesa', precio: 1500, destino: 'cocina', qty: 1, obs: '', enviado: false, persona: 'General' }];
+        var pedidoMock = { id: 'ped_test', mesa: 2, mozo: 'Trini', comensales: 2, estado: 'abierta', items: JSON.stringify(mesa2.items), total: 1500, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+        DB.pedidos.push(pedidoMock);
+        mesa2.pedidoId = 'ped_test';
+        mesa2.estado = 'ocupada';
+
+        Deps.registrar('inventarioService', { validarStockParaItems: function() { return { ok: true, faltantes: [] }; } });
+
+        var resultEnviar = await CommandBus.ejecutar({ type: 'enviarComanda', datos: { mesa: mesa2, mozo: 'Trini', comensales: 2, observaciones: '', itemsPendientes: mesa2.items } });
+        assert(resultEnviar.exito === true, 'enviarComanda: envío exitoso');
+        assert(DB.comandas.length === 1, 'enviarComanda: se creó 1 comanda');
+        assert(DB.comandas[0].destino === 'cocina', 'enviarComanda: comanda destino cocina');
+
+        // ── Suite 5: Auth.registrarCliente ────────────────
+        resultsEl.innerHTML += '<div class="suite"><h2>Auth: registrarCliente</h2></div>';
+        localStorage.removeItem('pubpos_usuarios');
+        await Auth._cargarUsuarios();
+
+        var eventoRecibido = null;
+        function handler(data) { eventoRecibido = data; }
+        EventBus.on('cliente:cuenta_creada', handler);
+
+        var resultadoReg = await Auth.registrarCliente('testuser', 'testpass');
+        assert(resultadoReg.exito === true, 'Registro de cliente exitoso');
+        assert(resultadoReg.nombre === 'testuser', 'El nombre retornado es correcto');
+        assert(eventoRecibido !== null, 'Evento cliente:cuenta_creada fue emitido');
+        assert(eventoRecibido.nombre === 'testuser', 'Payload del evento contiene el nombre');
+        assert(typeof eventoRecibido.timestamp === 'number', 'Payload tiene timestamp');
+
+        EventBus.off('cliente:cuenta_creada', handler);
+
+        // ── Suite 6: Auth.getAppwriteUserId ────────────────
+        resultsEl.innerHTML += '<div class="suite"><h2>Auth: getAppwriteUserId (mock)</h2></div>';
+        if (typeof DBAppwrite === 'undefined') {
+          window.DBAppwrite = {};
+        }
+        var originalAccount = DBAppwrite.account;
+        DBAppwrite.account = {
+          get: async function() { return { $id: 'anon_12345' }; }
+        };
+
+        var userId = await Auth.getAppwriteUserId();
+        assert(userId === 'anon_12345', 'getAppwriteUserId retorna el ID mockeado');
+
+        var llamadoDeNuevo = false;
+        DBAppwrite.account.get = async function() { llamadoDeNuevo = true; return { $id: 'otro' }; };
+        var userId2 = await Auth.getAppwriteUserId();
+        assert(userId2 === 'anon_12345', 'Segunda llamada retorna el valor cacheado');
+        assert(!llamadoDeNuevo, 'No se volvió a llamar a account.get()');
+
+        DBAppwrite.account = originalAccount;
+
+        // ── Suite 7: Comando completarSubcomanda ──────────
+        resultsEl.innerHTML += '<div class="suite"><h2>Comando: completarSubcomanda</h2></div>';
+
+        // Mock fresco de DBAppwrite para este test
+        var comandaMock = {
+          id: 'com_sub_1',
+          estado: 'nueva',
+          destino: 'ambos',
+          subcomandas: null,
+          mesa: 10,
+          items: '[]'
+        };
+
+        // Guardar métodos originales
+        var originalListar = DBAppwrite.listar;
+        var originalActualizar = DBAppwrite.actualizar;
+
+        // Parchear métodos
+        DBAppwrite.listar = async function(col) {
+          if (col === 'comandas') return [comandaMock];
+          return [];
+        };
+        DBAppwrite.actualizar = async function(col, id, cambios) {
+          if (col === 'comandas' && id === 'com_sub_1') {
+            if (cambios.subcomandas !== undefined) {
+              comandaMock.subcomandas = cambios.subcomandas;
+            }
+            if (cambios.estado) {
+              comandaMock.estado = cambios.estado;
+            }
+            return Object.assign({}, comandaMock);
+          }
+          return null;
+        };
+
+        var eventosEmitidos = [];
+        function listenerComanda(data) { eventosEmitidos.push(data); }
+        EventBus.on('comanda:subcomanda_completada', listenerComanda);
+        EventBus.on('comanda:completada', listenerComanda);
+
+        // Marcar cocina
+        var res1 = await CommandBus.ejecutar({
+          type: 'completarSubcomanda',
+          datos: { idOriginal: 'com_sub_1', destino: 'cocina' }
+        });
+        assert(res1.exito === true, 'Subcomanda cocina completada exitosamente');
+        assert(res1.data.ambasListas === false, 'No están ambas listas aún');
+
+        // Marcar barra → debe completar la comanda
+        var res2 = await CommandBus.ejecutar({
+          type: 'completarSubcomanda',
+          datos: { idOriginal: 'com_sub_1', destino: 'barra' }
+        });
+        assert(res2.exito === true, 'Subcomanda barra completada exitosamente');
+        assert(res2.data.ambasListas === true, 'Ambas subcomandas están listas');
+
+        // Verificar estado final del mock
+        assert(comandaMock.estado === 'completada', 'Comanda principal en estado completada');
+
+        // Verificar eventos emitidos
+        assert(eventosEmitidos.length === 3, 'Se emitieron exactamente 3 eventos');
+        var eventosSubcomanda = eventosEmitidos.filter(function(e) { return e.destino && !e.mesa; });
+        var eventosCompletada = eventosEmitidos.filter(function(e) { return e.mesa === 10; });
+        assert(eventosSubcomanda.length === 2, '2 eventos de subcomanda');
+        assert(eventosCompletada.length === 1, '1 evento de comanda completada');
+
+        // Restaurar métodos originales
+        DBAppwrite.listar = originalListar;
+        DBAppwrite.actualizar = originalActualizar;
+        EventBus.off('comanda:subcomanda_completada', listenerComanda);
+        EventBus.off('comanda:completada', listenerComanda);
+
+        // ── Suite 8: Normalización de productos con campo disponible ──
+        resultsEl.innerHTML += '<div class="suite"><h2>Normalización: producto.disponible</h2></div>';
+        var prod1 = DBCore._normalizarProducto({ nombre: 'Test', precio: 100 });
+        assert(prod1.disponible === true, 'Producto sin campo disponible → por defecto true');
+
+        var prod2 = DBCore._normalizarProducto({ nombre: 'Test2', precio: 200, disponible: false });
+        assert(prod2.disponible === false, 'Producto con disponible=false se respeta');
+
+        var prod3 = DBCore._normalizarProducto({ nombre: 'Test3', precio: 300, disponible: true });
+        assert(prod3.disponible === true, 'Producto con disponible=true se respeta');
+
+        // ── Suite 9: Normalización de mesas con campo permite_prepedidos ──
+        resultsEl.innerHTML += '<div class="suite"><h2>Normalización: mesa.permite_prepedidos</h2></div>';
+        var mesaA = DBCore._normalizarMesa({ numero: 1 });
+        assert(mesaA.permite_prepedidos === false, 'Mesa sin campo → por defecto false');
+
+        var mesaB = DBCore._normalizarMesa({ numero: 2, permite_prepedidos: true });
+        assert(mesaB.permite_prepedidos === true, 'Mesa con permite_prepedidos=true se respeta');
+
+        var mesaC = DBCore._normalizarMesa({ numero: 3, permite_prepedidos: false });
+        assert(mesaC.permite_prepedidos === false, 'Mesa con permite_prepedidos=false se respeta');
+
+        // ── Suite 10: Fábrica mesaVacia incluye permite_prepedidos ──
+        resultsEl.innerHTML += '<div class="suite"><h2>Fábrica: mesaVacia con permite_prepedidos</h2></div>';
+        var nueva = mesaVacia(50, 'salon');
+        assert(nueva.permite_prepedidos === false, 'mesaVacia crea mesa con permite_prepedidos=false');
+
+        // ── Resumen ──────────────────────────────────────
+        resultsEl.innerHTML += '<div class="summary">' + passed + ' pasaron, ' + failed + ' fallaron</div>';
+        if (failed === 0) {
+          resultsEl.innerHTML += '<div class="test pass">✔ Todos los tests del Core pasaron.</div>';
+        }
+      }
+
+      window.addEventListener('load', function() {
+        runTests().catch(function(e) {
+          resultsEl.innerHTML += '<div class="error">Error en tests: ' + e.message + '</div>';
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

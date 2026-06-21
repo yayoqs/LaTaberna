@@ -79,6 +79,18 @@
 .kds-time { font-size: 11px; color: var(--color-text-muted); }
 .kds-time.urgente { color: var(--color-danger); font-weight: 700; }
 
+/* ── GRUPO ─────────────────────────────────────────────────── */
+.kds-grupo-tag {
+  font-size: 10px;
+  background: rgba(139,92,246,.15);
+  color: #c4b5fd;
+  padding: 2px 8px;
+  border-radius: 99px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 /* ── LISTA DE ÍTEMS ────────────────────────────────────────── */
 .kds-items {
   padding: 12px 14px;
@@ -106,7 +118,7 @@
   font-size: 13px;
   flex-shrink: 0;
 }
-.kds-item-name  { font-weight: 500; flex: 1; }
+.kds-item-name  { font-weight: 500; flex: 1; display: flex; align-items: center; gap: 6px; }
 .kds-item-obs   { font-size: 11px; color: var(--color-warning); margin-top: 2px; }
 
 /* Observación general */
@@ -115,6 +127,28 @@
   font-size: 11px;
   color: var(--color-warning);
   font-style: italic;
+}
+
+/* ── BOTÓN DE PÁNICO ───────────────────────────────────────── */
+.kds-panico-btn {
+  background: transparent;
+  border: 1px solid var(--color-danger);
+  color: var(--color-danger);
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  font-size: 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin-left: 4px;
+  transition: all 0.15s;
+}
+.kds-panico-btn:hover {
+  background: var(--color-danger);
+  color: #fff;
 }
 
 /* ── FOOTER / ACCIONES ─────────────────────────────────────── */
@@ -176,20 +210,37 @@
 }
 .kds-empty i { font-size: 48px; opacity: .2; }
 .kds-empty-title { font-size: 16px; font-weight: 700; color: var(--color-text-sec); }
-/* =============================================================== */
 
-/* ── ESTILO PARA RECETA DENTRO DE KDS ─────────────────────── */
-.kds-item details summary {
-  cursor: pointer;
-  color: var(--color-accent);
-  font-weight: 600;
-  font-size: 11px;
-  margin-top: 2px;
-}
-.kds-item details ul {
-  margin: 4px 0 0 16px;
-  padding: 0;
-  list-style-type: disc;
-  font-size: 11px;
-  color: var(--color-text-sec);
+/* ── VISTA COMPACTA (tablets ≤ 600px) ──────────────────────── */
+@media (max-width: 600px) {
+  .kds-grid {
+    grid-template-columns: 1fr;
+    padding: 12px;
+    gap: 10px;
+  }
+  .kds-header {
+    padding: 8px 10px;
+  }
+  .kds-mesa {
+    font-size: 14px;
+  }
+  .kds-items {
+    padding: 8px 10px;
+    gap: 5px;
+  }
+  .kds-item {
+    font-size: 12px;
+  }
+  .kds-qty {
+    width: 22px;
+    height: 22px;
+    font-size: 11px;
+  }
+  .kds-btn {
+    padding: 6px;
+    font-size: 11px;
+  }
+  .kds-footer {
+    padding: 8px 10px;
+  }
 }

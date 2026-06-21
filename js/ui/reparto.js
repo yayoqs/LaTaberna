@@ -1,11 +1,14 @@
 /* ================================================================
-   Raíz — MÓDULO: reparto.js (v4.1 – corrección items.map)
+   Raíz — MÓDULO: reparto.js (v5.0 – mejoras: filtro por estado,
+   edición de ítems, prevención de duplicación de comandas)
    ================================================================ */
 const Reparto = (() => {
-  let _deliveryFlags = {};
+  let _estadoFiltro = 'todos';
+  let _itemsTemporales = [];
+  let _productoSeleccionado = null;
 
   function _asegurarVista() {
-    if ($id('view-reparto')) return;
+    if (document.getElementById('view-reparto')) return;
     const main = document.createElement('main');
     main.id = 'view-reparto';
     main.className = 'view';
@@ -13,6 +16,13 @@ const Reparto = (() => {
       <div class="view-toolbar">
         <h2><i class="fas fa-motorcycle"></i> Reparto — Pedidos de Delivery</h2>
         <div class="toolbar-actions">
+          <select id="repartoEstadoFilter" onchange="Reparto.filtrarPorEstado(this.value)">
+            <option value="todos">Todos los estados</option>
+            <option value="pendiente">Pendiente</option>
+            <option value="en_preparacion">En preparación</option>
+            <option value="en_camino">En camino</option>
+            <option value="entregado">Entregado</option>
+          </select>
           <button class="btn-primary" onclick="Reparto.mostrarModalNuevo()">
             <i class="fas fa-plus"></i> Nuevo Pedido
           </button>
@@ -25,25 +35,26 @@ const Reparto = (() => {
         </table>
       </div>
     `;
-    const referencia = $id('toastContainer') || document.body.lastChild;
+    const referencia = document.getElementById('toastContainer') || document.body.lastChild;
     document.body.insertBefore(main, referencia);
   }
 
-  /**
-   * Renderiza la tabla de pedidos de delivery desde el Store.
-   */
   function render() {
     _asegurarVista();
-    const tbody = $id('repartoBody'); if (!tbody) return;
-    const pedidos = Store.getState().pedidosDelivery || [];
-    const pedidosValidos = pedidos.filter(p => p && p.id);
-    if (!pedidosValidos.length) {
+    const tbody = document.getElementById('repartoBody'); if (!tbody) return;
+    let pedidos = Store.getState().pedidosDelivery || [];
+    pedidos = pedidos.filter(p => p && p.id);
+
+    if (_estadoFiltro !== 'todos') {
+      pedidos = pedidos.filter(p => p.estado === _estadoFiltro);
+    }
+
+    if (!pedidos.length) {
       tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--color-text-muted);">No hay pedidos de delivery.</td></tr>`;
       return;
     }
-    const ordenados = [...pedidosValidos].sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+    const ordenados = [...pedidos].sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
     tbody.innerHTML = ordenados.map(p => {
-      // Normalizar items: puede ser string JSON, array, o undefined
       var items = p.items;
       if (typeof items === 'string') {
         try { items = JSON.parse(items); } catch (e) { items = []; }
@@ -53,15 +64,16 @@ const Reparto = (() => {
 
       const badgeClase = { pendiente:'warning', en_preparacion:'info', en_camino:'accent', entregado:'success' }[p.estado] || 'default';
 
-      const estaListo = _deliveryFlags[p.id]?.listoParaRecoger === true;
-      const estadoMostrado = estaListo && p.estado === 'en_preparacion' ? 'listo' : p.estado;
-      const badgeExtra = estaListo && p.estado === 'en_preparacion' ? ' <span class="badge success" style="margin-left:4px;">✓ Listo</span>' : '';
+      let btnEditar = '';
+      if (p.estado === 'pendiente') {
+        btnEditar = `<button class="btn-ajuste" onclick="Reparto.editarItems('${p.id}')"><i class="fas fa-edit"></i> Editar</button>`;
+      }
 
       let botones = '';
       if (p.estado === 'pendiente') {
         botones += `<button class="btn-ajuste" onclick="Reparto.enviarACocina('${p.id}')"><i class="fas fa-fire-burner"></i> Enviar a Cocina</button>`;
       } else if (p.estado === 'en_preparacion') {
-        botones += `<button class="btn-ajuste" onclick="Reparto.despachar('${p.id}')"><i class="fas fa-motorcycle"></i> ${estaListo ? 'Despachar ahora' : 'En camino'}</button>`;
+        botones += `<button class="btn-ajuste" onclick="Reparto.despachar('${p.id}')"><i class="fas fa-motorcycle"></i> En camino</button>`;
       } else if (p.estado === 'en_camino') {
         botones += `<button class="btn-ajuste" onclick="Reparto.confirmarEntrega('${p.id}')"><i class="fas fa-check"></i> Entregado</button>`;
       }
@@ -73,21 +85,23 @@ const Reparto = (() => {
         <td>${p.telefono||'—'}</td>
         <td style="font-size:12px;">${resumen}</td>
         <td>${fmtMoney(p.total)}</td>
-        <td><span class="badge ${badgeClase}">${estadoMostrado.replace('_',' ')}</span>${badgeExtra}</td>
+        <td><span class="badge ${badgeClase}">${p.estado.replace('_',' ')}</span></td>
         <td>${p.repartidor||'—'}</td>
-        <td>${botones}</td>
+        <td>${btnEditar} ${botones}</td>
       </tr>`;
     }).join('');
   }
 
-  let _itemsTemporales = [];
-  let _productoSeleccionado = null;
+  function filtrarPorEstado(estado) {
+    _estadoFiltro = estado;
+    render();
+  }
 
   /** Muestra el modal para crear un nuevo pedido de delivery */
   function mostrarModalNuevo() {
     _itemsTemporales = [];
     _productoSeleccionado = null;
-    let modal = $id('modalReparto');
+    let modal = document.getElementById('modalReparto');
     if (!modal) {
       modal = document.createElement('div');
       modal.id = 'modalReparto';
@@ -111,22 +125,22 @@ const Reparto = (() => {
         </div>`;
       document.body.appendChild(modal);
     }
-    $id('repDireccion').value = '';
-    $id('repTelefono').value = '';
-    $id('repTotal').value = '0';
-    $id('repRepartidor').value = '';
-    $id('repObservaciones').value = '';
-    $id('repBusquedaProducto').value = '';
-    $id('repCantidad').value = 1;
-    $id('repResultadosBusqueda').style.display = 'none';
+    document.getElementById('repDireccion').value = '';
+    document.getElementById('repTelefono').value = '';
+    document.getElementById('repTotal').value = '0';
+    document.getElementById('repRepartidor').value = '';
+    document.getElementById('repObservaciones').value = '';
+    document.getElementById('repBusquedaProducto').value = '';
+    document.getElementById('repCantidad').value = 1;
+    document.getElementById('repResultadosBusqueda').style.display = 'none';
     _renderItemsTemporales();
     modal.style.display = 'flex';
   }
 
-  function cerrarModalNuevo() { const modal=$id('modalReparto'); if(modal) modal.style.display='none'; }
+  function cerrarModalNuevo() { const modal=document.getElementById('modalReparto'); if(modal) modal.style.display='none'; }
 
   function _filtrarProductos() {
-    const input=$id('repBusquedaProducto'), res=$id('repResultadosBusqueda');
+    const input=document.getElementById('repBusquedaProducto'), res=document.getElementById('repResultadosBusqueda');
     if(!input||!res) return;
     const term = input.value.trim().toLowerCase();
     if(!term) { res.style.display='none'; _productoSeleccionado=null; return; }
@@ -137,31 +151,31 @@ const Reparto = (() => {
 
   function _seleccionarProducto(el) {
     _productoSeleccionado = { id:el.dataset.id, nombre:el.dataset.nombre, precio:parseFloat(el.dataset.precio) };
-    $id('repBusquedaProducto').value = el.dataset.nombre;
-    $id('repResultadosBusqueda').style.display = 'none';
-    $id('repCantidad').focus();
+    document.getElementById('repBusquedaProducto').value = el.dataset.nombre;
+    document.getElementById('repResultadosBusqueda').style.display = 'none';
+    document.getElementById('repCantidad').focus();
   }
 
   function _agregarItemAlPedido() {
     if (!_productoSeleccionado) { showToast('warning','Selecciona un producto'); return; }
-    const cant = parseInt($id('repCantidad')?.value) || 1;
+    const cant = parseInt(document.getElementById('repCantidad')?.value) || 1;
     if (cant<=0) { showToast('warning','Cantidad inválida'); return; }
     const prod = DB.productos.find(p=>p.id===_productoSeleccionado.id);
     if(!prod) return;
     const existente = _itemsTemporales.find(it=>it.prodId===prod.id);
     if(existente) existente.qty += cant;
     else _itemsTemporales.push({ prodId:prod.id, nombre:prod.nombre, precio:prod.precio, qty:cant });
-    $id('repBusquedaProducto').value=''; _productoSeleccionado=null; $id('repCantidad').value=1; $id('repBusquedaProducto').focus();
+    document.getElementById('repBusquedaProducto').value=''; _productoSeleccionado=null; document.getElementById('repCantidad').value=1; document.getElementById('repBusquedaProducto').focus();
     _renderItemsTemporales();
   }
 
   function _quitarItemTemporal(idx) { _itemsTemporales.splice(idx,1); _renderItemsTemporales(); }
 
   function _renderItemsTemporales() {
-    const container=$id('repItemsLista'); if(!container) return;
-    if(!_itemsTemporales.length) { container.innerHTML='<p style="color:var(--color-text-muted);font-size:12px;">Sin productos agregados.</p>'; $id('repTotal').value='0'; return; }
+    const container=document.getElementById('repItemsLista'); if(!container) return;
+    if(!_itemsTemporales.length) { container.innerHTML='<p style="color:var(--color-text-muted);font-size:12px;">Sin productos agregados.</p>'; document.getElementById('repTotal').value='0'; return; }
     const total=_itemsTemporales.reduce((sum,it)=>sum+it.precio*(it.qty||1),0);
-    $id('repTotal').value=total.toFixed(2);
+    document.getElementById('repTotal').value=total.toFixed(2);
     container.innerHTML=_itemsTemporales.map((it,idx)=>`
       <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--color-panel);border-radius:var(--radius-xs);font-size:12px;">
         <span style="flex:1;"><strong>${it.qty||1}x</strong> ${it.nombre}</span>
@@ -172,7 +186,10 @@ const Reparto = (() => {
 
   /** Guarda el nuevo pedido de delivery */
   async function guardarNuevoPedido() {
-    const dir = $val('repDireccion'), tel = $val('repTelefono'), rep = $val('repRepartidor'), obs = $val('repObservaciones');
+    const dir = document.getElementById('repDireccion').value.trim();
+    const tel = document.getElementById('repTelefono').value.trim();
+    const rep = document.getElementById('repRepartidor').value.trim();
+    const obs = document.getElementById('repObservaciones').value.trim();
     if(!dir) { showToast('error','Dirección obligatoria'); return; }
     if(!_itemsTemporales.length) { showToast('error','Agrega al menos un producto'); return; }
     const itemsListos = _itemsTemporales.map(it=>({ nombre:it.nombre, precio:it.precio, qty:it.qty||1 }));
@@ -202,8 +219,16 @@ const Reparto = (() => {
     }
   }
 
-  /** Envía un pedido de delivery a cocina */
+  /** Envía un pedido de delivery a cocina (con prevención de duplicado) */
   async function enviarACocina(deliveryId) {
+    if (typeof DB !== 'undefined' && DB.comandas) {
+      const existeComanda = DB.comandas.find(c => c.deliveryId === deliveryId);
+      if (existeComanda) {
+        showToast('warning', 'Este pedido ya tiene una comanda en cocina.');
+        return;
+      }
+    }
+
     if(typeof DeliveryService!=='undefined' && DeliveryService.enviarACocina) {
       const r = await DeliveryService.enviarACocina(deliveryId);
       if(r.exito) {
@@ -262,7 +287,6 @@ const Reparto = (() => {
     if(typeof DeliveryService!=='undefined' && DeliveryService.despachar) {
       const r = await DeliveryService.despachar(deliveryId);
       if(r.exito) {
-        delete _deliveryFlags[deliveryId];
         DB.actualizarPedidoDelivery(deliveryId,{estado:'en_camino'});
         showToast('success','En camino');
         return;
@@ -271,7 +295,6 @@ const Reparto = (() => {
       return;
     }
     DB.actualizarPedidoDelivery(deliveryId,{estado:'en_camino'});
-    delete _deliveryFlags[deliveryId];
     showToast('success','En camino');
   }
 
@@ -301,11 +324,152 @@ const Reparto = (() => {
     showToast('warning','Eliminado');
   }
 
-  function _onDeliveryListo(data) {
-    if (!data || !data.deliveryId) return;
-    _deliveryFlags[data.deliveryId] = { listoParaRecoger: true };
-    Logger.info(`[Reparto] Delivery ${data.deliveryId} marcado como listo.`);
+  /** Permite editar los ítems de un pedido pendiente */
+  function editarItems(deliveryId) {
+    const ped = (Store.getState().pedidosDelivery || []).find(p => p.id === deliveryId);
+    if (!ped || ped.estado !== 'pendiente') {
+      showToast('error', 'Solo se pueden editar pedidos pendientes');
+      return;
+    }
+
+    _itemsTemporales = (ped.items || []).map(it => ({
+      prodId: it.prodId || '',
+      nombre: it.nombre,
+      precio: it.precio,
+      qty: it.qty || 1
+    }));
+    _productoSeleccionado = null;
+
+    let modal = document.getElementById('modalEditarItems');
+    if (!modal) {
+      modal = document.createElement('div');
+      modal.id = 'modalEditarItems';
+      modal.className = 'modal-overlay';
+      modal.style.display = 'none';
+      modal.innerHTML = `
+        <div class="modal-small" style="max-width:520px;">
+          <div class="modal-header"><h3>Editar ítems del pedido</h3><button class="modal-close" onclick="Reparto.cerrarEditarItems()"><i class="fas fa-times"></i></button></div>
+          <div class="modal-small-body">
+            <label>Productos</label>
+            <div style="position:relative;"><input type="text" id="editBusquedaProducto" placeholder="Buscar producto..." autocomplete="off" oninput="Reparto._filtrarProductosEdicion()" style="width:100%;"><div id="editResultadosBusqueda" style="position:absolute;top:100%;left:0;right:0;background:var(--color-panel);border:1px solid var(--color-border);border-radius:var(--radius-sm);z-index:10;max-height:200px;overflow-y:auto;display:none;"></div></div>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:8px;"><input type="number" id="editCantidad" value="1" min="1" style="width:70px;" onkeydown="if(event.key==='Enter'){event.preventDefault();Reparto._agregarItemEdicion();}"><button class="btn-secondary" onclick="Reparto._agregarItemEdicion()"><i class="fas fa-plus"></i> Agregar</button></div>
+            <div id="editItemsLista" style="display:flex;flex-direction:column;gap:6px;margin-top:8px;"></div>
+            <label>Total ($)</label><input type="number" id="editTotal" step="0.01" value="0" readonly style="font-weight:700;background:var(--color-panel);">
+            <div class="modal-small-footer"><button class="btn-secondary" onclick="Reparto.cerrarEditarItems()">Cancelar</button><button class="btn-primary" onclick="Reparto.guardarEdicionItems('${deliveryId}')"><i class="fas fa-save"></i> Guardar cambios</button></div>
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+    }
+
+    document.getElementById('editBusquedaProducto').value = '';
+    document.getElementById('editCantidad').value = 1;
+    document.getElementById('editResultadosBusqueda').style.display = 'none';
+    _productoSeleccionado = null;
+    _renderItemsEdicion();
+    modal.style.display = 'flex';
   }
+
+  function cerrarEditarItems() {
+    const modal = document.getElementById('modalEditarItems');
+    if (modal) modal.style.display = 'none';
+  }
+
+  function _filtrarProductosEdicion() {
+    const input = document.getElementById('editBusquedaProducto');
+    const res = document.getElementById('editResultadosBusqueda');
+    if (!input || !res) return;
+    const term = input.value.trim().toLowerCase();
+    if (!term) { res.style.display = 'none'; _productoSeleccionado = null; return; }
+    const prod = DB.productos.filter(p => p.activo !== false && p.nombre.toLowerCase().includes(term));
+    if (prod.length === 0) {
+      res.innerHTML = '<div style="padding:8px;color:var(--color-text-muted);">Sin resultados</div>';
+      res.style.display = 'block';
+      _productoSeleccionado = null;
+    } else {
+      res.innerHTML = prod.map(p => `<div class="resultado-item" data-id="${p.id}" data-nombre="${p.nombre}" data-precio="${p.precio}" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--color-border);" onclick="Reparto._seleccionarProductoEdicion(this)"><strong>${p.nombre}</strong> <span style="float:right;color:var(--color-accent);">${fmtMoney(p.precio)}</span></div>`).join('');
+      res.style.display = 'block';
+    }
+  }
+
+  function _seleccionarProductoEdicion(el) {
+    _productoSeleccionado = {
+      id: el.dataset.id,
+      nombre: el.dataset.nombre,
+      precio: parseFloat(el.dataset.precio)
+    };
+    document.getElementById('editBusquedaProducto').value = el.dataset.nombre;
+    document.getElementById('editResultadosBusqueda').style.display = 'none';
+    document.getElementById('editCantidad').focus();
+  }
+
+  function _agregarItemEdicion() {
+    if (!_productoSeleccionado) { showToast('warning', 'Selecciona un producto'); return; }
+    const cant = parseInt(document.getElementById('editCantidad')?.value) || 1;
+    if (cant <= 0) { showToast('warning', 'Cantidad inválida'); return; }
+    const prod = DB.productos.find(p => p.id === _productoSeleccionado.id);
+    if (!prod) return;
+    const existente = _itemsTemporales.find(it => it.prodId === prod.id);
+    if (existente) existente.qty += cant;
+    else _itemsTemporales.push({ prodId: prod.id, nombre: prod.nombre, precio: prod.precio, qty: cant });
+    document.getElementById('editBusquedaProducto').value = '';
+    document.getElementById('editCantidad').value = 1;
+    _productoSeleccionado = null;
+    _renderItemsEdicion();
+  }
+
+  function _quitarItemEdicion(idx) {
+    _itemsTemporales.splice(idx, 1);
+    _renderItemsEdicion();
+  }
+
+  function _renderItemsEdicion() {
+    const container = document.getElementById('editItemsLista');
+    if (!container) return;
+    if (!_itemsTemporales.length) {
+      container.innerHTML = '<p style="color:var(--color-text-muted);font-size:12px;">Sin productos.</p>';
+      document.getElementById('editTotal').value = '0';
+      return;
+    }
+    const total = _itemsTemporales.reduce((sum, it) => sum + it.precio * (it.qty || 1), 0);
+    document.getElementById('editTotal').value = total.toFixed(2);
+    container.innerHTML = _itemsTemporales.map((it, idx) => `
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--color-panel);border-radius:var(--radius-xs);font-size:12px;">
+        <span style="flex:1;"><strong>${it.qty || 1}x</strong> ${it.nombre}</span>
+        <span style="font-weight:600;">${fmtMoney(it.precio * (it.qty || 1))}</span>
+        <button class="btn-icon-sm del" onclick="Reparto._quitarItemEdicion(${idx})"><i class="fas fa-times"></i></button>
+      </div>`).join('');
+  }
+
+  async function guardarEdicionItems(deliveryId) {
+    if (!_itemsTemporales.length) { showToast('error', 'Agrega al menos un producto'); return; }
+    const nuevosItems = _itemsTemporales.map(it => ({
+      nombre: it.nombre,
+      precio: it.precio,
+      qty: it.qty || 1
+    }));
+    const total = nuevosItems.reduce((sum, i) => sum + i.precio * i.qty, 0);
+
+    try {
+      if (typeof DeliveryService !== 'undefined' && DeliveryService.actualizarItems) {
+        const res = await DeliveryService.actualizarItems(deliveryId, nuevosItems, total);
+        if (res.exito) {
+          cerrarEditarItems();
+          showToast('success', 'Ítems actualizados');
+          return;
+        }
+      }
+      // Fallback local
+      DB.actualizarPedidoDelivery(deliveryId, { items: nuevosItems, total });
+      cerrarEditarItems();
+      showToast('success', 'Ítems actualizados');
+    } catch (e) {
+      showToast('error', 'Error al actualizar ítems');
+    }
+  }
+
+  // Helpers para tests
+  function _getItemsTemporales() { return _itemsTemporales; }
+  function _setItemsTemporales(items) { _itemsTemporales = items; }
 
   function _initListeners() {
     Store.subscribe((state, action) => {
@@ -319,13 +483,13 @@ const Reparto = (() => {
     EventBus.on('vista:cambiada', (vista) => {
       if (vista === 'reparto') render();
     });
-    EventBus.on('delivery:listo', _onDeliveryListo);
   }
 
   _initListeners();
 
   return {
     render,
+    filtrarPorEstado,
     mostrarModalNuevo,
     cerrarModalNuevo,
     guardarNuevoPedido,
@@ -336,7 +500,16 @@ const Reparto = (() => {
     enviarACocina,
     despachar,
     confirmarEntrega,
-    eliminarPedido
+    eliminarPedido,
+    editarItems,
+    cerrarEditarItems,
+    _filtrarProductosEdicion,
+    _seleccionarProductoEdicion,
+    _agregarItemEdicion,
+    _quitarItemEdicion,
+    guardarEdicionItems,
+    _getItemsTemporales,
+    _setItemsTemporales
   };
 })();
 

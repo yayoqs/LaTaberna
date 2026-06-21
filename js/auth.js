@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: auth.js (v7.0 – hashing SHA‑256 + español neutro)
+   PubPOS — MÓDULO: auth.js (v7.2 – getAppwriteUserId + init sin login)
    ================================================================ */
 const Auth = (() => {
   // ── CONFIGURACIÓN INICIAL SOLO PARA PRIMER ARRANQUE ────────
@@ -25,11 +25,6 @@ const Auth = (() => {
   let _rolSimulado = null;
 
   // ── HASHING ────────────────────────────────────────────────
-  /**
-   * Calcula el hash SHA-256 de un texto.
-   * @param {string} texto
-   * @returns {Promise<string>} hash en hexadecimal
-   */
   async function _sha256(texto) {
     const encoder = new TextEncoder();
     const data = encoder.encode(texto);
@@ -39,10 +34,6 @@ const Auth = (() => {
   }
 
   // ── INICIALIZACIÓN DE USUARIOS ────────────────────────────
-  /**
-   * Carga los usuarios desde localStorage. Si no hay, migra los
-   * usuarios por defecto y guarda sus hashes.
-   */
   async function _cargarUsuarios() {
     const guardados = localStorage.getItem('pubpos_usuarios');
     if (guardados) {
@@ -56,7 +47,6 @@ const Auth = (() => {
       }
     }
 
-    // Primera ejecución: hashear contraseñas por defecto
     Logger.info('[Auth] Creando usuarios iniciales con hash...');
     _usuarios = [];
     for (const u of USUARIOS_POR_DEFECTO) {
@@ -66,9 +56,6 @@ const Auth = (() => {
     localStorage.setItem('pubpos_usuarios', JSON.stringify(_usuarios));
   }
 
-  /**
-   * Guarda la lista de usuarios en localStorage.
-   */
   function _guardarUsuarios() {
     localStorage.setItem('pubpos_usuarios', JSON.stringify(_usuarios));
   }
@@ -79,9 +66,7 @@ const Auth = (() => {
     if (saved) {
       try { _usuarioActual = JSON.parse(saved); } catch { _usuarioActual = null; }
     }
-    if (!_usuarioActual) {
-      mostrarLogin();
-    } else {
+    if (_usuarioActual) {
       aplicarRestriccionesUI();
     }
   }
@@ -97,12 +82,6 @@ const Auth = (() => {
     return 'mesas';
   }
 
-  /**
-   * Inicia sesión verificando hash.
-   * @param {string} nombre
-   * @param {string} password
-   * @returns {Promise<boolean>}
-   */
   async function login(nombre, password) {
     const hashIngresado = await _sha256(password);
     const usuario = _usuarios.find(u => u.nombre === nombre && u.hash === hashIngresado);
@@ -140,6 +119,24 @@ const Auth = (() => {
     sessionStorage.removeItem('usuarioActual');
     document.querySelectorAll('[data-rol]').forEach(function(el) { el.style.display = 'none'; });
     mostrarLogin();
+  }
+
+  // ── ID DE USUARIO DE APPWRITE ──────────────────────────
+  let _appwriteUserId = null;
+
+  async function getAppwriteUserId() {
+    if (_appwriteUserId) return _appwriteUserId;
+    try {
+      if (typeof DBAppwrite !== 'undefined' && DBAppwrite.account) {
+        const account = await DBAppwrite.account.get();
+        _appwriteUserId = account.$id;
+        Logger.info('[Auth] ID de Appwrite obtenido:', _appwriteUserId);
+        return _appwriteUserId;
+      }
+    } catch (e) {
+      Logger.warn('[Auth] No se pudo obtener el ID de Appwrite:', e);
+    }
+    return null;
   }
 
   // ── MODAL DE LOGIN ──────────────────────────────────────
@@ -190,13 +187,7 @@ const Auth = (() => {
     if (passInput) passInput.value = '';
   }
 
-  // ── GESTIÓN DE CONTRASEÑAS (solo admin/master) ─────────────
-  /**
-   * Cambia la contraseña de un usuario (solo master/admin).
-   * @param {string} nombreUsuario
-   * @param {string} nuevaPassword
-   * @returns {Promise<boolean>}
-   */
+  // ── GESTIÓN DE CONTRASEÑAS ────────────────────────────
   async function cambiarPassword(nombreUsuario, nuevaPassword) {
     if (!esAdmin() && !esMasterReal()) {
       showToast('error', 'No tienes permiso para cambiar contraseñas');
@@ -214,8 +205,27 @@ const Auth = (() => {
     return true;
   }
 
-  // ── PERMISOS (se mantienen sin cambios) ──────────────────
+  // ── REGISTRO DE CLIENTE ──────────────────────────────────
+  async function registrarCliente(nombre, password) {
+    if (!nombre || !password) {
+      Logger.warn('[Auth] Intento de registro sin nombre o password');
+      return { exito: false, error: 'Nombre y contraseña requeridos' };
+    }
+    const existe = _usuarios.find(u => u.nombre === nombre);
+    if (existe) {
+      Logger.warn('[Auth] Registro fallido: el usuario ya existe:', nombre);
+      return { exito: false, error: 'El usuario ya existe' };
+    }
+    const hash = await _sha256(password);
+    const nuevoUsuario = { nombre, hash, rol: 'cliente' };
+    _usuarios.push(nuevoUsuario);
+    _guardarUsuarios();
+    Logger.info('[Auth] Cliente registrado:', nombre);
+    EventBus.emit('cliente:cuenta_creada', { nombre, timestamp: Date.now() });
+    return { exito: true, nombre };
+  }
 
+  // ── PERMISOS ──────────────────────────────────────────
   function getRolEfectivo() {
     if (_usuarioActual?.rol === 'master' && _rolSimulado) return _rolSimulado;
     if (_usuarioActual?.espacioActivoId) {
@@ -410,13 +420,14 @@ const Auth = (() => {
     _cambiarRolSimulado, getRolEfectivo, esMasterReal, aplicarRestriccionesUI,
     puedeAccederRecetas, puedeAccederReparto, puedeAccederMenu,
     puedeAccederEventos, puedeAccederPerfil,
-    cambiarPassword, _cargarUsuarios
+    cambiarPassword, _cargarUsuarios,
+    registrarCliente,
+    getAppwriteUserId
   };
 })();
 
 window.Auth = Auth;
 
-// Inicializar usuarios (async) cuando el DOM esté listo
 document.addEventListener('DOMContentLoaded', function() {
   Auth._cargarUsuarios().catch(function(e) {
     Logger.error('[Auth] Error al cargar usuarios:', e);

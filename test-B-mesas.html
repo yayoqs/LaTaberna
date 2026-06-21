@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test B — Mapa de Mesas (v6.5) – Micro-insignias y Long-Press</title>
+  <style>
+    body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
+    h1 { color: #f59e0b; }
+    .suite { margin-bottom: 24px; border-bottom: 1px solid #2e2e42; padding-bottom: 12px; }
+    .test { margin: 4px 0; padding: 4px 8px; border-radius: 4px; }
+    .pass { background: rgba(34,197,94,.2); }
+    .fail { background: rgba(239,68,68,.2); }
+    .summary { margin-top: 20px; font-weight: bold; }
+    .info { color: #94a3b8; font-size: 12px; margin: 2px 0; }
+    .error { color: #ef4444; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test B — Mapa de Mesas (v6.5) – Micro-insignias y Long-Press</h1>
+  <p class="info">Valida que las micro-insignias (tenedor/copa) se rendericen con colores segun estado y que el long-press despliegue el popover.</p>
+  <div id="results"></div>
+
+  <!-- Dependencias -->
+  <script src="/js/utils.js"></script>
+  <script src="/js/lib/logger.js"></script>
+  <script src="/js/lib/eventBus.js"></script>
+  <script src="/js/lib/store.js"></script>
+  <script src="/js/lib/command-bus.js"></script>
+  <script src="/js/lib/deps.js"></script>
+  <script src="/js/dominio/resultado.js"></script>
+  <script src="/js/dominio/dinero.js"></script>
+  <script src="/js/dominio/cantidad.js"></script>
+  <script src="/js/db-core.js"></script>
+  <script src="/js/db-inventario.js"></script>
+  <script src="/js/db-fusion.js"></script>
+  <script src="/js/db-shim.js"></script>
+  <script src="/js/db-appwrite.js"></script>
+  <script src="/js/db.js"></script>
+
+  <!-- Módulo a testear -->
+  <script src="/js/ui/mesas.js"></script>
+
+  <script>
+    (function() {
+      var resultsEl = document.getElementById('results');
+      var passed = 0, failed = 0;
+
+      function assert(condition, msg) {
+        if (condition) {
+          passed++;
+          resultsEl.innerHTML += '<div class="test pass">✔ ' + msg + '</div>';
+        } else {
+          failed++;
+          resultsEl.innerHTML += '<div class="test fail">✘ ' + msg + '</div>';
+        }
+      }
+
+      function esperar(ms) {
+        return new Promise(function(resolve) { setTimeout(resolve, ms); });
+      }
+
+      async function runTests() {
+        resultsEl.innerHTML = '';
+        Logger.setLevel('ERROR');
+
+        // ── Configurar entorno ──────────────────────────
+        DB.config = { zonas: [{ nombre: 'salon', cantidad: 5 }] };
+        DB.mozos = [{ id: 'm1', nombre: 'Carlos', activo: true }];
+        DB.mesas = [
+          { numero: 1, estado: 'ocupada', zona: 'salon', items: [], mozo: 'Carlos', comensales: 2, pedidoId: 'p1', esVirtual: false }
+        ];
+        DB.pedidos = [];
+        DB.comandas = [];
+        DB.saveMesas = function() {};
+        DB.saveComandas = function() {};
+        DB.fusionarMesas = function() { return null; };
+
+        window.Auth = window.Auth || {};
+        window.showToast = function() {};
+
+        // Mock del Store con comandas
+        var comandasStore = [];
+        var mesasStore = DB.mesas;
+
+        var originalGetState = Store.getState;
+        var originalDispatch = Store.dispatch;
+
+        Store.getState = function() {
+          var state = originalGetState.call(Store);
+          state.comandas = comandasStore;
+          state.mesas = mesasStore;
+          return state;
+        };
+        Store.dispatch = function(action) {
+          if (action.type.startsWith('MESA') || action.type.startsWith('MESAS')) {
+            // Simular cambios simples
+          }
+          originalDispatch.call(Store, action);
+        };
+
+        // Inicializar Store
+        Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: mesasStore });
+
+        // Crear vista
+        var main = document.createElement('main');
+        main.id = 'view-mesas';
+        main.className = 'view active';
+        main.innerHTML = '<div id="mesasGrid"></div><div id="popoverContainer"></div>';
+        document.body.appendChild(main);
+
+        Mesas.render();
+        await esperar(50);
+
+        // ── Suite 1: Micro-insignias visibles ───────────
+        resultsEl.innerHTML += '<div class="suite"><h2>1. Micro-insignias visibles</h2></div>';
+        var microCocina = document.querySelector('.micro-cocina');
+        var microBarra = document.querySelector('.micro-barra');
+        assert(!!microCocina, 'Aparece micro-insignia de cocina');
+        assert(!!microBarra, 'Aparece micro-insignia de barra');
+
+        // ── Suite 2: Colores segun estado ────────────────
+        resultsEl.innerHTML += '<div class="suite"><h2>2. Colores segun estado de comandas</h2></div>';
+
+        // Sin comandas: ambos deben ser gris (#9ca3af)
+        var colorCocina = microCocina.style.background;
+        var colorBarra = microBarra.style.background;
+        assert(colorCocina === 'rgb(156, 163, 175)', 'Cocina gris (pendiente) sin comandas');
+        assert(colorBarra === 'rgb(156, 163, 175)', 'Barra gris (pendiente) sin comandas');
+
+        // Agregar comanda de cocina en-proceso
+        var ahora = Date.now();
+        comandasStore = [
+          {
+            id: 'com_1', mesa: 1, destino: 'cocina',
+            items: [{ prodId: 'prod_x', nombre: 'Hamburguesa', qty: 1, obs: '', enviadoA: 'cocina' }],
+            estado: 'en-proceso', ts: ahora - 5 * 60 * 1000, mozo: 'Carlos', observaciones: ''
+          }
+        ];
+        Mesas.render();
+        await esperar(50);
+        microCocina = document.querySelector('.micro-cocina');
+        assert(microCocina.style.background === 'rgb(245, 158, 11)', 'Cocina amarilla (en-proceso)');
+
+        // Marcar comanda como lista
+        comandasStore[0].estado = 'lista';
+        Mesas.render();
+        await esperar(50);
+        microCocina = document.querySelector('.micro-cocina');
+        assert(microCocina.style.background === 'rgb(34, 197, 94)', 'Cocina verde (lista)');
+
+        // ── Suite 3: Long-press despliega popover ────────
+        resultsEl.innerHTML += '<div class="suite"><h2>3. Long-press despliega popover</h2></div>';
+        var card = document.querySelector('.mesa-card');
+        assert(!!card, 'Tarjeta de mesa existe');
+
+        // Simular mousedown para iniciar long-press
+        card.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        await esperar(450); // Esperar mas de 400ms
+        card.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+
+        await esperar(50);
+        var popover = document.querySelector('#popoverContainer div');
+        assert(!!popover, 'Popover aparece tras long-press');
+        if (popover) {
+          assert(popover.textContent.includes('Mesa 1'), 'Popover muestra numero de mesa');
+          assert(popover.textContent.includes('lista'), 'Popover muestra estado lista');
+          // Cerrar popover
+          var btnCerrar = popover.querySelector('button');
+          if (btnCerrar) btnCerrar.click();
+        }
+
+        // ── Suite 4: Clic simple no despliega popover ────
+        resultsEl.innerHTML += '<div class="suite"><h2>4. Clic simple no despliega popover</h2></div>';
+        var popoverAntes = document.querySelector('#popoverContainer div');
+        // Simular clic rapido (mousedown + mouseup inmediato)
+        card.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+        await esperar(100);
+        card.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+        await esperar(50);
+        var popoverDespues = document.querySelector('#popoverContainer div');
+        // Si no habia popover antes, deberia seguir sin uno
+        if (!popoverAntes) {
+          assert(popoverDespues === null, 'Clic simple NO despliega popover');
+        }
+
+        // ── Resumen ──────────────────────────────────────
+        resultsEl.innerHTML += '<div class="summary">' + passed + ' pasaron, ' + failed + ' fallaron</div>';
+        if (failed === 0) {
+          resultsEl.innerHTML += '<div class="test pass">✔ Todos los tests de mesas v6.5 pasaron.</div>';
+        }
+      }
+
+      window.addEventListener('load', function() {
+        runTests().catch(function(e) {
+          resultsEl.innerHTML += '<div class="error">Error en tests: ' + e.message + '</div>';
+        });
+      });
+    })();
+  </script>
+</body>
+</html>
