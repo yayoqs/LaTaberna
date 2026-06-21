@@ -1,6 +1,6 @@
 /**
  * Módulo principal del Cliente (Frontend Cliente)
- * v1.6.0 — 2026-06-19
+ * v1.7.0 — 2026-06-20
  *
  * Punto de entrada cargado como <script type="module">.
  * Expone únicamente window.ClienteModulo.
@@ -11,6 +11,7 @@
  * - Importa Orden como módulo interno.
  * - Escucha eventos del sistema (vista:cambiada, cliente:cuenta_creada)
  *   para activar o desactivar los módulos del cliente.
+ * - Maneja la nueva vista 'bienvenida' como paso post-login.
  *
  * @module principal
  * @exports ClienteModulo
@@ -51,6 +52,13 @@ window.ClienteModulo = ClienteModulo;
         PantallaEventos.ocultar();
       }
 
+      if (esCliente && vista === 'bienvenida') {
+        PantallaInicio.ocultar();
+        PantallaBienvenida.mostrar();
+        MenuDigital.ocultar();
+        PantallaEventos.ocultar();
+      }
+
       if (esCliente && vista === 'menu') {
         PantallaInicio.ocultar();
         PantallaBienvenida.ocultar();
@@ -65,7 +73,7 @@ window.ClienteModulo = ClienteModulo;
         PantallaEventos.mostrar();
       }
 
-      if (!esCliente || (vista !== 'menu' && vista !== 'inicio' && vista !== 'eventos')) {
+      if (!esCliente || (vista !== 'menu' && vista !== 'inicio' && vista !== 'eventos' && vista !== 'bienvenida')) {
         PantallaBienvenida.ocultar();
         MenuDigital.ocultar();
         PantallaEventos.ocultar();

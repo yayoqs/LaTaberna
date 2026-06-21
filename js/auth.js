@@ -1,5 +1,5 @@
 /* ================================================================
-   PubPOS — MÓDULO: auth.js (v7.2 – getAppwriteUserId + init sin login)
+   PubPOS — MÓDULO: auth.js (v7.3 – vista bienvenida para cliente y master)
    ================================================================ */
 const Auth = (() => {
   // ── CONFIGURACIÓN INICIAL SOLO PARA PRIMER ARRANQUE ────────
@@ -78,7 +78,7 @@ const Auth = (() => {
     if (rol === 'despensa') return 'despensa';
     if (rol === 'reparto') return 'reparto';
     if (rol === 'eventos' || rol === 'artista') return 'eventos';
-    if (rol === 'cliente') return 'menu';
+    if (rol === 'cliente' || rol === 'master') return 'bienvenida';
     return 'mesas';
   }
 
