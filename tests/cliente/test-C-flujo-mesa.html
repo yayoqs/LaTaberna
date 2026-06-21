@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Flujo de Validación de Mesa — Célula C</title>
+  <style>
+    body { font-family: system-ui, sans-serif; padding: 20px; background: #0f0f14; color: #f1f5f9; }
+    h1 { color: #f59e0b; }
+    .resultado { padding: 10px; margin: 6px 0; border-radius: 6px; }
+    .ok { background: rgba(34,197,94,.15); border-left: 4px solid #22c55e; }
+    .fallo { background: rgba(239,68,68,.15); border-left: 4px solid #ef4444; }
+    .info { background: rgba(99,102,241,.15); border-left: 4px solid #6366f1; }
+    pre { margin: 0; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Tests — Flujo de Validación de Mesa</h1>
+  <div id="resultados"></div>
+
+  <script type="module">
+    import { PantallaBienvenida } from '../../js/modulos/cliente/pantalla-bienvenida.js';
+
+    const resultados = document.getElementById('resultados');
+    let pasaron = 0;
+    let fallaron = 0;
+
+    function log(tipo, mensaje) {
+      const div = document.createElement('div');
+      div.className = `resultado ${tipo}`;
+      div.innerHTML = `<pre>${mensaje}</pre>`;
+      resultados.appendChild(div);
+      if (tipo === 'ok') pasaron++;
+      if (tipo === 'fallo') fallaron++;
+    }
+
+    function assert(condicion, descripcion) {
+      if (condicion) {
+        log('ok', `✅ ${descripcion}`);
+      } else {
+        log('fallo', `❌ ${descripcion}`);
+      }
+    }
+
+    // ── Mock de Auth ──────────────────────────────────────
+    window.Auth = {
+      getNombre: () => 'Juan Pérez',
+      getUsuarioActual: () => ({ nombre: 'Juan Pérez', rol: 'cliente' }),
+      esCliente: () => true
+    };
+
+    // ── Mock de Store ─────────────────────────────────────
+    const mesas = [
+      { numero: 5, permite_prepedidos: false }
+    ];
+    window.Store = {
+      getState: () => ({ mesas: [...mesas], eventos_en_vivo: [] }),
+      subscribe: () => {},
+      dispatch: () => {}
+    };
+
+    // ── Mock de EventBus ──────────────────────────────────
+    const listeners = {};
+    window.EventBus = {
+      on: (evento, fn) => {
+        if (!listeners[evento]) listeners[evento] = [];
+        listeners[evento].push(fn);
+      },
+      emit: (evento, datos) => {
+        if (listeners[evento]) {
+          listeners[evento].forEach(fn => fn(datos));
+        }
+      },
+      off: () => {}
+    };
+
+    // ── Mock de App ───────────────────────────────────────
+    window.App = {
+      showView: () => {}
+    };
+
+    // ── Variable para el toast (opcional) ────────────────
+    document.body.innerHTML += '<div id="toastContainer"></div>';
+
+    // ═══════════════════════════════════════════════════════
+    // INICIO DE TESTS
+    // ═══════════════════════════════════════════════════════
+
+    log('info', '── Fase 1: Renderizado e ingreso de mesa ──');
+
+    // 1. Renderizar PantallaBienvenida
+    let vista = PantallaBienvenida.render();
+    assert(vista !== null, 'render() devuelve una vista');
+    assert(vista.id === 'view-bienvenida', 'La vista tiene id correcto');
+
+    // 2. Verificar elementos clave
+    const inputMesa = document.getElementById('inputMesa');
+    const btnGuardar = document.getElementById('btnGuardarMesa');
+    const cardEspera = document.getElementById('cardEspera');
+    const badgePrepedidos = document.getElementById('badgePrepedidos');
+    const mensajeGastro = document.getElementById('mensajeGastro');
+
+    assert(inputMesa !== null, 'Input de mesa existe');
+    assert(btnGuardar !== null, 'Botón Vincular existe');
+    assert(cardEspera !== null, 'Tarjeta de espera existe');
+    assert(badgePrepedidos !== null, 'Badge de pre-pedido existe');
+    assert(mensajeGastro !== null, 'Mensaje de tarjeta gastronómica existe');
+
+    // 3. Estado inicial: cardEspera oculta, badge oculto
+    assert(cardEspera.style.display === 'none', 'Tarjeta de espera empieza oculta');
+
+    log('info', '── Fase 2: Ingreso de mesa y estado de espera ──');
+
+    // 4. Simular ingreso de mesa
+    inputMesa.value = '5';
+    btnGuardar.click();
+
+    assert(PantallaBienvenida.obtenerMesa() === 5, 'obtenerMesa() devuelve 5 tras guardar');
+    assert(PantallaBienvenida.permitePrepedidos() === false, 'permitePrepedidos() es false inicialmente');
+    assert(cardEspera.style.display === 'block', 'Tarjeta de espera se muestra tras guardar mesa');
+    assert(badgePrepedidos.style.display === 'none' || badgePrepedidos.style.display === '', 'Badge de pre-pedido sigue oculto mientras no esté activado');
+
+    log('info', '── Fase 3: Simulación de activación del garzón ──');
+
+    // 5. Simular cambio de permite_prepedidos a true
+    mesas[0].permite_prepedidos = true;
+    window.EventBus.emit('mesas:actualizada', { numero: 5, permite_prepedidos: true });
+
+    // 6. Verificar que la UI reaccionó
+    assert(PantallaBienvenida.permitePrepedidos() === true, 'permitePrepedidos() es true tras evento');
+    assert(badgePrepedidos.style.display === 'inline-block', 'Badge de pre-pedido se muestra');
+    assert(mensajeGastro.textContent.includes('¡Pantalla Activada!'), 'Mensaje de tarjeta gastronómica cambia a activado');
+
+    log('info', '── Fase 4: Validación de bloqueo antes de activación ──');
+
+    // 7. Reiniciar estado: mesa 5 con permite_prepedidos false
+    mesas[0].permite_prepedidos = false;
+    window.EventBus.emit('mesas:actualizada', { numero: 5, permite_prepedidos: false });
+
+    assert(PantallaBienvenida.permitePrepedidos() === false, 'permitePrepedidos() vuelve a false');
+    assert(badgePrepedidos.style.display === 'none' || badgePrepedidos.style.display === '', 'Badge se oculta de nuevo');
+    assert(mensajeGastro.textContent.includes('Explora la carta digital'), 'Mensaje vuelve al texto por defecto');
+
+    log('info', '── Fase 5: Limpieza ──');
+    document.body.removeChild(vista);
+
+    // ── Resumen ──────────────────────────────────────────
+    log('info', `── Resultado: ${pasaron} pasaron, ${fallaron} fallaron ──`);
+    if (fallaron === 0) {
+      log('ok', '🎉 Todos los tests pasaron. Flujo de validación de mesa operativo.');
+    } else {
+      log('fallo', `⚠️ ${fallaron} test(s) fallaron. Revisar antes del PR.`);
+    }
+  </script>
+</body>
+</html>

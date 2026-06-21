@@ -1,10 +1,11 @@
 /* ================================================================
-   PubPOS — COMANDO: crear-pedido-mesa.js (v3.0 – delegación total)
+   PubPOS — COMANDO: crear-pedido-mesa.js (v3.1 – activa prepedidos)
    ================================================================
    Cambios:
    • Eliminado el acceso directo a DB para obtener/modificar la mesa.
    • Ahora usa repo.abrirMesa() que se encarga de toda la persistencia.
    • Mantiene validación de turno abierto.
+   • Agregada activación de permite_prepedidos en Appwrite (canónico).
    ================================================================ */
 
 /**
@@ -62,6 +63,9 @@ async function handleCrearPedidoMesa(comando) {
   }
 
   if (!pedido) throw new Error('No se pudo crear el pedido');
+
+  // ── 3.1 Activar permite_prepedidos en Appwrite ────────
+  await DBAppwrite.actualizar('mesas', String(numeroMesa), { permite_prepedidos: true });
 
   // ── 4. Auditoría ──────────────────────────────────────
   if (typeof PedidoManager.registrar === 'function') {

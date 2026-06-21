@@ -1,193 +1,180 @@
 /**
- * Pantalla de Bienvenida post-login (v1.2.0)
+ * Pantalla de Bienvenida post-login (v2.0.0)
  *
- * Layout completamente flexible, sin medidas fijas ni vh.
- * Las tarjetas se adaptan automáticamente al espacio disponible.
+ * Rediseño con paleta ámbar/índigo, barra superior,
+ * tarjeta de ingreso de mesa y tarjetas de acción.
  *
- * @version 1.2.0
+ * @version 2.0.0
  */
 
+/* Vista activa */
 .view.active#view-bienvenida {
   display: flex;
   flex-direction: column;
-  height: 100%; /* Se adapta al contenedor padre (.view.active) */
-  position: relative;
-  background: #1a1a2e;
+  align-items: center;
+  justify-content: flex-start;
+  min-height: 100vh;
+  padding: 20px;
+  background-color: var(--color-bg);
+  background-image:
+    radial-gradient(circle at 50% 0%, rgba(245,158,11,0.08) 0%, transparent 50%),
+    linear-gradient(rgba(255,255,255,0.01) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.01) 1px, transparent 1px);
+  background-size: 100% 100%, 40px 40px, 40px 40px;
 }
 
-/* Fondo mesh animado */
-.bienvenida-fondo {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  background:
-    radial-gradient(circle at 30% 40%, rgba(245,158,11,.25) 0%, transparent 50%),
-    radial-gradient(circle at 70% 60%, rgba(239,68,68,.2) 0%, transparent 50%),
-    radial-gradient(circle at 50% 80%, rgba(99,102,241,.15) 0%, transparent 50%);
-  animation: fondo-mesh 10s ease-in-out infinite alternate;
-  pointer-events: none;
-}
-@keyframes fondo-mesh {
-  0%   { transform: translate3d(0, 0, 0) scale(1); }
-  100% { transform: translate3d(-10px, -10px, 0) scale(1.05); }
-}
-
-/* Header */
-.bienvenida-header {
-  position: relative;
-  z-index: 1;
-  text-align: center;
-  padding: 20px 24px 8px;
+/* Barra superior */
+.top-bar {
+  width: 100%;
+  max-width: 500px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 0;
+  margin-bottom: 30px;
+  border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
 }
-.bienvenida-header h1 {
-  font-size: 24px;
-  font-weight: 800;
-  color: var(--color-text);
-  margin-bottom: 4px;
+.user-profile { display: flex; align-items: center; gap: 10px; }
+.user-avatar {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
+  display: flex; align-items: center; justify-content: center;
+  font-weight: bold; font-size: 0.9rem;
+  box-shadow: 0 0 10px rgba(245,158,11,0.4);
+  color: #fff;
 }
-.bienvenida-sub {
-  font-size: 14px;
-  color: var(--color-text-sec);
-  font-style: italic;
+.user-info h3 { font-size: 0.95rem; font-weight: 700; }
+.user-info p  { font-size: 0.75rem; color: var(--color-accent); }
+.logout-btn {
+  background: transparent;
+  border: 1px solid rgba(245,158,11,0.4);
+  color: var(--color-accent);
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-size: 0.8rem; font-weight: 600;
+  cursor: pointer; transition: var(--t);
 }
+.logout-btn:hover { background: var(--color-accent); color: #000; }
 
-/* Contenedor principal: crece para ocupar el espacio restante */
-.bienvenida-contenido {
-  position: relative;
-  z-index: 1;
-  flex: 1;          /* Ocupa TODO el espacio disponible */
+/* Contenedor principal */
+.welcome-container {
+  width: 100%;
+  max-width: 450px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 0 20px 16px;
-  max-width: 600px;
-  width: 100%;
-  margin: 0 auto;
-  min-height: 0;    /* Permite que flex: 1 reduzca su tamaño si es necesario */
+  gap: 25px;
 }
 
-/* Campo de mesa (tamaño natural) */
-.bienvenida-mesa {
+/* Tarjeta base */
+.status-card {
+  background: var(--color-card);
+  border-radius: var(--radius);
+  padding: 25px;
+  text-align: center;
+  border: 1px solid var(--color-border);
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  position: relative; overflow: hidden;
+}
+.status-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0;
+  width: 100%; height: 4px;
+  background: linear-gradient(to right, var(--color-accent), var(--color-primary));
+}
+.status-card h2 {
+  font-size: 1.3rem;
+  margin-bottom: 15px;
+  letter-spacing: 0.5px;
+}
+
+/* Input de mesa */
+.input-group {
+  display: flex; gap: 10px; margin-top: 15px; justify-content: center;
+}
+.table-input {
+  width: 100px;
+  background: var(--color-panel);
+  border: 2px solid rgba(245,158,11,0.3);
+  border-radius: var(--radius-sm);
+  padding: 12px; color: #fff;
+  font-size: 1.2rem; font-weight: 700; text-align: center;
+  outline: none; transition: var(--t);
+}
+.table-input:focus { border-color: var(--color-accent); }
+.primary-btn {
+  background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
+  border: none; color: #fff;
+  padding: 12px 24px; border-radius: var(--radius-sm);
+  font-weight: 700; font-size: 0.95rem;
+  cursor: pointer; transition: var(--t);
+}
+.primary-btn:hover { transform: translateY(-1px); }
+
+/* Espera */
+.waiting-status {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 12px; margin-top: 10px;
+}
+.spinner {
+  width: 24px; height: 24px;
+  border: 3px solid rgba(245,158,11,0.2);
+  border-top-color: var(--color-accent);
+  border-radius: 50%;
+  animation: spin 1s infinite linear;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.pre-order-badge {
+  display: inline-block; margin-top: 15px;
+  padding: 6px 12px;
+  background: rgba(245,158,11,0.08);
+  border: 1px dashed var(--color-accent);
+  border-radius: 20px;
+  font-size: 0.75rem; color: var(--color-accent); font-weight: 600;
+}
+
+/* Acciones */
+.menu-grid {
+  display: flex; flex-direction: column; gap: 15px; width: 100%;
+}
+.action-card {
   background: var(--color-card);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  padding: 12px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex-shrink: 0;
-}
-.bienvenida-mesa label {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: .5px;
-}
-.bienvenida-mesa input {
-  background: var(--color-panel);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  color: var(--color-text);
-  padding: 10px 12px;
-  font-size: 14px;
-  outline: none;
+  padding: 20px;
+  display: flex; align-items: center; gap: 18px;
+  cursor: pointer; text-align: left; position: relative;
   transition: var(--t);
 }
-.bienvenida-mesa input:focus { border-color: var(--color-accent); }
-.bienvenida-estado-mesa {
-  font-size: 12px;
-  color: var(--color-text-sec);
+.action-card::after {
+  content: '\f105';
+  font-family: 'Font Awesome 6 Free';
+  font-weight: 900;
+  position: absolute; right: 20px;
+  color: var(--color-text-muted); font-size: 1.1rem;
+  transition: transform 0.2s;
 }
+.action-card.order-mode:hover {
+  border-color: var(--color-accent);
+  background: rgba(245,158,11,0.04);
+  box-shadow: 0 0 15px rgba(245,158,11,0.1);
+}
+.action-card.order-mode .action-icon { color: var(--color-accent); }
+.action-card.events-mode:hover {
+  border-color: var(--color-primary);
+  background: rgba(99,102,241,0.04);
+  box-shadow: 0 0 15px rgba(99,102,241,0.1);
+}
+.action-card.events-mode .action-icon { color: var(--color-primary); }
+.action-card:hover::after { transform: translateX(4px); color: #fff; }
+.action-icon { font-size: 2rem; width: 45px; display: flex; justify-content: center; }
+.action-details h4 { font-size: 1.05rem; font-weight: 700; margin-bottom: 3px; }
+.action-details p  { font-size: 0.8rem; color: var(--color-text-sec); }
 
-/* Contenedor de tarjetas: crece y distribuye espacio */
-.bienvenida-cards {
-  flex: 1;          /* Toma el espacio restante debajo del campo de mesa */
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  min-height: 0;
-}
-
-/* Tarjetas flexibles, sin altura fija */
-.bienvenida-card {
-  border-radius: var(--radius);
-  overflow: hidden;
-  cursor: pointer;
-  transition: transform .3s ease, box-shadow .3s ease;
-  flex-shrink: 0;
-}
-.bienvenida-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 10px 28px rgba(0,0,0,.5);
-}
-.bienvenida-card-grande {
-  flex: 3;          /* 60% del espacio de tarjetas */
-  min-height: 0;
-}
-.bienvenida-card-chica {
-  flex: 2;          /* 40% del espacio de tarjetas */
-  min-height: 0;
-}
-
-.card-glass {
-  background: rgba(26,26,36,.7);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255,255,255,.1);
-  border-radius: var(--radius);
-  padding: 16px;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 10px;
-}
-
-.card-imagen {
-  width: 100%;
-  height: 100px;
-  background: var(--color-accent-dark);
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 40px;
-  color: rgba(255,255,255,.3);
-  flex-shrink: 0;
-}
-
-.card-texto h2 { font-size: 18px; color: var(--color-text); margin-bottom: 4px; }
-.card-texto p  { font-size: 12px; color: var(--color-text-sec); }
-
-/* Ecualizador animado */
-.ecualizador {
-  display: flex;
-  align-items: flex-end;
-  gap: 4px;
-  height: 30px;
-  margin-top: 8px;
-}
-.ecualizador span {
-  flex: 1;
-  background: var(--color-accent);
-  border-radius: 4px;
-  animation: eco 1.2s ease-in-out infinite alternate;
-}
-.ecualizador span:nth-child(1) { height: 60%; animation-delay: 0s; }
-.ecualizador span:nth-child(2) { height: 80%; animation-delay: .2s; }
-.ecualizador span:nth-child(3) { height: 40%; animation-delay: .4s; }
-.ecualizador span:nth-child(4) { height: 100%; animation-delay: .6s; }
-.ecualizador span:nth-child(5) { height: 70%; animation-delay: .8s; }
-@keyframes eco {
-  0%   { transform: translate3d(0, 0, 0); }
-  100% { transform: translate3d(0, -8px, 0); }
-}
-
-/* Responsive: letras más chicas en móvil */
-@media (max-width: 600px) {
-  .bienvenida-header h1 { font-size: 20px; }
-  .bienvenida-contenido { padding: 0 12px 12px; gap: 8px; }
-  .card-texto h2 { font-size: 16px; }
+/* Responsive */
+@media (max-width: 400px) {
+  .top-bar { flex-direction: column; gap: 12px; align-items: flex-start; }
+  .status-card { padding: 18px; }
+  .action-card { padding: 16px; }
 }

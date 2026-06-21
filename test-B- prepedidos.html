@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test B – Activar permite_prepedidos al abrir mesa</title>
+  <style>
+    body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
+    h1 { color: #f59e0b; }
+    .suite { margin-bottom: 24px; border-bottom: 1px solid #2e2e42; padding-bottom: 12px; }
+    .test { margin: 4px 0; padding: 4px 8px; border-radius: 4px; }
+    .pass { background: rgba(34,197,94,.2); }
+    .fail { background: rgba(239,68,68,.2); }
+    .summary { margin-top: 20px; font-weight: bold; }
+    .info { color: #94a3b8; font-size: 12px; margin: 2px 0; }
+    .error { color: #ef4444; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test B – Activar permite_prepedidos al abrir mesa</h1>
+  <p class="info">Verifica que al confirmar la apertura de una mesa se active el campo permite_prepedidos en Appwrite.</p>
+  <div id="results"></div>
+
+  <!-- Mocks tempranos -->
+  <script>
+    window.DBInventario = {
+      validarStockParaItems: function() { return { ok: true, faltantes: [] }; }
+    };
+    window.DBFusion = {
+      fusionarMesas: function() { return null; }
+    };
+  </script>
+
+  <!-- Dependencias (rutas absolutas) -->
+  <script src="/js/utils.js"></script>
+  <script src="/js/lib/logger.js"></script>
+  <script src="/js/lib/eventBus.js"></script>
+  <script src="/js/lib/store.js"></script>
+  <script src="/js/lib/command-bus.js"></script>
+  <script src="/js/lib/deps.js"></script>
+  <script src="/js/dominio/resultado.js"></script>
+  <script src="/js/dominio/dinero.js"></script>
+  <script src="/js/dominio/cantidad.js"></script>
+  <script src="/js/db-core.js"></script>
+  <script src="/js/db-appwrite.js"></script>
+  <script src="/js/puente-appwrite.js"></script>
+  <script src="/js/db.js"></script>
+
+  <!-- Módulos necesarios para el flujo -->
+  <script src="/js/ui/mesas.js"></script>
+  <script src="/js/ui/comanda.js"></script>
+  <script src="/js/ui/carta.js"></script>
+  <script src="/js/ui/pedido-ui.js"></script>
+
+  <script>
+    (function() {
+      var resultsEl = document.getElementById('results');
+      var passed = 0, failed = 0;
+
+      function assert(condition, msg) {
+        if (condition) {
+          passed++;
+          resultsEl.innerHTML += '<div class="test pass">✔ ' + msg + '</div>';
+        } else {
+          failed++;
+          resultsEl.innerHTML += '<div class="test fail">✘ ' + msg + '</div>';
+        }
+      }
+
+      function esperar(ms) {
+        return new Promise(function(resolve) { setTimeout(resolve, ms); });
+      }
+
+      async function runTests() {
+        resultsEl.innerHTML = '';
+        Logger.setLevel('ERROR');
+
+        // ── Configurar entorno mínimo ──────────────────
+        window.DB = window.DB || {};
+        DB.config = { zonas: [{ nombre: 'salon', cantidad: 5 }] };
+        DB.mozos = [{ id: 'm1', nombre: 'Carlos', activo: true }];
+        DB.mesas = [
+          { numero: 1, estado: 'libre', zona: 'salon', items: [], mozo: '', comensales: 1, pedidoId: null, esVirtual: false }
+        ];
+        DB.pedidos = [];
+        DB.comandas = [];
+        DB.productos = [];
+        DB.recetas = [];
+        DB.ingredientes = [];
+        DB.saveMesas = function() {};
+        DB.savePedidos = function() {};
+        DB.saveComandas = function() {};
+        DB.getMesa = function(num) { return DB.mesas.find(function(m) { return m.numero == num; }); };
+        DB.fusionarMesas = function() { return null; };
+
+        window.Auth = window.Auth || {};
+        Auth.puede = function() { return true; };
+        Auth.esAdmin = function() { return true; };
+        Auth.getUsuarioActual = function() { return { nombre: 'Test' }; };
+
+        window.showToast = function() {};
+
+        // Mock de DBAppwrite
+        var llamadasActualizar = [];
+        window.DBAppwrite = window.DBAppwrite || {};
+        DBAppwrite.actualizar = async function(coleccion, id, cambios) {
+          llamadasActualizar.push({ coleccion, id, cambios });
+          return true;
+        };
+        DBAppwrite.crear = async function() { return { id: 'ped_test' }; };
+        DBAppwrite.listar = async function() { return []; };
+
+        // Mock de CommandBus para simular crearPedidoMesa exitoso
+        var comandoEjecutado = false;
+        window.CommandBus = window.CommandBus || {};
+        CommandBus.registrar = function() {};
+        CommandBus.ejecutar = async function(comando) {
+          if (comando.type === 'crearPedidoMesa') {
+            comandoEjecutado = true;
+            return { exito: true, data: { id: 'ped_test' } };
+          }
+          return { exito: false };
+        };
+
+        // Inicializar Store
+        Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
+
+        // Crear DOM mínimo
+        var main = document.createElement('main');
+        main.id = 'view-mesas';
+        main.className = 'view active';
+        main.innerHTML = '<div id="mesasGrid"></div>';
+        document.body.appendChild(main);
+
+        Mesas.render();
+
+        // ── Suite 1: Activar permite_prepedidos al abrir ─
+        resultsEl.innerHTML += '<div class="suite"><h2>1. Activar permite_prepedidos al abrir mesa</h2></div>';
+
+        // Simular apertura de mesa 1
+        await Pedido._confirmarApertura(1);
+        await esperar(100);
+
+        // Verificar que el comando se ejecutó
+        assert(comandoEjecutado, 'El comando crearPedidoMesa fue ejecutado');
+
+        // Verificar que DBAppwrite.actualizar fue llamado para la mesa
+        var llamadaMesa = llamadasActualizar.find(function(ll) {
+          return ll.coleccion === 'mesas' && ll.id === '1';
+        });
+        assert(!!llamadaMesa, 'DBAppwrite.actualizar fue llamado para la mesa 1');
+        if (llamadaMesa) {
+          assert(llamadaMesa.cambios.permite_prepedidos === true, 'El campo permite_prepedidos se puso en true');
+        }
+
+        // Verificar que la mesa quedó ocupada
+        var mesa1 = DB.mesas[0];
+        assert(mesa1.estado === 'ocupada', 'La mesa 1 pasó a estado ocupada');
+        assert(mesa1.pedidoId === 'ped_test', 'La mesa 1 tiene pedidoId asignado');
+
+        // ── Suite 2: Fallo en actualización no detiene apertura ──
+        resultsEl.innerHTML += '<div class="suite"><h2>2. Fallo en actualización no detiene la apertura</h2></div>';
+
+        // Reiniciar mesa 2
+        DB.mesas.push({ numero: 2, estado: 'libre', zona: 'salon', items: [], mozo: '', comensales: 1, pedidoId: null, esVirtual: false });
+        Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
+
+        // Forzar fallo en DBAppwrite.actualizar
+        var originalActualizar = DBAppwrite.actualizar;
+        DBAppwrite.actualizar = async function(coleccion, id, cambios) {
+          if (coleccion === 'mesas') throw new Error('Error simulado');
+          return true;
+        };
+
+        comandoEjecutado = false;
+        await Pedido._confirmarApertura(2);
+        await esperar(100);
+
+        var mesa2 = DB.mesas.find(function(m) { return m.numero == 2; });
+        assert(mesa2.estado === 'ocupada', 'La mesa 2 se abrió a pesar del fallo en Appwrite');
+        assert(comandoEjecutado, 'El comando crearPedidoMesa se ejecutó correctamente');
+
+        // Restaurar mock
+        DBAppwrite.actualizar = originalActualizar;
+
+        // ── Limpiar el DOM para que no quede nada abierto ──
+        // Cerrar el modal de pedido si quedó abierto
+        var modalPedido = document.getElementById('modalPedido');
+        if (modalPedido) modalPedido.style.display = 'none';
+        // Eliminar cualquier overlay que haya quedado
+        var overlays = document.querySelectorAll('.modal-overlay');
+        overlays.forEach(function(o) { if (o.id !== 'view-mesas') o.remove(); });
+        // Restaurar mesas a estado libre
+        DB.mesas.forEach(function(m) { m.estado = 'libre'; m.items = []; m.pedidoId = null; });
+        Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
+        Mesas.render();
+
+        // ── Resumen ──────────────────────────────────────
+        resultsEl.innerHTML += '<div class="summary">' + passed + ' pasaron, ' + failed + ' fallaron</div>';
+        if (failed === 0) {
+          resultsEl.innerHTML += '<div class="test pass">✔ Todos los tests de permite_prepedidos pasaron.</div>';
+        }
+      }
+
+      window.addEventListener('load', function() {
+        runTests().catch(function(e) {
+          resultsEl.innerHTML += '<div class="error">Error en tests: ' + e.message + '</div>';
+          console.error(e);
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,12 +1,13 @@
 /**
- * Pantalla de Bienvenida post-login (v1.2.0)
+ * Pantalla de Bienvenida post-login (v2.0.0)
  * Módulo ES6 para la vista de bienvenida de clientes.
  *
  * @module PantallaBienvenida
- * @version 1.2.0
+ * @version 2.0.0
  *
- * Layout flexible: las tarjetas se adaptan automáticamente
- * al espacio disponible sin medidas fijas.
+ * Rediseño con paleta ámbar/índigo.
+ * Incluye barra superior con avatar, ingreso de mesa,
+ * espera de activación y tarjetas de acción.
  */
 const PantallaBienvenida = (() => {
   let _vista = null;
@@ -20,52 +21,68 @@ const PantallaBienvenida = (() => {
     _vista.id = 'view-bienvenida';
     _vista.className = 'view';
     _vista.innerHTML = `
-      <div class="bienvenida-fondo" id="bienvenidaFondo"></div>
-
-      <header class="bienvenida-header" id="bienvenidaHeader">
-        <h1 id="bienvenidaMensaje"></h1>
-        <p class="bienvenida-sub" id="bienvenidaSub"></p>
-      </header>
-
-      <section class="bienvenida-contenido">
-        <div class="bienvenida-mesa" id="bienvenidaMesa">
-          <label for="inputMesa">Número de mesa</label>
-          <input type="number" id="inputMesa" placeholder="Ej: 5" min="1" />
-          <button class="btn-primary" id="btnGuardarMesa">Confirmar mesa</button>
-          <p class="bienvenida-estado-mesa" id="estadoMesa"></p>
-        </div>
-
-        <!-- NUEVO: contenedor flexible para las tarjetas -->
-        <div class="bienvenida-cards">
-          <div class="bienvenida-card bienvenida-card-grande" id="cardGastronomica">
-            <div class="card-glass">
-              <div class="card-imagen" id="cardImagenGastro"></div>
-              <div class="card-texto">
-                <h2>📜 Armar mi Pedido</h2>
-                <p id="mensajeGastro">Explorá el menú y dejá tu selección lista para el garzón.</p>
-              </div>
-            </div>
-          </div>
-
-          <div class="bienvenida-card bienvenida-card-chica" id="cardEntretenimiento">
-            <div class="card-glass">
-              <div class="card-texto">
-                <h2>🎉 Eventos en Vivo</h2>
-                <p id="mensajeEvento">Próximo evento a las 22:00 hrs</p>
-                <div class="ecualizador" id="ecualizador" style="display:none;">
-                  <span></span><span></span><span></span><span></span><span></span>
-                </div>
-              </div>
-            </div>
+      <div class="top-bar" id="bienvenidaTopBar">
+        <div class="user-profile">
+          <div class="user-avatar" id="bienvenidaAvatar"></div>
+          <div class="user-info">
+            <h3 id="bienvenidaNombre"></h3>
+            <p><i class="fa-solid fa-circle-check"></i> Cliente Registrado</p>
           </div>
         </div>
-      </section>
+        <button class="logout-btn" id="btnLogout">
+          <i class="fa-solid fa-right-from-bracket"></i> Salir
+        </button>
+      </div>
+
+      <div class="welcome-container">
+        <!-- Ingreso de mesa -->
+        <div class="status-card" id="cardIngresoMesa">
+          <h2><i class="fa-solid fa-chair" style="color:var(--color-accent)"></i> ¿Dónde te ubicas?</h2>
+          <p style="color:var(--color-text-sec);font-size:0.9rem;">Ingresa el número de tu mesa física para activar tu sesión de atención.</p>
+          <div class="input-group">
+            <input type="number" class="table-input" id="inputMesa" placeholder="00" min="1" max="99">
+            <button class="primary-btn" id="btnGuardarMesa">Vincular</button>
+          </div>
+          <p class="mesa-estado" id="estadoMesa" style="margin-top:10px;font-size:0.85rem;color:var(--color-text-sec);"></p>
+        </div>
+
+        <!-- Espera activación -->
+        <div class="status-card" id="cardEspera" style="display:none;">
+          <h2>Mesa asignada: <span style="color:var(--color-accent)" id="mesaAsignada"></span></h2>
+          <div class="waiting-status">
+            <div class="spinner"></div>
+            <p style="font-size:0.9rem;font-weight:600;">Esperando validación del garzón...</p>
+            <p style="color:var(--color-text-sec);font-size:0.8rem;">Estamos confirmando tu presencia en el mesón.</p>
+          </div>
+          <span class="pre-order-badge" id="badgePrepedidos" style="display:none;">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> Modo Pre-pedido Habilitado
+          </span>
+        </div>
+
+        <!-- Tarjetas de acción -->
+        <div class="menu-grid">
+          <div class="action-card order-mode" id="cardGastronomica">
+            <div class="action-icon"><i class="fa-solid fa-scroll"></i></div>
+            <div class="action-details">
+              <h4>Armar mi Pedido</h4>
+              <p id="mensajeGastro">Explora la carta digital y arma tu orden.</p>
+            </div>
+          </div>
+          <div class="action-card events-mode" id="cardEntretenimiento">
+            <div class="action-icon"><i class="fa-solid fa-cake-candles"></i></div>
+            <div class="action-details">
+              <h4>Eventos en Vivo & Karaoke</h4>
+              <p id="mensajeEvento">Próximo evento a las 22:00 hrs</p>
+            </div>
+          </div>
+        </div>
+      </div>
     `;
 
     document.body.appendChild(_vista);
     _configurarEventos();
-    _actualizarMensaje();
-    _verificarEventos();
+    _actualizarPerfil();
+    _initRealtime();
     return _vista;
   }
 
@@ -73,6 +90,18 @@ const PantallaBienvenida = (() => {
     document.getElementById('btnGuardarMesa').addEventListener('click', _guardarMesa);
     document.getElementById('cardGastronomica').addEventListener('click', _irAlMenu);
     document.getElementById('cardEntretenimiento').addEventListener('click', _irAEventos);
+    document.getElementById('btnLogout').addEventListener('click', () => {
+      if (typeof window.Auth !== 'undefined' && typeof window.Auth.logout === 'function') {
+        window.Auth.logout();
+      }
+    });
+  }
+
+  function _actualizarPerfil() {
+    const nombre = window.Auth?.getNombre?.() || 'Comensal';
+    const iniciales = nombre.split(' ').map(n => n.charAt(0).toUpperCase()).slice(0, 2).join('');
+    document.getElementById('bienvenidaNombre').textContent = nombre;
+    document.getElementById('bienvenidaAvatar').textContent = iniciales;
   }
 
   function _guardarMesa() {
@@ -83,8 +112,10 @@ const PantallaBienvenida = (() => {
       return;
     }
     _mesa = valor;
+    document.getElementById('estadoMesa').textContent = `Mesa ${_mesa} guardada.`;
     _verificarPermisoMesa();
-    document.getElementById('estadoMesa').textContent = `Mesa ${_mesa} guardada. Esperando activación del garzón...`;
+    document.getElementById('cardEspera').style.display = 'block';
+    document.getElementById('mesaAsignada').textContent = `Mesa ${_mesa}`;
   }
 
   function _verificarPermisoMesa() {
@@ -94,49 +125,18 @@ const PantallaBienvenida = (() => {
     const mesaActual = mesas.find(m => m.numero === _mesa);
     if (mesaActual && mesaActual.permite_prepedidos === true) {
       _permitePrepedidos = true;
-      document.getElementById('estadoMesa').textContent = '✅ ¡Mesa activada! Podés armar tu pedido.';
+      document.getElementById('estadoMesa').textContent = '✅ Mesa activada.';
+      document.getElementById('badgePrepedidos').style.display = 'inline-block';
       document.getElementById('mensajeGastro').textContent = '🎉 ¡Pantalla Activada! Comenzá tu selección.';
     } else {
       _permitePrepedidos = false;
-      document.getElementById('estadoMesa').textContent = '⏳ Ponete cómodo. El garzón activará tu mesa pronto.';
-      document.getElementById('mensajeGastro').textContent = '¡Bienvenidos a La Taberna! En unos instantes tu garzón activará tu pantalla.';
+      document.getElementById('badgePrepedidos').style.display = 'none';
+      document.getElementById('mensajeGastro').textContent = 'Explora la carta digital y arma tu orden.';
     }
   }
 
   function obtenerMesa() { return _mesa; }
   function permitePrepedidos() { return _permitePrepedidos; }
-
-  function _actualizarMensaje() {
-    const nombre = window.Auth?.getNombre?.() || 'comensal';
-    const hora = new Date().getHours();
-    const headerEl = document.getElementById('bienvenidaMensaje');
-    const subEl = document.getElementById('bienvenidaSub');
-    if (hora >= 12 && hora < 19) {
-      headerEl.textContent = `La noche está joven, ${nombre}`;
-      subEl.textContent = '¿Con qué brindamos hoy?';
-    } else if (hora >= 19 || hora < 3) {
-      headerEl.textContent = `El escenario está ardiendo, ${nombre}`;
-      subEl.textContent = 'Pedí otra ronda.';
-    } else {
-      headerEl.textContent = `Bienvenido/a, ${nombre}`;
-      subEl.textContent = 'La Taberna te espera.';
-    }
-  }
-
-  function _verificarEventos() {
-    const state = window.Store?.getState?.() || {};
-    const eventos = state.eventos_en_vivo || [];
-    const activo = eventos.find(e => e.estado === 'activo');
-    const ecualizador = document.getElementById('ecualizador');
-    const mensaje = document.getElementById('mensajeEvento');
-    if (activo) {
-      mensaje.textContent = `🎤 ${activo.tipo || 'Evento'} en vivo ahora`;
-      if (ecualizador) ecualizador.style.display = 'flex';
-    } else {
-      mensaje.textContent = 'Próximo evento a las 22:00 hrs';
-      if (ecualizador) ecualizador.style.display = 'none';
-    }
-  }
 
   function _irAlMenu() {
     if (!_mesa) {
@@ -164,9 +164,8 @@ const PantallaBienvenida = (() => {
       if (viewMenu) viewMenu.classList.remove('active');
 
       _vista.classList.add('active');
-      _actualizarMensaje();
+      _actualizarPerfil();
       _verificarPermisoMesa();
-      _verificarEventos();
     }
   }
 
@@ -179,11 +178,19 @@ const PantallaBienvenida = (() => {
       window.EventBus.on('mesas:actualizada', (datos) => {
         if (_mesa && datos && datos.numero === _mesa) _verificarPermisoMesa();
       });
-      window.EventBus.on('eventos_en_vivo:actualizada', () => _verificarEventos());
+      window.EventBus.on('eventos_en_vivo:actualizada', () => {
+        const state = window.Store?.getState?.() || {};
+        const eventos = state.eventos_en_vivo || [];
+        const activo = eventos.find(e => e.estado === 'activo');
+        const mensaje = document.getElementById('mensajeEvento');
+        if (activo && mensaje) {
+          mensaje.textContent = `🎤 ${activo.tipo || 'Evento'} en vivo ahora`;
+        } else if (mensaje) {
+          mensaje.textContent = 'Próximo evento a las 22:00 hrs';
+        }
+      });
     }
   }
-
-  _initRealtime();
 
   return { render, mostrar, ocultar, obtenerMesa, permitePrepedidos };
 })();

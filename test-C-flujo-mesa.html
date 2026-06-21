@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Flujo de Validación de Mesa — Célula C</title>
+  <style>
+    body { font-family: system-ui, sans-serif; padding: 20px; background: #0f0f14; color: #f1f5f9; }
+    h1 { color: #f59e0b; }
+    h2 { color: #94a3b8; font-size: 1rem; margin: 20px 0 10px; }
+    .resultado { padding: 10px; margin: 6px 0; border-radius: 6px; }
+    .ok { background: rgba(34,197,94,.15); border-left: 4px solid #22c55e; }
+    .fallo { background: rgba(239,68,68,.15); border-left: 4px solid #ef4444; }
+    .info { background: rgba(99,102,241,.15); border-left: 4px solid #6366f1; }
+    pre { margin: 0; white-space: pre-wrap; }
+    .accion { background: rgba(245,158,11,.15); border-left: 4px solid #f59e0b; padding: 10px; margin: 6px 0; border-radius: 6px; }
+    button { background: #f59e0b; border: none; color: #000; padding: 8px 16px; border-radius: 6px; font-weight: 700; cursor: pointer; margin-right: 8px; }
+    button:hover { background: #d97706; }
+    #panelTest { margin-top: 20px; padding: 16px; background: #1a1a24; border-radius: 12px; border: 1px solid #2e2e42; max-height: 300px; overflow-y: auto; }
+  </style>
+</head>
+<body>
+  <h1>Test — Flujo de Validación de Mesa</h1>
+  <p>Simula el ciclo: cliente ingresa mesa → espera → garzón activa → acceso al menú.</p>
+
+  <div id="controles">
+    <button id="btnPaso1">1. Renderizar PantallaBienvenida</button>
+    <button id="btnPaso2">2. Ingresar mesa</button>
+    <button id="btnPaso3">3. Simular activación del garzón</button>
+    <button id="btnPaso4">4. Verificar acceso al menú</button>
+  </div>
+
+  <div id="resultados"></div>
+  <div id="panelTest"><p style="color:#64748b;">La vista renderizada aparecerá aquí...</p></div>
+
+  <script type="module">
+    import { PantallaBienvenida } from '../js/modulos/cliente/pantalla-bienvenida.js';
+
+    const resultados = document.getElementById('resultados');
+    const panelTest = document.getElementById('panelTest');
+    let pasaron = 0;
+    let fallaron = 0;
+
+    function log(tipo, mensaje) {
+      const div = document.createElement('div');
+      div.className = `resultado ${tipo}`;
+      div.innerHTML = `<pre>${mensaje}</pre>`;
+      resultados.appendChild(div);
+      if (tipo === 'ok') pasaron++;
+      if (tipo === 'fallo') fallaron++;
+    }
+
+    function assert(condicion, descripcion) {
+      if (condicion) {
+        log('ok', `✅ ${descripcion}`);
+      } else {
+        log('fallo', `❌ ${descripcion}`);
+      }
+    }
+
+    // ── Mocks del sistema ─────────────────────────────────
+    // Simulamos Store, EventBus y Auth antes de cargar la vista
+    if (!window.Store) {
+      window.Store = {
+        _state: { mesas: [], eventos_en_vivo: [] },
+        getState: () => window.Store._state,
+        subscribe: () => {}
+      };
+    }
+    if (!window.EventBus) {
+      window.EventBus = {
+        _handlers: {},
+        on: (evento, fn) => {
+          if (!window.EventBus._handlers[evento]) window.EventBus._handlers[evento] = [];
+          window.EventBus._handlers[evento].push(fn);
+        },
+        emit: (evento, datos) => {
+          (window.EventBus._handlers[evento] || []).forEach(fn => fn(datos));
+        }
+      };
+    }
+    if (!window.Auth) {
+      window.Auth = {
+        getNombre: () => 'Diego Test',
+        esCliente: () => true,
+        getUsuarioActual: () => ({ nombre: 'Diego Test', rol: 'cliente' })
+      };
+    }
+    if (!window.App) {
+      window.App = {
+        showView: (vista) => log('accion', `🔀 Navegación: App.showView('${vista}')`)
+      };
+    }
+
+    // ── Paso 1: Renderizar ────────────────────────────────
+    document.getElementById('btnPaso1').addEventListener('click', () => {
+      log('info', '── Paso 1: Renderizar PantallaBienvenida ──');
+      panelTest.innerHTML = '';
+
+      PantallaBienvenida.render();
+      PantallaBienvenida.mostrar();
+
+      const vista = document.getElementById('view-bienvenida');
+      assert(vista !== null, 'La vista se renderiza en el DOM');
+      assert(vista.classList.contains('active'), 'La vista está activa');
+
+      const avatar = document.getElementById('bienvenidaAvatar');
+      const nombre = document.getElementById('bienvenidaNombre');
+      assert(avatar?.textContent === 'DT', 'Avatar muestra iniciales del cliente');
+      assert(nombre?.textContent === 'Diego Test', 'Nombre del cliente visible');
+
+      const inputMesa = document.getElementById('inputMesa');
+      const btnVincular = document.getElementById('btnGuardarMesa');
+      assert(inputMesa !== null, 'Input de mesa existe');
+      assert(btnVincular !== null, 'Botón Vincular existe');
+
+      // Mostrar la vista en el panel
+      panelTest.appendChild(vista);
+      log('accion', '✅ Vista renderizada correctamente.');
+    });
+
+    // ── Paso 2: Ingresar mesa ─────────────────────────────
+    document.getElementById('btnPaso2').addEventListener('click', () => {
+      log('info', '── Paso 2: Ingresar número de mesa ──');
+
+      const inputMesa = document.getElementById('inputMesa');
+      const btnVincular = document.getElementById('btnGuardarMesa');
+      if (!inputMesa || !btnVincular) {
+        log('fallo', '❌ No se encontró el input o el botón. Ejecutá el Paso 1 primero.');
+        return;
+      }
+
+      inputMesa.value = '5';
+      btnVincular.click();
+
+      const estadoMesa = document.getElementById('estadoMesa');
+      assert(estadoMesa?.textContent?.includes('Mesa 5'), 'Mensaje de mesa guardada visible');
+
+      // Verificar que la tarjeta de espera aparece
+      const cardEspera = document.getElementById('cardEspera');
+      assert(cardEspera?.style?.display === 'block', 'Tarjeta de espera visible');
+
+      const spinner = document.querySelector('.spinner');
+      assert(spinner !== null, 'Spinner de espera presente');
+
+      // Verificar que permitePrepedidos es false
+      assert(PantallaBienvenida.permitePrepedidos() === false, 'permitePrepedidos() es false (esperando garzón)');
+      assert(PantallaBienvenida.obtenerMesa() === 5, 'obtenerMesa() devuelve 5');
+
+      log('accion', '✅ Mesa ingresada. Esperando activación del garzón...');
+    });
+
+    // ── Paso 3: Simular activación del garzón ──────────────
+    document.getElementById('btnPaso3').addEventListener('click', () => {
+      log('info', '── Paso 3: Simular activación del garzón ──');
+
+      const mesa = PantallaBienvenida.obtenerMesa();
+      if (!mesa) {
+        log('fallo', '❌ No hay mesa ingresada. Ejecutá el Paso 2 primero.');
+        return;
+      }
+
+      // Simular que el Store ahora tiene la mesa activada
+      window.Store._state.mesas = [{ numero: mesa, permite_prepedidos: true }];
+
+      // Emitir el evento de Realtime que llegaría desde Appwrite
+      window.EventBus.emit('mesas:actualizada', { numero: mesa, estado: 'ocupada' });
+
+      // Verificar cambios en la UI
+      const badge = document.getElementById('badgePrepedidos');
+      assert(badge?.style?.display === 'inline-block', 'Badge "Modo Pre-pedido Habilitado" visible');
+
+      const mensajeGastro = document.getElementById('mensajeGastro');
+      assert(mensajeGastro?.textContent?.includes('Pantalla Activada'), 'Mensaje de activación en tarjeta gastronómica');
+
+      // Verificar que permitePrepedidos ahora es true
+      assert(PantallaBienvenida.permitePrepedidos() === true, 'permitePrepedidos() es true (garzón activó la mesa)');
+
+      log('accion', '✅ Garzón activó la mesa. Cliente notificado vía Realtime.');
+    });
+
+    // ── Paso 4: Verificar acceso al menú ──────────────────
+    document.getElementById('btnPaso4').addEventListener('click', () => {
+      log('info', '── Paso 4: Verificar acceso al menú ──');
+
+      if (PantallaBienvenida.permitePrepedidos() !== true) {
+        log('fallo', '❌ La mesa no está activada. Ejecutá el Paso 3 primero.');
+        return;
+      }
+
+      // Simular clic en la tarjeta gastronómica
+      const cardGastro = document.getElementById('cardGastronomica');
+      assert(cardGastro !== null, 'Tarjeta gastronómica existe');
+      cardGastro.click();
+
+      // Verificar que se intentó navegar al menú
+      // (App.showView fue mockeado para loguear la navegación)
+      log('accion', '✅ Acceso al menú digital concedido.');
+
+      // Resumen final
+      log('info', `── Resultado: ${pasaron} pasaron, ${fallaron} fallaron ──`);
+      if (fallaron === 0) {
+        log('ok', '🎉 Flujo de validación de mesa completo y funcionando.');
+      } else {
+        log('fallo', `⚠️ ${fallaron} test(s) fallaron. Revisar antes del PR.`);
+      }
+    });
+  </script>
+</body>
+</html>

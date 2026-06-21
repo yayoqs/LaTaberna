@@ -1,8 +1,11 @@
 /* ================================================================
-   PubPOS — MÓDULO: pedido-ui.js (v5.5 – sintaxis robusta)
+   PubPOS — MÓDULO: pedido-ui.js (v5.6 – activa permite_prepedidos)
    Propósito: Modal de pedido, revisar comandas, validación de stock.
               Usa funciones tradicionales y concatenación de strings
               para evitar errores de sintaxis al copiar/pegar.
+   Novedad v5.6: al confirmar la apertura de una mesa, actualiza el
+                 campo 'permite_prepedidos' en Appwrite para que el
+                 cliente pueda empezar a armar su pedido.
    ================================================================ */
 var Pedido = (function() {
 
@@ -152,6 +155,13 @@ var Pedido = (function() {
     mesa.items = [];
     mesa.observaciones = '';
     DB.saveMesas();
+
+    // Activar prepedidos para que el cliente pueda armar su orden
+    try {
+      await DBAppwrite.actualizar('mesas', String(num), { permite_prepedidos: true });
+    } catch (e) {
+      Logger.warn('[Pedido] No se pudo activar permite_prepedidos:', e);
+    }
 
     _abrirModalPedido(mesa);
   }
