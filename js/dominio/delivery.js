@@ -1,18 +1,13 @@
 /* ================================================================
-   LaTaberna - PubPOS — DOMINIO JS
+   LaTaberna - PubPOS — DOMINIO JS (ES6)
    Archivo: js/dominio/delivery.js
-   Versión: 1.0.2
+   Versión: 1.1.0
    Propósito: Agregado Delivery: pedido de entrega con máquina de estados.
-              Factory reconstruirDelivery acepta objeto plano o instancia.
+              Migrado a módulo ES6 con export.
    Dependencias: js/dominio/direccion.js, js/dominio/dinero.js,
                  js/dominio/cantidad.js
    ================================================================ */
-class Delivery {
-  /**
-   * @param {string} id - Identificador único del delivery
-   * @param {Direccion} direccion - Dirección de entrega
-   * @param {string} repartidor - Nombre del repartidor
-   */
+export class Delivery {
   constructor(id, direccion, repartidor = '') {
     if (!id) throw new Error('Delivery debe tener un ID');
     if (!(direccion instanceof Direccion)) throw new Error('Direccion inválida');
@@ -94,12 +89,7 @@ class Delivery {
   }
 }
 
-/**
- * Reconstruye un Delivery desde un objeto plano (JSON) o desde una instancia de Direccion.
- * @param {object} datos - Objeto con las propiedades del delivery.
- * @returns {Delivery}
- */
-function reconstruirDelivery(datos) {
+export function reconstruirDelivery(datos) {
   let direccion;
   if (datos.direccion instanceof Direccion) {
     direccion = datos.direccion;

@@ -1,20 +1,13 @@
 /* ================================================================
-   LaTaberna - PubPOS — DOMINIO JS
+   LaTaberna - PubPOS — DOMINIO JS (ES6)
    Archivo: js/dominio/pedido.js
-   Versión: 1.0.1
+   Versión: 1.1.0
    Propósito: Agregado PedidoAgregado: pedido de mesa, ítems, totales.
-              Agregada factory reconstruirPedidoAgregado.
+              Migrado a módulo ES6 con export.
    Dependencias: js/dominio/dinero.js, js/dominio/cantidad.js
    ================================================================ */
    
-   
-class PedidoAgregado {
-  /**
-   * @param {string} id - Identificador único del pedido
-   * @param {number} mesa - Número de mesa
-   * @param {string} mozo - Nombre del mesero
-   * @param {Cantidad} comensales - Cantidad de comensales
-   */
+export class PedidoAgregado {
   constructor(id, mesa, mozo, comensales) {
     if (!id) throw new Error('Pedido debe tener un ID');
     if (!mesa) throw new Error('Pedido debe tener una mesa');
@@ -107,12 +100,7 @@ class PedidoAgregado {
   }
 }
 
-/**
- * Reconstruye un PedidoAgregado desde un objeto plano (JSON).
- * @param {object} datos - Objeto con las propiedades del pedido.
- * @returns {PedidoAgregado}
- */
-function reconstruirPedidoAgregado(datos) {
+export function reconstruirPedidoAgregado(datos) {
   const pedido = new PedidoAgregado(
     datos.id,
     datos.mesa,

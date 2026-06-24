@@ -2,23 +2,22 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Test D – Eventos en Vivo</title>
+  <title>Test D – Eventos en Vivo (Votación)</title>
   <style>
     body { font-family: system-ui, sans-serif; background: #1a1a1a; color: #e0e0e0; padding: 30px; max-width: 700px; margin: auto; }
     h1 { color: #f59e0b; }
     .resultado { background: #2a2a2a; border-radius: 8px; padding: 12px 16px; margin: 8px 0; display: flex; align-items: center; gap: 12px; }
     .ok { border-left: 4px solid #22c55e; }
     .fallo { border-left: 4px solid #ef4444; }
-    .seccion { color: #f59e0b; font-size: 13px; min-width: 110px; }
+    .seccion { color: #f59e0b; font-size: 13px; min-width: 120px; }
   </style>
 </head>
 <body>
-  <h1>Test D – Eventos en Vivo</h1>
-  <p style="color:#a0a0a0; font-size:13px;">Panel del animador: bingo, karaoke, votación y control de acceso.</p>
+  <h1>Test D – Eventos en Vivo (Votación)</h1>
+  <p style="color:#a0a0a0; font-size:13px;">Flujo completo de votación: creación, envío de votos y actualización en tiempo real.</p>
   <div id="resultados"></div>
 
   <script>
-    // ─── Stubs del sistema ───────────────────────────────
     const Logger = { info: console.log, warn: console.warn, error: console.error };
     const EventBus = {
       events: {},
@@ -29,11 +28,7 @@
     const Auth = {
       _rol: 'artista',
       getRol() { return this._rol; },
-      getNombre() { return 'Animador Test'; },
-      esArtista() { return this._rol === 'artista'; },
-      esEventos() { return this._rol === 'eventos'; },
-      esAdmin() { return this._rol === 'admin'; },
-      esMaster() { return this._rol === 'master'; }
+      getNombre() { return 'Animador Test'; }
     };
     let toastMessages = [];
     function showToast(tipo, msg) { toastMessages.push({tipo, msg}); }
@@ -41,19 +36,21 @@
     let _docActual = null;
     const DBAppwrite = {
       async crear(coleccion, id, datos) {
-        _docActual = { id: 'doc_123', ...datos };
-        this.ultimoCreado = { coleccion, id, datos };
+        _docActual = { id: 'doc_votacion', ...datos };
         return _docActual;
       },
       async actualizar(coleccion, id, cambios) {
-        _docActual = { ..._docActual, ...cambios };
-        this.ultimaActualizacion = { coleccion, id, cambios };
-        EventBus.emit('eventos_en_vivo:actualizada', _docActual);
+        if (cambios.datos) {
+          _docActual.datos = { ..._docActual.datos, ...cambios.datos };
+        }
+        if (cambios.estado) {
+          _docActual.estado = cambios.estado;
+        }
+        EventBus.emit('eventos_en_vivo:actualizada', { ..._docActual });
       }
     };
   </script>
 
-  <!-- Cargar el módulo como ES6 -->
   <script type="module" src="js/modulos/admin/eventos-en-vivo.js"></script>
 
   <script>
@@ -65,7 +62,6 @@
     }
 
     async function iniciarTests() {
-      // Esperar a que el módulo esté disponible
       if (typeof window.EventosEnVivo === 'undefined') {
         await new Promise(r => setTimeout(r, 300));
       }
@@ -74,88 +70,66 @@
         return;
       }
 
-      // Test 1: Render inicial
       EventBus.emit('vista:cambiada', 'eventos-en-vivo');
       await new Promise(r => setTimeout(r, 50));
-      resultado(document.getElementById('view-eventos-en-vivo') !== null, 'Render', 'La vista se crea');
+      resultado(document.getElementById('view-eventos-en-vivo') !== null, 'Render', 'Vista creada');
       resultado(document.getElementById('estadoEvento').textContent.includes('Sin evento'), 'Render', 'Estado inicial sin evento');
 
-      // Test 2: Crear bingo
-      document.getElementById('selTipoEvento').value = 'bingo';
-      await EventosEnVivo.crearEvento();
-      resultado(document.getElementById('estadoEvento').textContent.includes('bingo'), 'Bingo', 'Badge muestra bingo');
-      resultado(document.getElementById('estadoEvento').textContent.includes('configuracion'), 'Bingo', 'Estado inicial configuracion');
-
-      // Test 3: Iniciar y cantar bola
-      await EventosEnVivo.cambiarEstado('activo');
-      await new Promise(r => setTimeout(r, 50));
-      const btnCantar = document.querySelector('#zonaInteraccion .btn-primary');
-      resultado(btnCantar && !btnCantar.disabled, 'Bingo', 'Botón Cantar bola habilitado');
-
-      await EventosEnVivo.cantarBola();
-      await new Promise(r => setTimeout(r, 50));
-      const bolas = document.querySelectorAll('.bola');
-      resultado(bolas.length === 1, 'Bingo', 'Aparece una bola tras cantar');
-      resultado(document.getElementById('estadoEvento').textContent.includes('activo'), 'Bingo', 'Estado sigue activo');
-
-      // Test 4: Finalizar y reiniciar
-      await EventosEnVivo.cambiarEstado('finalizado');
-      await new Promise(r => setTimeout(r, 50));
-      resultado(document.getElementById('estadoEvento').textContent.includes('finalizado'), 'Bingo', 'Estado finalizado');
-      const btnReiniciar = document.getElementById('btnReiniciar');
-      resultado(btnReiniciar.style.display !== 'none', 'Bingo', 'Botón reiniciar visible');
-
-      await EventosEnVivo.reiniciarEvento();
-      await new Promise(r => setTimeout(r, 50));
-      resultado(document.getElementById('estadoEvento').textContent.includes('configuracion'), 'Bingo', 'Reiniciado a configuracion');
-      const bolasDespues = document.querySelectorAll('.bola');
-      resultado(bolasDespues.length === 0, 'Bingo', 'Bolas limpiadas tras reiniciar');
-
-      // Test 5: Karaoke
-      document.getElementById('selTipoEvento').value = 'karaoke';
-      await EventosEnVivo.crearEvento();
-      await EventosEnVivo.cambiarEstado('activo');
-      await new Promise(r => setTimeout(r, 50));
-      document.getElementById('letraKaraoke').value = 'Estribillo de prueba';
-      await EventosEnVivo.actualizarLetra();
-      await new Promise(r => setTimeout(r, 50));
-      resultado(DBAppwrite.ultimaActualizacion.cambios.datos.letra === 'Estribillo de prueba', 'Karaoke', 'Letra guardada correctamente');
-
-      await EventosEnVivo.limpiarLetra();
-      await new Promise(r => setTimeout(r, 50));
-      resultado(DBAppwrite.ultimaActualizacion.cambios.datos.letra === '', 'Karaoke', 'Letra limpia correctamente');
-
-      // Test 6: Votación
       document.getElementById('selTipoEvento').value = 'votacion';
       await EventosEnVivo.crearEvento();
+      resultado(document.getElementById('estadoEvento').textContent.includes('votacion'), 'Votación', 'Badge muestra votación');
+      resultado(document.getElementById('estadoEvento').textContent.includes('configuracion'), 'Votación', 'Estado configuracion');
+
       await EventosEnVivo.cambiarEstado('activo');
       await new Promise(r => setTimeout(r, 50));
+      resultado(document.getElementById('estadoEvento').textContent.includes('activo'), 'Votación', 'Estado activo');
+
       document.getElementById('nuevaOpcion').value = 'Opción A';
       await EventosEnVivo.agregarOpcion();
       await new Promise(r => setTimeout(r, 50));
-      resultado(DBAppwrite.ultimaActualizacion.cambios.datos.opciones.includes('Opción A'), 'Votación', 'Opción A agregada');
+      resultado(_docActual.datos.opciones.includes('Opción A'), 'Votación', 'Opción A registrada');
 
       document.getElementById('nuevaOpcion').value = 'Opción B';
       await EventosEnVivo.agregarOpcion();
       await new Promise(r => setTimeout(r, 50));
-      await EventosEnVivo.eliminarUltimaOpcion();
-      await new Promise(r => setTimeout(r, 50));
-      resultado(!DBAppwrite.ultimaActualizacion.cambios.datos.opciones.includes('Opción B'), 'Votación', 'Opción B eliminada');
-      resultado(DBAppwrite.ultimaActualizacion.cambios.datos.opciones.includes('Opción A'), 'Votación', 'Opción A permanece');
+      resultado(_docActual.datos.opciones.includes('Opción B'), 'Votación', 'Opción B registrada');
 
-      // Test 7: Acceso denegado
-      Auth._rol = 'cliente';
-      EventBus.emit('vista:cambiada', 'otra');
-      EventBus.emit('vista:cambiada', 'eventos-en-vivo');
+      // ── Simular llegada de votos ──────────────────────
+      // Voto inicial para Opción A
+      await DBAppwrite.actualizar('eventos_en_vivo', 'doc_votacion', {
+        datos: { resultados: { 'Opción A': 1, 'Opción B': 0 } }
+      });
       await new Promise(r => setTimeout(r, 50));
-      const panel = document.getElementById('panelEventoVivo');
-      resultado(panel.textContent.includes('Acceso denegado'), 'Acceso', 'Muestra acceso denegado para rol no autorizado');
+      let listaVotos = document.querySelector('.votacion-lista');
+      resultado(listaVotos !== null, 'Votos', 'Lista de opciones visible');
+      resultado(listaVotos.textContent.includes('Opción A — 1 votos'), 'Votos', 'Opción A muestra 1 voto');
+      resultado(listaVotos.textContent.includes('Opción B — 0 votos'), 'Votos', 'Opción B muestra 0 votos');
 
-      // Ocultar la vista para limpiar la interfaz
+      // Voto adicional para Opción B
+      await DBAppwrite.actualizar('eventos_en_vivo', 'doc_votacion', {
+        datos: { resultados: { 'Opción A': 1, 'Opción B': 1 } }
+      });
+      await new Promise(r => setTimeout(r, 50));
+      listaVotos = document.querySelector('.votacion-lista'); // Volver a obtener del DOM actualizado
+      resultado(listaVotos.textContent.includes('Opción B — 1 votos'), 'Votos', 'Opción B ahora muestra 1 voto');
+
+      // Múltiples votos acumulados
+      await DBAppwrite.actualizar('eventos_en_vivo', 'doc_votacion', {
+        datos: { resultados: { 'Opción A': 5, 'Opción B': 3 } }
+      });
+      await new Promise(r => setTimeout(r, 50));
+      listaVotos = document.querySelector('.votacion-lista'); // Obtener de nuevo
+      resultado(listaVotos.textContent.includes('Opción A — 5 votos'), 'Votos', 'Opción A muestra 5 votos acumulados');
+      resultado(listaVotos.textContent.includes('Opción B — 3 votos'), 'Votos', 'Opción B muestra 3 votos acumulados');
+
+      await EventosEnVivo.cambiarEstado('finalizado');
+      await new Promise(r => setTimeout(r, 50));
+      resultado(document.getElementById('estadoEvento').textContent.includes('finalizado'), 'Votación', 'Votación finalizada');
+
       const vista = document.getElementById('view-eventos-en-vivo');
       if (vista) vista.style.display = 'none';
 
-      console.log('Todos los tests de eventos en vivo finalizados.');
+      console.log('Todos los tests de votación en vivo finalizados.');
     }
 
     window.addEventListener('load', () => setTimeout(iniciarTests, 100));

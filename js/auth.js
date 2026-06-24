@@ -1,8 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS
    Archivo: js/auth.js
-   Versión: 1.0.0
-   Propósito: Autenticación local, gestión de sesión, roles y login.
+   Versión: 1.0.2
+   Propósito: Autenticación, hashing SHA-256, roles, login/logout,
+              registro de clientes, modal de login con botón Registrarse.
+   Dependencias: js/lib/logger.js, js/lib/eventBus.js, js/utils.js
    ================================================================ */
 const Auth = (() => {
   // ── CONFIGURACIÓN INICIAL SOLO PARA PRIMER ARRANQUE ────────
@@ -162,9 +164,12 @@ const Auth = (() => {
             '<input type="text" id="loginUsuario" placeholder="Ej: admin, mesero, cocina...">' +
             '<label>Contraseña</label>' +
             '<input type="password" id="loginPassword" placeholder="Contraseña">' +
-            '<div class="modal-small-footer">' +
+            '<div class="modal-small-footer" style="display:flex; flex-direction:column; gap:8px;">' +
               '<button class="btn-primary" onclick="Auth._loginFromModal()" style="width:100%;">' +
                 '<i class="fas fa-sign-in-alt"></i> Ingresar' +
+              '</button>' +
+              '<button class="btn-secondary" onclick="Auth._mostrarRegistro()" style="width:100%;">' +
+                '<i class="fas fa-user-plus"></i> ¿Aun sin cuenta? Registrate' +
               '</button>' +
             '</div>' +
           '</div>' +
@@ -188,6 +193,14 @@ const Auth = (() => {
     const passInput = document.getElementById('loginPassword');
     if (userInput) userInput.value = '';
     if (passInput) passInput.value = '';
+  }
+
+  /**
+   * Emite el evento 'auth:mostrarRegistro' para que la Célula C
+   * abra su modal de registro.
+   */
+  function _mostrarRegistro() {
+    EventBus.emit('auth:mostrarRegistro');
   }
 
   // ── GESTIÓN DE CONTRASEÑAS ────────────────────────────
@@ -425,7 +438,8 @@ const Auth = (() => {
     puedeAccederEventos, puedeAccederPerfil,
     cambiarPassword, _cargarUsuarios,
     registrarCliente,
-    getAppwriteUserId
+    getAppwriteUserId,
+    _mostrarRegistro
   };
 })();
 

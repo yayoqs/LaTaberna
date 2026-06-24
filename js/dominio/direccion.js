@@ -1,19 +1,13 @@
 /* ================================================================
-   LaTaberna - PubPOS — DOMINIO JS
+   LaTaberna - PubPOS — DOMINIO JS (ES6)
    Archivo: js/dominio/direccion.js
-   Versión: 1.0.0
+   Versión: 1.1.0
    Propósito: Objeto de Valor Direccion: dirección de entrega inmutable.
+              Migrado a módulo ES6 con export.
    Dependencias: (ninguna externa)
    ================================================================ */
    
-class Direccion {
-  /**
-   * @param {string} calle - Calle principal (obligatorio)
-   * @param {string} numero - Número (opcional)
-   * @param {string} depto - Departamento (opcional)
-   * @param {string} referencia - Referencia adicional (opcional)
-   * @param {string} telefono - Teléfono de contacto (opcional)
-   */
+export class Direccion {
   constructor(calle, numero = '', depto = '', referencia = '', telefono = '') {
     if (!calle || typeof calle !== 'string' || calle.trim().length === 0) {
       throw new Error('La calle es obligatoria');
@@ -32,10 +26,6 @@ class Direccion {
   get referencia() { return this._referencia; }
   get telefono()   { return this._telefono; }
 
-  // ── Utilidades ───────────────────────────────────────────
-  /**
-   * Devuelve la dirección en una sola línea para mostrar en tickets.
-   */
   toString() {
     let dir = this._calle;
     if (this._numero)     dir += ' ' + this._numero;
@@ -56,8 +46,7 @@ class Direccion {
   }
 }
 
-// Factory segura
-function crearDireccion(calle, numero, depto, referencia, telefono) {
+export function crearDireccion(calle, numero, depto, referencia, telefono) {
   try {
     return new Direccion(calle, numero, depto, referencia, telefono);
   } catch {

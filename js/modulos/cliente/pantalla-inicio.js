@@ -1,10 +1,24 @@
 /* ================================================================
-   LaTaberna - PubPOS — MÓDULO JS
+   LaTaberna - PubPOS — Módulo
    Archivo: js/modulos/cliente/pantalla-inicio.js
-   Versión: 1.0.0
-   Propósito: Pantalla de inicio pública con triángulo de acceso, vitrinas deslizables y eslogan dinámico.
-   Dependencias: js/auth.js (Auth.mostrarLogin, Auth.registrarCliente)
+   Versión: 1.0.2
+   Propósito: Pantalla de inicio híbrida con triángulo de acceso,
+             vitrinas y registro vía modal del sistema.
+   Dependencias: Auth, EventBus
    ================================================================ */
+
+/**
+ * Pantalla de Inicio Híbrida (v1.0.2)
+ * Vista pública que no requiere autenticación.
+ *
+ * @module PantallaInicio
+ * @version 1.0.2
+ *
+ * Rediseño con triángulo de acceso neón, cabecera izquierda
+ * y vitrinas deslizables decorativas con eslogan dinámico.
+ * Ahora también escucha el evento 'auth:mostrarRegistro' para
+ * abrir el modal de registro desde el modal de login del sistema.
+ */
 const PantallaInicio = (() => {
   let _vista = null;
   let _intervaloEslogan = null;
@@ -75,6 +89,13 @@ const PantallaInicio = (() => {
       e.stopPropagation();
       _mostrarRegistro();
     });
+
+    // Escuchar el evento del modal de login del sistema
+    if (typeof window.EventBus !== 'undefined') {
+      window.EventBus.on('auth:mostrarRegistro', () => {
+        _mostrarRegistro();
+      });
+    }
 
     _iniciarEsloganDinamico();
 

@@ -1,23 +1,21 @@
 /* ================================================================
    LaTaberna - PubPOS — Módulo
    Archivo: js/modulos/cliente/pantalla-bienvenida.js
-   Versión: 1.0.2
-   Propósito: Pantalla de bienvenida post-login con ingreso de mesa,
-             espera de activación y tarjetas de acción. 
-             La gestión del header principal se delega en app.js v1.0.2.
+   Versión: 1.0.3
+   Propósito: Pantalla de bienvenida post-login con validación de
+             existencia de mesa en el Store antes de activar espera.
    Dependencias: Auth, Store, EventBus, App
    ================================================================ */
 
 /**
- * Pantalla de Bienvenida post-login (v1.0.2)
+ * Pantalla de Bienvenida post-login (v1.0.3)
  * Módulo ES6 para la vista de bienvenida de clientes.
  *
  * @module PantallaBienvenida
- * @version 1.0.2
+ * @version 1.0.3
  *
- * Se eliminó la manipulación manual del header.
- * Ahora app.js v1.0.2 lo oculta para todos los roles
- * y permite al master revelarlo con un gesto swipe.
+ * Ahora valida que la mesa ingresada exista en Store.getState().mesas.
+ * Si no existe, muestra error y no pasa al estado de espera.
  */
 const PantallaBienvenida = (() => {
   let _vista = null;
@@ -114,12 +112,25 @@ const PantallaBienvenida = (() => {
   function _guardarMesa() {
     const input = document.getElementById('inputMesa');
     const valor = parseInt(input?.value, 10);
+    const estadoEl = document.getElementById('estadoMesa');
+    
     if (!valor || valor < 1) {
-      document.getElementById('estadoMesa').textContent = 'Ingresá un número válido.';
+      estadoEl.textContent = 'Ingresá un número válido.';
       return;
     }
+
+    // Validar que la mesa existe en el Store
+    const state = window.Store?.getState?.() || {};
+    const mesas = state.mesas || [];
+    const mesaExiste = mesas.some(m => m.numero === valor);
+
+    if (!mesaExiste) {
+      estadoEl.textContent = `La mesa ${valor} no existe. Verificá el número.`;
+      return;
+    }
+
     _mesa = valor;
-    document.getElementById('estadoMesa').textContent = `Mesa ${_mesa} guardada.`;
+    estadoEl.textContent = `Mesa ${_mesa} guardada.`;
     _verificarPermisoMesa();
     document.getElementById('cardEspera').style.display = 'block';
     document.getElementById('mesaAsignada').textContent = `Mesa ${_mesa}`;
