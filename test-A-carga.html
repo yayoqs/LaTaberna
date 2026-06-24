@@ -81,10 +81,10 @@
         resultsEl.innerHTML += '<h2>5. Inicialización de Appwrite</h2>';
         var appwriteOk = false;
         try {
-          appwriteOk = await DBAppwrite.init();
-          assert(appwriteOk === true, 'DBAppwrite.init() retorna true');
+          appwriteOk = await DBAppwrite.iniciar();
+          assert(appwriteOk === true, 'DBAppwrite.iniciar() retorna true');
         } catch (e) {
-          assert(false, 'Error en DBAppwrite.init: ' + e.message);
+          assert(false, 'Error en DBAppwrite.iniciar: ' + e.message);
         }
 
         // 6. Probar listado de una colección (productos)

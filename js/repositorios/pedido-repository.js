@@ -1,9 +1,13 @@
 /* ================================================================
-   Raíz — REPOSITORIO: pedido-repository.js (v2.0 – Appwrite directo)
-   Propósito: Implementación local del repositorio de pedidos.
-              Cada método que modifica datos sincroniza directamente
-              con Appwrite después de actualizar el estado local.
+   LaTaberna - PubPOS — REPOSITORIO JS
+   Archivo: js/repositorios/pedido-repository.js
+   Versión: 1.0.1
+   Propósito: Implementación local del repositorio de pedidos con sincronización directa a Appwrite.
+              Agregado método guardarPedido para persistir cambios de PedidoService.
+   Dependencias: js/db.js, js/db-appwrite.js, js/lib/logger.js, js/lib/store.js, js/lib/eventBus.js, js/utils.js (calcularTotal)
    ================================================================ */
+   
+   
 const PedidoRepository = {
   async crearPedidoMesa(datos) { throw new Error('No implementado'); },
   async obtenerPorId(id)   { throw new Error('No implementado'); },
@@ -12,7 +16,8 @@ const PedidoRepository = {
   async abrirMesa(numeroMesa, mozo, comensales) { throw new Error('No implementado'); },
   async enviarComanda(mesa, itemsPendientes, mozo, comensales, observaciones) { throw new Error('No implementado'); },
   async agregarMesa(datosMesa) { throw new Error('No implementado'); },
-  async liberarMesa(numeroMesa) { throw new Error('No implementado'); }
+  async liberarMesa(numeroMesa) { throw new Error('No implementado'); },
+  async guardarPedido(datosPedido) { throw new Error('No implementado'); }
 };
 
 const PedidoRepositoryLocal = (() => {
@@ -116,7 +121,6 @@ const PedidoRepositoryLocal = (() => {
     mesa.pedidoId = pedidoLocal.id;
     DB.saveMesas();
 
-    // Sincronizar con Appwrite
     await _syncMesa(mesa);
     await _syncPedido(pedidoLocal, true);
 
@@ -165,7 +169,6 @@ const PedidoRepositoryLocal = (() => {
 
     DB.saveComandas();
 
-    // Actualizar pedido localmente
     if (mesa.pedidoId && typeof DB.actualizarPedido === 'function') {
       await DB.actualizarPedido(mesa.pedidoId, {
         estado: 'en_proceso',
@@ -177,7 +180,6 @@ const PedidoRepositoryLocal = (() => {
       });
     }
 
-    // Sincronizar con Appwrite: comandas y pedido actualizado
     for (const c of comandasCreadas) {
       await _syncComanda(c, true);
     }
@@ -217,7 +219,6 @@ const PedidoRepositoryLocal = (() => {
     if (pedidoCerrado) {
       await _syncPedido(pedidoCerrado, false);
 
-      // Liberar la mesa asociada
       const mesa = DB.mesas.find(m => m.pedidoId === id);
       if (mesa && !mesa.esVirtual) {
         mesa.estado = 'libre';
@@ -282,12 +283,10 @@ const PedidoRepositoryLocal = (() => {
       }
     }
 
-    // Sincronizar la mesa liberada
     if (!mesa.esVirtual) {
       const mesaActualizada = DB.mesas.find(m => m.numero == numeroMesa);
       if (mesaActualizada) await _syncMesa(mesaActualizada);
     } else {
-      // Si era virtual, las mesas originales se liberaron, hay que sincronizarlas
       for (const num of mesa.mesasFusionadas || []) {
         const m = DB.mesas.find(x => x.numero === num);
         if (m) await _syncMesa(m);
@@ -298,6 +297,27 @@ const PedidoRepositoryLocal = (() => {
     return mesa;
   }
 
+  /**
+   * Guarda un pedido existente. Actualiza el array local y sincroniza con Appwrite.
+   * @param {object} datosPedido - objeto con los datos actualizados del pedido.
+   * @returns {Promise<object>}
+   */
+  async function guardarPedido(datosPedido) {
+    if (!window.DB || !DB.pedidos) throw new Error('DB no disponible');
+    const idx = DB.pedidos.findIndex(p => p.id === datosPedido.id);
+    if (idx === -1) throw new Error('Pedido no encontrado para guardar');
+
+    DB.pedidos[idx] = { ...DB.pedidos[idx], ...datosPedido };
+    DB.savePedidos();
+
+    if (typeof Store !== 'undefined') {
+      Store.dispatch({ type: 'PEDIDO_ACTUALIZADO', payload: { id: datosPedido.id, cambios: datosPedido } });
+    }
+
+    await _syncPedido(DB.pedidos[idx], false);
+    return DB.pedidos[idx];
+  }
+
   return {
     abrirMesa,
     enviarComanda,
@@ -306,7 +326,8 @@ const PedidoRepositoryLocal = (() => {
     cerrarPedido,
     obtenerTodos,
     agregarMesa,
-    liberarMesa
+    liberarMesa,
+    guardarPedido
   };
 })();
 

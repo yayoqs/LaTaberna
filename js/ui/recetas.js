@@ -1,14 +1,17 @@
 /* ================================================================
-   PubPOS — MÓDULO: recetas.js (v6.0 – búsqueda por ingrediente,
-   cálculo de costos y exportación individual de receta a PDF)
-   Propósito: Vista de recetario con filtros mejorados, costos y
-              exportación. Obtiene datos del Store.
+   LaTaberna - PubPOS — UI JS
+   Archivo: js/ui/recetas.js
+   Versión: 1.0.0
+   Propósito: Vista unificada de recetario (modo consulta y administración).
+   Dependencias: js/lib/store.js, js/lib/eventBus.js, js/auth.js, js/db.js, js/utils.js, js/lib/logger.js
    ================================================================ */
-
+   
+   
 const Recetas = (() => {
 
   let _terminoBusqueda = '';
   let _terminoIngrediente = '';
+  let _modo = null; // 'administracion' | 'consulta' | null (autodetectar)
 
   function _asegurarVista() {
     if (document.getElementById('view-recetas')) return;
@@ -28,7 +31,7 @@ const Recetas = (() => {
             <i class="fas fa-boxes"></i>
             <input type="text" id="recetasIngredienteSearch" placeholder="Buscar por ingrediente..." oninput="Recetas.filtrarPorIngrediente()">
           </div>
-          <button class="btn-secondary" onclick="Recetas.mostrarModalReceta()"><i class="fas fa-plus"></i> Nueva Receta</button>
+          <button class="btn-secondary" id="btnNuevaReceta" onclick="Recetas.mostrarModalReceta()"><i class="fas fa-plus"></i> Nueva Receta</button>
         </div>
       </div>
       <div id="recetasGrid" class="recetas-grid"></div>
@@ -38,10 +41,26 @@ const Recetas = (() => {
   }
 
   /**
-   * Renderiza la cuadrícula de recetas obteniendo datos del Store.
+   * Renderiza la cuadrícula de recetas.
+   * @param {string} [modo] - 'administracion', 'consulta' o undefined (autodetectar según rol).
    */
-  function render() {
+  function render(modo) {
+    // Determinar modo
+    if (modo) {
+      _modo = modo;
+    } else {
+      const rol = Auth.getRol();
+      _modo = (rol === 'admin' || rol === 'master') ? 'administracion' : 'consulta';
+    }
+
     _asegurarVista();
+
+    // Mostrar/ocultar botón Nueva Receta según modo
+    const btnNueva = document.getElementById('btnNuevaReceta');
+    if (btnNueva) {
+      btnNueva.style.display = (_modo === 'administracion') ? '' : 'none';
+    }
+
     const grid = document.getElementById('recetasGrid');
     if (!grid) return;
 
@@ -58,13 +77,11 @@ const Recetas = (() => {
     const recetas = state.recetas || [];
     const ingredientes = state.ingredientes || [];
 
-    // Filtro por nombre de producto
     if (_terminoBusqueda) {
       const term = _terminoBusqueda.toLowerCase();
       productos = productos.filter(p => p.nombre.toLowerCase().includes(term));
     }
 
-    // Filtro por ingrediente
     if (_terminoIngrediente) {
       const termIng = _terminoIngrediente.toLowerCase();
       productos = productos.filter(prod => {
@@ -77,7 +94,6 @@ const Recetas = (() => {
       });
     }
 
-    // Solo mostrar productos que tengan receta con ingredientes
     productos = productos.filter(prod => {
       const receta = recetas.find(r => r.productoId == prod.id);
       return receta && receta.ingredientes && receta.ingredientes.length > 0;
@@ -108,13 +124,11 @@ const Recetas = (() => {
     }).join('');
   }
 
-  /** Filtra recetas por término de búsqueda de nombre */
   function filtrar() {
     _terminoBusqueda = document.getElementById('recetasSearch')?.value?.trim() || '';
     render();
   }
 
-  /** Filtra recetas por ingrediente */
   function filtrarPorIngrediente() {
     _terminoIngrediente = document.getElementById('recetasIngredienteSearch')?.value?.trim() || '';
     render();
@@ -139,7 +153,7 @@ const Recetas = (() => {
     return mapa[categoria] || 'fa-box';
   }
 
-  /** Muestra el modal de detalle de una receta, ahora con cálculo de costo total */
+  /** Muestra el modal de detalle de una receta */
   function mostrarDetalle(prodId) {
     const state = Store.getState();
     const producto = (state.productos || []).find(p => p.id == prodId);
@@ -168,10 +182,10 @@ const Recetas = (() => {
             <div id="detalleCosto"></div>
             <div id="detalleInstrucciones"></div>
           </div>
-          <div class="modal-footer">
-            <button class="btn-secondary" onclick="Recetas.cerrarDetalle()">Cerrar</button>
-            <button class="btn-secondary" onclick="Recetas.exportarRecetaPDF('${prodId}')"><i class="fas fa-print"></i> Exportar PDF</button>
-            <button class="btn-primary" onclick="Recetas.editarRecetaDesdeDetalle('${prodId}')"><i class="fas fa-edit"></i> Editar Receta</button>
+          <div class="modal-footer" id="detalleFooter">
+            <button class="btn-secondary" id="btnCerrarDetalle" onclick="Recetas.cerrarDetalle()">Cerrar</button>
+            <button class="btn-secondary" id="btnExportarPDF" onclick="Recetas.exportarRecetaPDF('${prodId}')"><i class="fas fa-print"></i> Exportar PDF</button>
+            <button class="btn-primary" id="btnEditarReceta" onclick="Recetas.editarRecetaDesdeDetalle('${prodId}')"><i class="fas fa-edit"></i> Editar Receta</button>
           </div>
         </div>
       `;
@@ -208,7 +222,6 @@ const Recetas = (() => {
     htmlIng += '</ul>';
     document.getElementById('detalleIngredientes').innerHTML = htmlIng;
 
-    // Mostrar costo total
     document.getElementById('detalleCosto').innerHTML = `
       <h4><i class="fas fa-dollar-sign"></i> Costo estimado</h4>
       <p style="font-size:14px; font-weight:600;">Total: ${fmtMoney(costoTotal)}</p>
@@ -225,6 +238,12 @@ const Recetas = (() => {
       <div class="receta-pasos">${pasosHTML || '<p>Sin instrucciones.</p>'}</div>
     `;
 
+    // Ajustar visibilidad según modo
+    const btnEditar = document.getElementById('btnEditarReceta');
+    if (btnEditar) {
+      btnEditar.style.display = (_modo === 'administracion') ? '' : 'none';
+    }
+
     modal.dataset.productoId = prodId;
     modal.style.display = 'flex';
   }
@@ -235,11 +254,14 @@ const Recetas = (() => {
   }
 
   function editarRecetaDesdeDetalle(prodId) {
+    if (_modo !== 'administracion') {
+      showToast('error', 'No tienes permisos para editar recetas');
+      return;
+    }
     cerrarDetalle();
     Recetas.mostrarModalReceta(prodId);
   }
 
-  /** Exporta la receta actual a PDF (ventana de impresión) */
   function exportarRecetaPDF(prodId) {
     const state = Store.getState();
     const producto = (state.productos || []).find(p => p.id == prodId);
@@ -290,8 +312,11 @@ const Recetas = (() => {
     ventana.close();
   }
 
-  /** Asegura que el modal de creación/edición de receta exista */
   function _asegurarModalReceta() {
+    if (_modo !== 'administracion') {
+      showToast('error', 'Acceso denegado');
+      return;
+    }
     if (document.getElementById('modalReceta')) return;
 
     const modal = document.createElement('div');
@@ -317,9 +342,9 @@ const Recetas = (() => {
     document.body.appendChild(modal);
   }
 
-  /** Muestra el modal de receta */
   function mostrarModalReceta(productoId = null) {
     _asegurarModalReceta();
+    if (_modo !== 'administracion') return;
 
     const state = Store.getState();
     const selProd = document.getElementById('recProductoId');
@@ -374,8 +399,11 @@ const Recetas = (() => {
     }
   }
 
-  /** Guarda la receta actual */
   async function guardarReceta() {
+    if (_modo !== 'administracion') {
+      showToast('error', 'Acceso denegado');
+      return;
+    }
     const productoId = document.getElementById('recProductoId').value;
     if (!productoId) {
       showToast('error', 'Selecciona un producto');
@@ -423,6 +451,10 @@ const Recetas = (() => {
   }
 
   async function _quitarIngrediente(productoId, ingredienteId) {
+    if (_modo !== 'administracion') {
+      showToast('error', 'Acceso denegado');
+      return;
+    }
     const receta = DB.recetas.find(r => r.productoId == productoId);
     if (receta) {
       receta.ingredientes = receta.ingredientes.filter(ing => ing.ingredienteId != ingredienteId);
@@ -432,7 +464,6 @@ const Recetas = (() => {
     }
   }
 
-  /* ── SUSCRIPCIÓN AL STORE ───────────────────────────────── */
   function _initListeners() {
     Store.subscribe((state, action) => {
       if (action.type.startsWith('PRODUCTO') || action.type.startsWith('RECETA') || action.type.startsWith('INGREDIENTE')) {

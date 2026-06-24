@@ -1,5 +1,8 @@
 /* ================================================================
-   PubPOS — MÓDULO: roles.js (v3 – nuevo rol artista)
+   LaTaberna - PubPOS — MÓDULO JS
+   Archivo: js/roles.js
+   Versión: 1.0.0
+   Propósito: Definición de roles y matriz de permisos del sistema.
    ================================================================ */
 const Roles = {
   lista: ['master', 'admin', 'cocina', 'barra', 'caja', 'mesero', 'despensa', 'eventos', 'reparto', 'cliente', 'artista'],

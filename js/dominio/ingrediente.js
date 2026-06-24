@@ -1,8 +1,9 @@
 /* ================================================================
-   PubPOS — DOMINIO: Ingrediente (Agregado)
-   Propósito: Representa un ingrediente o insumo del inventario.
-              Encapsula las reglas de stock y garantiza que nunca
-              quede en un estado inválido.
+   LaTaberna - PubPOS — DOMINIO JS
+   Archivo: js/dominio/ingrediente.js
+   Versión: 1.0.0
+   Propósito: Agregado Ingrediente: stock, valor unitario, alertas.
+   Dependencias: js/dominio/cantidad.js, js/dominio/dinero.js
    ================================================================ */
 class Ingrediente {
   /**

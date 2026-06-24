@@ -3,247 +3,247 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>La Taberna — Bienvenida (Prototipo)</title>
+    <title>La Taberna — Eventos en Vivo (Prototipo v2)</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
             --color-bg: #0f0f14;
             --color-accent: #f59e0b;
-            --color-accent-dark: #d97706;
             --color-primary: #6366f1;
             --color-card: #1a1a24;
-            --color-panel: #21212e;
             --color-border: #2e2e42;
             --color-text: #f1f5f9;
             --color-text-sec: #94a3b8;
             --color-text-muted: #64748b;
             --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            --radius: 14px;
-            --radius-sm: 8px;
-            --t: all 0.2s ease;
+            --radius: 16px;
+            --radius-sm: 10px;
+            --t: all 0.25s ease;
         }
 
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
             font-family: var(--font-ui);
-            background-color: var(--color-bg);
+            background: var(--color-bg);
             color: var(--color-text);
             min-height: 100vh;
             display: flex;
-            flex-direction: column;
             align-items: center;
-            justify-content: flex-start;
+            justify-content: center;
             padding: 20px;
-            background-image:
-                radial-gradient(circle at 50% 0%, rgba(245,158,11,0.08) 0%, transparent 50%),
-                linear-gradient(rgba(255,255,255,0.01) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255,255,255,0.01) 1px, transparent 1px);
-            background-size: 100% 100%, 40px 40px, 40px 40px;
         }
 
-        /* Barra superior */
-        .top-bar {
+        .vista-eventos {
             width: 100%;
-            max-width: 500px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 15px 0;
-            margin-bottom: 30px;
-            border-bottom: 1px solid var(--color-border);
-        }
-        .user-profile { display: flex; align-items: center; gap: 10px; }
-        .user-avatar {
-            width: 40px; height: 40px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
-            display: flex; align-items: center; justify-content: center;
-            font-weight: bold; font-size: 0.9rem;
-            box-shadow: 0 0 10px rgba(245,158,11,0.4);
-        }
-        .user-info h3 { font-size: 0.95rem; font-weight: 700; }
-        .user-info p  { font-size: 0.75rem; color: var(--color-accent); }
-        .logout-btn {
-            background: transparent;
-            border: 1px solid rgba(245,158,11,0.4);
-            color: var(--color-accent);
-            padding: 8px 14px;
-            border-radius: 20px;
-            font-size: 0.8rem; font-weight: 600;
-            cursor: pointer; transition: var(--t);
-        }
-        .logout-btn:hover { background: var(--color-accent); color: #000; }
-
-        /* Contenedor principal */
-        .welcome-container {
-            width: 100%;
-            max-width: 450px;
+            max-width: 480px;
+            min-height: 650px;
+            background: var(--color-bg);
+            border-radius: var(--radius);
+            position: relative;
+            overflow: hidden;
             display: flex;
             flex-direction: column;
-            gap: 25px;
+            box-shadow: 0 0 40px rgba(0,0,0,.5);
         }
 
-        /* Tarjeta base */
-        .status-card {
-            background: var(--color-card);
-            border-radius: var(--radius);
-            padding: 25px;
+        /* Fondo animado */
+        .eventos-fondo {
+            position: absolute;
+            inset: 0;
+            background:
+                radial-gradient(circle at 30% 40%, rgba(99,102,241,.12) 0%, transparent 55%),
+                radial-gradient(circle at 70% 60%, rgba(245,158,11,.1) 0%, transparent 55%),
+                radial-gradient(circle at 50% 80%, rgba(239,68,68,.08) 0%, transparent 55%);
+            animation: eventos-mesh 12s ease-in-out infinite alternate;
+            pointer-events: none;
+            z-index: 0;
+        }
+        @keyframes eventos-mesh {
+            0%   { transform: scale(1); }
+            100% { transform: scale(1.08); }
+        }
+
+        .eventos-contenido {
+            position: relative;
+            z-index: 1;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 28px 20px 24px;
+            gap: 20px;
+        }
+
+        /* Header */
+        .eventos-header {
             text-align: center;
-            border: 1px solid var(--color-border);
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            position: relative; overflow: hidden;
+            flex-shrink: 0;
         }
-        .status-card::before {
-            content: '';
-            position: absolute; top: 0; left: 0;
-            width: 100%; height: 4px;
+        .eventos-header h1 {
+            font-size: 26px;
+            font-weight: 800;
             background: linear-gradient(to right, var(--color-accent), var(--color-primary));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 6px;
         }
-        .status-card h2 {
-            font-size: 1.3rem;
-            margin-bottom: 15px;
-            letter-spacing: 0.5px;
-        }
-
-        /* Input de mesa */
-        .input-group {
-            display: flex; gap: 10px; margin-top: 15px; justify-content: center;
-        }
-        .table-input {
-            width: 100px;
-            background: var(--color-panel);
-            border: 2px solid rgba(245,158,11,0.3);
-            border-radius: var(--radius-sm);
-            padding: 12px; color: #fff;
-            font-size: 1.2rem; font-weight: 700; text-align: center;
-            outline: none; transition: var(--t);
-        }
-        .table-input:focus { border-color: var(--color-accent); }
-        .primary-btn {
-            background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
-            border: none; color: #fff;
-            padding: 12px 24px; border-radius: var(--radius-sm);
-            font-weight: 700; font-size: 0.95rem;
-            cursor: pointer; transition: var(--t);
-        }
-        .primary-btn:hover { transform: translateY(-1px); }
-
-        /* Espera */
-        .waiting-status {
-            display: flex; flex-direction: column; align-items: center;
-            gap: 12px; margin-top: 10px;
-        }
-        .spinner {
-            width: 24px; height: 24px;
-            border: 3px solid rgba(245,158,11,0.2);
-            border-top-color: var(--color-accent);
-            border-radius: 50%;
-            animation: spin 1s infinite linear;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-        .pre-order-badge {
-            display: inline-block; margin-top: 15px;
-            padding: 6px 12px;
-            background: rgba(245,158,11,0.08);
-            border: 1px dashed var(--color-accent);
-            border-radius: 20px;
-            font-size: 0.75rem; color: var(--color-accent); font-weight: 600;
+        .eventos-sub {
+            font-size: 14px;
+            color: var(--color-text-sec);
+            font-style: italic;
+            margin-bottom: 12px;
         }
 
-        /* Acciones */
-        .menu-grid {
-            display: flex; flex-direction: column; gap: 15px; width: 100%;
-        }
-        .action-card {
-            background: var(--color-card);
-            border: 1px solid var(--color-border);
-            border-radius: var(--radius);
-            padding: 20px;
-            display: flex; align-items: center; gap: 18px;
-            cursor: pointer; text-align: left; position: relative;
+        /* Badge En vivo con pulso mejorado */
+        .eventos-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(239,68,68,0.12);
+            border: 1px solid rgba(239,68,68,0.25);
+            border-radius: 99px;
+            padding: 6px 16px;
+            font-size: 12px;
+            font-weight: 700;
+            color: #ef4444;
             transition: var(--t);
         }
-        .action-card::after {
-            content: '\f105';
-            font-family: 'Font Awesome 6 Free';
-            font-weight: 900;
-            position: absolute; right: 20px;
-            color: var(--color-text-muted); font-size: 1.1rem;
-            transition: transform 0.2s;
+        .eventos-punto {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ef4444;
+            animation: punto-vivo 1s ease-in-out infinite;
         }
-        .action-card.order-mode:hover {
+        @keyframes punto-vivo {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50%      { opacity: .3; transform: scale(1.3); }
+        }
+
+        /* Tarjeta principal con borde degradado */
+        .eventos-card {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: var(--color-card);
+            border-radius: var(--radius);
+            padding: 28px 20px;
+            text-align: center;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            background-image: linear-gradient(rgba(26,26,36,.95), rgba(26,26,36,.95)),
+                              linear-gradient(135deg, var(--color-accent), var(--color-primary));
+            background-origin: border-box;
+            background-clip: padding-box, border-box;
+            border: 2px solid transparent;
+            transition: opacity 0.4s ease;
+        }
+        .eventos-icono { font-size: 56px; }
+        .eventos-card h2 { font-size: 22px; }
+        .eventos-descripcion { font-size: 14px; color: var(--color-text-sec); max-width: 400px; }
+
+        /* Ecualizador con colores de paleta */
+        .ecualizador {
+            display: flex;
+            align-items: flex-end;
+            gap: 5px;
+            height: 36px;
+            margin-top: 8px;
+        }
+        .ecualizador span {
+            width: 7px;
+            border-radius: 3px;
+            animation: eco 0.8s ease-in-out infinite alternate;
+        }
+        .ecualizador span:nth-child(odd)  { background: var(--color-accent); }
+        .ecualizador span:nth-child(even) { background: var(--color-primary); }
+        .ecualizador span:nth-child(1) { height: 50%; animation-delay: 0s; }
+        .ecualizador span:nth-child(2) { height: 75%; animation-delay: .1s; }
+        .ecualizador span:nth-child(3) { height: 40%; animation-delay: .2s; }
+        .ecualizador span:nth-child(4) { height: 90%; animation-delay: .3s; }
+        .ecualizador span:nth-child(5) { height: 60%; animation-delay: .4s; }
+        @keyframes eco {
+            0%   { transform: scaleY(0.5); }
+            100% { transform: scaleY(1); }
+        }
+
+        /* Estado vacío mejorado */
+        .eventos-vacio {
+            text-align: center;
+        }
+        .eventos-vacio i {
+            font-size: 48px;
+            opacity: 0.2;
+            display: block;
+            margin-bottom: 16px;
+            color: var(--color-text-muted);
+        }
+        .eventos-vacio h2 { margin-bottom: 8px; }
+        .eventos-vacio p  { font-size: 14px; color: var(--color-text-muted); margin-bottom: 20px; }
+        .ecualizador.inactivo span { animation: none; opacity: .25; background: var(--color-text-muted); }
+
+        /* Votación */
+        .eventos-votacion {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 100%;
+            max-width: 300px;
+        }
+        .votacion-opcion {
+            background: var(--color-panel, #21212e);
+            border: 1px solid var(--color-border);
+            border-radius: var(--radius-sm);
+            color: var(--color-text);
+            padding: 12px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--t);
+            text-align: center;
+        }
+        .votacion-opcion:hover {
             border-color: var(--color-accent);
-            background: rgba(245,158,11,0.04);
-            box-shadow: 0 0 15px rgba(245,158,11,0.1);
+            background: var(--color-hover, #2a2a3a);
+            color: var(--color-accent);
         }
-        .action-card.order-mode .action-icon { color: var(--color-accent); }
-        .action-card.events-mode:hover {
-            border-color: var(--color-primary);
-            background: rgba(99,102,241,0.04);
-            box-shadow: 0 0 15px rgba(99,102,241,0.1);
-        }
-        .action-card.events-mode .action-icon { color: var(--color-primary); }
-        .action-card:hover::after { transform: translateX(4px); color: #fff; }
-        .action-icon { font-size: 2rem; width: 45px; display: flex; justify-content: center; }
-        .action-details h4 { font-size: 1.05rem; font-weight: 700; margin-bottom: 3px; }
-        .action-details p  { font-size: 0.8rem; color: var(--color-text-sec); }
     </style>
 </head>
 <body>
-    <div class="top-bar">
-        <div class="user-profile">
-            <div class="user-avatar">JP</div>
-            <div class="user-info">
-                <h3>Juan Pérez</h3>
-                <p><i class="fa-solid fa-circle-check"></i> Cliente Registrado</p>
-            </div>
-        </div>
-        <button class="logout-btn" onclick="alert('Cerrando sesión...')">
-            <i class="fa-solid fa-right-from-bracket"></i> Salir
-        </button>
-    </div>
-
-    <div class="welcome-container">
-        <!-- Ingreso de mesa -->
-        <div class="status-card">
-            <h2><i class="fa-solid fa-chair" style="color:var(--color-accent)"></i> ¿Dónde te ubicas?</h2>
-            <p style="color:var(--color-text-sec);font-size:0.9rem;">Ingresa el número de tu mesa física para activar tu sesión de atención.</p>
-            <div class="input-group">
-                <input type="number" class="table-input" placeholder="00" min="1" max="99">
-                <button class="primary-btn" onclick="alert('Mesa enviada.')">Vincular</button>
-            </div>
-        </div>
-
-        <!-- Espera activación -->
-        <div class="status-card">
-            <h2>Mesa asignada: <span style="color:var(--color-accent)">Mesa 14</span></h2>
-            <div class="waiting-status">
-                <div class="spinner"></div>
-                <p style="font-size:0.9rem;font-weight:600;">Esperando validación del garzón...</p>
-                <p style="color:var(--color-text-sec);font-size:0.8rem;">Estamos confirmando tu presencia en el mesón.</p>
-            </div>
-            <span class="pre-order-badge">
-                <i class="fa-solid fa-wand-magic-sparkles"></i> Modo Pre-pedido Habilitado
-            </span>
-        </div>
-
-        <!-- Tarjetas de acción -->
-        <div class="menu-grid">
-            <div class="action-card order-mode" onclick="alert('Navegando a MenuDigital...')">
-                <div class="action-icon"><i class="fa-solid fa-scroll"></i></div>
-                <div class="action-details">
-                    <h4>Armar mi Pedido</h4>
-                    <p>Explora la carta digital y arma tu orden.</p>
+    <div class="vista-eventos">
+        <div class="eventos-fondo"></div>
+        <div class="eventos-contenido">
+            <div class="eventos-header">
+                <h1>🎉 Eventos en Vivo</h1>
+                <p class="eventos-sub">Conectate a la energía de La Taberna</p>
+                <div class="eventos-badge">
+                    <span class="eventos-punto"></span> En vivo
                 </div>
             </div>
-            <div class="action-card events-mode" onclick="alert('Navegando a PantallaEventos...')">
-                <div class="action-icon"><i class="fa-solid fa-cake-candles"></i></div>
-                <div class="action-details">
-                    <h4>Eventos en Vivo & Karaoke</h4>
-                    <p>Vota canciones e interactúa en tiempo real.</p>
+
+            <!-- Ejemplo: tarjeta de karaoke activo -->
+            <div class="eventos-card">
+                <div class="eventos-icono">🎤</div>
+                <h2>Karaoke en vivo</h2>
+                <p class="eventos-descripcion">Subí al escenario y brillá como una estrella</p>
+                <div class="ecualizador">
+                    <span></span><span></span><span></span><span></span><span></span>
                 </div>
             </div>
+
+            <!-- Para probar estado vacío, comentar la tarjeta de arriba y descomentar esto:
+            <div class="eventos-card">
+                <div class="eventos-vacio">
+                    <i class="fa-solid fa-calendar-alt"></i>
+                    <h2>No hay eventos activos ahora</h2>
+                    <p>Volvé más tarde o consultá el cronograma en la barra.</p>
+                    <div class="ecualizador inactivo">
+                        <span></span><span></span><span></span><span></span><span></span>
+                    </div>
+                </div>
+            </div>
+            -->
         </div>
     </div>
 </body>

@@ -1,5 +1,12 @@
 /* ================================================================
-   PubPOS — MÓDULO: cobro.js (v5.0 – usa comando liberarMesa)
+   LaTaberna - PubPOS — UI JS
+   Archivo: js/ui/cobro.js
+   Versión: 1.0.0
+   Propósito: Modal de cierre de mesa, split bill, pago y liberación.
+   Dependencias: js/auth.js, js/utils.js, js/lib/logger.js,
+                 js/lib/deps.js, js/lib/command-bus.js, js/lib/eventBus.js,
+                 js/db.js, js/ui/comanda.js, js/ui/tickets.js,
+                 js/ui/pedido.js
    ================================================================ */
 const Cobro = (() => {
   let _mesaACerrar = null;

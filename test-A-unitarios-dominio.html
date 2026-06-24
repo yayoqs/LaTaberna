@@ -23,34 +23,31 @@
   <!-- DEPENDENCIAS (rutas desde la raíz del proyecto) -->
   <script src="js/utils.js"></script>
   <script src="js/lib/logger.js"></script>
-  <script src="js/dominio/resultado.js"></script>
-  <script src="js/dominio/dinero.js"></script>
-  <script src="js/dominio/cantidad.js"></script>
+  <script type="module" src="js/dominio/resultado.js"></script>
+  <script type="module" src="js/dominio/dinero.js"></script>
+  <script type="module" src="js/dominio/cantidad.js"></script>
 
-  <!-- PRUEBAS (inline) -->
-  <script>
-    (function() {
-      const resultsEl = document.getElementById('results');
-      let passed = 0, failed = 0;
+  <!-- PRUEBAS (inline como módulo para esperar los imports) -->
+  <script type="module">
+    const resultsEl = document.getElementById('results');
+    let passed = 0, failed = 0;
 
-      function assert(condition, msg) {
-        if (condition) {
-          passed++;
-          resultsEl.innerHTML += `<div class="test pass">✔ ${msg}</div>`;
-        } else {
-          failed++;
-          resultsEl.innerHTML += `<div class="test fail">✘ ${msg}</div>`;
-        }
+    function assert(condition, msg) {
+      if (condition) {
+        passed++;
+        resultsEl.innerHTML += `<div class="test pass">✔ ${msg}</div>`;
+      } else {
+        failed++;
+        resultsEl.innerHTML += `<div class="test fail">✘ ${msg}</div>`;
       }
+    }
 
-      // Verificar dependencias
-      const deps = ['Cantidad','crearCantidad','Dinero','crearDinero','Resultado','fmtMoney'];
-      const faltantes = deps.filter(d => typeof window[d] === 'undefined');
-      if (faltantes.length > 0) {
-        resultsEl.innerHTML += `<div class="error">❌ Faltan dependencias: ${faltantes.join(', ')}.</div>`;
-        return;
-      }
-
+    // Verificar dependencias
+    const deps = ['Cantidad','crearCantidad','Dinero','crearDinero','Resultado','fmtMoney'];
+    const faltantes = deps.filter(d => typeof window[d] === 'undefined');
+    if (faltantes.length > 0) {
+      resultsEl.innerHTML += `<div class="error">❌ Faltan dependencias: ${faltantes.join(', ')}.</div>`;
+    } else {
       // ── Cantidad ─────────────────────────────────────────
       resultsEl.innerHTML += '<div class="suite"><h2>Cantidad</h2></div>';
       (() => {
@@ -110,12 +107,12 @@
         assert(!chainEx.exito, 'encadenar captura excepción');
         assert(chainEx.error === 'ups', 'error es el mensaje de la excepción');
       })();
+    }
 
-      resultsEl.innerHTML += `<div class="summary">${passed} pasaron, ${failed} fallaron</div>`;
-      if (failed === 0) {
-        resultsEl.innerHTML += '<div class="test pass">✔ Todos los tests de dominio pasaron.</div>';
-      }
-    })();
+    resultsEl.innerHTML += `<div class="summary">${passed} pasaron, ${failed} fallaron</div>`;
+    if (failed === 0) {
+      resultsEl.innerHTML += '<div class="test pass">✔ Todos los tests de dominio pasaron.</div>';
+    }
   </script>
 </body>
 </html>

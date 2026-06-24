@@ -1,11 +1,8 @@
 /* ================================================================
-   Raíz — MÓDULO: db.js (Orquestador v5.4 – ajuste de mesas por configuración)
-   Propósito: Appwrite es la única fuente de verdad. La configuración
-              de zonas se carga desde Appwrite (con fallback local).
-              Las mesas se generan según la configuración si Appwrite
-              está vacío y siempre se ordenan por número.
-              Incluye método sincronizarMesasConConfig para ajustar
-              la cantidad de mesas al cambiar las zonas desde la UI.
+   LaTaberna - PubPOS — MÓDULO JS
+   Archivo: js/db.js
+   Versión: 1.0.0
+   Propósito: Orquestador de base de datos (Appwrite + localStorage).
    ================================================================ */
 var DB = (function() {
   const core = DBCore;
@@ -26,8 +23,8 @@ var DB = (function() {
       Logger.info("[DB] Iniciando carga de datos (Appwrite)...");
 
       var appwriteOk = false;
-      if (appwrite && appwrite.init) {
-        appwriteOk = await appwrite.init();
+      if (appwrite && appwrite.iniciar) {
+        appwriteOk = await appwrite.iniciar();
       }
 
       if (!appwriteOk) {
@@ -36,20 +33,40 @@ var DB = (function() {
         return false;
       }
 
-      // Cargar configuración desde Appwrite (o localStorage si no existe)
       await this._cargarConfiguracion();
-
       this._cargarMozosLocal();
 
-      Logger.info('[DB] Cargando datos desde Appwrite...');
+      Logger.info('[DB] Cargando datos desde Appwrite (paralelo)...');
       try {
-        var prodAppwrite = await appwrite.listar('productos');
+        // ── Carga paralela de todas las colecciones ──────────
+        var resultados = {};
+        var promesas = [
+          'productos',
+          'pedidos',
+          'mesas',
+          'comandas',
+          'ingredientes',
+          'recetas',
+          'pedidos_delivery'
+        ].map(function(coleccion) {
+          return appwrite.listar(coleccion).then(function(lista) {
+            resultados[coleccion] = lista;
+          }).catch(function(e) {
+            Logger.warn('[DB] Error al cargar ' + coleccion + ':', e);
+            resultados[coleccion] = [];
+          });
+        });
+
+        await Promise.all(promesas);
+
+        // ── Procesar resultados ──────────────────────────────
+        var prodAppwrite = resultados.productos || [];
         if (prodAppwrite.length) {
           this.productos = prodAppwrite.map(p => this._normalizarProducto(p));
           EventBus.emit('productos:cargados', this.productos);
         }
 
-        var pedidosAppwrite = await appwrite.listar('pedidos');
+        var pedidosAppwrite = resultados.pedidos || [];
         if (pedidosAppwrite.length) {
           this.pedidos = pedidosAppwrite.map(p => ({
             ...p,
@@ -57,7 +74,7 @@ var DB = (function() {
           }));
         }
 
-        var comandasAppwrite = await appwrite.listar('comandas');
+        var comandasAppwrite = resultados.comandas || [];
         if (comandasAppwrite.length) {
           this.comandas = comandasAppwrite.map(c => ({
             ...c,
@@ -65,37 +82,17 @@ var DB = (function() {
           }));
         }
 
-        var mesasAppwrite = await appwrite.listar('mesas');
-        if (mesasAppwrite.length > 0) {
-          this.mesas = mesasAppwrite.map(m => this._normalizarMesa(m));
-          this.mesas.sort((a, b) => a.numero - b.numero);
-          Logger.info('[DB] ' + this.mesas.length + ' mesas cargadas desde Appwrite.');
-        } else {
-          Logger.info('[DB] Sin mesas en Appwrite. Generando desde config.zonas...');
-          this.mesas = [];
-          var zonas = this.config.zonas || [{ nombre: 'salon', cantidad: 12 }];
-          var numero = 1;
-          for (var z = 0; z < zonas.length; z++) {
-            var zona = zonas[z];
-            for (var n = 0; n < zona.cantidad; n++) {
-              this.mesas.push({
-                ...mesaVacia(numero, zona.nombre),
-                numero: numero
-              });
-              numero++;
-            }
-          }
-          this.mesas.sort((a, b) => a.numero - b.numero);
-          Logger.info('[DB] ' + this.mesas.length + ' mesas iniciales generadas localmente.');
-          this._mesasPendientesSync = true;
-        }
+        var mesasAppwrite = resultados.mesas || [];
+        this.mesas = mesasAppwrite.length > 0
+          ? mesasAppwrite.map(m => this._normalizarMesa(m))
+          : [];
 
-        var ingAppwrite = await appwrite.listar('ingredientes');
+        var ingAppwrite = resultados.ingredientes || [];
         if (ingAppwrite.length) {
           this.ingredientes = ingAppwrite.map(i => this._normalizarIngrediente(i));
         }
 
-        var recAppwrite = await appwrite.listar('recetas');
+        var recAppwrite = resultados.recetas || [];
         if (recAppwrite.length) {
           this.recetas = recAppwrite.map(function(r) {
             if (typeof r.ingredientes === 'string') {
@@ -105,13 +102,9 @@ var DB = (function() {
           });
         }
 
-        try {
-          var delivAppwrite = await appwrite.listar('pedidos_delivery');
-          if (delivAppwrite.length) {
-            this.pedidosDelivery = delivAppwrite;
-          }
-        } catch (e) {
-          Logger.debug('[DB] Sin pedidos delivery en Appwrite.');
+        var delivAppwrite = resultados.pedidos_delivery || [];
+        if (delivAppwrite.length) {
+          this.pedidosDelivery = delivAppwrite;
         }
 
         Logger.info('[DB] Datos de Appwrite cargados exitosamente.');
@@ -121,6 +114,9 @@ var DB = (function() {
         return false;
       }
 
+      // ── REPARACIÓN MÍNIMA: solo mesa 1 si no hay ninguna ──
+      await this.repararMesas();
+
       Logger.info("[DB] Inicialización completada.");
       EventBus.emit('db:inicializada');
       return true;
@@ -128,6 +124,46 @@ var DB = (function() {
       Logger.error("[DB] Error crítico en init:", e);
       this._mostrarErrorCarga();
       return false;
+    }
+  };
+
+  /**
+   * Repara la grilla mínima: garantiza que exista la mesa 1 en salón.
+   * No borra mesas existentes, no regenera la grilla completa.
+   */
+  combined.repararMesas = async function() {
+    if (!appwrite || !appwrite.habilitado) return;
+
+    var zonaDefault = (this.config.zonas && this.config.zonas[0]?.nombre) || 'salon';
+
+    var mesa1 = this.mesas.find(m => m.numero === 1);
+    if (mesa1) return;
+
+    Logger.info('[DB] Mesa 1 no encontrada. Creando automáticamente...');
+    var nuevaMesa = mesaVacia(1, zonaDefault);
+
+    try {
+      var dataMesa = {
+        numero: 1,
+        estado: 'libre',
+        pedidoId: '',
+        items: '[]',
+        mozo: '',
+        comensales: 1,
+        abiertaEn: new Date().toISOString(),
+        observaciones: '',
+        zona: zonaDefault,
+        esVirtual: false,
+        permite_prepedidos: false
+      };
+      await appwrite.crear('mesas', '1', dataMesa);
+      this.mesas.push(nuevaMesa);
+      this.mesas.sort((a, b) => a.numero - b.numero);
+      this.saveMesas();
+      EventBus.emit('mesas:guardadas', this.mesas);
+      Logger.info('[DB] Mesa 1 creada exitosamente.');
+    } catch (e) {
+      Logger.warn('[DB] Error al crear mesa 1:', e);
     }
   };
 
@@ -168,104 +204,28 @@ var DB = (function() {
 
   combined.cerrarPedido = async function(id, formaPago, total, descuento) {
     const pedido = this.pedidos.find(p => p.id === id);
-    if (!pedido) {
-      Logger.warn(`[DB] Pedido ${id} no encontrado.`);
-      return null;
-    }
-
+    if (!pedido) { Logger.warn(`[DB] Pedido ${id} no encontrado.`); return null; }
     if (pedido.estado === 'cerrada' || pedido.estado === 'cerrado') {
       Logger.warn(`[DB] El pedido ${id} ya está cerrado.`);
       return pedido;
     }
-
     if (appwrite && appwrite.habilitado) {
       try {
-        await appwrite.actualizar('pedidos', id, {
-          estado: 'cerrada',
-          total: total,
-          updated_at: new Date().toISOString()
-        });
+        await appwrite.actualizar('pedidos', id, { estado: 'cerrada', total: total });
         Logger.info(`[DB] Pedido ${id} actualizado en Appwrite.`);
-      } catch (e) {
-        Logger.error("[DB] Error al actualizar pedido en Appwrite:", e);
-        return null;
-      }
+      } catch (e) { Logger.error("[DB] Error al actualizar pedido en Appwrite:", e); return null; }
     }
-
     pedido.estado = 'cerrada';
     pedido.total = total;
-    pedido.updated_at = new Date().toISOString();
-
+    pedido.actualizadoEn = new Date().toISOString();
     if (typeof Store !== 'undefined') {
-      Store.dispatch({ type: 'PEDIDO_CERRADO', payload: { id, total, updated_at: pedido.updated_at } });
+      Store.dispatch({ type: 'PEDIDO_CERRADO', payload: { id, total, updated_at: pedido.actualizadoEn } });
     }
-
     return pedido;
   };
 
-  /**
-   * Ajusta la cantidad de mesas según la configuración de zonas actual.
-   * Crea las mesas que falten y elimina las que sobren (empezando por el número más alto).
-   * Debe llamarse después de cambiar DB.config.zonas (ej. desde Config.guardar).
-   */
   combined.sincronizarMesasConConfig = async function() {
-    if (!appwrite || !appwrite.habilitado) return;
-
-    var zonas = this.config.zonas || [{ nombre: 'salon', cantidad: 12 }];
-    var totalDeseado = 0;
-    for (var i = 0; i < zonas.length; i++) {
-      totalDeseado += zonas[i].cantidad;
-    }
-
-    var mesasActuales = this.mesas.filter(function(m) { return !m.esVirtual; });
-    var cantidadActual = mesasActuales.length;
-
-    if (cantidadActual === totalDeseado) return;
-
-    if (cantidadActual > totalDeseado) {
-      var sobrantes = mesasActuales.sort(function(a, b) { return b.numero - a.numero; }).slice(totalDeseado);
-      for (var i = 0; i < sobrantes.length; i++) {
-        var mesaEliminar = sobrantes[i];
-        try {
-          await appwrite.eliminar('mesas', String(mesaEliminar.numero));
-        } catch (e) {
-          Logger.warn('[DB] Error al eliminar mesa ' + mesaEliminar.numero + ':', e);
-        }
-        this.mesas = this.mesas.filter(function(m) { return m.numero !== mesaEliminar.numero; });
-      }
-    } else if (cantidadActual < totalDeseado) {
-      var maxNumero = mesasActuales.length > 0 ? Math.max.apply(null, mesasActuales.map(function(m) { return m.numero; })) : 0;
-      var faltantes = totalDeseado - cantidadActual;
-      for (var j = 0; j < faltantes; j++) {
-        maxNumero++;
-        var nuevaMesa = {
-          ...mesaVacia(maxNumero, 'salon'),
-          numero: maxNumero
-        };
-        try {
-          var dataMesa = {
-            numero: nuevaMesa.numero,
-            estado: 'libre',
-            pedidoId: '',
-            items: '[]',
-            mozo: '',
-            comensales: 1,
-            abiertaEn: new Date().toISOString(),
-            observaciones: '',
-            zona: nuevaMesa.zona,
-            esVirtual: false
-          };
-          await appwrite.crear('mesas', String(maxNumero), dataMesa);
-        } catch (e) {
-          Logger.warn('[DB] Error al crear mesa ' + maxNumero + ':', e);
-        }
-        this.mesas.push(nuevaMesa);
-      }
-    }
-
-    this.mesas.sort(function(a, b) { return a.numero - b.numero; });
-    this.saveMesas();
-    EventBus.emit('mesas:guardadas', this.mesas);
+    return this.repararMesas();
   };
 
   return combined;

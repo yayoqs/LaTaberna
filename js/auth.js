@@ -1,5 +1,8 @@
 /* ================================================================
-   PubPOS — MÓDULO: auth.js (v7.3 – vista bienvenida para cliente y master)
+   LaTaberna - PubPOS — MÓDULO JS
+   Archivo: js/auth.js
+   Versión: 1.0.0
+   Propósito: Autenticación local, gestión de sesión, roles y login.
    ================================================================ */
 const Auth = (() => {
   // ── CONFIGURACIÓN INICIAL SOLO PARA PRIMER ARRANQUE ────────

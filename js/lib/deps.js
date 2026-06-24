@@ -1,9 +1,9 @@
 /* ================================================================
-   PubPOS — MÓDULO: deps.js (contenedor de dependencias)
-   Propósito: Registro central de repositorios y servicios para
-              que los comandos y handlers los obtengan sin depender
-              del scope global. Facilita la inyección de dependencias
-              y los futuros tests unitarios.
+   LaTaberna - PubPOS — MÓDULO JS
+   Archivo: js/lib/deps.js
+   Versión: 1.0.0
+   Propósito: Contenedor de inyección de dependencias. Registro y resolución de servicios y repositorios.
+   Dependencias: js/lib/logger.js
    ================================================================ */
 const Deps = (() => {
   const _registro = {};

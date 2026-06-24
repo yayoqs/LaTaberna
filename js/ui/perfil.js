@@ -1,7 +1,9 @@
 /* ================================================================
-   PubPOS — MÓDULO: perfil.js (v3.0 – ES6 nativo)
-   Propósito: Vista de perfil de usuario con foto, datos y documentos.
-              Compatible con carga normal y como módulo ES6.
+   LaTaberna - PubPOS — UI JS
+   Archivo: js/ui/perfil.js
+   Versión: 1.0.0
+   Propósito: Vista de perfil de usuario: avatar, datos y documentos.
+   Dependencias: js/auth.js, js/db.js (DB.llamar), js/lib/logger.js, js/lib/eventBus.js, js/utils.js (showToast)
    ================================================================ */
 const Perfil = (() => {
 

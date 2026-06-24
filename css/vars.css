@@ -1,13 +1,14 @@
-/* ================================================================
-   PubPOS — CSS MODULAR
+/* ==============================================
+   LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/vars.css
-   Propósito: Variables globales de diseño (colores, tipografía, etc.)
-   ----------------------------------------------------------------
+   Versión: 1.0.0
+   Propósito: Variables globales de diseño (colores, tipografía, layout).
+ ===============================================
    EDICIÓN POR ETAPAS:
    • Para cambiar colores del tema → editar las variables --color-*
    • Para cambiar tipografía      → editar --font-ui y --font-mono
    • Para cambiar radios/sombras  → editar --radius-* y --shadow-*
-   ================================================================ */
+============================================= */
 
 :root {
 

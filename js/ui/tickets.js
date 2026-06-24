@@ -1,5 +1,9 @@
 /* ================================================================
-   PubPOS — MÓDULO: tickets.js (v4.4 – botón extra "Pagado")
+   LaTaberna - PubPOS — UI JS
+   Archivo: js/ui/tickets.js
+   Versión: 1.0.0
+   Propósito: Generación y visualización de tickets de comanda, cuenta y cierre.
+   Dependencias: js/utils.js (fmtMoney, fmtHoraCorta, fmtFechaCorta, calcularTotal), js/db.js (DB.config)
    ================================================================ */
 const Tickets = (() => {
 

@@ -1,10 +1,10 @@
 /* ================================================================
-   PubPOS — MÓDULO: logger.js (Sistema centralizado de logging)
-   Propósito: Reemplazar los console.log/error dispersos por un
-              sistema con niveles, filtros y almacenamiento opcional.
-              Facilita la depuración, permite silenciar logs en
-              producción y habilita futuras integraciones (envío a
-              servidor, visualización de bitácora, etc.).
+   LaTaberna - PubPOS — MÓDULO JS
+   Archivo: js/lib/logger.js
+   Versión: 1.0.0
+   Propósito: Sistema de logging con niveles (DEBUG, INFO, WARN, ERROR)
+              y captura global de errores no manejados (ErrorHandler).
+   Dependencias: js/utils.js (showToast)
    ================================================================ */
 
 const Logger = (() => {

@@ -1,6 +1,10 @@
 /* ================================================================
-   PubPOS — MÓDULO: cuenta.js
-   Propósito: Pedir la cuenta (pre‑cuenta) y cambiar estado de mesa.
+   LaTaberna - PubPOS — UI JS
+   Archivo: js/ui/cuenta.js
+   Versión: 1.0.0
+   Propósito: Solicitud de cuenta (pre-cierre) y cambio de estado de mesa.
+   Dependencias: js/auth.js, js/utils.js, js/lib/eventBus.js, js/db.js,
+                 js/ui/comanda.js, js/ui/tickets.js
    ================================================================ */
 
 const Cuenta = (() => {

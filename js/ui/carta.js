@@ -1,8 +1,9 @@
 /* ================================================================
-   PubPOS — MÓDULO: carta.js (v2.1 – JSDoc completo)
-   Propósito: Carta de productos dentro del modal de pedido.
-              Obtiene los productos del Store y se re-renderiza
-              automáticamente cuando cambian.
+   LaTaberna - PubPOS — UI JS
+   Archivo: js/ui/carta.js
+   Versión: 1.0.0
+   Propósito: Carta de productos: categorías, búsqueda y selección.
+   Dependencias: js/lib/store.js, js/lib/eventBus.js, js/utils.js
    ================================================================ */
 const Carta = (() => {
   let _categoriaActiva = 'Todos';

@@ -1,5 +1,9 @@
 /* ================================================================
-   PubPOS — COMANDO: enviar-comanda.js (v3.1 – stock estricto)
+   LaTaberna - PubPOS — COMANDO JS
+   Archivo: js/comandos/enviar-comanda.js
+   Versión: 1.0.0
+   Propósito: Enviar comanda a cocina/barra con validación de stock y soporte para override de bloqueo.
+   Dependencias: CommandBus, Deps, EventBus, PedidoManager, InventarioService, DB, Logger, showToast
    ================================================================ */
 
 function crearComandoEnviarComanda(datos) {

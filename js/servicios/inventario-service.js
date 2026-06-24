@@ -1,8 +1,12 @@
 /* ================================================================
-   PubPOS — SERVICIO: InventarioService
-   Propósito: Coordina las operaciones del inventario usando el
-              agregado Ingrediente. Retorna Resultado en cada caso.
+   LaTaberna - PubPOS — SERVICIO JS
+   Archivo: js/servicios/inventario-service.js
+   Versión: 1.0.0
+   Propósito: Servicio de casos de uso para inventario e ingredientes.
+   Dependencias: js/dominio/ingrediente.js, js/dominio/cantidad.js, js/dominio/dinero.js, js/dominio/resultado.js, js/lib/eventBus.js, js/db.js, js/lib/logger.js
    ================================================================ */
+
+
 const InventarioService = (() => {
 
   let _inventarioRepo = null;

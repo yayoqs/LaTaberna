@@ -1,6 +1,13 @@
-/* ================================================================
-   Raíz — MÓDULO: reparto.js (v5.0 – mejoras: filtro por estado,
-   edición de ítems, prevención de duplicación de comandas)
+
+   /* ================================================================
+   LaTaberna - PubPOS — UI JS
+   Archivo: js/ui/reparto.js
+   Versión: 1.0.2
+   Propósito: Gestión de pedidos de delivery con filtros, edición y
+              prevención de duplicación de comandas.
+              v1.0.2: protege replace() contra id nulo.
+   Dependencias: js/lib/store.js, js/lib/eventBus.js, js/lib/logger.js,
+                 js/db.js, js/servicios/delivery-service.js
    ================================================================ */
 const Reparto = (() => {
   let _estadoFiltro = 'todos';
@@ -43,6 +50,8 @@ const Reparto = (() => {
     _asegurarVista();
     const tbody = document.getElementById('repartoBody'); if (!tbody) return;
     let pedidos = Store.getState().pedidosDelivery || [];
+
+    // Protección doble: eliminar nulos y elementos sin id válido
     pedidos = pedidos.filter(p => p && p.id);
 
     if (_estadoFiltro !== 'todos') {
@@ -53,8 +62,18 @@ const Reparto = (() => {
       tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--color-text-muted);">No hay pedidos de delivery.</td></tr>`;
       return;
     }
-    const ordenados = [...pedidos].sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+
+    const ordenados = [...pedidos].sort((a,b) => {
+      const fechaA = a.creadoEn || a.created_at || '';
+      const fechaB = b.creadoEn || b.created_at || '';
+      return new Date(fechaB) - new Date(fechaA);
+    });
+
     tbody.innerHTML = ordenados.map(p => {
+      // Seguridad adicional: si aun así el id es nulo, mostrar texto alternativo
+      const idSeguro = (p.id || '').toString();
+      const idCorto = idSeguro.replace('deliv_','').slice(-6) || '—';
+
       var items = p.items;
       if (typeof items === 'string') {
         try { items = JSON.parse(items); } catch (e) { items = []; }
@@ -66,26 +85,26 @@ const Reparto = (() => {
 
       let btnEditar = '';
       if (p.estado === 'pendiente') {
-        btnEditar = `<button class="btn-ajuste" onclick="Reparto.editarItems('${p.id}')"><i class="fas fa-edit"></i> Editar</button>`;
+        btnEditar = `<button class="btn-ajuste" onclick="Reparto.editarItems('${idSeguro}')"><i class="fas fa-edit"></i> Editar</button>`;
       }
 
       let botones = '';
       if (p.estado === 'pendiente') {
-        botones += `<button class="btn-ajuste" onclick="Reparto.enviarACocina('${p.id}')"><i class="fas fa-fire-burner"></i> Enviar a Cocina</button>`;
+        botones += `<button class="btn-ajuste" onclick="Reparto.enviarACocina('${idSeguro}')"><i class="fas fa-fire-burner"></i> Enviar a Cocina</button>`;
       } else if (p.estado === 'en_preparacion') {
-        botones += `<button class="btn-ajuste" onclick="Reparto.despachar('${p.id}')"><i class="fas fa-motorcycle"></i> En camino</button>`;
+        botones += `<button class="btn-ajuste" onclick="Reparto.despachar('${idSeguro}')"><i class="fas fa-motorcycle"></i> En camino</button>`;
       } else if (p.estado === 'en_camino') {
-        botones += `<button class="btn-ajuste" onclick="Reparto.confirmarEntrega('${p.id}')"><i class="fas fa-check"></i> Entregado</button>`;
+        botones += `<button class="btn-ajuste" onclick="Reparto.confirmarEntrega('${idSeguro}')"><i class="fas fa-check"></i> Entregado</button>`;
       }
-      botones += `<button class="btn-ajuste del" onclick="Reparto.eliminarPedido('${p.id}')"><i class="fas fa-trash"></i></button>`;
+      botones += `<button class="btn-ajuste del" onclick="Reparto.eliminarPedido('${idSeguro}')"><i class="fas fa-trash"></i></button>`;
 
       return `<tr>
-        <td><strong>${p.id.replace('deliv_','').slice(-6)}</strong></td>
-        <td>${p.direccion}</td>
+        <td><strong>${idCorto}</strong></td>
+        <td>${p.direccion || '—'}</td>
         <td>${p.telefono||'—'}</td>
         <td style="font-size:12px;">${resumen}</td>
         <td>${fmtMoney(p.total)}</td>
-        <td><span class="badge ${badgeClase}">${p.estado.replace('_',' ')}</span></td>
+        <td><span class="badge ${badgeClase}">${(p.estado || '').replace('_',' ')}</span></td>
         <td>${p.repartidor||'—'}</td>
         <td>${btnEditar} ${botones}</td>
       </tr>`;

@@ -1,8 +1,11 @@
 /* ================================================================
-   PubPOS — DOMINIO: Delivery (Agregado)
-   Propósito: Representa un pedido de entrega (delivery). Encapsula
-              los estados y las reglas de transición (pendiente →
-              en preparación → en camino → entregado).
+   LaTaberna - PubPOS — DOMINIO JS
+   Archivo: js/dominio/delivery.js
+   Versión: 1.0.2
+   Propósito: Agregado Delivery: pedido de entrega con máquina de estados.
+              Factory reconstruirDelivery acepta objeto plano o instancia.
+   Dependencias: js/dominio/direccion.js, js/dominio/dinero.js,
+                 js/dominio/cantidad.js
    ================================================================ */
 class Delivery {
   /**
@@ -17,13 +20,12 @@ class Delivery {
     this._id           = id;
     this._direccion    = direccion;
     this._repartidor   = repartidor || 'Sin repartidor';
-    this._items        = [];            // { nombre, precio: Dinero, cantidad: Cantidad }
-    this._estado       = 'pendiente';   // pendiente | en_preparacion | en_camino | entregado
+    this._items        = [];
+    this._estado       = 'pendiente';
     this._creadoEn     = new Date().toISOString();
     this._observaciones = '';
   }
 
-  // ── GETTERS ──────────────────────────────────────────────
   get id()             { return this._id; }
   get direccion()      { return this._direccion; }
   get repartidor()     { return this._repartidor; }
@@ -32,12 +34,6 @@ class Delivery {
   get creadoEn()       { return this._creadoEn; }
   get observaciones()  { return this._observaciones; }
 
-  // ── REGLAS DE NEGOCIO ────────────────────────────────────
-
-  /**
-   * Agrega un ítem al pedido.
-   * Solo permitido en estado 'pendiente'.
-   */
   agregarItem(nombre, precio, cantidad) {
     if (this._estado !== 'pendiente') throw new Error('Solo se pueden agregar ítems a pedidos pendientes');
     if (!(precio instanceof Dinero)) throw new Error('Precio inválido');
@@ -51,46 +47,27 @@ class Delivery {
     }
   }
 
-  /**
-   * Transición: pendiente → en_preparacion.
-   * Se llama cuando el pedido se envía a cocina/barra.
-   */
   enviarACocina() {
     if (this._estado !== 'pendiente') throw new Error('Solo pedidos pendientes pueden enviarse a cocina');
     if (this._items.length === 0) throw new Error('No se puede enviar un pedido vacío');
     this._estado = 'en_preparacion';
   }
 
-  /**
-   * Transición: en_preparacion → en_camino.
-   * El repartidor recoge el pedido y sale a entregar.
-   */
   despachar() {
     if (this._estado !== 'en_preparacion') throw new Error('El pedido no está listo para despachar');
     this._estado = 'en_camino';
   }
 
-  /**
-   * Transición: en_camino → entregado.
-   * El cliente recibe el pedido.
-   */
   confirmarEntrega() {
     if (this._estado !== 'en_camino') throw new Error('El pedido no está en camino');
     this._estado = 'entregado';
   }
 
-  /**
-   * Cancela el pedido (solo si está pendiente).
-   */
   cancelar() {
     if (this._estado === 'entregado') throw new Error('No se puede cancelar un pedido ya entregado');
     this._estado = 'cancelado';
   }
 
-  /**
-   * Calcula el total del pedido.
-   * @returns {Dinero}
-   */
   calcularTotal() {
     if (this._items.length === 0) return new Dinero(0);
     return this._items.reduce((total, it) => {
@@ -100,7 +77,6 @@ class Delivery {
 
   setObservaciones(obs) { this._observaciones = obs || ''; }
 
-  // ── SERIALIZACIÓN ────────────────────────────────────────
   toJSON() {
     return {
       id:             this._id,
@@ -118,4 +94,52 @@ class Delivery {
   }
 }
 
+/**
+ * Reconstruye un Delivery desde un objeto plano (JSON) o desde una instancia de Direccion.
+ * @param {object} datos - Objeto con las propiedades del delivery.
+ * @returns {Delivery}
+ */
+function reconstruirDelivery(datos) {
+  let direccion;
+  if (datos.direccion instanceof Direccion) {
+    direccion = datos.direccion;
+  } else {
+    direccion = new Direccion(
+      datos.direccion.calle,
+      datos.direccion.numero,
+      datos.direccion.depto,
+      datos.direccion.referencia,
+      datos.direccion.telefono
+    );
+  }
+
+  const delivery = new Delivery(datos.id, direccion, datos.repartidor);
+
+  (datos.items || []).forEach(it => {
+    delivery.agregarItem(
+      it.nombre,
+      crearDinero(it.precio),
+      crearCantidad(it.cantidad)
+    );
+  });
+
+  const estado = datos.estado;
+  if (estado === 'en_preparacion') {
+    delivery.enviarACocina();
+  } else if (estado === 'en_camino') {
+    delivery.enviarACocina();
+    delivery.despachar();
+  } else if (estado === 'entregado') {
+    delivery.enviarACocina();
+    delivery.despachar();
+    delivery.confirmarEntrega();
+  } else if (estado === 'cancelado') {
+    delivery.cancelar();
+  }
+
+  delivery.setObservaciones(datos.observaciones);
+  return delivery;
+}
+
 window.Delivery = Delivery;
+window.reconstruirDelivery = reconstruirDelivery;

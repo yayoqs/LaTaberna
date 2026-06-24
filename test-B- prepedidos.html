@@ -17,7 +17,7 @@
 </head>
 <body>
   <h1>🧪 Test B – Activar permite_prepedidos al abrir mesa</h1>
-  <p class="info">Verifica que al confirmar la apertura de una mesa se active el campo permite_prepedidos en Appwrite.</p>
+  <p class="info">Verifica que al confirmar la apertura de una mesa se ejecute el comando crearPedidoMesa, el cual activa el campo permite_prepedidos en Appwrite.</p>
   <div id="results"></div>
 
   <!-- Mocks tempranos -->
@@ -30,7 +30,7 @@
     };
   </script>
 
-  <!-- Dependencias (rutas absolutas) -->
+  <!-- Dependencias -->
   <script src="/js/utils.js"></script>
   <script src="/js/lib/logger.js"></script>
   <script src="/js/lib/eventBus.js"></script>
@@ -100,23 +100,19 @@
         window.showToast = function() {};
 
         // Mock de DBAppwrite
-        var llamadasActualizar = [];
         window.DBAppwrite = window.DBAppwrite || {};
-        DBAppwrite.actualizar = async function(coleccion, id, cambios) {
-          llamadasActualizar.push({ coleccion, id, cambios });
-          return true;
-        };
+        DBAppwrite.actualizar = async function() { return true; };
         DBAppwrite.crear = async function() { return { id: 'ped_test' }; };
         DBAppwrite.listar = async function() { return []; };
 
-        // Mock de CommandBus para simular crearPedidoMesa exitoso
-        var comandoEjecutado = false;
+        // Mock de CommandBus que registra la llamada
+        var comandosEjecutados = [];
         window.CommandBus = window.CommandBus || {};
         CommandBus.registrar = function() {};
         CommandBus.ejecutar = async function(comando) {
+          comandosEjecutados.push(comando);
           if (comando.type === 'crearPedidoMesa') {
-            comandoEjecutado = true;
-            return { exito: true, data: { id: 'ped_test' } };
+            return { exito: true, data: { id: 'ped_test', mesa: comando.datos.numeroMesa } };
           }
           return { exito: false };
         };
@@ -133,23 +129,20 @@
 
         Mesas.render();
 
-        // ── Suite 1: Activar permite_prepedidos al abrir ─
-        resultsEl.innerHTML += '<div class="suite"><h2>1. Activar permite_prepedidos al abrir mesa</h2></div>';
+        // ── Suite 1: El comando crearPedidoMesa es ejecutado ─
+        resultsEl.innerHTML += '<div class="suite"><h2>1. El comando crearPedidoMesa se ejecuta al abrir</h2></div>';
 
-        // Simular apertura de mesa 1
         await Pedido._confirmarApertura(1);
         await esperar(100);
 
         // Verificar que el comando se ejecutó
-        assert(comandoEjecutado, 'El comando crearPedidoMesa fue ejecutado');
-
-        // Verificar que DBAppwrite.actualizar fue llamado para la mesa
-        var llamadaMesa = llamadasActualizar.find(function(ll) {
-          return ll.coleccion === 'mesas' && ll.id === '1';
+        var comandoApertura = comandosEjecutados.find(function(c) {
+          return c.type === 'crearPedidoMesa' && c.datos.numeroMesa === 1;
         });
-        assert(!!llamadaMesa, 'DBAppwrite.actualizar fue llamado para la mesa 1');
-        if (llamadaMesa) {
-          assert(llamadaMesa.cambios.permite_prepedidos === true, 'El campo permite_prepedidos se puso en true');
+        assert(!!comandoApertura, 'El comando crearPedidoMesa fue ejecutado para mesa 1');
+
+        if (comandoApertura) {
+          assert(comandoApertura.datos.comensales === 2, 'El comando incluye la cantidad de comensales');
         }
 
         // Verificar que la mesa quedó ocupada
@@ -157,39 +150,29 @@
         assert(mesa1.estado === 'ocupada', 'La mesa 1 pasó a estado ocupada');
         assert(mesa1.pedidoId === 'ped_test', 'La mesa 1 tiene pedidoId asignado');
 
-        // ── Suite 2: Fallo en actualización no detiene apertura ──
-        resultsEl.innerHTML += '<div class="suite"><h2>2. Fallo en actualización no detiene la apertura</h2></div>';
+        // ── Suite 2: Fallo en el comando no abre la mesa ──
+        resultsEl.innerHTML += '<div class="suite"><h2>2. Fallo en el comando no abre la mesa</h2></div>';
 
-        // Reiniciar mesa 2
         DB.mesas.push({ numero: 2, estado: 'libre', zona: 'salon', items: [], mozo: '', comensales: 1, pedidoId: null, esVirtual: false });
         Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
 
-        // Forzar fallo en DBAppwrite.actualizar
-        var originalActualizar = DBAppwrite.actualizar;
-        DBAppwrite.actualizar = async function(coleccion, id, cambios) {
-          if (coleccion === 'mesas') throw new Error('Error simulado');
-          return true;
+        // Forzar fallo en el comando
+        CommandBus.ejecutar = async function(comando) {
+          comandosEjecutados.push(comando);
+          return { exito: false, error: 'Error simulado en el comando' };
         };
 
-        comandoEjecutado = false;
         await Pedido._confirmarApertura(2);
         await esperar(100);
 
         var mesa2 = DB.mesas.find(function(m) { return m.numero == 2; });
-        assert(mesa2.estado === 'ocupada', 'La mesa 2 se abrió a pesar del fallo en Appwrite');
-        assert(comandoEjecutado, 'El comando crearPedidoMesa se ejecutó correctamente');
+        assert(mesa2.estado === 'libre', 'La mesa 2 sigue libre porque el comando falló');
 
-        // Restaurar mock
-        DBAppwrite.actualizar = originalActualizar;
-
-        // ── Limpiar el DOM para que no quede nada abierto ──
-        // Cerrar el modal de pedido si quedó abierto
+        // ── Limpiar DOM ──────────────────────────────────
         var modalPedido = document.getElementById('modalPedido');
         if (modalPedido) modalPedido.style.display = 'none';
-        // Eliminar cualquier overlay que haya quedado
         var overlays = document.querySelectorAll('.modal-overlay');
         overlays.forEach(function(o) { if (o.id !== 'view-mesas') o.remove(); });
-        // Restaurar mesas a estado libre
         DB.mesas.forEach(function(m) { m.estado = 'libre'; m.items = []; m.pedidoId = null; });
         Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
         Mesas.render();

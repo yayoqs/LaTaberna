@@ -1,7 +1,8 @@
 /* ================================================================
-   PubPOS — MÓDULO: utils.js
-   Propósito: Funciones de utilidad compartidas por todos los módulos.
-              Sin dependencias externas.
+   LaTaberna - PubPOS — MÓDULO JS
+   Archivo: js/utils.js
+   Versión: 1.0.0
+   Propósito: Utilidades compartidas: formato monetario, fechas, toast, DOM.
    ================================================================ */
 
 /* ── FORMATO MONETARIO ───────────────────────────────────────── */

@@ -4,18 +4,21 @@
   <meta charset="UTF-8">
   <title>Test D – Eventos en Vivo</title>
   <style>
-    body { font-family: sans-serif; background: #111; color: #eee; padding: 20px; }
-    .test { margin: 10px 0; padding: 10px; border-left: 4px solid #666; }
-    .pass { border-color: #4caf50; }
-    .fail { border-color: #f44336; }
+    body { font-family: system-ui, sans-serif; background: #1a1a1a; color: #e0e0e0; padding: 30px; max-width: 700px; margin: auto; }
+    h1 { color: #f59e0b; }
+    .resultado { background: #2a2a2a; border-radius: 8px; padding: 12px 16px; margin: 8px 0; display: flex; align-items: center; gap: 12px; }
+    .ok { border-left: 4px solid #22c55e; }
+    .fallo { border-left: 4px solid #ef4444; }
+    .seccion { color: #f59e0b; font-size: 13px; min-width: 110px; }
   </style>
 </head>
 <body>
   <h1>Test D – Eventos en Vivo</h1>
+  <p style="color:#a0a0a0; font-size:13px;">Panel del animador: bingo, karaoke, votación y control de acceso.</p>
   <div id="resultados"></div>
 
-  <!-- 1. Stubs del sistema -->
   <script>
+    // ─── Stubs del sistema ───────────────────────────────
     const Logger = { info: console.log, warn: console.warn, error: console.error };
     const EventBus = {
       events: {},
@@ -50,61 +53,63 @@
     };
   </script>
 
-  <!-- 2. Función assert y batería de tests -->
+  <!-- Cargar el módulo como ES6 -->
+  <script type="module" src="js/modulos/admin/eventos-en-vivo.js"></script>
+
   <script>
-    function assert(cond, desc) {
+    function resultado(ok, seccion, mensaje) {
       const div = document.createElement('div');
-      div.className = 'test ' + (cond ? 'pass' : 'fail');
-      div.textContent = (cond ? '✔' : '✘') + ' ' + desc;
+      div.className = 'resultado ' + (ok ? 'ok' : 'fallo');
+      div.innerHTML = `<span>${ok ? '✔' : '✘'}</span><span class="seccion">[${seccion}]</span><span>${mensaje}</span>`;
       document.getElementById('resultados').appendChild(div);
     }
 
     async function iniciarTests() {
-      // Esperar a que el módulo esté disponible en el ámbito global
-      // (se expone como window.EventosEnVivo)
+      // Esperar a que el módulo esté disponible
       if (typeof window.EventosEnVivo === 'undefined') {
-        assert(false, 'El módulo EventosEnVivo no se cargó correctamente');
+        await new Promise(r => setTimeout(r, 300));
+      }
+      if (typeof window.EventosEnVivo === 'undefined') {
+        resultado(false, 'Carga', 'El módulo EventosEnVivo no se cargó');
         return;
       }
-
-      const EventosEnVivo = window.EventosEnVivo;
 
       // Test 1: Render inicial
       EventBus.emit('vista:cambiada', 'eventos-en-vivo');
       await new Promise(r => setTimeout(r, 50));
-      assert(document.getElementById('view-eventos-en-vivo') !== null, 'La vista se crea');
-      assert(document.getElementById('estadoEvento').textContent.includes('Sin evento'), 'Estado inicial sin evento');
+      resultado(document.getElementById('view-eventos-en-vivo') !== null, 'Render', 'La vista se crea');
+      resultado(document.getElementById('estadoEvento').textContent.includes('Sin evento'), 'Render', 'Estado inicial sin evento');
 
       // Test 2: Crear bingo
       document.getElementById('selTipoEvento').value = 'bingo';
       await EventosEnVivo.crearEvento();
-      assert(document.getElementById('estadoEvento').textContent.includes('bingo'), 'Badge muestra bingo');
-      assert(document.getElementById('estadoEvento').textContent.includes('configuracion'), 'Estado inicial configuracion');
+      resultado(document.getElementById('estadoEvento').textContent.includes('bingo'), 'Bingo', 'Badge muestra bingo');
+      resultado(document.getElementById('estadoEvento').textContent.includes('configuracion'), 'Bingo', 'Estado inicial configuracion');
 
       // Test 3: Iniciar y cantar bola
       await EventosEnVivo.cambiarEstado('activo');
       await new Promise(r => setTimeout(r, 50));
       const btnCantar = document.querySelector('#zonaInteraccion .btn-primary');
-      assert(btnCantar && !btnCantar.disabled, 'Botón Cantar bola habilitado');
+      resultado(btnCantar && !btnCantar.disabled, 'Bingo', 'Botón Cantar bola habilitado');
 
       await EventosEnVivo.cantarBola();
       await new Promise(r => setTimeout(r, 50));
       const bolas = document.querySelectorAll('.bola');
-      assert(bolas.length === 1, 'Aparece una bola tras cantar');
-      assert(document.getElementById('estadoEvento').textContent.includes('activo'), 'Estado sigue activo');
+      resultado(bolas.length === 1, 'Bingo', 'Aparece una bola tras cantar');
+      resultado(document.getElementById('estadoEvento').textContent.includes('activo'), 'Bingo', 'Estado sigue activo');
 
       // Test 4: Finalizar y reiniciar
       await EventosEnVivo.cambiarEstado('finalizado');
       await new Promise(r => setTimeout(r, 50));
-      assert(document.getElementById('estadoEvento').textContent.includes('finalizado'), 'Estado finalizado');
+      resultado(document.getElementById('estadoEvento').textContent.includes('finalizado'), 'Bingo', 'Estado finalizado');
       const btnReiniciar = document.getElementById('btnReiniciar');
-      assert(btnReiniciar.style.display !== 'none', 'Botón reiniciar visible');
+      resultado(btnReiniciar.style.display !== 'none', 'Bingo', 'Botón reiniciar visible');
 
       await EventosEnVivo.reiniciarEvento();
       await new Promise(r => setTimeout(r, 50));
-      assert(document.getElementById('estadoEvento').textContent.includes('configuracion'), 'Reiniciado a configuracion');
+      resultado(document.getElementById('estadoEvento').textContent.includes('configuracion'), 'Bingo', 'Reiniciado a configuracion');
       const bolasDespues = document.querySelectorAll('.bola');
-      assert(bolasDespues.length === 0, 'Bolas limpiadas tras reiniciar');
+      resultado(bolasDespues.length === 0, 'Bingo', 'Bolas limpiadas tras reiniciar');
 
       // Test 5: Karaoke
       document.getElementById('selTipoEvento').value = 'karaoke';
@@ -114,11 +119,11 @@
       document.getElementById('letraKaraoke').value = 'Estribillo de prueba';
       await EventosEnVivo.actualizarLetra();
       await new Promise(r => setTimeout(r, 50));
-      assert(DBAppwrite.ultimaActualizacion.cambios.datos.letra === 'Estribillo de prueba', 'Letra guardada correctamente');
+      resultado(DBAppwrite.ultimaActualizacion.cambios.datos.letra === 'Estribillo de prueba', 'Karaoke', 'Letra guardada correctamente');
 
       await EventosEnVivo.limpiarLetra();
       await new Promise(r => setTimeout(r, 50));
-      assert(DBAppwrite.ultimaActualizacion.cambios.datos.letra === '', 'Letra limpia correctamente');
+      resultado(DBAppwrite.ultimaActualizacion.cambios.datos.letra === '', 'Karaoke', 'Letra limpia correctamente');
 
       // Test 6: Votación
       document.getElementById('selTipoEvento').value = 'votacion';
@@ -128,15 +133,15 @@
       document.getElementById('nuevaOpcion').value = 'Opción A';
       await EventosEnVivo.agregarOpcion();
       await new Promise(r => setTimeout(r, 50));
-      assert(DBAppwrite.ultimaActualizacion.cambios.datos.opciones.includes('Opción A'), 'Opción A agregada');
+      resultado(DBAppwrite.ultimaActualizacion.cambios.datos.opciones.includes('Opción A'), 'Votación', 'Opción A agregada');
 
       document.getElementById('nuevaOpcion').value = 'Opción B';
       await EventosEnVivo.agregarOpcion();
       await new Promise(r => setTimeout(r, 50));
       await EventosEnVivo.eliminarUltimaOpcion();
       await new Promise(r => setTimeout(r, 50));
-      assert(!DBAppwrite.ultimaActualizacion.cambios.datos.opciones.includes('Opción B'), 'Opción B eliminada');
-      assert(DBAppwrite.ultimaActualizacion.cambios.datos.opciones.includes('Opción A'), 'Opción A permanece');
+      resultado(!DBAppwrite.ultimaActualizacion.cambios.datos.opciones.includes('Opción B'), 'Votación', 'Opción B eliminada');
+      resultado(DBAppwrite.ultimaActualizacion.cambios.datos.opciones.includes('Opción A'), 'Votación', 'Opción A permanece');
 
       // Test 7: Acceso denegado
       Auth._rol = 'cliente';
@@ -144,21 +149,16 @@
       EventBus.emit('vista:cambiada', 'eventos-en-vivo');
       await new Promise(r => setTimeout(r, 50));
       const panel = document.getElementById('panelEventoVivo');
-      assert(panel.textContent.includes('Acceso denegado'), 'Muestra acceso denegado para rol no autorizado');
+      resultado(panel.textContent.includes('Acceso denegado'), 'Acceso', 'Muestra acceso denegado para rol no autorizado');
 
-      console.log('Todos los tests finalizados.');
+      // Ocultar la vista para limpiar la interfaz
+      const vista = document.getElementById('view-eventos-en-vivo');
+      if (vista) vista.style.display = 'none';
+
+      console.log('Todos los tests de eventos en vivo finalizados.');
     }
-  </script>
 
-  <!-- 3. Carga del módulo como ES6 -->
-  <script type="module" src="js/modulos/admin/eventos-en-vivo.js"></script>
-
-  <!-- 4. Arranque de los tests (esperar a que el módulo esté listo) -->
-  <script>
-    window.addEventListener('load', () => {
-      // Pequeño retraso para asegurar que el módulo se haya ejecutado completamente
-      setTimeout(iniciarTests, 100);
-    });
+    window.addEventListener('load', () => setTimeout(iniciarTests, 100));
   </script>
 </body>
 </html>

@@ -1,7 +1,10 @@
 /* ================================================================
-   PubPOS — MÓDULO: caja.js (v4.1 – logging unificado + JSDoc)
-   Propósito: Resumen del turno y cierre de caja. Ahora obtiene los
-              datos del Store y se suscribe a cambios.
+   LaTaberna - PubPOS — UI JS
+   Archivo: js/ui/caja.js
+   Versión: 1.0.0
+   Propósito: Vista de caja: resumen de turno, estadísticas y tabla de pedidos.
+   Dependencias: js/lib/store.js, js/lib/eventBus.js, js/utils.js,
+                 js/app.js (App.cerrarTurnoApp)
    ================================================================ */
 const Caja = (() => {
 
@@ -74,8 +77,8 @@ const Caja = (() => {
     let items = [];
     try { items = JSON.parse(p.items || '[]'); } catch {}
     const cant = items.reduce((s, it) => s + it.qty, 0);
-    const apertura = fmtHoraCorta(p.created_at);
-    const cierre = p.estado === 'cerrada' ? fmtHoraCorta(p.updated_at) : '—';
+    const apertura = fmtHoraCorta(p.creadoEn || p.created_at);
+    const cierre = p.estado === 'cerrada' ? fmtHoraCorta(p.actualizadoEn || p.updated_at) : '—';
     return `
       <tr>
         <td><strong>Mesa ${p.mesa}</strong></td>

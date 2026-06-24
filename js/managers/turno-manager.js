@@ -1,5 +1,9 @@
 /* ================================================================
-   PubPOS — MÓDULO: turno-manager.js (v1.2 – logging unificado + JSDoc)
+   LaTaberna - PubPOS — MÓDULO JS
+   Archivo: js/managers/turno-manager.js
+   Versión: 1.0.0
+   Propósito: Cierre de turno, respaldo en Google Drive y reseteo del sistema.
+   Dependencias: js/managers/pedido-manager.js, js/lib/logger.js, js/db.js, js/utils.js (showToast), js/lib/eventBus.js, js/ui/mesas.js, js/ui/kds.js, js/ui/caja.js, js/ui/reparto.js, js/db-core.js (mesaVacia)
    ================================================================ */
 const TurnoManager = (() => {
 

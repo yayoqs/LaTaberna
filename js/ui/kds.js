@@ -1,10 +1,12 @@
 /* ================================================================
-   PubPOS — MÓDULO: kds.js (v4.6 – botón de pánico y acceso a recetario)
-   Propósito: Monitor de cocina (KDS). Muestra comandas activas.
-   Novedades v4.6:
-   - Botón de pánico por ítem para admin/master.
-   - Acceso al recetario desde el toolbar (llama a Recetario.render()).
+   LaTaberna - PubPOS — UI JS
+   Archivo: js/ui/kds.js
+   Versión: 1.0.0
+   Propósito: Monitor de cocina (KDS): tarjetas de comandas, estados y recetario.
+   Dependencias: js/lib/store.js, js/lib/eventBus.js, js/lib/command-bus.js, js/auth.js, js/db.js, js/db-appwrite.js, js/utils.js, js/lib/logger.js, js/ui/recetas.js (Recetas.render)
    ================================================================ */
+
+
 const KDS = (() => {
   const MINUTOS_URGENTE = 15;
   const MINUTOS_OCULTAR_LISTA = 10;
@@ -22,7 +24,7 @@ const KDS = (() => {
           <button class="btn-secondary" onclick="KDS.refresh()">
             <i class="fas fa-sync-alt"></i> Actualizar
           </button>
-          <button class="btn-secondary" onclick="window.Recetario.render()">
+          <button class="btn-secondary" onclick="window.Recetas.render('consulta')">
             <i class="fas fa-book-open"></i> Recetario
           </button>
         </div>

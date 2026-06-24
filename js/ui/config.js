@@ -1,9 +1,9 @@
 /* ================================================================
-   Raíz — MÓDULO: config.js (v5.0 – mejoras: validación de zonas,
-   vista previa de imagen, autoajuste de precio, UI actualizada)
-   Propósito: Vista de configuración (productos, mozos, zonas, stock).
-              Lee del Store y persiste cambios en DB y Appwrite.
-              Al guardar, ajusta la cantidad de mesas según las zonas.
+   LaTaberna - PubPOS — UI JS
+   Archivo: js/ui/config.js
+   Versión: 1.0.0
+   Propósito: Vista de configuración: productos, zonas, impresoras, mozos.
+   Dependencias: js/lib/store.js, js/lib/eventBus.js, js/lib/logger.js, js/auth.js, js/utils.js, js/db.js, js/db-appwrite.js, js/ui/mesas.js, js/ui/tickets.js
    ================================================================ */
 const Config = (() => {
   function _asegurarVista() {

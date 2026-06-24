@@ -1,11 +1,13 @@
 /* ================================================================
-   PubPOS — CSS MODULAR
+   LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/ticket.css
-   Propósito: Estilos del ticket de 80mm (preview + impresión)
-   ----------------------------------------------------------------
+   Versión: 1.0.0
+   Propósito: Estilos del ticket de 80mm (preview e impresión).
+   ============================================
+   ----------------------------
    El div .ticket-80mm simula el papel físico de 80mm (~302px a 96dpi)
    Usar font-family monoespaciada para alineación correcta al imprimir.
-   ================================================================ */
+============================================= */
 
 /* ── PREVIEW EN PANTALLA ───────────────────────────────────── */
 .ticket-80mm {

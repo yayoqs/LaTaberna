@@ -1,10 +1,13 @@
 /* ================================================================
-   PubPOS — DOMINIO: PedidoAgregado (Agregado)
-   Propósito: Representa un pedido de mesa. Encapsula las reglas de
-              negocio y garantiza que siempre esté en un estado válido.
-              Renombrado desde "Pedido" para evitar conflicto con el
-              módulo de interfaz js/pedido.js.
+   LaTaberna - PubPOS — DOMINIO JS
+   Archivo: js/dominio/pedido.js
+   Versión: 1.0.1
+   Propósito: Agregado PedidoAgregado: pedido de mesa, ítems, totales.
+              Agregada factory reconstruirPedidoAgregado.
+   Dependencias: js/dominio/dinero.js, js/dominio/cantidad.js
    ================================================================ */
+   
+   
 class PedidoAgregado {
   /**
    * @param {string} id - Identificador único del pedido
@@ -104,4 +107,33 @@ class PedidoAgregado {
   }
 }
 
+/**
+ * Reconstruye un PedidoAgregado desde un objeto plano (JSON).
+ * @param {object} datos - Objeto con las propiedades del pedido.
+ * @returns {PedidoAgregado}
+ */
+function reconstruirPedidoAgregado(datos) {
+  const pedido = new PedidoAgregado(
+    datos.id,
+    datos.mesa,
+    datos.mozo,
+    crearCantidad(datos.comensales)
+  );
+
+  (datos.items || []).forEach(it => {
+    pedido.agregarItem(
+      it.nombre,
+      crearDinero(it.precio),
+      crearCantidad(it.cantidad)
+    );
+  });
+
+  if (datos.descuento) pedido.aplicarDescuento(datos.descuento);
+  if (datos.estado === 'cerrado') pedido.cerrar();
+  pedido.setObservaciones(datos.observaciones);
+
+  return pedido;
+}
+
 window.PedidoAgregado = PedidoAgregado;
+window.reconstruirPedidoAgregado = reconstruirPedidoAgregado;

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Test de Flujo Real - Appwrite</title>
+  <title>Test de Flujo Real - Appwrite (TablesDB)</title>
   <style>
     body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
     h1 { color: #f59e0b; }
@@ -17,7 +17,7 @@
   </style>
 </head>
 <body>
-  <h1>🧪 Test de Flujo Real: Pedido → Comanda</h1>
+  <h1>🧪 Test de Flujo Real: Pedido → Comanda (TablesDB)</h1>
   <p class="info">Abre una mesa, crea un pedido, envía una comanda y verifica la sincronización entre colecciones.</p>
   <div id="results"></div>
   <button onclick="location.reload()">🔄 Ejecutar de nuevo</button>
@@ -27,14 +27,12 @@
   <script src="js/lib/eventBus.js"></script>
   <script src="js/lib/store.js"></script>
   <script src="js/appwrite.min.js"></script>
-  <script src="js/init-appwrite.js"></script>
   <script src="js/db-appwrite.js"></script>
   <script src="js/db-core.js"></script>
   <script src="js/db-inventario.js"></script>
   <script src="js/db-fusion.js"></script>
   <script src="js/db-shim.js"></script>
   <script src="js/db.js"></script>
-  <script src="js/puente-appwrite.js"></script>
 
   <script>
     (function() {
@@ -63,7 +61,7 @@
         Logger.setLevel('ERROR');
 
         // Inicializar
-        await DBAppwrite.init();
+        await DBAppwrite.iniciar();
         if (!DBAppwrite.habilitado) {
           resultsEl.innerHTML += '<div class="fail">❌ Appwrite no habilitado.</div>';
           return;
@@ -75,7 +73,6 @@
         DB.mesas = [];
         DB.pedidos = [];
         DB.comandas = [];
-        if (typeof activarPuenteAppwrite === 'function') activarPuenteAppwrite();
 
         // ── Paso 0: Limpiar mesa de prueba si existe ──────
         resultsEl.innerHTML += '<h2>Paso 0: Preparar entorno</h2>';
@@ -109,8 +106,6 @@
           estado: 'abierta',
           items: '[]',
           total: 0,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
           observaciones: 'Pedido de prueba'
         };
 
@@ -165,8 +160,7 @@
         await DBAppwrite.actualizar('pedidos', testPedidoId, {
           items: JSON.stringify(itemsComanda),
           total: totalPedido,
-          estado: 'en_proceso',
-          updated_at: new Date().toISOString()
+          estado: 'en_proceso'
         });
 
         // Verificar estado de las tres colecciones
@@ -194,8 +188,7 @@
         // ── Paso 4: Cerrar pedido y liberar mesa ───────────
         resultsEl.innerHTML += '<h2>Paso 4: Cerrar Pedido y Liberar Mesa</h2>';
         await DBAppwrite.actualizar('pedidos', testPedidoId, {
-          estado: 'cerrada',
-          updated_at: new Date().toISOString()
+          estado: 'cerrada'
         });
         await DBAppwrite.actualizar('mesas', String(TEST_MESA), {
           estado: 'libre',

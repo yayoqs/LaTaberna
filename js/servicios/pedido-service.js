@@ -1,6 +1,12 @@
 /* ================================================================
-   PubPOS — SERVICIO: PedidoService (v1.4 – logging unificado + JSDoc)
+   LaTaberna - PubPOS — SERVICIO JS
+   Archivo: js/servicios/pedido-service.js
+   Versión: 1.0.0
+   Propósito: Servicio de casos de uso para pedidos de mesa.
+   Dependencias: js/dominio/pedido.js, js/dominio/cantidad.js, js/dominio/dinero.js, js/dominio/resultado.js, js/lib/eventBus.js, js/lib/logger.js
    ================================================================ */
+
+
 const PedidoService = (() => {
 
   let _pedidoRepo = null;

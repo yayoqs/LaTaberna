@@ -1,8 +1,10 @@
 /* ================================================================
-   PubPOS — MÓDULO: despensa.js (v12.0 – mejoras: filtros avanzados,
-   ordenamiento múltiple, exportación PDF, paginación movimientos)
-   Propósito: Gestión de inventario (ingredientes, movimientos, alertas).
-              Obtiene los datos del Store y se re‑renderiza automáticamente.
+   LaTaberna - PubPOS — UI JS
+   Archivo: js/ui/despensa.js
+   Versión: 1.0.0
+   Propósito: Vista de inventario: ingredientes, movimientos, filtros, exportación.
+   Dependencias: js/lib/store.js, js/lib/eventBus.js, js/auth.js,
+                 js/utils.js, js/db.js, js/servicios/inventario-service.js
    ================================================================ */
 
 const Despensa = (() => {

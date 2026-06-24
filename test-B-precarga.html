@@ -13,7 +13,6 @@
     .summary { margin-top: 20px; font-weight: bold; }
     .info { color: #94a3b8; font-size: 12px; margin: 2px 0; }
     .error { color: #ef4444; }
-    pre { background: #111; padding: 10px; white-space: pre-wrap; }
   </style>
 </head>
 <body>
@@ -21,7 +20,7 @@
   <p class="info">Verifica que el Frontend Interno muestre la insignia, cargue los ítems (agrupando por producto), asigne correctamente las observaciones y actualice el estado de la precarga.</p>
   <div id="results"></div>
 
-  <!-- Mock temprano para evitar errores de dependencias no cargadas -->
+  <!-- Mocks tempranos -->
   <script>
     window.DBInventario = {
       validarStockParaItems: function() { return { ok: true, faltantes: [] }; }
@@ -48,14 +47,12 @@
   <script src="/js/dominio/cantidad.js"></script>
   <script src="/js/db-core.js"></script>
   <script src="/js/db-appwrite.js"></script>
-  <script src="/js/puente-appwrite.js"></script>
   <script src="/js/db.js"></script>
 
   <!-- Módulos a testear -->
   <script src="/js/ui/mesas.js"></script>
   <script src="/js/ui/comanda.js"></script>
-  <!-- PrecargaControl ahora se carga como módulo ES6 nativo -->
-  <script type="module" src="/js/modulos/interno/precarga-control.js"></script>
+  <script src="/js/modulos/interno/precarga-control.js"></script>
 
   <script>
     (function() {
@@ -93,6 +90,7 @@
         DB.fusionarMesas = function() { return null; };
         DB.productos = [];
 
+        // Mock de Appwrite
         if (!window.DBAppwrite || !DBAppwrite.actualizar) {
           window.DBAppwrite = {
             actualizar: async function(coleccion, id, cambios) {
@@ -102,8 +100,40 @@
           };
         }
 
+        // Mock del Store con dispatch que actualiza DB.mesas
+        var originalDispatch = Store.dispatch;
+        Store.dispatch = function(action) {
+          if (action.type === 'COMANDA_ITEM_AGREGAR') {
+            var mesa = DB.mesas.find(function(m) { return m.numero === action.payload.numeroMesa; });
+            if (mesa) {
+              var item = action.payload.item;
+              var existente = mesa.items.find(function(it) {
+                return it.prodId === item.prodId && !it.enviado && it.persona === (item.persona || 'General');
+              });
+              if (existente) {
+                existente.qty++;
+              } else {
+                mesa.items.push({ ...item, qty: 1 });
+              }
+            }
+          } else if (action.type === 'COMANDA_ITEM_CAMBIAR') {
+            var mesa = DB.mesas.find(function(m) { return m.numero === action.payload.numeroMesa; });
+            if (mesa && mesa.items[action.payload.index]) {
+              Object.assign(mesa.items[action.payload.index], action.payload.cambios);
+            }
+          } else if (action.type === 'COMANDA_ITEM_QUITAR') {
+            var mesa = DB.mesas.find(function(m) { return m.numero === action.payload.numeroMesa; });
+            if (mesa) {
+              mesa.items.splice(action.payload.index, 1);
+            }
+          }
+          originalDispatch.call(Store, action);
+        };
+
+        // Inicializar Store
         Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
 
+        // Crear DOM mínimo para Mesas.render
         var main = document.createElement('main');
         main.id = 'view-mesas';
         main.innerHTML = '<div id="mesasGrid"></div>';
@@ -111,6 +141,7 @@
 
         Mesas.render();
 
+        // Preparar mesa 1 como activa en Comanda
         var mesa1 = DB.mesas[0];
         mesa1.estado = 'ocupada';
         mesa1.pedidoId = 'ped_test';
@@ -151,7 +182,7 @@
         var precargasGuardadas = PrecargaControl._precargas;
         assert(precargasGuardadas.has('prec_001'), 'Precarga almacenada en PrecargaControl');
 
-        // ── Suite 2: Clic en insignia carga ítems (agrupados) ──
+        // ── Suite 2: Clic en insignia carga ítems ──────
         resultsEl.innerHTML += '<div class="suite"><h2>2. Clic en insignia carga ítems y los agrupa correctamente</h2></div>';
 
         badgeEl = document.querySelector('.precarga-badge');

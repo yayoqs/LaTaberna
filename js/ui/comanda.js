@@ -1,11 +1,14 @@
 /* ================================================================
-   PubPOS — MÓDULO: comanda.js (v2 – JSDoc completo)
-   Propósito: Gestión de la comanda actual, incluyendo asignación
-              de ítems a personas (split bill).
+   LaTaberna - PubPOS — UI
+   Archivo: js/ui/comanda.js
+   Versión: 1.0.1
+   Propósito: Gestión de la comanda actual (ítems, cantidades,
+              observaciones, split bill). Ahora lee del Store y
+              despacha acciones en lugar de modificar DB.
+   Dependencias: Store, EventBus, DB, Auth, Logger
    ================================================================ */
-
 const Comanda = (() => {
-  let _mesaActiva = null;
+  let _mesaActiva = null; // referencia al objeto mesa del Store
 
   /**
    * Establece la mesa activa y sincroniza la UI.
@@ -90,24 +93,26 @@ const Comanda = (() => {
   function agregarItem(producto) {
     if (!_mesaActiva) return;
     const persona = _mesaActiva.personaActiva || 'General';
-    const existente = _mesaActiva.items.find(it => it.prodId === producto.id && !it.enviado && it.persona === persona);
-    if (existente) {
-      existente.qty++;
-    } else {
-      _mesaActiva.items.push({
-        prodId:    producto.id,
-        nombre:    producto.nombre,
-        precio:    producto.precio,
-        categoria: producto.categoria,
-        destino:   producto.destino,
-        qty:       1,
-        obs:       '',
-        enviado:   false,
-        enviadoA:  null,
-        enviadoTs: null,
-        persona:   persona
-      });
-    }
+    const item = {
+      prodId: producto.id,
+      nombre: producto.nombre,
+      precio: producto.precio,
+      categoria: producto.categoria,
+      destino: producto.destino,
+      persona: persona,
+      obs: '',
+      enviado: false,
+      enviadoA: null,
+      enviadoTs: null
+    };
+
+    // Despachar acción al Store (la agrupación la maneja el reducer)
+    Store.dispatch({
+      type: 'COMANDA_ITEM_AGREGAR',
+      payload: { numeroMesa: _mesaActiva.numero, item }
+    });
+
+    // Mantener compatibilidad temporal: sincronizar DB y emitir eventos
     _guardarYRenderizar();
   }
 
@@ -124,7 +129,11 @@ const Comanda = (() => {
       showToast('error', 'No tienes permiso para modificar ítems ya enviados');
       return;
     }
-    item.qty = Math.max(1, item.qty + delta);
+    const nuevaCantidad = Math.max(1, item.qty + delta);
+    Store.dispatch({
+      type: 'COMANDA_ITEM_CAMBIAR',
+      payload: { numeroMesa: _mesaActiva.numero, index: idx, cambios: { qty: nuevaCantidad } }
+    });
     _guardarYRenderizar();
   }
 
@@ -135,7 +144,10 @@ const Comanda = (() => {
    */
   function setObservacion(idx, valor) {
     if (_mesaActiva?.items[idx]) {
-      _mesaActiva.items[idx].obs = valor;
+      Store.dispatch({
+        type: 'COMANDA_ITEM_CAMBIAR',
+        payload: { numeroMesa: _mesaActiva.numero, index: idx, cambios: { obs: valor } }
+      });
     }
   }
 
@@ -147,7 +159,10 @@ const Comanda = (() => {
       showToast('error', 'Solo administrador puede eliminar ítems enviados');
       return;
     }
-    _mesaActiva.items.splice(idx, 1);
+    Store.dispatch({
+      type: 'COMANDA_ITEM_QUITAR',
+      payload: { numeroMesa: _mesaActiva.numero, index: idx }
+    });
     _guardarYRenderizar();
   }
 
@@ -176,6 +191,12 @@ const Comanda = (() => {
 
   function _guardarYRenderizar() {
     if (!_mesaActiva) return;
+    // Actualizar la referencia local desde el Store para tener el total actualizado
+    const state = Store.getState();
+    const mesaActualizada = state.mesas.find(m => m.numero === _mesaActiva.numero);
+    if (mesaActualizada) {
+      _mesaActiva = mesaActualizada;
+    }
     _mesaActiva.total = calcularTotal(_mesaActiva.items);
     DB.saveMesas();
     EventBus.emit('mesa:actualizada', { mesa: _mesaActiva.numero, estado: _mesaActiva.estado });
@@ -195,7 +216,12 @@ const Comanda = (() => {
     const subtotalEl = document.getElementById('subtotalDisplay');
     if (!contenedor || !_mesaActiva) return;
 
-    if (!_mesaActiva.items.length) {
+    // Leer los ítems desde el Store para asegurar consistencia
+    const state = Store.getState();
+    const mesaDelStore = state.mesas.find(m => m.numero === _mesaActiva.numero);
+    const items = mesaDelStore ? mesaDelStore.items : _mesaActiva.items;
+
+    if (!items.length) {
       contenedor.innerHTML = `
         <div class="comanda-vacia">
           <i class="fas fa-utensils"></i>
@@ -206,8 +232,8 @@ const Comanda = (() => {
       return;
     }
 
-    contenedor.innerHTML = _mesaActiva.items.map((item, idx) => _htmlItem(item, idx)).join('');
-    if (subtotalEl) subtotalEl.textContent = fmtMoney(_mesaActiva.total || 0);
+    contenedor.innerHTML = items.map((item, idx) => _htmlItem(item, idx)).join('');
+    if (subtotalEl) subtotalEl.textContent = fmtMoney(mesaDelStore?.total || _mesaActiva.total || 0);
     _renderSelectorPersona();
   }
 

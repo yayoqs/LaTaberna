@@ -1,9 +1,10 @@
-/**
- * Panel de la Orden del Cliente (v1.0.0)
- *
- * Panel lateral fijo que muestra los ítems agregados a la orden,
- * con cantidades, observaciones y total.
- */
+/* ================================================================
+   LaTaberna - PubPOS — CSS MODULAR
+   Archivo: css/cliente-orden.css
+   Versión: 1.0.0
+   Propósito: Panel lateral de la orden del cliente.
+   ================================================================ */
+
 
 .orden-panel {
   position: fixed;

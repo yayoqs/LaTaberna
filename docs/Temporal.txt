@@ -1,0 +1,10 @@
+
+
+ya, algunas cosas puntuales.
+en Productos: 
+Categoria quedo como varchar, pero analizaremos si cambiarla a enum.
+precio quedo como double.
+mantuve stock como double, debemos consultar al equipo que haremos con el, si lo dejaremos o eliminaremos.
+.. 
+en Pedidos:
+total lo deje como double.

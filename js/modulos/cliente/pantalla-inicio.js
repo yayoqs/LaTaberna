@@ -1,13 +1,10 @@
-/**
- * Pantalla de Inicio Híbrida (v1.1.0)
- * Vista pública que no requiere autenticación.
- *
- * @module PantallaInicio
- * @version 1.1.0
- *
- * Rediseño con triángulo de acceso neón, cabecera izquierda
- * y vitrinas deslizables decorativas con eslogan dinámico.
- */
+/* ================================================================
+   LaTaberna - PubPOS — MÓDULO JS
+   Archivo: js/modulos/cliente/pantalla-inicio.js
+   Versión: 1.0.0
+   Propósito: Pantalla de inicio pública con triángulo de acceso, vitrinas deslizables y eslogan dinámico.
+   Dependencias: js/auth.js (Auth.mostrarLogin, Auth.registrarCliente)
+   ================================================================ */
 const PantallaInicio = (() => {
   let _vista = null;
   let _intervaloEslogan = null;

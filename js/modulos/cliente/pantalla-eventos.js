@@ -1,14 +1,11 @@
-/**
- * Pantalla de Eventos en Vivo para clientes (v1.0.0)
- *
- * @module PantallaEventos
- * @version 1.0.0
- *
- * Muestra el evento activo (bingo, karaoke, votación) en tiempo real
- * usando los datos del Store y suscribiéndose a eventos_en_vivo:actualizada.
- * Las interacciones de votación son placeholders visuales hasta que la
- * Célula D exponga los endpoints correspondientes.
- */
+/* ================================================================
+   LaTaberna - PubPOS — MÓDULO JS
+   Archivo: js/modulos/cliente/pantalla-eventos.js
+   Versión: 1.0.0
+   Propósito: Vista inmersiva de eventos en vivo para el cliente.
+   Dependencias: js/lib/store.js, js/lib/eventBus.js
+   ================================================================ */
+   
 const PantallaEventos = (() => {
   let _vista = null;
 

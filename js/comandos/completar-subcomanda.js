@@ -1,9 +1,10 @@
 /* ================================================================
-   PubPOS — COMANDO: completarSubcomanda (v1.0.1 – fix payload)
-   Propósito: Marcar como completada una subcomanda (cocina/barra)
-              de una comanda con destino 'ambos'.
-              Si ambas están listas, la comanda principal se
-              marca como 'completada'.
+   LaTaberna - PubPOS — COMANDO JS
+   Archivo: js/comandos/completar-subcomanda.js
+   Versión: 1.0.1
+   Propósito: Marcar una subcomanda (cocina/barra) como completada.
+              Ahora expone función creadora.
+   Dependencias: CommandBus, DBAppwrite, EventBus, Logger
    ================================================================ */
 
 (function() {
@@ -12,12 +13,18 @@
     return;
   }
 
+  // Función creadora
+  function crearComandoCompletarSubcomanda(idOriginal, destino) {
+    return {
+      type: 'completarSubcomanda',
+      datos: { idOriginal, destino }
+    };
+  }
+
   CommandBus.registrar('completarSubcomanda', async function(payload) {
-    // Extraer los datos reales del objeto que envía CommandBus.ejecutar
     const datos = payload && payload.datos ? payload.datos : payload;
     const { idOriginal, destino } = datos;
 
-    // Validación mínima
     if (!idOriginal || !destino) {
       return { exito: false, error: 'Se requiere idOriginal y destino (cocina | barra).' };
     }
@@ -26,7 +33,6 @@
     }
 
     try {
-      // 1. Obtener la comanda original desde Appwrite
       const comandas = await DBAppwrite.listar('comandas');
       const comanda = comandas.find(c => c.id === idOriginal);
 
@@ -35,7 +41,6 @@
         return { exito: false, error: 'Comanda no encontrada.' };
       }
 
-      // 2. Parsear el campo 'subcomandas' (JSON) o inicializarlo
       let subcomandas = {};
       try {
         subcomandas = comanda.subcomandas
@@ -47,21 +52,17 @@
         subcomandas = {};
       }
 
-      // 3. Marcar el destino como completado
       subcomandas[destino] = 'completada';
 
-      // 4. Determinar si ambas están completadas
       const ambasListas =
         subcomandas.cocina === 'completada' &&
         subcomandas.barra === 'completada';
 
-      // 5. Actualizar en Appwrite
       await DBAppwrite.actualizar('comandas', idOriginal, {
         subcomandas: JSON.stringify(subcomandas),
         estado: ambasListas ? 'completada' : comanda.estado
       });
 
-      // 6. Emitir eventos
       EventBus.emit('comanda:subcomanda_completada', {
         id: idOriginal,
         destino,
@@ -84,6 +85,9 @@
       return { exito: false, error: e.message };
     }
   });
+
+  // Exponer función creadora globalmente
+  window.crearComandoCompletarSubcomanda = crearComandoCompletarSubcomanda;
 
   Logger.info('[completarSubcomanda] Comando registrado en CommandBus.');
 })();

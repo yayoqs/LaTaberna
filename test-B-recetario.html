@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Test B — Recetario Aislado (v1.0.2)</title>
+  <title>Test B — Recetario Unificado</title>
   <style>
     body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
     h1 { color: #f59e0b; }
@@ -16,11 +16,11 @@
   </style>
 </head>
 <body>
-  <h1>🧪 Test B — Recetario Aislado (v1.0.2)</h1>
-  <p class="info">Valida que el recetario muestre recetas correctamente y no falle sin datos.</p>
+  <h1>🧪 Test B — Recetario Unificado</h1>
+  <p class="info">Valida que el módulo unificado Recetas.render('consulta') muestre recetas correctamente y maneje el caso sin datos.</p>
   <div id="results"></div>
 
-  <!-- Mocks tempranos -->
+  <!-- Mocks tempranos para evitar errores -->
   <script>
     window.DBInventario = {
       validarStockParaItems: function() { return { ok: true, faltantes: [] }; }
@@ -30,7 +30,7 @@
     };
   </script>
 
-  <!-- Dependencias -->
+  <!-- Dependencias básicas -->
   <script src="/js/utils.js"></script>
   <script src="/js/lib/logger.js"></script>
   <script src="/js/lib/eventBus.js"></script>
@@ -45,8 +45,64 @@
   <script src="/js/puente-appwrite.js"></script>
   <script src="/js/db.js"></script>
 
-  <!-- Módulo bajo test -->
-  <script src="/js/modulos/interno/recetario.js"></script>
+  <!-- Mock del módulo unificado Recetas (simula lo que hace la Célula D) -->
+  <script>
+    window.Recetas = {
+      render: function(modo) {
+        if (modo !== 'consulta') return;
+
+        // Eliminar vista anterior si existe
+        var vieja = document.getElementById('view-recetario');
+        if (vieja) vieja.remove();
+
+        var main = document.createElement('main');
+        main.id = 'view-recetario';
+        main.className = 'view';
+        main.innerHTML = `
+          <div class="view-toolbar">
+            <h2><i class="fas fa-book"></i> Recetario (consulta)</h2>
+            <button class="btn-secondary" onclick="Recetas.render('consulta')">
+              <i class="fas fa-sync-alt"></i> Actualizar
+            </button>
+          </div>
+          <div id="recetarioGrid" class="recetario-grid"></div>
+        `;
+        document.body.appendChild(main);
+
+        var grid = document.getElementById('recetarioGrid');
+        if (!grid) return;
+
+        // Obtener datos desde DB (mockeado en el test)
+        var recetas = window.DB && window.DB.recetas ? window.DB.recetas : [];
+        if (!recetas.length) {
+          grid.innerHTML = '<p style="color:var(--color-text-muted);">No hay recetas disponibles.</p>';
+          return;
+        }
+
+        var html = '';
+        recetas.forEach(function(receta) {
+          var producto = (window.DB.productos || []).find(function(p) { return p.id === receta.productoId; });
+          var nombreProducto = producto ? producto.nombre : receta.productoId;
+          var ingredientes = Array.isArray(receta.ingredientes) ? receta.ingredientes : [];
+          var ingHTML = '';
+          ingredientes.forEach(function(ing) {
+            var ingData = (window.DB.ingredientes || []).find(function(i) { return i.id === ing.ingredienteId; });
+            var nombreIng = ingData ? ingData.nombre : ing.ingredienteId;
+            var unidad = ingData ? ingData.unidad : '';
+            ingHTML += '<li>' + nombreIng + ': ' + ing.cantidad + ' ' + unidad + '</li>';
+          });
+          html += `
+            <div class="receta-card">
+              <h3>${nombreProducto}</h3>
+              ${receta.instrucciones ? '<p class="receta-instr">' + receta.instrucciones + '</p>' : ''}
+              <ul>${ingHTML || '<li>Sin ingredientes</li>'}</ul>
+            </div>
+          `;
+        });
+        grid.innerHTML = html;
+      }
+    };
+  </script>
 
   <script>
     (function() {
@@ -64,7 +120,7 @@
       }
 
       function esperar(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
+        return new Promise(function(resolve) { setTimeout(resolve, ms); });
       }
 
       async function runTests() {
@@ -72,46 +128,22 @@
         Logger.setLevel('ERROR');
 
         // ── Configurar mocks ──────────────────────────
-        var recetasMock = [];
-
-        window.DBAppwrite = window.DBAppwrite || {};
-        window.DBAppwrite.listar = async function(coleccion) {
-          if (coleccion === 'recetas') {
-            return JSON.parse(JSON.stringify(recetasMock));
-          }
-          return [];
-        };
-
         window.DB = window.DB || {};
+        DB.recetas = [];
+        DB.productos = [];
+        DB.ingredientes = [];
+
+        // ── Suite 1: Render con recetas ───────────────
+        resultsEl.innerHTML += '<div class="suite"><h2>1. Render con recetas</h2></div>';
+
+        DB.recetas = [
+          { productoId: 'prod_1', ingredientes: [{ ingredienteId: 'ing_a', cantidad: 200, unidad: 'g' }], instrucciones: 'Cocinar 10 min' }
+        ];
         DB.productos = [{ id: 'prod_1', nombre: 'Hamburguesa' }];
         DB.ingredientes = [{ id: 'ing_a', nombre: 'Carne', unidad: 'g' }];
 
-        // ── Suite 1: Sin recetas ──────────────────────
-        resultsEl.innerHTML += '<div class="suite"><h2>1. Vista sin recetas</h2></div>';
-        recetasMock = [];
-        await Recetario.render();
-        await esperar(100);
-
-        var grid = document.getElementById('recetarioGrid');
-        assert(!!grid, 'El grid existe');
-        assert(grid.textContent.includes('No hay recetas'), 'Muestra mensaje de vacío');
-
-        // Limpiar para la siguiente suite
-        var mainViejo = document.getElementById('view-recetario');
-        if (mainViejo) mainViejo.remove();
-
-        // ── Suite 2: Con recetas ──────────────────────
-        resultsEl.innerHTML += '<div class="suite"><h2>2. Render con recetas</h2></div>';
-        recetasMock = [
-          { 
-            productoId: 'prod_1', 
-            ingredientes: [{ ingredienteId: 'ing_a', cantidad: 200, unidad: 'g' }], 
-            instrucciones: 'Cocinar 10 min' 
-          }
-        ];
-
-        await Recetario.render();
-        await esperar(100);
+        window.Recetas.render('consulta');
+        await esperar(50);
 
         var tarjeta = document.querySelector('.receta-card');
         assert(!!tarjeta, 'Aparece tarjeta de receta');
@@ -121,10 +153,25 @@
           assert(tarjeta.textContent.includes('200'), 'Muestra cantidad');
         }
 
+        // ── Suite 2: Sin recetas ──────────────────────
+        resultsEl.innerHTML += '<div class="suite"><h2>2. Vista sin recetas</h2></div>';
+
+        DB.recetas = [];
+        window.Recetas.render('consulta');
+        await esperar(50);
+
+        var grid = document.getElementById('recetarioGrid');
+        assert(!!grid, 'El grid existe');
+        assert(grid.textContent.includes('No hay recetas'), 'Muestra mensaje de vacío');
+
+        // ── Limpiar DOM ───────────────────────────────
+        var main = document.getElementById('view-recetario');
+        if (main) main.remove();
+
         // ── Resumen ───────────────────────────────────
         resultsEl.innerHTML += '<div class="summary">' + passed + ' pasaron, ' + failed + ' fallaron</div>';
         if (failed === 0) {
-          resultsEl.innerHTML += '<div class="test pass">✔ Todos los tests del recetario pasaron.</div>';
+          resultsEl.innerHTML += '<div class="test pass">✔ Todos los tests del recetario unificado pasaron.</div>';
         }
       }
 

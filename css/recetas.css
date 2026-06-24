@@ -1,7 +1,9 @@
 /* ================================================================
-   PubPOS — CSS MODULAR
-   Archivo: css/recetas.css  (v2 – diseño inmersivo estilo recetario)
-   ================================================================ */
+   LaTaberna - PubPOS — CSS MODULAR
+   Archivo: css/recetas.css
+   Versión: 1.0.0
+   Propósito: Vista de Recetas: grid inmersivo, tarjetas de receta y detalle.
+   ================================================================ *//
 
 /* ── BÚSQUEDA ─────────────────────────────────────────────── */
 .recetas-search {

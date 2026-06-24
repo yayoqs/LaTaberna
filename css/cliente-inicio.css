@@ -1,10 +1,13 @@
-/**
- * Pantalla de Inicio Híbrida — Estilos (v1.1.0)
- * Rediseño neón con triángulo de acceso y vitrinas deslizables.
- */
+/* ================================================================
+   LaTaberna - PubPOS — CSS
+   Archivo: css/cliente-inicio.css
+   Versión: 1.1.2
+   Propósito: Pantalla de inicio híbrida con triángulo de acceso y vitrinas.
+   Dependencias: css/vars.css
+   ================================================================ */
 
-/* --- Variables de paleta (coherente con vars.css) --- */
-:root {
+/* --- Variables encapsuladas en la vista de inicio --- */
+#view-inicio {
   --color-bg: #0f0f14;
   --color-accent: #f59e0b;
   --color-primary: #6366f1;
@@ -66,7 +69,7 @@
   flex-direction: column;
   align-items: flex-end;
   justify-content: flex-start;
-  padding: 28px 22px 0 0;
+  padding: 30px 25px 0 0;
   text-align: right;
 }
 .login-title {
@@ -77,6 +80,7 @@
   color: #fff;
   text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
   margin-bottom: 6px;
+  white-space: nowrap;
 }
 .login-subtitle {
   font-size: 0.8rem;

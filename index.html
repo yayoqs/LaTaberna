@@ -74,10 +74,6 @@
         <i class="fas fa-beer"></i>
         <span>LaTaberna</span>
       </div>
-      <div class="header-info">
-        <span id="currentDate"></span>
-        <span id="currentTime"></span>
-      </div>
     </div>
 
     <nav class="header-nav">
@@ -116,9 +112,17 @@
       </button>
     </nav>
 
+    <!-- Fecha y hora centradas entre la navegación y el usuario -->
+    <div class="header-center">
+      <div class="header-info">
+        <span id="currentDate"></span>
+        <span id="currentTime"></span>
+      </div>
+    </div>
+
     <div class="header-right">
       <span id="syncStatusIndicator" title="Sin sincronizar"><i class="fas fa-sync-alt"></i></span>
-      <span id="usuarioActualDisplay" style="margin:0 12px; font-size:13px; color:var(--color-text-sec);"></span>
+      <span id="usuarioActualDisplay"></span>
       <button class="btn-secondary" onclick="Auth.logout()" title="Cerrar sesión" style="padding:6px 10px;">
         <i class="fas fa-sign-out-alt"></i>
       </button>
@@ -127,7 +131,7 @@
 
   <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
-  <!-- ========== SCRIPTS LEGACY (SIN type="module") ========== -->
+  <!-- ========== SCRIPTS LEGACY (orden de dependencia) ========== -->
   <script src="js/utils.js"></script>
   <script src="js/lib/logger.js"></script>
   <script src="js/lib/eventBus.js"></script>
@@ -145,29 +149,35 @@
   <script src="js/roles.js"></script>
   <script src="js/auth.js"></script>
 
-  <script src="js/dominio/resultado.js"></script>
-  <script src="js/dominio/dinero.js"></script>
-  <script src="js/dominio/cantidad.js"></script>
+  <!-- Dominio (migrados a ES6) -->
+  <script type="module" src="js/dominio/resultado.js"></script>
+  <script type="module" src="js/dominio/dinero.js"></script>
+  <script type="module" src="js/dominio/cantidad.js"></script>
   <script src="js/dominio/direccion.js"></script>
   <script src="js/dominio/pedido.js"></script>
   <script src="js/dominio/delivery.js"></script>
   <script src="js/dominio/ingrediente.js"></script>
+
+  <!-- Servicios -->
   <script src="js/servicios/pedido-service.js"></script>
   <script src="js/servicios/delivery-service.js"></script>
   <script src="js/servicios/inventario-service.js"></script>
 
+  <!-- Comandos -->
   <script src="js/comandos/crear-pedido-mesa.js"></script>
   <script src="js/comandos/enviar-comanda.js"></script>
   <script src="js/comandos/agregar-mesa.js"></script>
   <script src="js/comandos/liberar-mesa.js"></script>
   <script src="js/comandos/completar-subcomanda.js"></script>
 
+  <!-- Repositorios -->
   <script src="js/repositorios/pedido-repository.js"></script>
 
+  <!-- Managers -->
   <script src="js/managers/pedido-manager.js"></script>
   <script src="js/managers/turno-manager.js"></script>
 
-  <!-- Vistas legacy (NO migradas a ES6) -->
+  <!-- Vistas legacy -->
   <script src="js/ui/mesas.js"></script>
   <script src="js/ui/carta.js"></script>
   <script src="js/ui/comanda.js"></script>
@@ -183,7 +193,7 @@
   <script src="js/ui/reparto.js"></script>
   <script src="js/ui/menu.js"></script>
 
-  <!-- Vistas legacy migradas a ES6 (sí llevan type="module") -->
+  <!-- Vistas legacy migradas a ES6 -->
   <script type="module" src="js/ui/perfil.js"></script>
   <script type="module" src="js/ui/eventos.js"></script>
 
@@ -192,7 +202,6 @@
 
   <!-- ========== MÓDULOS ES6 NATIVOS ========== -->
   <script type="module" src="js/modulos/interno/precarga-control.js"></script>
-  <script type="module" src="js/modulos/interno/recetario.js"></script>
   <script type="module" src="js/modulos/admin/eventos-en-vivo.js"></script>
 
   <!-- Módulo ES6 nativo de la Célula C (Frontend Cliente) -->

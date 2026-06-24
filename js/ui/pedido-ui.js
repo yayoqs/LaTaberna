@@ -1,11 +1,10 @@
 /* ================================================================
-   PubPOS — MÓDULO: pedido-ui.js (v5.6 – activa permite_prepedidos)
-   Propósito: Modal de pedido, revisar comandas, validación de stock.
-              Usa funciones tradicionales y concatenación de strings
-              para evitar errores de sintaxis al copiar/pegar.
-   Novedad v5.6: al confirmar la apertura de una mesa, actualiza el
-                 campo 'permite_prepedidos' en Appwrite para que el
-                 cliente pueda empezar a armar su pedido.
+   LaTaberna - PubPOS — UI
+   Archivo: js/ui/pedido-ui.js
+   Versión: 1.0.1
+   Propósito: Modal de pedido, revisar comandas, validación de stock. 
+        Ahora delega toda la lógica de apertura en el comando crearPedidoMesa, sin duplicar actualizaciones.
+   Dependencias: CommandBus, EventBus, Logger, DB, Mesas, Comanda, Carta, Cuenta, Cobro, Tickets, Auth
    ================================================================ */
 var Pedido = (function() {
 
@@ -127,40 +126,38 @@ var Pedido = (function() {
     var mesa = DB.mesas.find(function(m) { return m.numero == num; });
     if (!mesa) { showToast('error', 'Mesa no encontrada'); return; }
 
-    mesa.comensales = comensales;
-    mesa.personas = personas;
-    mesa.personaActiva = personas.length > 0 ? personas[0] : 'General';
+    // El mozo se toma del selector global o del primer mozo disponible
+    var mozo = $id('mozoActivo')?.value || (DB.mozos[0]?.nombre || 'Mozo');
 
-    var comando = {
+    // Ejecutar el comando (toda la lógica de apertura está ahí)
+    var resultado = await CommandBus.ejecutar({
       type: 'crearPedidoMesa',
       datos: {
         numeroMesa: num,
-        mozo: mesa.mozo || (DB.mozos[0]?.nombre || 'Mozo'),
+        mozo: mozo,
         comensales: comensales
       }
-    };
+    });
 
-    Logger.debug('[Pedido] Ejecutando comando crearPedidoMesa...');
-    var resultado = await CommandBus.ejecutar(comando);
-
-    if (!resultado.exito || !resultado.data) {
-      Logger.error('[Pedido] El comando crearPedidoMesa falló:', resultado.error);
-      showToast('error', 'No se pudo abrir la mesa. Intenta de nuevo.');
+    if (!resultado || !resultado.exito) {
+      var errorMsg = (resultado && resultado.error) ? resultado.error : 'Error desconocido';
+      Logger.error('[Pedido] El comando crearPedidoMesa falló:', errorMsg);
+      showToast('error', 'No se pudo abrir la mesa. ' + errorMsg);
       return;
     }
 
-    mesa.pedidoId = resultado.data.id;
-    mesa.estado = 'ocupada';
-    mesa.abiertaEn = Date.now();
-    mesa.items = [];
-    mesa.observaciones = '';
-    DB.saveMesas();
-
-    // Activar prepedidos para que el cliente pueda armar su orden
-    try {
-      await DBAppwrite.actualizar('mesas', String(num), { permite_prepedidos: true });
-    } catch (e) {
-      Logger.warn('[Pedido] No se pudo activar permite_prepedidos:', e);
+    // El comando ya actualizó Appwrite y el estado local.
+    // Solo necesitamos reflejar los cambios en el objeto mesa local
+    // para que Comanda y el modal funcionen correctamente.
+    var pedido = resultado.data || resultado; // El comando retorna el pedido directamente
+    if (pedido) {
+      mesa.pedidoId = pedido.id;
+      mesa.estado = 'ocupada';
+      mesa.mozo = mozo;
+      mesa.comensales = comensales;
+      mesa.personas = personas;
+      mesa.personaActiva = personas.length > 0 ? personas[0] : 'General';
+      // No tocamos DB.saveMesas(), el comando ya sincronizó.
     }
 
     _abrirModalPedido(mesa);
@@ -192,7 +189,6 @@ var Pedido = (function() {
       if (!mesa) { Logger.error('[Pedido] Mesa ' + num + ' no encontrada.'); return; }
 
       if (mesa.estado === 'libre') {
-        mesa.mozo = document.getElementById('mozoActivo')?.value || (DB.mozos[0]?.nombre || 'Mozo');
         _mostrarModalApertura(mesa);
       } else {
         _abrirModalPedido(mesa);

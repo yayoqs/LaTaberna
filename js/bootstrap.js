@@ -1,5 +1,8 @@
 /* ================================================================
-   Raíz — MÓDULO: bootstrap.js (v3.2 – vista pública 'inicio')
+   LaTaberna - PubPOS — MÓDULO JS
+   Archivo: js/bootstrap.js
+   Versión: 1.0.0
+   Propósito: Secuencia de arranque: Auth, DB, Store, dependencias.
    ================================================================ */
 const Bootstrap = (() => {
 

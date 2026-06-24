@@ -1,9 +1,9 @@
 /* ================================================================
-   Raíz — MÓDULO: loader.js (v1.2 – con callback para Bootstrap)
-   Propósito: Verifica que las dependencias globales esenciales
-              estén disponibles y llama a un callback cuando todo
-              está listo. Así Bootstrap no arranca hasta tener
-              todas las piezas.
+   LaTaberna - PubPOS — MÓDULO JS
+   Archivo: js/lib/loader.js
+   Versión: 1.0.0
+   Propósito: Verifica que las dependencias globales estén disponibles antes de ejecutar Bootstrap. Si hay faltantes críticos, recarga la página.
+   Dependencias: js/utils.js (showToast)
    ================================================================ */
 var Loader = (function() {
   var DEPENDENCIAS = [

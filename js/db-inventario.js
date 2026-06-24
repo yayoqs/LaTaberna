@@ -1,7 +1,8 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-inventario.js (v5.2 – logging unificado + JSDoc)
-   Propósito: Gestión de ingredientes, recetas y movimientos de stock.
-              Validación de stock para ítems antes de enviar.
+   LaTaberna - PubPOS — MÓDULO JS
+   Archivo: js/db-inventario.js
+   Versión: 1.0.0
+   Propósito: Gestión de ingredientes, recetas, stock y movimientos.
    ================================================================ */
 
 const DBInventario = (function() {

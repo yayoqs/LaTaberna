@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test Rápido – SDK TablesDB</title>
+  <style>
+    body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
+    h1 { color: #f59e0b; }
+    h2 { color: #94a3b8; margin-top: 24px; }
+    pre { background: #111; padding: 10px; white-space: pre-wrap; word-wrap: break-word; font-size: 11px; }
+    .pass { background: rgba(34,197,94,.2); }
+    .fail { background: rgba(239,68,68,.2); }
+    .info { color: #94a3b8; font-size: 12px; margin: 2px 0; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test Rápido – SDK TablesDB</h1>
+  <p class="info">Verifica que la nueva API listRows devuelve los mismos datos. Esperá unos segundos...</p>
+  <div id="resultado">
+    <p>⏳ Iniciando Appwrite...</p>
+  </div>
+
+  <!-- Dependencias mínimas para DBAppwrite -->
+  <script src="/js/utils.js"></script>
+  <script src="/js/lib/logger.js"></script>
+  <script src="/js/appwrite.min.js"></script>
+  <script src="/js/db-appwrite.js"></script>
+
+  <script>
+    (async function() {
+      var resultado = document.getElementById('resultado');
+      Logger.setLevel('ERROR'); // Silenciar logs durante el test
+
+      try {
+        // Inicializar (sesión anónima)
+        var ok = await DBAppwrite.iniciar();
+        if (!ok) {
+          resultado.innerHTML = '<p class="fail">❌ No se pudo iniciar DBAppwrite. Revisá la conexión.</p>';
+          return;
+        }
+        resultado.innerHTML += '<p class="pass">✔ DBAppwrite.iniciar() exitoso.</p>';
+
+        var colecciones = [
+          'productos','pedidos','mesas','comandas','ingredientes','recetas',
+          'pedidos_delivery','usuarios','configuracion','precargas_cliente','eventos_en_vivo'
+        ];
+
+        for (var i = 0; i < colecciones.length; i++) {
+          var col = colecciones[i];
+          try {
+            var datos = await DBAppwrite.listar(col);
+            resultado.innerHTML += '<h2>' + col + ' (' + datos.length + ' documentos)</h2>';
+            if (datos.length > 0) {
+              resultado.innerHTML += '<pre>' + JSON.stringify(datos.slice(0, 2), null, 2) + '</pre>';
+              var primero = datos[0];
+              if (primero.creadoEn && primero.actualizadoEn) {
+                resultado.innerHTML += '<p class="pass">✔ Timestamps en español presentes.</p>';
+              } else {
+                resultado.innerHTML += '<p class="fail">❌ Faltan creadoEn/actualizadoEn.</p>';
+              }
+            } else {
+              resultado.innerHTML += '<p class="info">(colección vacía)</p>';
+            }
+          } catch (e) {
+            resultado.innerHTML += '<h2>' + col + '</h2><p class="fail">Error: ' + e.message + '</p>';
+          }
+        }
+
+        resultado.innerHTML += '<h2>✔ Test finalizado.</h2>';
+      } catch (e) {
+        resultado.innerHTML = '<p class="fail">Error general: ' + e.message + '</p>';
+      }
+    })();
+  </script>
+</body>
+</html>

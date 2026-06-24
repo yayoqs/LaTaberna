@@ -1,9 +1,10 @@
-/**
- * Pantalla de Eventos en Vivo del Cliente (v1.0.0)
- *
- * Estilos para la vista inmersiva de eventos.
- * Mantiene coherencia visual con PantallaBienvenida.
- */
+/* ================================================================
+   LaTaberna - PubPOS — CSS MODULAR
+   Archivo: css/cliente-eventos.css
+   Versión: 1.0.0
+   Propósito: Vista inmersiva de eventos en vivo para el cliente.
+   ================================================================ */
+
 
 .view.active#view-eventos-cliente {
   display: flex;

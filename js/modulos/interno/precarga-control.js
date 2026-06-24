@@ -1,19 +1,21 @@
-/**
- * Módulo: PrecargaControl (ES6 nativo)
- * Propósito: Gestionar la recepción de precargas del cliente y su
- *            integración con el mapa de mesas y la comanda.
- * Dependencias: window.EventBus, window.CommandBus, window.DBAppwrite,
- *               window.Logger, window.Mesas, window.Comanda, window.showToast
- */
+/* ================================================================
+   LaTaberna - PubPOS — MÓDULO JS
+   Archivo: js/modulos/interno/precarga-control.js
+   Versión: 1.0.1
+   Propósito: Gestionar la recepción de precargas del cliente y su
+              integración con el mapa de mesas y la comanda.
+   Dependencias: window.EventBus, window.CommandBus, window.DBAppwrite,
+                 window.Logger, window.Mesas, window.Comanda, window.showToast
+   ================================================================ */
 const PrecargaControl = (() => {
-  // Tomar dependencias del scope global (compatible con carga como módulo o script)
+  // Tomar dependencias del scope global
   const EventBus = window.EventBus;
   const CommandBus = window.CommandBus;
   const DBAppwrite = window.DBAppwrite;
   const Logger = window.Logger;
   const Mesas = window.Mesas;
   const Comanda = window.Comanda;
-  // showToast se usará directamente desde window para permitir mock en tests
+  // showToast se usa directamente desde window para permitir mock en tests
 
   const _precargas = new Map();
 
@@ -42,7 +44,6 @@ const PrecargaControl = (() => {
 
     const mesaActiva = Comanda.getMesaActiva();
     if (!mesaActiva || mesaActiva.numero !== mesa) {
-      // Usar window.showToast para que los mocks en tests funcionen
       if (typeof window.showToast === 'function') {
         window.showToast('warning', `Abrí la mesa ${mesa} antes de cargar la precarga.`);
       }
@@ -115,15 +116,11 @@ const PrecargaControl = (() => {
   EventBus.on('cliente:precarga_enviada', _onPrecargaEnviada);
   EventBus.on('mesa:badge_click', _onBadgeClick);
 
-  Logger.info('[PrecargaControl] Módulo inicializado (ES6 nativo).');
+  Logger.info('[PrecargaControl] Módulo inicializado (v1.0.1).');
 
   return {
     _precargas
   };
 })();
 
-// Exposición global para compatibilidad con código legacy y tests
 window.PrecargaControl = PrecargaControl;
-
-// Exportación para entornos que soporten módulos ES6 (carga con type="module")
-export default PrecargaControl;

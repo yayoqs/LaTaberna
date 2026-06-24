@@ -1,12 +1,11 @@
-/**
- * Módulo de gestión de la Orden del cliente (v1.0.0)
- *
- * @module Orden
- * @version 1.0.0
- *
- * Estado local en memoria. No persiste en Appwrite.
- * Almacena la selección de productos antes de confirmarla.
- */
+/* ================================================================
+   LaTaberna - PubPOS — MÓDULO JS
+   Archivo: js/modulos/cliente/orden.js
+   Versión: 1.0.0
+   Propósito: Gestión local de la orden del cliente antes de confirmarla.
+   Dependencias: (ninguna externa)
+   ================================================================ */
+   
 const Orden = (() => {
   /** @type {Array<{prodId: string, nombre: string, precio: number, categoria: string, destino: string, qty: number, obs: string}>} */
   let _items = [];

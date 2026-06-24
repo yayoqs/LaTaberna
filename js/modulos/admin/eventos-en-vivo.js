@@ -1,8 +1,10 @@
 /* ================================================================
-   La Taberna — MÓDULO: eventos-en-vivo.js (v1.2 – ES6 nativo)
+   LaTaberna - PubPOS — MÓDULO JS
+   Archivo: js/modulos/admin/eventos-en-vivo.js
+   Versión: 1.0.0
    Propósito: Panel del animador para eventos en vivo (bingo, karaoke, votaciones).
-              Usa DBAppwrite para persistir y EventBus para tiempo real.
-              Compatible con carga como <script> normal y como módulo ES6.
+   Dependencias: js/db-appwrite.js, js/auth.js, js/lib/logger.js,
+                 js/lib/eventBus.js, js/utils.js (showToast)
    ================================================================ */
 
 const EventosEnVivo = (() => {

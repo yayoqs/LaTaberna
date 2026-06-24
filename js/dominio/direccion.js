@@ -1,8 +1,11 @@
 /* ================================================================
-   PubPOS — DOMINIO: Direccion (Value Object)
-   Propósito: Representa una dirección de entrega para delivery.
-              Es inmutable. Ningún campo es obligatorio excepto la calle.
+   LaTaberna - PubPOS — DOMINIO JS
+   Archivo: js/dominio/direccion.js
+   Versión: 1.0.0
+   Propósito: Objeto de Valor Direccion: dirección de entrega inmutable.
+   Dependencias: (ninguna externa)
    ================================================================ */
+   
 class Direccion {
   /**
    * @param {string} calle - Calle principal (obligatorio)

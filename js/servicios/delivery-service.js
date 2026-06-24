@@ -1,5 +1,9 @@
 /* ================================================================
-   PubPOS — SERVICIO: DeliveryService (v1.2 – logging + JSDoc)
+   LaTaberna - PubPOS — SERVICIO JS
+   Archivo: js/servicios/delivery-service.js
+   Versión: 1.0.0
+   Propósito: Servicio de casos de uso para pedidos de delivery.
+   Dependencias: js/dominio/delivery.js, js/dominio/direccion.js, js/dominio/dinero.js, js/dominio/cantidad.js, js/dominio/resultado.js, js/lib/eventBus.js, js/lib/logger.js
    ================================================================ */
 const DeliveryService = (() => {
 

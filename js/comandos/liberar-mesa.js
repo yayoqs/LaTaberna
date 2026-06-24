@@ -1,7 +1,9 @@
 /* ================================================================
-   PubPOS — COMANDO: liberar-mesa.js
-   Propósito: Liberar una mesa después del pago, restaurándola al
-              estado libre y quitando la virtual si corresponde.
+   LaTaberna - PubPOS — COMANDO JS
+   Archivo: js/comandos/liberar-mesa.js
+   Versión: 1.0.0
+   Propósito: Liberar una mesa después del pago, restaurando su estado.
+   Dependencias: CommandBus, Deps, EventBus, PedidoManager
    ================================================================ */
 
 function crearComandoLiberarMesa(datos) {

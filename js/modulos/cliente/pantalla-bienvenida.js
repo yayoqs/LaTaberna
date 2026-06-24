@@ -1,13 +1,23 @@
+/* ================================================================
+   LaTaberna - PubPOS — Módulo
+   Archivo: js/modulos/cliente/pantalla-bienvenida.js
+   Versión: 1.0.2
+   Propósito: Pantalla de bienvenida post-login con ingreso de mesa,
+             espera de activación y tarjetas de acción. 
+             La gestión del header principal se delega en app.js v1.0.2.
+   Dependencias: Auth, Store, EventBus, App
+   ================================================================ */
+
 /**
- * Pantalla de Bienvenida post-login (v2.0.0)
+ * Pantalla de Bienvenida post-login (v1.0.2)
  * Módulo ES6 para la vista de bienvenida de clientes.
  *
  * @module PantallaBienvenida
- * @version 2.0.0
+ * @version 1.0.2
  *
- * Rediseño con paleta ámbar/índigo.
- * Incluye barra superior con avatar, ingreso de mesa,
- * espera de activación y tarjetas de acción.
+ * Se eliminó la manipulación manual del header.
+ * Ahora app.js v1.0.2 lo oculta para todos los roles
+ * y permite al master revelarlo con un gesto swipe.
  */
 const PantallaBienvenida = (() => {
   let _vista = null;
@@ -35,7 +45,6 @@ const PantallaBienvenida = (() => {
       </div>
 
       <div class="welcome-container">
-        <!-- Ingreso de mesa -->
         <div class="status-card" id="cardIngresoMesa">
           <h2><i class="fa-solid fa-chair" style="color:var(--color-accent)"></i> ¿Dónde te ubicas?</h2>
           <p style="color:var(--color-text-sec);font-size:0.9rem;">Ingresa el número de tu mesa física para activar tu sesión de atención.</p>
@@ -46,20 +55,18 @@ const PantallaBienvenida = (() => {
           <p class="mesa-estado" id="estadoMesa" style="margin-top:10px;font-size:0.85rem;color:var(--color-text-sec);"></p>
         </div>
 
-        <!-- Espera activación -->
         <div class="status-card" id="cardEspera" style="display:none;">
           <h2>Mesa asignada: <span style="color:var(--color-accent)" id="mesaAsignada"></span></h2>
-          <div class="waiting-status">
+          <div class="waiting-status" id="waitingBlock">
             <div class="spinner"></div>
             <p style="font-size:0.9rem;font-weight:600;">Esperando validación del garzón...</p>
             <p style="color:var(--color-text-sec);font-size:0.8rem;">Estamos confirmando tu presencia en el mesón.</p>
           </div>
-          <span class="pre-order-badge" id="badgePrepedidos" style="display:none;">
+          <span class="pre-order-badge visible" id="badgePrepedidos" style="display:none;">
             <i class="fa-solid fa-wand-magic-sparkles"></i> Modo Pre-pedido Habilitado
           </span>
         </div>
 
-        <!-- Tarjetas de acción -->
         <div class="menu-grid">
           <div class="action-card order-mode" id="cardGastronomica">
             <div class="action-icon"><i class="fa-solid fa-scroll"></i></div>
@@ -127,10 +134,12 @@ const PantallaBienvenida = (() => {
       _permitePrepedidos = true;
       document.getElementById('estadoMesa').textContent = '✅ Mesa activada.';
       document.getElementById('badgePrepedidos').style.display = 'inline-block';
+      setTimeout(() => document.getElementById('badgePrepedidos').classList.add('visible'), 10);
       document.getElementById('mensajeGastro').textContent = '🎉 ¡Pantalla Activada! Comenzá tu selección.';
     } else {
       _permitePrepedidos = false;
       document.getElementById('badgePrepedidos').style.display = 'none';
+      document.getElementById('badgePrepedidos').classList.remove('visible');
       document.getElementById('mensajeGastro').textContent = 'Explora la carta digital y arma tu orden.';
     }
   }
@@ -170,7 +179,9 @@ const PantallaBienvenida = (() => {
   }
 
   function ocultar() {
-    if (_vista) _vista.classList.remove('active');
+    if (_vista) {
+      _vista.classList.remove('active');
+    }
   }
 
   function _initRealtime() {

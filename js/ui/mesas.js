@@ -1,11 +1,9 @@
 /* ================================================================
-   Raíz — MÓDULO: mesas.js (v6.5 – micro-insignias KDS y long-press)
-   Propósito: Mapa de mesas con zonas dinámicas y colores. Obtiene
-              los datos del Store y los ordena siempre por número.
-   Novedades v6.5:
-   - Micro-insignias de cocina (tenedor) y barra (copa) con colores
-     según el estado de las comandas.
-   - Long-press (400ms) para desplegar popover con desglose.
+   LaTaberna - PubPOS — UI JS
+   Archivo: js/ui/mesas.js
+   Versión: 1.0.0
+   Propósito: Mapa de mesas con zonas dinámicas, insignias KDS, long-press.
+   Dependencias: js/lib/store.js, js/lib/eventBus.js, js/lib/command-bus.js, js/auth.js, js/db.js, js/utils.js, js/lib/logger.js
    ================================================================ */
 const Mesas = (() => {
 

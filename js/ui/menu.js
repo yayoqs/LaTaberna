@@ -1,8 +1,11 @@
 /* ================================================================
-   PubPOS — MÓDULO: menu.js (v2.1 – JSDoc completo)
-   Propósito: Vista de menú digital. Obtiene los productos del Store
-              y se re-renderiza automáticamente cuando cambian.
+   LaTaberna - PubPOS — UI JS
+   Archivo: js/ui/menu.js
+   Versión: 1.0.0
+   Propósito: Vista de menú digital: categorías, búsqueda y detalle.
+   Dependencias: js/lib/store.js, js/lib/eventBus.js, js/utils.js
    ================================================================ */
+   
 const Menu = (() => {
 
   let _categoriaActiva = 'Todas';

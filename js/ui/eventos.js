@@ -1,9 +1,12 @@
 /* ================================================================
-   Raíz — MÓDULO: eventos.js (v2.0 – ES6 nativo)
-   Propósito: Gestión de eventos administrativos (carpetas Drive,
-              presupuestos, menús). Usa DB.llamar para comunicación
-              con Google Apps Script.
+   LaTaberna - PubPOS — UI JS
+   Archivo: js/ui/eventos.js
+   Versión: 1.0.0
+   Propósito: Vista de gestión de eventos administrativos (carpetas Drive, presupuestos, menús) usando Google Apps Script.
+   Dependencias: js/db.js (DB.llamar), js/auth.js, js/lib/logger.js, js/lib/eventBus.js, js/utils.js (showToast)
    ================================================================ */
+   
+   
 const Eventos = (() => {
 
   function _asegurarVista() {

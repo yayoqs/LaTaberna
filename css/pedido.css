@@ -1,9 +1,8 @@
 /* ================================================================
-   PubPOS — CSS MODULAR
+   LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/pedido.css
-   Propósito: Modal de pedido, carta de productos y comanda
-   Versión: Pantalla completa en móviles, footer siempre visible
-   Fix: Header siempre visible en móviles (vertical/horizontal)
+   Versión: 1.0.0
+   Propósito: Modal de pedido, carta de productos, comanda y responsive móvil.
    ================================================================ */
 
 /* ── MODAL BASE ────────────────────────────────────────────── */

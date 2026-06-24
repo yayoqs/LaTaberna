@@ -1,6 +1,9 @@
 /* ================================================================
-   PubPOS — COMANDO: agregar-mesa.js
-   Propósito: Añadir una nueva mesa al salón, validando zona y turno.
+   LaTaberna - PubPOS — COMANDO JS
+   Archivo: js/comandos/agregar-mesa.js
+   Versión: 1.0.0
+   Propósito: Comando para agregar una nueva mesa validando turno y zona.
+   Dependencias: CommandBus, Deps, EventBus, PedidoManager
    ================================================================ */
 
 /**

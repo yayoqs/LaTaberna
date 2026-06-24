@@ -1,9 +1,8 @@
 /* ================================================================
-   Raíz — MÓDULO: db-shim.js (v1.1 – llamar tolerante a fallos)
-   Propósito: Compatibilidad con Google Apps Script para funciones
-              que no migraron a Appwrite (eventos, perfil, cierre
-              de turno). Proporciona urlSheets, llamar y versiones
-              vacías de los métodos de sincronización antiguos.
+   LaTaberna - PubPOS — MÓDULO JS
+   Archivo: js/db-shim.js
+   Versión: 1.0.0
+   Propósito: Compatibilidad con Google Apps Script (funciones legacy).
    ================================================================ */
 var DBShim = (function() {
   var module = {};

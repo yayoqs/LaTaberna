@@ -1,10 +1,10 @@
 /* ================================================================
-   PubPOS — MÓDULO: eventBus.js (v2.1 – logging unificado + JSDoc)
-   Propósito: Sistema de publicación/suscripción para desacoplar módulos.
-              Soporta eventos basados en clases (tipados) y mantiene
-              compatibilidad con suscriptores que usan strings.
+   LaTaberna - PubPOS — MÓDULO JS
+   Archivo: js/lib/eventBus.js
+   Versión: 1.0.0
+   Propósito: Bus de eventos pub/sub para desacoplar módulos.
+   Dependencias: js/lib/logger.js
    ================================================================ */
-
 const EventBus = (() => {
   const eventos = {};
 

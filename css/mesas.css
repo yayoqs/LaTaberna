@@ -1,170 +1,126 @@
 /* ================================================================
-   PubPOS — CSS MODULAR
+   LaTaberna - PubPOS — CSS
    Archivo: css/mesas.css
-   Propósito: Grilla de mesas y tarjetas de mesa.
-              Se han eliminado los estilos fijos .zona-salon y .zona-terraza,
-              porque ahora los colores se asignan dinámicamente desde JS.
+   Versión: 1.0.1
+   Propósito: Estilos para el mapa de mesas, incluyendo zonas,
+              estados, tarjetas, modo fusión y notificaciones.
    ================================================================ */
 
-/* ── GRID DE MESAS ─────────────────────────────────────────── */
+/* ── GRID DE MESAS ──────────────────────────────────────────── */
 .mesas-grid {
-  flex: 1;
-  overflow-y: auto;
-  padding: 24px;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 16px;
+  padding: 20px;
+  overflow-y: auto;
   align-content: start;
 }
 
 /* ── TARJETA DE MESA ───────────────────────────────────────── */
 .mesa-card {
   background: var(--color-card);
-  border: 2px solid var(--color-border);
   border-radius: var(--radius);
-  padding: 20px 16px;
-  cursor: pointer;
-  transition: var(--t);
+  padding: 16px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 8px;
-  user-select: none;
+  cursor: pointer;
   position: relative;
-  text-align: center;
+  transition: var(--t);
+  box-shadow: var(--shadow-sm);
+  min-height: 140px;
+  justify-content: center;
 }
+
 .mesa-card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
 }
 
-/* ── COLORES POR ESTADO ────────────────────────────────────── */
-.mesa-card.libre    { border-color: var(--color-border); }
-.mesa-card.libre:hover { border-color: var(--color-success); }
-.mesa-card.ocupada  { border-color: var(--color-danger); }
-.mesa-card.esperando{ border-color: var(--color-warning); }
-.mesa-card.cuenta   { border-color: var(--color-info); }
+.mesa-card.libre       { border-left-color: #22c55e; }
+.mesa-card.ocupada     { border-left-color: #3b82f6; }
+.mesa-card.esperando   { border-left-color: #f59e0b; }
+.mesa-card.cuenta      { border-left-color: #ef4444; }
+.mesa-card.fusionada   { border-left-color: #8b5cf6; }
 
-/* ── MESA VIRTUAL (FUSIONADA) ──────────────────────────────── */
-.mesa-card.mesa-virtual {
+/* ── VIRTUAL (FUSIÓN) ─────────────────────────────────────── */
+.mesa-virtual {
   border-style: dashed;
-  border-width: 3px;
-  border-color: var(--color-accent);
-  background: rgba(245, 158, 11, 0.05);
+  opacity: .85;
 }
+
 .mesa-virtual-badge {
   font-size: 10px;
-  background: var(--color-accent);
-  color: #000;
+  background: #8b5cf6;
+  color: #fff;
   padding: 2px 8px;
   border-radius: 99px;
-  margin-top: 6px;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-weight: 600;
 }
 
-/* ── CHECKBOX DE SELECCIÓN (MODO FUSIÓN) ───────────────────── */
+/* ── ELEMENTOS INTERNOS ───────────────────────────────────── */
+.mesa-icon {
+  font-size: 24px;
+  color: var(--color-text-sec);
+}
+
+.mesa-numero {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.mesa-estado-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--color-text-muted);
+}
+
+.mesa-zona-badge {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+}
+
+/* ── MODO SELECCIÓN (FUSIÓN) ─────────────────────────────── */
 .mesa-checkbox {
   position: absolute;
   top: 8px;
   left: 8px;
-  width: 20px;
-  height: 20px;
-  accent-color: var(--color-accent);
+  width: 18px;
+  height: 18px;
   cursor: pointer;
   z-index: 2;
 }
 
-/* ── CONTENIDO ─────────────────────────────────────────────── */
-.mesa-icon { font-size: 26px; margin-bottom: 2px; }
-
-.mesa-card.libre    > .mesa-icon { color: var(--color-text-muted); }
-.mesa-card.ocupada  > .mesa-icon { color: var(--color-danger); }
-.mesa-card.esperando> .mesa-icon { color: var(--color-warning); }
-.mesa-card.cuenta   > .mesa-icon { color: var(--color-info); }
-.mesa-card.mesa-virtual > .mesa-icon { color: var(--color-accent); }
-
-.mesa-numero {
-  font-size: 30px;
-  font-weight: 800;
-  line-height: 1;
-}
-.mesa-card.libre    .mesa-numero { color: var(--color-text-sec); }
-.mesa-card.ocupada  > .mesa-numero { color: var(--color-danger); }
-.mesa-card.esperando > .mesa-numero { color: var(--color-warning); }
-.mesa-card.cuenta    > .mesa-numero { color: var(--color-info); }
-.mesa-card.mesa-virtual > .mesa-numero { color: var(--color-accent); }
-
-.mesa-estado-label {
-  font-size: 10px;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: .5px;
-  font-weight: 600;
-}
-.mesa-mozo {
-  font-size: 11px;
-  color: var(--color-accent);
-  font-weight: 600;
+/* ── MICRO-INSIGNIAS KDS ─────────────────────────────────── */
+.micro-insignias {
   display: flex;
-  align-items: center;
-  gap: 5px;
-}
-.mesa-meta {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 11px;
-  color: var(--color-text-sec);
-}
-.mesa-tiempo  { font-size: 10px; color: var(--color-text-muted); }
-.mesa-total   { font-size: 14px; font-weight: 700; color: var(--color-success); }
-
-/* Badge de esquina (cuenta / listo) */
-.mesa-corner-badge {
-  position: absolute;
-  top: -8px;
-  right: -8px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 9px;
-  font-weight: 800;
-  border: 2px solid var(--color-bg);
-}
-.mesa-corner-badge.cuenta   { background: var(--color-info);    color: #fff; }
-.mesa-corner-badge.esperando{ background: var(--color-warning);  color: #000; }
-
-/* ── ZONA BADGE (común, se personaliza con inline style) ──── */
-.mesa-zona-badge {
-  font-size: 9px;
-  font-weight: 700;
-  padding: 1px 6px;
-  border-radius: 99px;
-  text-transform: uppercase;
+  gap: 8px;
   margin-top: 4px;
 }
 
-/* ── RESPONSIVE ────────────────────────────────────────────── */
-@media (max-width: 600px) {
-  .mesas-grid {
-    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
-    gap: 12px;
-    padding: 16px;
-  }
-  .mesa-card {
-    padding: 14px 8px;
-  }
-  .mesa-numero {
-    font-size: 24px;
-  }
+.micro-badge {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  color: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,.3);
 }
-/* ── Insignia de notificación de precarga ── */
+
+/* ── INSIGNIA DE PRECARGA ─────────────────────────────────── */
 .precarga-badge {
   position: absolute;
   top: -8px;
@@ -180,9 +136,9 @@
   justify-content: center;
   border-radius: 50%;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  box-shadow: 0 2px 6px rgba(0,0,0,.3);
   z-index: 5;
-  transition: transform 0.15s ease;
+  transition: transform .15s ease;
   padding: 0 4px;
   gap: 3px;
 }

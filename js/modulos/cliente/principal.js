@@ -1,21 +1,10 @@
-/**
- * Módulo principal del Cliente (Frontend Cliente)
- * v1.7.0 — 2026-06-20
- *
- * Punto de entrada cargado como <script type="module">.
- * Expone únicamente window.ClienteModulo.
- *
- * Responsabilidades:
- * - Renderiza y orquesta PantallaInicio, PantallaBienvenida,
- *   MenuDigital y PantallaEventos.
- * - Importa Orden como módulo interno.
- * - Escucha eventos del sistema (vista:cambiada, cliente:cuenta_creada)
- *   para activar o desactivar los módulos del cliente.
- * - Maneja la nueva vista 'bienvenida' como paso post-login.
- *
- * @module principal
- * @exports ClienteModulo
- */
+/* ================================================================
+   LaTaberna - PubPOS — MÓDULO JS
+   Archivo: js/modulos/cliente/principal.js
+   Versión: 1.0.0
+   Propósito: Punto de entrada del frontend del cliente. Orquesta todas las pantallas y expone window.ClienteModulo.
+   Dependencias: js/modulos/cliente/pantalla-inicio.js, js/modulos/cliente/pantalla-bienvenida.js, js/modulos/cliente/menu-digital.js, js/modulos/cliente/orden.js, js/modulos/cliente/pantalla-eventos.js, js/lib/eventBus.js, js/auth.js
+   ================================================================ */
 
 import { PantallaInicio } from './pantalla-inicio.js';
 import { PantallaBienvenida } from './pantalla-bienvenida.js';

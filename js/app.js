@@ -1,6 +1,10 @@
 /* ================================================================
-   PubPOS — MÓDULO: app.js (v5.7 – oculta header en vista pública
-              y lo restaura explícitamente con display: flex)
+   LaTaberna - PubPOS — MÓDULO JS
+   Archivo: js/app.js
+   Versión: 1.0.2
+   Propósito: Núcleo de la UI. Control de vistas, header y monitoreo.
+              Header oculto en inicio y bienvenida, swipe toggle para master.
+   Dependencias: js/lib/logger.js, js/lib/eventBus.js, js/auth.js
    ================================================================ */
 const App = {
   async init() {
@@ -62,10 +66,42 @@ const App = {
   _vistasPublicas: ['inicio'],
 
   showView(nombre) {
-    // ── Control de header: ocultar en vista pública, mostrar con flex en el resto ─────
+    // ── Control de header: ocultar en vistas públicas ─────
     const header = document.querySelector('.app-header');
     if (header) {
-      header.style.display = (nombre === 'inicio') ? 'none' : 'flex';
+      header.style.display = (nombre === 'inicio' || nombre === 'bienvenida') ? 'none' : 'flex';
+      header.style.transition = 'all 0.3s ease';
+    }
+
+    // ── Swipe toggle para revelar/ocultar el header (solo master real en bienvenida) ──
+    if (nombre === 'bienvenida' && typeof Auth !== 'undefined' && Auth.esMasterReal && Auth.esMasterReal()) {
+      let touchStartY = 0;
+      const onTouchStart = (e) => {
+        touchStartY = e.touches[0].clientY;
+      };
+      const onTouchEnd = (e) => {
+        if (!header) return;
+        const touchEndY = e.changedTouches[0].clientY;
+        const deltaY = touchEndY - touchStartY;
+
+        // Swipe hacia abajo desde el borde superior (mostrar header)
+        if (touchStartY < 50 && deltaY > 100 && header.style.display === 'none') {
+          header.style.display = 'flex';
+        }
+        // Swipe hacia arriba desde el borde inferior (ocultar header)
+        if (touchStartY > window.innerHeight - 50 && deltaY < -100 && header.style.display === 'flex') {
+          header.style.display = 'none';
+        }
+      };
+      document.addEventListener('touchstart', onTouchStart, { passive: true });
+      document.addEventListener('touchend', onTouchEnd, { passive: true });
+
+      // Limpiar listeners al cambiar de vista
+      const limpiarSwipe = () => {
+        document.removeEventListener('touchstart', onTouchStart);
+        document.removeEventListener('touchend', onTouchEnd);
+      };
+      document.addEventListener('vista:cambiada', limpiarSwipe, { once: true });
     }
 
     // Permitir acceso a vistas públicas sin sesión activa
@@ -132,7 +168,6 @@ const App = {
     if (nombre === 'menu' && window.Menu) Menu.render();
     if (nombre === 'eventos' && window.Eventos) Eventos.render();
     if (nombre === 'perfil' && window.Perfil) Perfil.render();
-    // La vista 'inicio' es gestionada por la Célula C (PantallaInicio)
   },
 
   /** Monitorea la conexión a internet */

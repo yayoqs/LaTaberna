@@ -1,6 +1,8 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-fusion.js (v1.1 – logging unificado + JSDoc)
-   Propósito: Fusión y liberación de mesas virtuales.
+   LaTaberna - PubPOS — MÓDULO JS
+   Archivo: js/db-fusion.js
+   Versión: 1.0.0
+   Propósito: Lógica de fusión y liberación de mesas virtuales.
    ================================================================ */
 
 const DBFusion = (function() {

@@ -1,7 +1,9 @@
 /* ================================================================
-   PubPOS — MÓDULO: command-bus.js (v1.1 – logging unificado + JSDoc)
-   Propósito: Bus de comandos centralizado para CQRS. Registra handlers
-              y ejecuta comandos de manera desacoplada.
+   LaTaberna - PubPOS — MÓDULO JS
+   Archivo: js/lib/command-bus.js
+   Versión: 1.0.0
+   Propósito: Bus de comandos centralizado (CQRS). Registra handlers y ejecuta comandos de manera desacoplada.
+   Dependencias: js/lib/logger.js
    ================================================================ */
 const CommandBus = (() => {
   const handlers = new Map();

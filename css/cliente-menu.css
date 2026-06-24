@@ -1,9 +1,11 @@
-/**
- * Menú Digital del Cliente (v1.0.1)
- *
- * Agrega el botón flotante para abrir el panel de la orden.
- */
-
+/* ================================================================
+   LaTaberna - PubPOS — CSS MODULAR
+   Archivo: css/cliente-menu.css
+   Versión: 1.0.0
+   Propósito: Menú digital del cliente: banner, búsqueda y botón flotante.
+   ================================================================ */
+   
+   
 .menu-estado {
   display: flex;
   justify-content: space-between;

@@ -1,12 +1,12 @@
-/**
- * Menú Digital interactivo para clientes (v1.1.0)
- *
- * @module MenuDigital
- * @version 1.1.0
- *
- * Agrega el panel de la orden y el flujo de confirmación.
- * Emite cliente:precarga_enviada al confirmar la orden.
- */
+/* ================================================================
+   LaTaberna - PubPOS — MÓDULO JS
+   Archivo: js/modulos/cliente/menu-digital.js
+   Versión: 1.0.0
+   Propósito: Menú digital interactivo para clientes: catálogo, orden y envío.
+   Dependencias: js/modulos/cliente/orden.js, js/modulos/cliente/pantalla-bienvenida.js, js/auth.js, js/db-appwrite.js, js/lib/eventBus.js, js/lib/store.js, js/utils.js (fmtMoney)
+   ================================================================ */
+   
+   
 const MenuDigital = (() => {
   let _vista = null;
   let _panelOrden = null;

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Test A — Diagnóstico Appwrite</title>
+  <title>Test A — Diagnóstico Appwrite (TablesDB)</title>
   <style>
     body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
     h1 { color: #f59e0b; }
@@ -17,8 +17,8 @@
   </style>
 </head>
 <body>
-  <h1>🧪 Test A — Diagnóstico Appwrite</h1>
-  <p class="info">Verifica conexión, listado de colecciones, CRUD e integración con Store (sesión anónima).</p>
+  <h1>🧪 Test A — Diagnóstico Appwrite (TablesDB)</h1>
+  <p class="info">Verifica conexión, listado de colecciones (paralelo), CRUD e integración con Store.</p>
   <div id="results"></div>
   <button onclick="location.reload()">🔄 Ejecutar de nuevo</button>
 
@@ -53,36 +53,45 @@
         resultsEl.innerHTML = '';
         Logger.setLevel('ERROR');
 
-        // ── Suite 1: Inicializar DBAppwrite (sesión anónima) ──
-        resultsEl.innerHTML += '<h2>1. Inicializar DBAppwrite</h2>';
-        var appwriteOk = await DBAppwrite.init();
-        assert(appwriteOk === true, 'DBAppwrite.init() exitoso');
+        // ── Suite 1: Iniciar DBAppwrite ──────────────────
+        resultsEl.innerHTML += '<h2>1. Iniciar DBAppwrite (TablesDB)</h2>';
+        var appwriteOk = await DBAppwrite.iniciar();
+        assert(appwriteOk === true, 'DBAppwrite.iniciar() exitoso');
         assert(DBAppwrite.habilitado === true, 'DBAppwrite.habilitado = true');
         if (!appwriteOk) {
-          resultsEl.innerHTML += '<div class="fail">No se pudo conectar a Appwrite. Revisa endpoint y projectId en localStorage.</div>';
+          resultsEl.innerHTML += '<div class="fail">No se pudo conectar a Appwrite.</div>';
           return;
         }
 
-        // ── Suite 2: Listar colecciones ──────────────────────
-        resultsEl.innerHTML += '<h2>2. Listar colecciones</h2>';
+        // ── Suite 2: Listar colecciones EN PARALELO ───────
+        resultsEl.innerHTML += '<h2>2. Listar colecciones (paralelo)</h2>';
         var colecciones = ['productos','pedidos','mesas','comandas','ingredientes','recetas','pedidos_delivery','usuarios','configuracion','precargas_cliente','eventos_en_vivo'];
+
+        var resultados = {};
+        await Promise.all(colecciones.map(function(col) {
+          return DBAppwrite.listar(col).then(function(lista) {
+            resultados[col] = lista;
+          }).catch(function(e) {
+            resultados[col] = { error: e.message };
+          });
+        }));
+
         for (var i = 0; i < colecciones.length; i++) {
-          try {
-            var lista = await DBAppwrite.listar(colecciones[i]);
-            assert(Array.isArray(lista), colecciones[i] + ': ' + lista.length + ' documentos');
-          } catch(e) {
-            assert(false, colecciones[i] + ': Error - ' + e.message);
+          var col = colecciones[i];
+          var lista = resultados[col];
+          if (lista && Array.isArray(lista)) {
+            assert(true, col + ': ' + lista.length + ' documentos');
+          } else {
+            assert(false, col + ': Error - ' + (lista?.error || 'desconocido'));
           }
         }
 
-        // ── Suite 3: CRUD básico ─────────────────────────────
+        // ── Suite 3: CRUD básico ─────────────────────────
         resultsEl.innerHTML += '<h2>3. CRUD básico en pedidos</h2>';
         try {
           var doc = {
             mesa: 999, mozo: 'Test', comensales: 1, estado: 'abierta',
-            items: '[]', total: 0,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            items: '[]', total: 0
           };
           var creado = await DBAppwrite.crear('pedidos', 'unique()', doc);
           assert(!!creado && !!creado.id, 'Documento creado: ' + (creado ? creado.id : 'falló'));
@@ -94,16 +103,16 @@
           assert(false, 'Error CRUD: ' + e.message);
         }
 
-        // ── Suite 4: Integración con Store ───────────────────
+        // ── Suite 4: Integración con Store ───────────────
         resultsEl.innerHTML += '<h2>4. Integración Appwrite → Store</h2>';
         window.Auth = window.Auth || { getEspacioActivo: function() { return { id: 'esp_taberna' }; } };
         window.PedidoManager = window.PedidoManager || { getTurnoActual: function() { return { id: 'test', estado: 'abierto' }; }, registrar: function() {} };
 
-        var productos = await DBAppwrite.listar('productos');
-        var pedidos = await DBAppwrite.listar('pedidos');
-        var mesas = await DBAppwrite.listar('mesas');
-        var ingredientes = await DBAppwrite.listar('ingredientes');
-        var recetas = await DBAppwrite.listar('recetas');
+        var productos = resultados.productos || [];
+        var pedidos = resultados.pedidos || [];
+        var mesas = resultados.mesas || [];
+        var ingredientes = resultados.ingredientes || [];
+        var recetas = resultados.recetas || [];
 
         DB.productos = productos.map(p => DB._normalizarProducto(p));
         DB.pedidos = pedidos;
@@ -127,7 +136,7 @@
           resultsEl.innerHTML += '<div class="info">⚠️ Todas las colecciones están vacías. ¿Ejecutaste la migración inicial?</div>';
         }
 
-        // ── Resumen ──────────────────────────────────────────
+        // ── Resumen ──────────────────────────────────────
         resultsEl.innerHTML += '<h2>Resultado</h2>';
         resultsEl.innerHTML += '<p>' + passed + ' pasaron, ' + failed + ' fallaron.</p>';
         if (failed === 0) {

@@ -1,6 +1,13 @@
+
 /* ================================================================
-   PubPOS — MÓDULO: pedido-manager.js (v3.3 – logging unificado + JSDoc)
+   LaTaberna - PubPOS — MÓDULO JS
+   Archivo: js/managers/pedido-manager.js
+   Versión: 1.0.0
+   Propósito: Gestor de pedidos de mesa y delivery, turnos y auditoría.
+   Dependencias: js/lib/command-bus.js, js/lib/logger.js, js/db.js, js/lib/eventBus.js, js/auth.js (Auth.getNombre), js/managers/turno-manager.js, js/repositorios/pedido-repository.js
    ================================================================ */
+
+
 const PedidoManager = (() => {
 
   let turnoActual = null;
@@ -66,11 +73,6 @@ const PedidoManager = (() => {
     EventBus.emit('audit:actualizado', { turnoId: turnoActual.id, total: auditLog.length });
   }
 
-  /**
-   * Registra un evento en la bitácora de auditoría.
-   * @param {string} tipo - Tipo de evento (ej. 'mesa:abierta')
-   * @param {object} datos - Datos asociados al evento
-   */
   function _registrarAuditoria(tipo, datos) {
     const entrada = {
       id: 'aud_' + Date.now() + '_' + Math.random().toString(36).substr(2,6),
@@ -83,13 +85,6 @@ const PedidoManager = (() => {
     Logger.debug(`[Audit] ${tipo}:`, datos);
   }
 
-  /**
-   * Crea un pedido de mesa. Intenta usar CommandBus; si falla, usa el repositorio directamente.
-   * @param {number} numeroMesa
-   * @param {string} mozo
-   * @param {number} comensales
-   * @returns {Promise<object|null>}
-   */
   async function crearPedidoMesa(numeroMesa, mozo, comensales) {
     if (typeof CommandBus !== 'undefined' && CommandBus.ejecutar) {
       const resultado = await CommandBus.ejecutar({
@@ -113,12 +108,6 @@ const PedidoManager = (() => {
     }
   }
 
-  /**
-   * Agrega un ítem a un pedido (placeholder, la gestión real se hace en UI).
-   * @param {string} pedidoId
-   * @param {object} item
-   * @returns {boolean}
-   */
   function agregarItemAPedido(pedidoId, item) {
     Logger.warn('[PedidoManager] agregarItemAPedido no implementado (se gestiona en UI).');
     return false;
@@ -138,7 +127,7 @@ const PedidoManager = (() => {
       total: datos.total || 0,
       estado: 'pendiente',
       repartidor: datos.repartidor || '',
-      created_at: new Date().toISOString(),
+      creadoEn: new Date().toISOString(),
       observaciones: datos.observaciones || ''
     };
     if (typeof DB !== 'undefined' && DB.pedidosDelivery) {
@@ -149,11 +138,6 @@ const PedidoManager = (() => {
     return nuevo;
   }
 
-  /**
-   * Envía un pedido de delivery a cocina cambiando su estado.
-   * @param {string} deliveryId
-   * @returns {boolean}
-   */
   function enviarPedidoDeliveryACocina(deliveryId) {
     if (typeof DB === 'undefined' || !DB.pedidosDelivery) return false;
     const pedido = DB.pedidosDelivery.find(p => p.id === deliveryId);
@@ -168,10 +152,6 @@ const PedidoManager = (() => {
     return true;
   }
 
-  /**
-   * Finaliza el turno actual delegando en TurnoManager.
-   * @returns {Promise<{exito: boolean, mensaje: string}>}
-   */
   async function finalizarTurno() {
     if (typeof TurnoManager === 'undefined') {
       return { exito: false, mensaje: 'TurnoManager no disponible.' };

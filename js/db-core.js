@@ -1,5 +1,8 @@
 /* ================================================================
-   PubPOS — MÓDULO: db-core.js (v3.2.8 – campo disponible en productos)
+   LaTaberna - PubPOS — MÓDULO JS
+   Archivo: js/db-core.js
+   Versión: 1.0.0
+   Propósito: Núcleo de datos: mesas, pedidos, productos, persistencia local.
    ================================================================ */
 const DBCore = (function() {
   const module = {};
@@ -23,7 +26,7 @@ const DBCore = (function() {
       descripcion: this._validarString(p.descripcion, ''),
       activo: this._validarBooleano(p.activo, true),
       imagen: this._validarString(p.imagen, ''),
-      disponible: this._validarBooleano(p.disponible, true)   // ← NUEVO
+      disponible: this._validarBooleano(p.disponible, true)
     };
   };
 
@@ -61,7 +64,8 @@ const DBCore = (function() {
       total: this._validarNumero(pd.total, 0),
       estado: ['pendiente','en_preparacion','en_camino','entregado'].includes(pd.estado) ? pd.estado : 'pendiente',
       repartidor: this._validarString(pd.repartidor, ''),
-      created_at: pd.created_at || new Date().toISOString(),
+      creadoEn: pd.creadoEn || pd.$createdAt || pd.created_at || new Date().toISOString(),  // ← actualizado
+      actualizadoEn: pd.actualizadoEn || pd.$updatedAt || pd.updated_at || null,              // ← nuevo
       observaciones: this._validarString(pd.observaciones, '')
     };
   };
@@ -269,8 +273,8 @@ const DBCore = (function() {
       estado: 'abierta',
       items: '[]',
       total: 0,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      creadoEn: new Date().toISOString(),         // ← actualizado
+      actualizadoEn: new Date().toISOString()      // ← nuevo
     };
     this.pedidos.push(nuevo);
     this.savePedidos();
@@ -283,6 +287,8 @@ const DBCore = (function() {
       if (cambios.items && Array.isArray(cambios.items)) {
         cambios.items = JSON.stringify(cambios.items);
       }
+      // Asegurar que actualizadoEn se actualice
+      cambios.actualizadoEn = new Date().toISOString();
       this.pedidos[idx] = { ...this.pedidos[idx], ...cambios };
       this.savePedidos();
     }
@@ -302,7 +308,7 @@ const DBCore = (function() {
     const nuevo = this._normalizarPedidoDelivery({
       ...datos,
       id: 'deliv_' + Date.now(),
-      created_at: new Date().toISOString()
+      creadoEn: new Date().toISOString()          // ← actualizado
     });
     this.pedidosDelivery.push(nuevo);
     this.savePedidosDelivery();
@@ -312,6 +318,8 @@ const DBCore = (function() {
   module.actualizarPedidoDelivery = function(id, cambios) {
     const idx = this.pedidosDelivery.findIndex(p => p.id === id);
     if (idx >= 0) {
+      // Asegurar que actualizadoEn se refresque
+      cambios.actualizadoEn = new Date().toISOString();
       this.pedidosDelivery[idx] = { ...this.pedidosDelivery[idx], ...cambios };
       this.savePedidosDelivery();
     }
