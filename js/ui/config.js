@@ -1,9 +1,13 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS
    Archivo: js/ui/config.js
-   Versión: 1.0.0
+   Versión: 1.0.2
    Propósito: Vista de configuración: productos, zonas, impresoras, mozos.
-   Dependencias: js/lib/store.js, js/lib/eventBus.js, js/lib/logger.js, js/auth.js, js/utils.js, js/db.js, js/db-appwrite.js, js/ui/mesas.js, js/ui/tickets.js
+              Corregidos guardarProducto y _eliminarProducto. Agregado
+              botón Resetear Mesas.
+   Dependencias: js/lib/store.js, js/lib/eventBus.js, js/lib/logger.js,
+                 js/auth.js, js/utils.js, js/db.js, js/db-appwrite.js,
+                 js/ui/mesas.js, js/ui/tickets.js
    ================================================================ */
 const Config = (() => {
   function _asegurarVista() {
@@ -45,6 +49,7 @@ const Config = (() => {
             <label>Zonas / Espacios</label>
             <div id="zonasContainer" style="display:flex; flex-direction:column; gap:6px;"></div>
             <button class="btn-secondary" onclick="Config.agregarZona()"><i class="fas fa-plus"></i> Añadir Zona</button>
+            <button class="btn-danger" onclick="Config.resetearMesas()" style="margin-top:8px;"><i class="fas fa-sync-alt"></i> Resetear Mesas</button>
 
             <div style="margin-top:16px; padding-top:12px; border-top:1px solid var(--color-border);">
               <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
@@ -234,7 +239,6 @@ const Config = (() => {
         };
       });
 
-      // Validar al menos una zona
       if (zonasNuevas.length === 0) {
         showToast('error', 'Debe existir al menos una zona.');
         return;
@@ -264,7 +268,6 @@ const Config = (() => {
     if (window.Mesas) Mesas.render();
     showToast('success', '<i class="fas fa-check-circle"></i> Configuración guardada');
 
-    // Sincronizar con Appwrite
     if (typeof DBAppwrite !== 'undefined' && DBAppwrite.habilitado) {
       try {
         var datosConfig = {
@@ -390,13 +393,40 @@ const Config = (() => {
       imagen: document.getElementById('prodImagen').value.trim(),
       activo: document.getElementById('prodActivo')?.checked ?? true
     };
-    try {
-      await DB.syncGuardarProducto(producto);
-      showToast('success', 'Producto guardado y sincronizado');
-    } catch (e) {
-      showToast('error', 'Error guardando producto');
-      return;
+
+    if (!DB.productos) DB.productos = [];
+    var idx = DB.productos.findIndex(function(p) { return p.id === id; });
+    if (idx >= 0) {
+      DB.productos[idx] = producto;
+    } else {
+      DB.productos.push(producto);
     }
+    if (typeof DB.saveProductos === 'function') {
+      DB.saveProductos();
+    } else {
+      localStorage.setItem('pubpos_productos', JSON.stringify(DB.productos));
+    }
+
+    if (typeof DBAppwrite !== 'undefined' && DBAppwrite.habilitado) {
+      try {
+        var existenteEnAppwrite = await DBAppwrite.listar('productos').then(function(l) {
+          return l.find(function(p) { return p.id === id; });
+        });
+        if (existenteEnAppwrite) {
+          await DBAppwrite.actualizar('productos', id, producto);
+        } else {
+          await DBAppwrite.crear('productos', id, producto);
+        }
+      } catch (e) {
+        Logger.warn('[Config] Error al sincronizar producto con Appwrite:', e);
+      }
+    }
+
+    if (typeof Store !== 'undefined') {
+      Store.dispatch({ type: 'PRODUCTOS_INICIALIZAR', payload: DB.productos });
+    }
+
+    showToast('success', 'Producto guardado y sincronizado');
     cerrarModalProducto();
     renderProductos();
     if (typeof Pedido !== 'undefined' && Pedido._setCat) Pedido._setCat('Todos');
@@ -409,11 +439,40 @@ const Config = (() => {
 
   async function _eliminarProducto(id) {
     if (!confirm('¿Eliminar este producto?')) return;
-    try {
-      await DB.syncEliminarProducto(id);
-      renderProductos();
-    } catch (e) {
-      showToast('error', 'Error al eliminar producto');
+
+    if (DB.productos) {
+      DB.productos = DB.productos.filter(function(p) { return p.id !== id; });
+      if (typeof DB.saveProductos === 'function') {
+        DB.saveProductos();
+      } else {
+        localStorage.setItem('pubpos_productos', JSON.stringify(DB.productos));
+      }
+    }
+
+    if (typeof DBAppwrite !== 'undefined' && DBAppwrite.habilitado) {
+      try {
+        await DBAppwrite.eliminar('productos', id);
+      } catch (e) {
+        Logger.warn('[Config] Error al eliminar producto de Appwrite:', e);
+      }
+    }
+
+    if (typeof Store !== 'undefined') {
+      Store.dispatch({ type: 'PRODUCTOS_INICIALIZAR', payload: DB.productos });
+    }
+
+    renderProductos();
+    showToast('success', 'Producto eliminado');
+  }
+
+  async function resetearMesas() {
+    if (!confirm('¿Resetear todas las mesas? Se eliminarán las mesas libres y se recrearán según las zonas configuradas. Las mesas ocupadas se conservarán al final.')) return;
+    if (typeof DB.resetearMesas === 'function') {
+      await DB.resetearMesas();
+      if (window.Mesas) Mesas.render();
+      showToast('success', 'Mesas reseteadas correctamente');
+    } else {
+      showToast('error', 'Función no disponible');
     }
   }
 
@@ -478,6 +537,7 @@ const Config = (() => {
       eliminarMozo,
       agregarZona,
       eliminarZona,
+      resetearMesas,
       _updateZona,
       _mostrarCambiarPassword,
       _autoajustarPrecio,

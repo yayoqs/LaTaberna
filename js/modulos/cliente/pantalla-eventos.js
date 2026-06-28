@@ -1,10 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — Módulo
    Archivo: js/modulos/cliente/pantalla-eventos.js
-   Versión: 1.0.2
-   Propósito: Pantalla de eventos en vivo con votación real.
-             Conecta los botones a DBAppwrite.actualizar.
-   Dependencias: Store, EventBus, DBAppwrite
+   Versión: 1.0.3
+   Propósito: Pantalla de eventos en vivo con votación real y botón de retorno.
+   Dependencias: Store, EventBus, DBAppwrite, App
    ================================================================ */
 
 const PantallaEventos = (() => {
@@ -20,6 +19,10 @@ const PantallaEventos = (() => {
     _vista.innerHTML = `
       <div class="eventos-fondo" id="eventosFondo"></div>
 
+      <button class="btn-volver" id="btnVolverEventos" style="position:absolute; top:10px; left:10px; z-index:10; background:transparent; border:none; color:var(--color-text-sec); font-size:1.3rem; cursor:pointer; transition: color 0.2s;" title="Volver a la bienvenida">
+        <i class="fas fa-arrow-left"></i>
+      </button>
+
       <header class="eventos-header">
         <h1 id="eventosTitulo">🎉 Eventos en Vivo</h1>
         <p class="eventos-sub" id="eventosSub">Conectate a la energía de La Taberna</p>
@@ -33,6 +36,13 @@ const PantallaEventos = (() => {
     `;
 
     document.body.appendChild(_vista);
+
+    document.getElementById('btnVolverEventos').addEventListener('click', () => {
+      if (typeof window.App !== 'undefined' && typeof window.App.showView === 'function') {
+        window.App.showView('bienvenida');
+      }
+    });
+
     _initRealtime();
     return _vista;
   }

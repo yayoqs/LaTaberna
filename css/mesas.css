@@ -1,7 +1,7 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS
    Archivo: css/mesas.css
-   Versión: 1.0.1
+   Versión: 1.0.4
    Propósito: Estilos para el mapa de mesas, incluyendo zonas,
               estados, tarjetas, modo fusión y notificaciones.
    ================================================================ */
@@ -38,11 +38,12 @@
   transform: translateY(-2px);
 }
 
-.mesa-card.libre       { border-left-color: #22c55e; }
-.mesa-card.ocupada     { border-left-color: #3b82f6; }
-.mesa-card.esperando   { border-left-color: #f59e0b; }
-.mesa-card.cuenta      { border-left-color: #ef4444; }
-.mesa-card.fusionada   { border-left-color: #8b5cf6; }
+/* ── COLORACIÓN POR ESTADO ─────────────────────────────────── */
+.mesa-card.libre       { border-left: 5px solid #22c55e; }
+.mesa-card.ocupada     { border-left: 5px solid #3b82f6; }
+.mesa-card.esperando   { border-left: 5px solid #f59e0b; }
+.mesa-card.cuenta      { border-left: 5px solid #ef4444; }
+.mesa-card.fusionada   { border-left: 5px solid #8b5cf6; }
 
 /* ── VIRTUAL (FUSIÓN) ─────────────────────────────────────── */
 .mesa-virtual {
@@ -150,4 +151,30 @@
 
 .precarga-badge i {
   font-size: 10px;
+}
+
+/* ── INSIGNIA CLIENTE ESPERANDO ─────────────────────────────── */
+.esperando-cliente-badge {
+  position: absolute;
+  top: 20px;
+  right: -8px;
+  background: #3b82f6;
+  color: #fff;
+  font-size: 10px;
+  min-width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: default;
+  box-shadow: 0 2px 6px rgba(0,0,0,.3);
+  z-index: 5;
+  padding: 0 4px;
+  animation: esperando-pulse 2s infinite;
+}
+
+@keyframes esperando-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,.4); }
+  50%      { box-shadow: 0 0 0 6px rgba(59,130,246,0); }
 }

@@ -1,12 +1,11 @@
 /* ================================================================
-   LaTaberna - PubPOS — MÓDULO JS
+   LaTaberna - PubPOS — Módulo
    Archivo: js/modulos/cliente/menu-digital.js
-   Versión: 1.0.0
-   Propósito: Menú digital interactivo para clientes: catálogo, orden y envío.
-   Dependencias: js/modulos/cliente/orden.js, js/modulos/cliente/pantalla-bienvenida.js, js/auth.js, js/db-appwrite.js, js/lib/eventBus.js, js/lib/store.js, js/utils.js (fmtMoney)
+   Versión: 1.1.1
+   Propósito: Menú digital interactivo con botón de retorno a la bienvenida.
+   Dependencias: Store, EventBus, App, ClienteModulo (Orden, PantallaBienvenida)
    ================================================================ */
-   
-   
+
 const MenuDigital = (() => {
   let _vista = null;
   let _panelOrden = null;
@@ -20,6 +19,10 @@ const MenuDigital = (() => {
     _vista.id = 'view-menu-digital';
     _vista.className = 'view';
     _vista.innerHTML = `
+      <button class="btn-volver" id="btnVolverMenu" style="position:absolute; top:10px; left:10px; z-index:10; background:transparent; border:none; color:var(--color-text-sec); font-size:1.3rem; cursor:pointer; transition: color 0.2s;" title="Volver a la bienvenida">
+        <i class="fas fa-arrow-left"></i>
+      </button>
+
       <div class="menu-estado" id="menuEstado">
         <span id="menuEstadoCliente"></span>
         <span id="menuEstadoMesa"></span>
@@ -58,6 +61,11 @@ const MenuDigital = (() => {
     });
 
     document.getElementById('btnToggleOrden').addEventListener('click', _togglePanelOrden);
+    document.getElementById('btnVolverMenu').addEventListener('click', () => {
+      if (typeof window.App !== 'undefined' && typeof window.App.showView === 'function') {
+        window.App.showView('bienvenida');
+      }
+    });
 
     _initRealtime();
     return _vista;
@@ -133,7 +141,6 @@ const MenuDigital = (() => {
       </div>
     `).join('');
 
-    // Eventos de cantidad
     container.querySelectorAll('[data-accion]').forEach(btn => {
       btn.addEventListener('click', () => {
         const id = btn.dataset.id;
@@ -146,14 +153,12 @@ const MenuDigital = (() => {
       });
     });
 
-    // Eventos de observación
     container.querySelectorAll('.orden-item-obs input').forEach(input => {
       input.addEventListener('input', () => {
         window.ClienteModulo?.Orden?.modificarObservacion(input.dataset.id, input.value);
       });
     });
 
-    // Eventos de quitar
     container.querySelectorAll('.btn-quitar-item').forEach(btn => {
       btn.addEventListener('click', () => {
         window.ClienteModulo?.Orden?.quitarItem(btn.dataset.id);
@@ -244,7 +249,6 @@ const MenuDigital = (() => {
     }
   }
 
-  /* ── Toast ────────────────────────────────────────────── */
   function _mostrarToast(tipo, mensaje) {
     const contenedor = document.getElementById('toastContainer');
     if (!contenedor) return;
@@ -255,7 +259,6 @@ const MenuDigital = (() => {
     setTimeout(() => toast.remove(), 2500);
   }
 
-  /* ── Mostrar / Ocultar ───────────────────────────────── */
   function mostrar() {
     const viewMenu = document.getElementById('view-menu');
     if (viewMenu) viewMenu.classList.remove('active');

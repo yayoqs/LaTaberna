@@ -1,8 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS
    Archivo: js/db.js
-   Versión: 1.0.0
+   Versión: 1.0.2
    Propósito: Orquestador de base de datos (Appwrite + localStorage).
+              Sincronización y reseteo de mesas por configuración de zonas.
    ================================================================ */
 var DB = (function() {
   const core = DBCore;
@@ -38,7 +39,6 @@ var DB = (function() {
 
       Logger.info('[DB] Cargando datos desde Appwrite (paralelo)...');
       try {
-        // ── Carga paralela de todas las colecciones ──────────
         var resultados = {};
         var promesas = [
           'productos',
@@ -59,7 +59,6 @@ var DB = (function() {
 
         await Promise.all(promesas);
 
-        // ── Procesar resultados ──────────────────────────────
         var prodAppwrite = resultados.productos || [];
         if (prodAppwrite.length) {
           this.productos = prodAppwrite.map(p => this._normalizarProducto(p));
@@ -114,9 +113,6 @@ var DB = (function() {
         return false;
       }
 
-      // ── REPARACIÓN MÍNIMA: solo mesa 1 si no hay ninguna ──
-      await this.repararMesas();
-
       Logger.info("[DB] Inicialización completada.");
       EventBus.emit('db:inicializada');
       return true;
@@ -128,43 +124,187 @@ var DB = (function() {
   };
 
   /**
-   * Repara la grilla mínima: garantiza que exista la mesa 1 en salón.
-   * No borra mesas existentes, no regenera la grilla completa.
+   * Sincroniza la grilla de mesas con la configuración de zonas.
+   * - Crea las mesas que falten para alcanzar el total deseado.
+   * - Elimina mesas libres sobrantes si hay más de las necesarias.
+   * - Respeta las mesas ocupadas, incluso si exceden el total.
    */
-  combined.repararMesas = async function() {
+  combined.sincronizarMesasConConfig = async function() {
     if (!appwrite || !appwrite.habilitado) return;
 
-    var zonaDefault = (this.config.zonas && this.config.zonas[0]?.nombre) || 'salon';
+    var zonas = this.config.zonas || [{ nombre: 'salon', cantidad: 12 }];
 
-    var mesa1 = this.mesas.find(m => m.numero === 1);
-    if (mesa1) return;
-
-    Logger.info('[DB] Mesa 1 no encontrada. Creando automáticamente...');
-    var nuevaMesa = mesaVacia(1, zonaDefault);
-
-    try {
-      var dataMesa = {
-        numero: 1,
-        estado: 'libre',
-        pedidoId: '',
-        items: '[]',
-        mozo: '',
-        comensales: 1,
-        abiertaEn: new Date().toISOString(),
-        observaciones: '',
-        zona: zonaDefault,
-        esVirtual: false,
-        permite_prepedidos: false
-      };
-      await appwrite.crear('mesas', '1', dataMesa);
-      this.mesas.push(nuevaMesa);
-      this.mesas.sort((a, b) => a.numero - b.numero);
-      this.saveMesas();
-      EventBus.emit('mesas:guardadas', this.mesas);
-      Logger.info('[DB] Mesa 1 creada exitosamente.');
-    } catch (e) {
-      Logger.warn('[DB] Error al crear mesa 1:', e);
+    var totalDeseado = 0;
+    for (var i = 0; i < zonas.length; i++) {
+      totalDeseado += zonas[i].cantidad;
     }
+
+    var virtuales = this.mesas.filter(function(m) { return m.esVirtual; });
+    var reales = this.mesas.filter(function(m) { return !m.esVirtual; });
+
+    var ocupadas = reales.filter(function(m) { return m.estado !== 'libre'; });
+    var libres = reales.filter(function(m) { return m.estado === 'libre'; });
+
+    Logger.info('[DB] Sincronizando mesas. Deseadas: ' + totalDeseado + ', Actuales: ' + reales.length + ', Ocupadas: ' + ocupadas.length);
+
+    var libresNecesarias = Math.max(0, totalDeseado - ocupadas.length);
+
+    var nuevasMesas = [];
+    var mesasAEliminar = [];
+    var maxNumero = 0;
+
+    if (reales.length > 0) {
+      maxNumero = Math.max.apply(null, reales.map(function(m) { return m.numero; }));
+    }
+
+    if (libres.length > libresNecesarias) {
+      var sobrantes = libres.length - libresNecesarias;
+      libres.sort(function(a, b) { return b.numero - a.numero; });
+      mesasAEliminar = libres.slice(0, sobrantes);
+      libres = libres.slice(sobrantes);
+    }
+
+    if (libres.length < libresNecesarias) {
+      var faltantes = libresNecesarias - libres.length;
+      for (var j = 0; j < faltantes; j++) {
+        maxNumero++;
+        var zonaNombre = zonas[0]?.nombre || 'salon';
+        var nueva = mesaVacia(maxNumero, zonaNombre);
+        libres.push(nueva);
+        nuevasMesas.push(nueva);
+      }
+    }
+
+    for (var i = 0; i < mesasAEliminar.length; i++) {
+      var mesa = mesasAEliminar[i];
+      try {
+        await appwrite.eliminar('mesas', String(mesa.numero));
+        Logger.info('[DB] Mesa ' + mesa.numero + ' eliminada (sobrante).');
+      } catch (e) {
+        Logger.warn('[DB] Error al eliminar mesa ' + mesa.numero + ':', e);
+      }
+    }
+
+    for (var i = 0; i < nuevasMesas.length; i++) {
+      var mesa = nuevasMesas[i];
+      try {
+        var dataMesa = {
+          numero: mesa.numero,
+          estado: 'libre',
+          pedidoId: '',
+          items: '[]',
+          mozo: '',
+          comensales: 1,
+          abiertaEn: new Date().toISOString(),
+          observaciones: '',
+          zona: mesa.zona || 'salon',
+          esVirtual: false,
+          permite_prepedidos: false
+        };
+        await appwrite.crear('mesas', String(mesa.numero), dataMesa);
+        Logger.info('[DB] Mesa ' + mesa.numero + ' creada en Appwrite.');
+      } catch (e) {
+        Logger.warn('[DB] Error al crear mesa ' + mesa.numero + ':', e);
+      }
+    }
+
+    this.mesas = [].concat(ocupadas, libres, virtuales);
+    this.mesas.sort(function(a, b) { return a.numero - b.numero; });
+
+    this.saveMesas();
+    EventBus.emit('mesas:guardadas', this.mesas);
+    Logger.info('[DB] Sincronización de mesas completada. Total: ' + this.mesas.length);
+  };
+
+  /**
+   * Resetea completamente la grilla de mesas:
+   * elimina todas las mesas libres de Appwrite y las recrea desde cero
+   * según la configuración de zonas, comenzando desde el número 1.
+   * Las mesas ocupadas se conservan y se reubican al final de la numeración.
+   */
+  combined.resetearMesas = async function() {
+    if (!appwrite || !appwrite.habilitado) return;
+
+    var zonas = this.config.zonas || [{ nombre: 'salon', cantidad: 12 }];
+
+    // Separar mesas virtuales
+    var virtuales = this.mesas.filter(function(m) { return m.esVirtual; });
+    var reales = this.mesas.filter(function(m) { return !m.esVirtual; });
+
+    // Separar ocupadas y libres
+    var ocupadas = reales.filter(function(m) { return m.estado !== 'libre'; });
+    var libres = reales.filter(function(m) { return m.estado === 'libre'; });
+
+    Logger.info('[DB] Reseteando mesas. Ocupadas: ' + ocupadas.length + ', Libres: ' + libres.length);
+
+    // 1. Eliminar TODAS las mesas libres de Appwrite
+    for (var i = 0; i < libres.length; i++) {
+      var mesa = libres[i];
+      try {
+        await appwrite.eliminar('mesas', String(mesa.numero));
+        Logger.info('[DB] Mesa libre ' + mesa.numero + ' eliminada.');
+      } catch (e) {
+        Logger.warn('[DB] Error al eliminar mesa libre ' + mesa.numero + ':', e);
+      }
+    }
+
+    // 2. Crear la grilla nueva desde 1 según las zonas
+    var totalDeseado = 0;
+    for (var i = 0; i < zonas.length; i++) {
+      totalDeseado += zonas[i].cantidad;
+    }
+
+    var nuevasMesas = [];
+    var numero = 1;
+    for (var z = 0; z < zonas.length; z++) {
+      var zona = zonas[z];
+      for (var n = 0; n < zona.cantidad; n++) {
+        var nueva = mesaVacia(numero, zona.nombre);
+        nuevasMesas.push(nueva);
+        numero++;
+      }
+    }
+
+    // 3. Reubicar mesas ocupadas al final
+    var siguienteNumero = totalDeseado + 1;
+    for (var i = 0; i < ocupadas.length; i++) {
+      var ocupada = ocupadas[i];
+      ocupada.numero = siguienteNumero;
+      siguienteNumero++;
+      nuevasMesas.push(ocupada);
+    }
+
+    // 4. Crear las mesas nuevas en Appwrite
+    for (var i = 0; i < nuevasMesas.length; i++) {
+      var mesa = nuevasMesas[i];
+      try {
+        var dataMesa = {
+          numero: mesa.numero,
+          estado: mesa.estado || 'libre',
+          pedidoId: mesa.pedidoId || '',
+          items: Array.isArray(mesa.items) ? JSON.stringify(mesa.items) : (mesa.items || '[]'),
+          mozo: mesa.mozo || '',
+          comensales: mesa.comensales || 1,
+          abiertaEn: mesa.abiertaEn || new Date().toISOString(),
+          observaciones: mesa.observaciones || '',
+          zona: mesa.zona || 'salon',
+          esVirtual: mesa.esVirtual || false,
+          permite_prepedidos: mesa.permite_prepedidos || false
+        };
+        await appwrite.crear('mesas', String(mesa.numero), dataMesa);
+        Logger.info('[DB] Mesa ' + mesa.numero + ' creada en Appwrite (reset).');
+      } catch (e) {
+        Logger.warn('[DB] Error al crear mesa ' + mesa.numero + ':', e);
+      }
+    }
+
+    // 5. Actualizar array local
+    this.mesas = nuevasMesas.concat(virtuales);
+    this.mesas.sort(function(a, b) { return a.numero - b.numero; });
+
+    this.saveMesas();
+    EventBus.emit('mesas:guardadas', this.mesas);
+    Logger.info('[DB] Reseteo de mesas completado. Total: ' + this.mesas.length);
   };
 
   combined._cargarConfiguracion = async function() {
@@ -222,10 +362,6 @@ var DB = (function() {
       Store.dispatch({ type: 'PEDIDO_CERRADO', payload: { id, total, updated_at: pedido.actualizadoEn } });
     }
     return pedido;
-  };
-
-  combined.sincronizarMesasConConfig = async function() {
-    return this.repararMesas();
   };
 
   return combined;

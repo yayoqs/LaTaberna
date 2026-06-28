@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Test B Temporal — Depuración KDS</title>
+  <title>Test B – Insignia Cliente Esperando (v1.0.3)</title>
   <style>
     body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
     h1 { color: #f59e0b; }
@@ -16,8 +16,8 @@
   </style>
 </head>
 <body>
-  <h1>🧪 Test B Temporal — Depuración KDS</h1>
-  <p class="info">Herramienta temporal para depurar problemas en los tests del KDS.</p>
+  <h1>🧪 Test B – Insignia Cliente Esperando (v1.0.3)</h1>
+  <p class="info">Verifica que la insignia se active con el evento cliente:mesa_ingresada y solo en la mesa correcta.</p>
   <div id="results"></div>
 
   <!-- Mocks tempranos -->
@@ -37,14 +37,10 @@
   <script src="/js/dominio/dinero.js"></script>
   <script src="/js/dominio/cantidad.js"></script>
   <script src="/js/db-core.js"></script>
-  <script src="/js/db-inventario.js"></script>
-  <script src="/js/db-fusion.js"></script>
-  <script src="/js/db-shim.js"></script>
-  <script src="/js/db-appwrite.js"></script>
   <script src="/js/db.js"></script>
 
-  <!-- Módulo KDS -->
-  <script src="/js/ui/kds.js"></script>
+  <!-- Módulo a testear -->
+  <script src="/js/ui/mesas.js"></script>
 
   <script>
     (function() {
@@ -62,81 +58,96 @@
       }
 
       function esperar(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
+        return new Promise(function(resolve) { setTimeout(resolve, ms); });
       }
 
       async function runTests() {
         resultsEl.innerHTML = '';
         Logger.setLevel('ERROR');
 
-        // Configurar entorno mínimo
+        // ── Configurar entorno ──────────────────────────
         DB.config = { zonas: [{ nombre: 'salon', cantidad: 5 }] };
         DB.mozos = [{ id: 'm1', nombre: 'Carlos', activo: true }];
         DB.mesas = [
-          { numero: 1, estado: 'ocupada', zona: 'salon', items: [], mozo: 'Carlos', comensales: 2, pedidoId: 'p1', esVirtual: false }
+          { numero: 1, estado: 'libre', zona: 'salon', items: [], mozo: '', comensales: 1, pedidoId: null, esVirtual: false, permite_prepedidos: false },
+          { numero: 2, estado: 'libre', zona: 'salon', items: [], mozo: '', comensales: 1, pedidoId: null, esVirtual: false, permite_prepedidos: false }
         ];
         DB.pedidos = [];
         DB.comandas = [];
-        DB.productos = [];
         DB.saveMesas = function() {};
-        DB.saveComandas = function() {};
-        DB.getMesa = function(num) { return DB.mesas.find(m => m.numero == num); };
+        DB.fusionarMesas = function() { return null; };
 
-        window.Auth = window.Auth || {};
-        Auth.getRol = function() { return 'admin'; };
         window.showToast = function() {};
 
         // Mock del Store
-        var comandasStore = [];
         var originalGetState = Store.getState;
         Store.getState = function() {
           var state = originalGetState.call(Store);
-          state.comandas = comandasStore;
+          state.mesas = DB.mesas;
           return state;
         };
-        var originalDispatch = Store.dispatch;
-        Store.dispatch = function(action) {
-          if (action.type === 'COMANDA_ACTUALIZADA') {
-            var c = comandasStore.find(function(x) { return x.id === action.payload.id; });
-            if (c) Object.assign(c, action.payload.cambios);
-          }
-          originalDispatch.call(Store, action);
-        };
 
-        var ahora = Date.now();
-        var com = {
-          id: 'com_test', mesa: '1', destino: 'cocina',
-          items: [{ prodId: 'prod_x', nombre: 'Hamburguesa', qty: 1, obs: '', enviadoA: 'cocina', destino: 'cocina' }],
-          estado: 'nueva', ts: ahora - 2 * 60 * 1000, mozo: 'Ana', observaciones: ''
-        };
-        comandasStore = [com];
+        Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
 
-        // Crear vista KDS
+        // Crear DOM mínimo
         var main = document.createElement('main');
-        main.id = 'view-cocina';
-        main.className = 'view';
-        main.innerHTML = '<div id="cocinaKDS" class="kds-grid"></div>';
+        main.id = 'view-mesas';
+        main.className = 'view active';
+        main.innerHTML = '<div id="mesasGrid"></div><div id="popoverContainer"></div>';
         document.body.appendChild(main);
 
-        KDS.refresh();
+        Mesas.render();
         await esperar(50);
 
-        var tarjeta = document.getElementById('kds-com_test');
-        console.log('[Temporal] Tarjeta inicial:', tarjeta ? tarjeta.outerHTML : 'null');
-        assert(!!tarjeta, 'Tarjeta visible inicialmente');
+        // ── Suite 1: Ninguna insignia al inicio ──────────
+        resultsEl.innerHTML += '<div class="suite"><h2>1. Sin insignias al inicio</h2></div>';
+        var insignias = document.querySelectorAll('.esperando-cliente-badge');
+        assert(insignias.length === 0, 'No hay insignias de cliente esperando al inicio');
 
-        // Cambiar a en-proceso
-        KDS._setEstado('com_test', 'en-proceso');
-        await esperar(100);
-        KDS.refresh();
-        await esperar(100);
+        // ── Suite 2: Emitir evento y ver aparición ────────
+        resultsEl.innerHTML += '<div class="suite"><h2>2. Insignia aparece al emitir cliente:mesa_ingresada</h2></div>';
+        EventBus.emit('cliente:mesa_ingresada', { mesa: 1 });
+        await esperar(50);
+        insignias = document.querySelectorAll('.esperando-cliente-badge');
+        assert(insignias.length === 1, 'Aparece una insignia de cliente esperando');
+        if (insignias.length > 0) {
+          assert(insignias[0].querySelector('.fa-clock') !== null, 'La insignia tiene ícono de reloj');
+        }
+        // Verificar que esté solo en mesa 1
+        var mesa1 = document.querySelector('.mesa-card:nth-child(1) .esperando-cliente-badge');
+        var mesa2 = document.querySelector('.mesa-card:nth-child(2) .esperando-cliente-badge');
+        assert(!!mesa1, 'Insignia en mesa 1');
+        assert(!mesa2, 'No hay insignia en mesa 2');
 
-        tarjeta = document.getElementById('kds-com_test');
-        console.log('[Temporal] Tarjeta tras en-proceso:', tarjeta ? tarjeta.outerHTML : 'null');
-        assert(!!tarjeta, 'Tarjeta sigue visible');
-        assert(tarjeta.classList.contains('en-proceso'), 'Clase en-proceso presente');
+        // ── Suite 3: Desaparece al cambiar estado de la mesa ──
+        resultsEl.innerHTML += '<div class="suite"><h2>3. Desaparece al cambiar estado de la mesa</h2></div>';
+        DB.mesas[0].estado = 'ocupada';
+        DB.mesas[0].permite_prepedidos = true;
+        Mesas.render();
+        await esperar(50);
+        insignias = document.querySelectorAll('.esperando-cliente-badge');
+        assert(insignias.length === 0, 'La insignia desaparece al ocupar la mesa');
 
+        // ── Suite 4: Reemitir evento y aparecer de nuevo ──
+        resultsEl.innerHTML += '<div class="suite"><h2>4. Reaparece si el cliente vuelve a ingresar</h2></div>';
+        DB.mesas[0].estado = 'libre';
+        DB.mesas[0].permite_prepedidos = false;
+        Mesas.render();
+        await esperar(50);
+        // Aún no debería haber insignia porque el mapa se limpió al ocupar
+        insignias = document.querySelectorAll('.esperando-cliente-badge');
+        assert(insignias.length === 0, 'No hay insignia sin evento');
+        // Emitir evento de nuevo
+        EventBus.emit('cliente:mesa_ingresada', { mesa: 1 });
+        await esperar(50);
+        insignias = document.querySelectorAll('.esperando-cliente-badge');
+        assert(insignias.length === 1, 'Vuelve a aparecer tras evento');
+
+        // ── Resumen ──────────────────────────────────────
         resultsEl.innerHTML += '<div class="summary">' + passed + ' pasaron, ' + failed + ' fallaron</div>';
+        if (failed === 0) {
+          resultsEl.innerHTML += '<div class="test pass">✔ Todos los tests de la insignia pasaron.</div>';
+        }
       }
 
       window.addEventListener('load', function() {

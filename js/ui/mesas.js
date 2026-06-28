@@ -1,9 +1,11 @@
 /* ================================================================
-   LaTaberna - PubPOS — UI JS
+   LaTaberna - PubPOS — UI
    Archivo: js/ui/mesas.js
-   Versión: 1.0.0
-   Propósito: Mapa de mesas con zonas dinámicas, insignias KDS, long-press.
-   Dependencias: js/lib/store.js, js/lib/eventBus.js, js/lib/command-bus.js, js/auth.js, js/db.js, js/utils.js, js/lib/logger.js
+   Versión: 1.0.6
+   Propósito: Mapa de mesas con zonas dinámicas, colores, insignias
+              de precarga y cliente esperando. Ahora soporta
+              identificadores personalizados en mesas virtuales.
+   Dependencias: Store, EventBus, DB, CommandBus, Logger, Auth
    ================================================================ */
 const Mesas = (() => {
 
@@ -33,6 +35,9 @@ const Mesas = (() => {
   // Para long-press
   let _longPressTimer = null;
   let _longPressMesa = null;
+
+  // Mesas donde un cliente ha ingresado y está esperando
+  let _clientesEsperando = new Map(); // numMesa → true
 
   function _asegurarVista() {
     if ($id('view-mesas')) return;
@@ -111,11 +116,6 @@ const Mesas = (() => {
     _renderZoneButtons();
   }
 
-  /**
-   * Obtiene el estado mas avanzado de las comandas de una mesa
-   * para cada destino (cocina/barra).
-   * Retorna { cocina: 'pendiente'|'en-proceso'|'lista', barra: 'pendiente'|'en-proceso'|'lista' }
-   */
   function _getEstadoComandas(mesaNumero) {
     const comandas = Store.getState().comandas || [];
     const estados = { cocina: 'pendiente', barra: 'pendiente' };
@@ -124,7 +124,6 @@ const Mesas = (() => {
       if (c.mesa != mesaNumero) return;
 
       let destino = c.destino;
-      // Si es una comanda virtual, respetar su destino
       if (c.id && c.id.endsWith('_cocina')) destino = 'cocina';
       if (c.id && c.id.endsWith('_barra')) destino = 'barra';
 
@@ -161,7 +160,16 @@ const Mesas = (() => {
     if (_zonaActiva !== 'todas') {
       mesas = mesas.filter(m => m.zona === _zonaActiva);
     }
-    mesas.sort((a, b) => a.numero - b.numero);
+    // Ordenar: las mesas virtuales se ordenan por el menor número de sus mesas fusionadas
+    mesas.sort((a, b) => {
+      const numA = a.esVirtual && a.mesasFusionadas && a.mesasFusionadas.length > 0
+        ? Math.min(...a.mesasFusionadas)
+        : (typeof a.numero === 'number' ? a.numero : 9999);
+      const numB = b.esVirtual && b.mesasFusionadas && b.mesasFusionadas.length > 0
+        ? Math.min(...b.mesasFusionadas)
+        : (typeof b.numero === 'number' ? b.numero : 9999);
+      return numA - numB;
+    });
 
     grid.innerHTML = '';
 
@@ -180,12 +188,24 @@ const Mesas = (() => {
                                (mesa.estado === 'libre' || mesa.estado === 'ocupada' || mesa.estado === 'esperando') && 
                                !mesa.esVirtual;
 
+      // Badge de precarga
       const badgeInfo = _badges.get(mesa.numero);
       const badgeHTML = badgeInfo 
-        ? `<span class="precarga-badge" onclick="event.stopPropagation(); Mesas.onPrecargaClick(${mesa.numero})" title="Precarga pendiente">
+        ? `<span class="precarga-badge" onclick="event.stopPropagation(); Mesas.onPrecargaClick(${typeof mesa.numero === 'number' ? mesa.numero : '\'' + mesa.numero + '\''})" title="Precarga pendiente">
              <i class="fas fa-bell"></i> ${badgeInfo.cantidad}
            </span>` 
         : '';
+
+      // Insignia de cliente esperando (solo si está en el mapa y cumple condiciones)
+      let esperandoHTML = '';
+      if (_clientesEsperando.has(mesa.numero) && mesa.estado === 'libre' && mesa.permite_prepedidos === false) {
+        esperandoHTML = `<span class="esperando-cliente-badge" title="Cliente esperando validación">
+          <i class="fas fa-clock"></i>
+        </span>`;
+      } else if (_clientesEsperando.has(mesa.numero)) {
+        // Si ya no cumple condiciones, limpiar el mapa
+        _clientesEsperando.delete(mesa.numero);
+      }
 
       // Micro-insignias de cocina y barra
       const estados = _getEstadoComandas(mesa.numero);
@@ -196,7 +216,6 @@ const Mesas = (() => {
         <i class="fas fa-glass-martini-alt"></i>
       </span>`;
 
-      // Contenido base
       let innerHTML = '';
 
       if (puedeSeleccionar) {
@@ -205,10 +224,10 @@ const Mesas = (() => {
           <input type="checkbox" class="mesa-checkbox" data-num="${mesa.numero}" ${checked} 
                  onclick="event.stopPropagation(); Mesas.toggleSeleccionMesa('${mesa.numero}', this.checked)">
           <i class="fas ${ICONOS[mesa.estado] || 'fa-chair'} mesa-icon"></i>
-          <strong class="mesa-numero">${mesa.numero}</strong>
+          <strong class="mesa-numero">${mesa.esVirtual && mesa.mesasFusionadas ? mesa.mesasFusionadas.join(' + ') : mesa.numero}</strong>
           <span class="mesa-estado-label">${LABELS[mesa.estado] || mesa.estado}</span>
           <div class="micro-insignias">${microCocina}${microBarra}</div>
-          ${badgeHTML}
+          ${badgeHTML}${esperandoHTML}
           <span class="mesa-zona-badge" style="background:${colorZona}; color:white;">${mesa.zona}</span>
         `;
       } else {
@@ -216,7 +235,7 @@ const Mesas = (() => {
         let icono = ICONOS[mesa.estado] || 'fa-chair';
         
         if (mesa.esVirtual) {
-          numeroMostrado = mesa.mesasFusionadas.join(' + ');
+          numeroMostrado = mesa.mesasFusionadas ? mesa.mesasFusionadas.join(' + ') : mesa.numero;
           icono = 'fa-object-group';
         }
         
@@ -226,7 +245,7 @@ const Mesas = (() => {
           <span class="mesa-estado-label">${LABELS[mesa.estado] || mesa.estado}</span>
           ${mesa.esVirtual ? '<span class="mesa-virtual-badge"><i class="fas fa-link"></i> Unión</span>' : ''}
           <div class="micro-insignias">${microCocina}${microBarra}</div>
-          ${badgeHTML}
+          ${badgeHTML}${esperandoHTML}
           <span class="mesa-zona-badge" style="background:${colorZona}; color:white;">${mesa.zona}</span>
         `;
       }
@@ -234,9 +253,9 @@ const Mesas = (() => {
       card.innerHTML = innerHTML;
 
       // Eventos de long-press y clic normal
-      if (!puedeSeleccionar && !mesa.esVirtual) {
+      if (!puedeSeleccionar) {
         card.addEventListener('mousedown', (e) => {
-          if (e.target.closest('.precarga-badge') || e.target.closest('.micro-badge')) return;
+          if (e.target.closest('.precarga-badge') || e.target.closest('.micro-badge') || e.target.closest('.esperando-cliente-badge')) return;
           _longPressMesa = mesa.numero;
           _longPressTimer = setTimeout(() => {
             _mostrarPopover(mesa, card);
@@ -248,7 +267,7 @@ const Mesas = (() => {
           if (_longPressTimer) {
             clearTimeout(_longPressTimer);
             _longPressTimer = null;
-            if (_longPressMesa === mesa.numero && !e.target.closest('.precarga-badge') && !e.target.closest('.micro-badge')) {
+            if (_longPressMesa === mesa.numero && !e.target.closest('.precarga-badge') && !e.target.closest('.micro-badge') && !e.target.closest('.esperando-cliente-badge')) {
               EventBus.emit('mesa:seleccionada', mesa.numero);
             }
           }
@@ -265,7 +284,7 @@ const Mesas = (() => {
 
         // Touch events
         card.addEventListener('touchstart', (e) => {
-          if (e.target.closest('.precarga-badge') || e.target.closest('.micro-badge')) return;
+          if (e.target.closest('.precarga-badge') || e.target.closest('.micro-badge') || e.target.closest('.esperando-cliente-badge')) return;
           _longPressMesa = mesa.numero;
           _longPressTimer = setTimeout(() => {
             _mostrarPopover(mesa, card);
@@ -277,7 +296,7 @@ const Mesas = (() => {
           if (_longPressTimer) {
             clearTimeout(_longPressTimer);
             _longPressTimer = null;
-            if (_longPressMesa === mesa.numero && !e.target.closest('.precarga-badge') && !e.target.closest('.micro-badge')) {
+            if (_longPressMesa === mesa.numero && !e.target.closest('.precarga-badge') && !e.target.closest('.micro-badge') && !e.target.closest('.esperando-cliente-badge')) {
               EventBus.emit('mesa:seleccionada', mesa.numero);
             }
           }
@@ -296,7 +315,7 @@ const Mesas = (() => {
       // Clic normal para modo fusion
       if (puedeSeleccionar) {
         card.onclick = (e) => {
-          if (e.target.type !== 'checkbox' && !e.target.closest('.precarga-badge') && !e.target.closest('.micro-badge')) {
+          if (e.target.type !== 'checkbox' && !e.target.closest('.precarga-badge') && !e.target.closest('.micro-badge') && !e.target.closest('.esperando-cliente-badge')) {
             const cb = card.querySelector('.mesa-checkbox');
             if (cb) {
               cb.checked = !cb.checked;
@@ -304,9 +323,9 @@ const Mesas = (() => {
             }
           }
         };
-      } else if (mesa.esVirtual) {
+      } else {
         card.onclick = (e) => {
-          if (!e.target.closest('.precarga-badge') && !e.target.closest('.micro-badge')) {
+          if (!e.target.closest('.precarga-badge') && !e.target.closest('.micro-badge') && !e.target.closest('.esperando-cliente-badge')) {
             EventBus.emit('mesa:seleccionada', mesa.numero);
           }
         };
@@ -355,9 +374,21 @@ const Mesas = (() => {
     _modoSeleccion = !_modoSeleccion;
     _mesasSeleccionadas.clear();
     _renderGrid();
-    const btn = document.getElementById('btnFusionar');
-    if (btn) {
-      btn.innerHTML = _modoSeleccion ? '<i class="fas fa-times"></i> Cancelar' : '<i class="fas fa-object-group"></i> Fusionar Mesas';
+
+    const btnFusionar = document.getElementById('btnFusionar');
+    const btnConfirmar = document.getElementById('btnConfirmarFusion');
+
+    if (_modoSeleccion) {
+      // Entrando al modo de selección
+      if (btnFusionar) btnFusionar.style.display = 'none';
+      if (btnConfirmar) btnConfirmar.style.display = 'inline-block';
+    } else {
+      // Saliendo del modo de selección
+      if (btnFusionar) {
+        btnFusionar.style.display = 'inline-block';
+        btnFusionar.innerHTML = '<i class="fas fa-object-group"></i> Fusionar Mesas';
+      }
+      if (btnConfirmar) btnConfirmar.style.display = 'none';
     }
   }
 
@@ -374,15 +405,23 @@ const Mesas = (() => {
       showToast('warning', 'Selecciona al menos dos mesas para fusionar.');
       return;
     }
-    const numeros = Array.from(_mesasSeleccionadas).sort((a,b) => a - b);
+    const numeros = Array.from(_mesasSeleccionadas).sort((a,b) => {
+      const numA = typeof a === 'number' ? a : parseInt(a);
+      const numB = typeof b === 'number' ? b : parseInt(b);
+      return numA - numB;
+    });
     const mozo = $id('mozoActivo')?.value || 'Mozo';
-    const mesaVirtual = DB.fusionarMesas(numeros, mozo);
+
+    // Solicitar nombre personalizado
+    const nombrePersonalizado = prompt('Nombre para la mesa fusionada (opcional):\nEj: DJ, VIP, barra\nDejar vacío para usar formato automático (1+2)');
+
+    const mesaVirtual = DB.fusionarMesas(numeros, mozo, nombrePersonalizado);
     if (mesaVirtual) {
-      showToast('success', `Mesas ${numeros.join(', ')} fusionadas.`);
+      showToast('success', `Mesas fusionadas: ${mesaVirtual.numero}`);
       toggleModoFusion();
       EventBus.emit('mesa:seleccionada', mesaVirtual.numero);
     } else {
-      showToast('error', 'No se pudo fusionar. Verifica que las mesas estén en un estado válido.');
+      showToast('error', 'No se pudo fusionar. Verifica que el nombre no esté en uso.');
     }
   }
 
@@ -390,7 +429,7 @@ const Mesas = (() => {
     if (typeof DB === 'undefined') return;
     const zona = _zonaActiva !== 'todas' ? _zonaActiva : (DB.config.zonas[0]?.nombre || 'salon');
     const mesas = Store.getState().mesas;
-    const maxNum = mesas.reduce((max, m) => Math.max(max, m.numero || 0), 0);
+    const maxNum = mesas.reduce((max, m) => Math.max(max, typeof m.numero === 'number' ? m.numero : 0), 0);
     const nuevoNum = maxNum + 1;
 
     if (typeof CommandBus !== 'undefined') {
@@ -438,6 +477,17 @@ const Mesas = (() => {
     }
   }
 
+  // ── Métodos para cliente esperando ──
+  function setClienteEsperando(numMesa) {
+    _clientesEsperando.set(numMesa, true);
+    _renderGrid();
+  }
+
+  function clearClienteEsperando(numMesa) {
+    _clientesEsperando.delete(numMesa);
+    _renderGrid();
+  }
+
   // ── Listeners ──
   function _initListeners() {
     Store.subscribe((state, action) => {
@@ -456,6 +506,15 @@ const Mesas = (() => {
     EventBus.on('comanda:enviada', () => _renderGrid());
     EventBus.on('comanda:lista', () => _renderGrid());
     EventBus.on('mesa:actualizada', () => _renderGrid());
+
+    // Nuevo evento de la Célula C
+    EventBus.on('cliente:mesa_ingresada', (data) => {
+      if (data && data.mesa) {
+        _clientesEsperando.set(data.mesa, true);
+        _renderGrid();
+        Logger.info(`[Mesas] Cliente esperando en mesa ${data.mesa}`);
+      }
+    });
   }
 
   _initListeners();
@@ -470,7 +529,9 @@ const Mesas = (() => {
     setZona,
     setBadge,
     clearBadge,
-    onPrecargaClick
+    onPrecargaClick,
+    setClienteEsperando,
+    clearClienteEsperando
   };
 })();
 

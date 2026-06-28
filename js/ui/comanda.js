@@ -1,14 +1,57 @@
 /* ================================================================
    LaTaberna - PubPOS — UI
    Archivo: js/ui/comanda.js
-   Versión: 1.0.1
+   Versión: 1.0.2
    Propósito: Gestión de la comanda actual (ítems, cantidades,
-              observaciones, split bill). Ahora lee del Store y
-              despacha acciones en lugar de modificar DB.
+              observaciones, split bill). Fase 2: eliminada la
+              escritura directa a DB.saveMesas(). La sincronización
+              del estado local con DB se hace mediante un suscriptor
+              del Store, manteniendo la compatibilidad con el flujo
+              de envío a cocina.
    Dependencias: Store, EventBus, DB, Auth, Logger
    ================================================================ */
 const Comanda = (() => {
-  let _mesaActiva = null; // referencia al objeto mesa del Store
+  let _mesaActiva = null;
+
+  /**
+   * Sincroniza los cambios del Store con DB.mesas.
+   * Reemplaza la antigua llamada a DB.saveMesas().
+   */
+  function _syncMesaStoreADB(mesaActualizada) {
+    if (!mesaActualizada) return;
+    const idx = DB.mesas.findIndex(m => m.numero == mesaActualizada.numero);
+    if (idx >= 0) {
+      DB.mesas[idx] = mesaActualizada;
+      if (typeof DB.saveMesas === 'function') {
+        DB.saveMesas();
+      }
+    }
+  }
+
+  function _initStoreSync() {
+    Store.subscribe((state, action) => {
+      // Solo reaccionar a acciones de comanda
+      if (!action || !action.type) return;
+      if (!['COMANDA_ITEM_AGREGAR', 'COMANDA_ITEM_CAMBIAR', 'COMANDA_ITEM_QUITAR'].includes(action.type)) return;
+      if (!_mesaActiva) return;
+
+      // Obtener la mesa actualizada desde el Store
+      const mesaStore = state.mesas.find(m => m.numero == _mesaActiva.numero);
+      if (!mesaStore) return;
+
+      // Sincronizar con DB y emitir evento
+      _syncMesaStoreADB(mesaStore);
+      _mesaActiva = mesaStore;
+      EventBus.emit('mesa:actualizada', { mesa: _mesaActiva.numero, estado: _mesaActiva.estado });
+      _render();
+      if (typeof actualizarTotalCierre === 'function') {
+        actualizarTotalCierre();
+      }
+    });
+  }
+
+  // Activar la sincronización al cargar el módulo
+  _initStoreSync();
 
   /**
    * Establece la mesa activa y sincroniza la UI.
@@ -106,14 +149,10 @@ const Comanda = (() => {
       enviadoTs: null
     };
 
-    // Despachar acción al Store (la agrupación la maneja el reducer)
     Store.dispatch({
       type: 'COMANDA_ITEM_AGREGAR',
       payload: { numeroMesa: _mesaActiva.numero, item }
     });
-
-    // Mantener compatibilidad temporal: sincronizar DB y emitir eventos
-    _guardarYRenderizar();
   }
 
   /**
@@ -134,7 +173,6 @@ const Comanda = (() => {
       type: 'COMANDA_ITEM_CAMBIAR',
       payload: { numeroMesa: _mesaActiva.numero, index: idx, cambios: { qty: nuevaCantidad } }
     });
-    _guardarYRenderizar();
   }
 
   /**
@@ -163,7 +201,6 @@ const Comanda = (() => {
       type: 'COMANDA_ITEM_QUITAR',
       payload: { numeroMesa: _mesaActiva.numero, index: idx }
     });
-    _guardarYRenderizar();
   }
 
   /** @param {string} mozo */
@@ -189,23 +226,6 @@ const Comanda = (() => {
     }
   }
 
-  function _guardarYRenderizar() {
-    if (!_mesaActiva) return;
-    // Actualizar la referencia local desde el Store para tener el total actualizado
-    const state = Store.getState();
-    const mesaActualizada = state.mesas.find(m => m.numero === _mesaActiva.numero);
-    if (mesaActualizada) {
-      _mesaActiva = mesaActualizada;
-    }
-    _mesaActiva.total = calcularTotal(_mesaActiva.items);
-    DB.saveMesas();
-    EventBus.emit('mesa:actualizada', { mesa: _mesaActiva.numero, estado: _mesaActiva.estado });
-    _render();
-    if (typeof actualizarTotalCierre === 'function') {
-      actualizarTotalCierre();
-    }
-  }
-
   /** Renderiza la lista de ítems de la comanda */
   function render() {
     _render();
@@ -218,7 +238,7 @@ const Comanda = (() => {
 
     // Leer los ítems desde el Store para asegurar consistencia
     const state = Store.getState();
-    const mesaDelStore = state.mesas.find(m => m.numero === _mesaActiva.numero);
+    const mesaDelStore = state.mesas.find(m => m.numero == _mesaActiva.numero);
     const items = mesaDelStore ? mesaDelStore.items : _mesaActiva.items;
 
     if (!items.length) {

@@ -1,10 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — UI
    Archivo: js/ui/pedido-ui.js
-   Versión: 1.0.1
+   Versión: 1.0.2
    Propósito: Modal de pedido, revisar comandas, validación de stock. 
-        Ahora delega toda la lógica de apertura en el comando crearPedidoMesa, sin duplicar actualizaciones.
-   Dependencias: CommandBus, EventBus, Logger, DB, Mesas, Comanda, Carta, Cuenta, Cobro, Tickets, Auth
+              Ahora soporta identificadores de mesa string en apertura.
+   Dependencias: CommandBus, EventBus, Logger, DB, Mesas, Comanda,
+                 Carta, Cuenta, Cobro, Tickets, Auth
    ================================================================ */
 var Pedido = (function() {
 
@@ -98,7 +99,7 @@ var Pedido = (function() {
           '<textarea id="aperturaPersonas" rows="3" placeholder="Ej: Juan, María, Pedro"></textarea>' +
           '<div class="modal-small-footer">' +
             '<button class="btn-secondary" onclick="Pedido._cancelarApertura()">Cancelar</button>' +
-            '<button class="btn-primary" onclick="Pedido._confirmarApertura(' + numMesa + ')">' +
+            '<button class="btn-primary" onclick="Pedido._confirmarApertura(\'' + numMesa + '\')">' +
               '<i class="fas fa-check-circle"></i> Abrir Mesa' +
             '</button>' +
           '</div>' +
