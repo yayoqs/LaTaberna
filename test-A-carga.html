@@ -20,21 +20,19 @@
   <div id="results"></div>
   <button onclick="location.reload()">🔄 Ejecutar de nuevo</button>
 
-  <!-- Cargar exactamente los mismos scripts que index.html, en orden -->
-  <script src="js/utils.js"></script>
-  <script src="js/lib/logger.js"></script>
-  <script src="js/lib/eventBus.js"></script>
-  <script src="js/lib/command-bus.js"></script>
-  <script src="js/lib/store.js"></script>
-  <script src="js/lib/deps.js"></script>
-  <script src="js/db-core.js"></script>
-  <script src="js/db-inventario.js"></script>
-  <script src="js/db-fusion.js"></script>
+  <!-- Solo el SDK de Appwrite como script global -->
   <script src="js/appwrite.min.js"></script>
-  <script src="js/db-appwrite.js"></script>
-  <script src="js/db.js"></script>
 
-  <script>
+  <script type="module">
+    import { Logger } from './js/lib/logger.js';
+    import { EventBus } from './js/lib/eventBus.js';
+    import { CommandBus } from './js/lib/command-bus.js';
+    import { Store } from './js/lib/store.js';
+    import { Deps } from './js/lib/deps.js';
+    import { DB } from './js/db.js';
+    import { DBAppwrite } from './js/db-appwrite.js';
+    import { $id, fmtMoney, showToast, calcularTotal, fmtHoraCorta } from './js/utils.js';
+
     (function() {
       var resultsEl = document.getElementById('results');
       var passed = 0, failed = 0;
@@ -52,7 +50,6 @@
       async function runTests() {
         resultsEl.innerHTML = '';
 
-        // 1. Verificar funciones globales de utils.js
         resultsEl.innerHTML += '<h2>1. Utilidades globales</h2>';
         assert(typeof $id === 'function', '$id está definido');
         assert(typeof fmtMoney === 'function', 'fmtMoney está definido');
@@ -60,7 +57,6 @@
         assert(typeof calcularTotal === 'function', 'calcularTotal está definido');
         assert(typeof fmtHoraCorta === 'function', 'fmtHoraCorta está definido');
 
-        // 2. Verificar módulos del núcleo
         resultsEl.innerHTML += '<h2>2. Módulos del núcleo</h2>';
         assert(typeof Logger !== 'undefined', 'Logger existe');
         assert(typeof EventBus !== 'undefined', 'EventBus existe');
@@ -68,16 +64,13 @@
         assert(typeof CommandBus !== 'undefined', 'CommandBus existe');
         assert(typeof Deps !== 'undefined', 'Deps existe');
 
-        // 3. Verificar módulos de base de datos
         resultsEl.innerHTML += '<h2>3. Base de datos</h2>';
         assert(typeof DB !== 'undefined', 'DB existe');
         assert(typeof DBAppwrite !== 'undefined', 'DBAppwrite existe');
 
-        // 4. Verificar que Appwrite SDK está disponible
         resultsEl.innerHTML += '<h2>4. SDK Appwrite</h2>';
-        assert(typeof Appwrite !== 'undefined', 'Appwrite SDK cargado');
+        assert(typeof window.Appwrite !== 'undefined', 'Appwrite SDK cargado');
 
-        // 5. Probar inicialización de Appwrite
         resultsEl.innerHTML += '<h2>5. Inicialización de Appwrite</h2>';
         var appwriteOk = false;
         try {
@@ -87,7 +80,6 @@
           assert(false, 'Error en DBAppwrite.iniciar: ' + e.message);
         }
 
-        // 6. Probar listado de una colección (productos)
         if (appwriteOk) {
           resultsEl.innerHTML += '<h2>6. Lectura de datos desde Appwrite</h2>';
           try {
@@ -98,14 +90,12 @@
           }
         }
 
-        // 7. Simular acciones del Store y verificar que los listeners no fallen
         resultsEl.innerHTML += '<h2>7. Store y listeners</h2>';
         var listenerError = null;
         var testListener = function(state, action) {
           try {
-            // Intentar usar $id para ver si falla
             if (typeof $id === 'function') {
-              $id('results'); // solo para probar que $id funciona
+              $id('results');
             }
           } catch (e) {
             listenerError = e.message;
@@ -123,7 +113,6 @@
           assert(true, 'Store despacha acciones sin errores en listeners');
         }
 
-        // 8. Verificar que EventBus funciona sin errores
         resultsEl.innerHTML += '<h2>8. EventBus</h2>';
         var eventError = null;
         EventBus.on('test:evento', function() {

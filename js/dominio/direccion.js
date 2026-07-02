@@ -1,12 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — DOMINIO JS (ES6)
    Archivo: js/dominio/direccion.js
-   Versión: 1.1.0
+   Versión: 1.1.2
    Propósito: Objeto de Valor Direccion: dirección de entrega inmutable.
-              Migrado a módulo ES6 con export.
-   Dependencias: (ninguna externa)
+              Sin asignaciones window.
    ================================================================ */
-   
+
 export class Direccion {
   constructor(calle, numero = '', depto = '', referencia = '', telefono = '') {
     if (!calle || typeof calle !== 'string' || calle.trim().length === 0) {
@@ -47,12 +46,5 @@ export class Direccion {
 }
 
 export function crearDireccion(calle, numero, depto, referencia, telefono) {
-  try {
-    return new Direccion(calle, numero, depto, referencia, telefono);
-  } catch {
-    return null;
-  }
+  try { return new Direccion(calle, numero, depto, referencia, telefono); } catch { return null; }
 }
-
-window.Direccion = Direccion;
-window.crearDireccion = crearDireccion;

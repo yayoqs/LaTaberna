@@ -1,18 +1,22 @@
 /* ================================================================
-   LaTaberna - PubPOS — UI JS
+   LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/cuenta.js
-   Versión: 1.0.0
+   Versión: 1.0.1
    Propósito: Solicitud de cuenta (pre-cierre) y cambio de estado de mesa.
+              Sin asignaciones window.
    Dependencias: js/auth.js, js/utils.js, js/lib/eventBus.js, js/db.js,
                  js/ui/comanda.js, js/ui/tickets.js
    ================================================================ */
 
+import { Auth } from '../auth.js';
+import { showToast } from '../utils.js';
+import { EventBus } from '../lib/eventBus.js';
+import { DB } from '../db.js';
+import { Comanda } from './comanda.js';
+import { Tickets } from './tickets.js';
+
 const Cuenta = (() => {
 
-  /**
-   * Solicita la cuenta de la mesa activa. Cambia el estado a 'cuenta'
-   * y genera el ticket de pre‑cuenta.
-   */
   function pedirCuenta() {
     const rol = Auth.getRol();
     const rolesPermitidos = ['mesero', 'admin', 'master', 'caja'];
@@ -54,4 +58,4 @@ const Cuenta = (() => {
   return { pedirCuenta };
 })();
 
-window.Cuenta = Cuenta;
+export { Cuenta };

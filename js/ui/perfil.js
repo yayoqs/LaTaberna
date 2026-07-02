@@ -1,13 +1,19 @@
 /* ================================================================
-   LaTaberna - PubPOS — UI JS
+   LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/perfil.js
-   Versión: 1.0.0
+   Versión: 1.0.2
    Propósito: Vista de perfil de usuario: avatar, datos y documentos.
-   Dependencias: js/auth.js, js/db.js (DB.llamar), js/lib/logger.js, js/lib/eventBus.js, js/utils.js (showToast)
+              Sin onclick. Usa addEventListener.
    ================================================================ */
+
+import { Auth } from '../auth.js';
+import { DB } from '../db.js';
+import { Logger } from '../lib/logger.js';
+import { EventBus } from '../lib/eventBus.js';
+import { showToast } from '../utils.js';
+
 const Perfil = (() => {
 
-  /** Clave en localStorage para datos extendidos del usuario */
   function _storageKey(usuario) {
     return `pubpos_perfil_${usuario}`;
   }
@@ -22,8 +28,8 @@ const Perfil = (() => {
       <div class="view-toolbar">
         <h2><i class="fas fa-id-card"></i> Mi Perfil</h2>
         <div class="toolbar-actions">
-          <button class="btn-primary" onclick="Perfil.mostrarModalEditar()"><i class="fas fa-pen"></i> Editar</button>
-          <button class="btn-secondary" onclick="Perfil.render()"><i class="fas fa-sync-alt"></i> Actualizar</button>
+          <button class="btn-primary" id="btnEditarPerfil"><i class="fas fa-pen"></i> Editar</button>
+          <button class="btn-secondary" id="btnActualizarPerfil"><i class="fas fa-sync-alt"></i> Actualizar</button>
         </div>
       </div>
       <div class="perfil-contenido">
@@ -46,9 +52,11 @@ const Perfil = (() => {
     `;
     const referencia = document.getElementById('toastContainer') || document.body.lastChild;
     document.body.insertBefore(main, referencia);
+
+    document.getElementById('btnEditarPerfil').addEventListener('click', mostrarModalEditar);
+    document.getElementById('btnActualizarPerfil').addEventListener('click', render);
   }
 
-  /** Carga y muestra los datos del perfil y los documentos. */
   async function render() {
     _asegurarVista();
 
@@ -109,20 +117,24 @@ const Perfil = (() => {
       modal.style.display = 'none';
       modal.innerHTML = `
         <div class="modal-small" style="max-width:460px;">
-          <div class="modal-header"><h3><i class="fas fa-pen"></i> Editar Perfil</h3><button class="modal-close" onclick="Perfil.cerrarModalEditar()"><i class="fas fa-times"></i></button></div>
+          <div class="modal-header"><h3><i class="fas fa-pen"></i> Editar Perfil</h3><button class="modal-close" id="btnCerrarModalEditar"><i class="fas fa-times"></i></button></div>
           <div class="modal-small-body">
             <label>Nombre</label><input type="text" id="editarPerfilNombre">
             <label>Teléfono</label><input type="text" id="editarPerfilTelefono">
             <label>Email</label><input type="email" id="editarPerfilEmail">
             <label>Foto de perfil (URL)</label><input type="text" id="editarPerfilFoto">
             <div class="modal-small-footer">
-              <button class="btn-secondary" onclick="Perfil.cerrarModalEditar()">Cancelar</button>
-              <button class="btn-primary" onclick="Perfil.guardarPerfil()">Guardar</button>
+              <button class="btn-secondary" id="btnCancelarEditarPerfil">Cancelar</button>
+              <button class="btn-primary" id="btnGuardarPerfil">Guardar</button>
             </div>
           </div>
         </div>
       `;
       document.body.appendChild(modal);
+
+      document.getElementById('btnCerrarModalEditar').addEventListener('click', cerrarModalEditar);
+      document.getElementById('btnCancelarEditarPerfil').addEventListener('click', cerrarModalEditar);
+      document.getElementById('btnGuardarPerfil').addEventListener('click', guardarPerfil);
     }
 
     const usuario = Auth.getUsuarioActual();
@@ -139,7 +151,6 @@ const Perfil = (() => {
     if (modal) modal.style.display = 'none';
   }
 
-  /** Guarda los datos editados del perfil. */
   async function guardarPerfil() {
     const usuario = Auth.getUsuarioActual();
     if (!usuario) { showToast('error', 'No hay sesión activa'); return; }
@@ -195,8 +206,4 @@ const Perfil = (() => {
   return { render, mostrarModalEditar, cerrarModalEditar, guardarPerfil };
 })();
 
-// Compatibilidad global
-window.Perfil = Perfil;
-
-// Exportar como módulo ES6
-export default Perfil;
+export { Perfil };

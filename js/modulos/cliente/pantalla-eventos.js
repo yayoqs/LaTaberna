@@ -1,10 +1,15 @@
 /* ================================================================
-   LaTaberna - PubPOS — Módulo
+   LaTaberna - PubPOS — Módulo (ES6)
    Archivo: js/modulos/cliente/pantalla-eventos.js
-   Versión: 1.0.3
+   Versión: 1.0.5
    Propósito: Pantalla de eventos en vivo con votación real y botón de retorno.
-   Dependencias: Store, EventBus, DBAppwrite, App
+              Sin dependencia de App global.
    ================================================================ */
+
+import { Store } from '../../lib/store.js';
+import { EventBus } from '../../lib/eventBus.js';
+import { DBAppwrite } from '../../db-appwrite.js';
+import { showToast } from '../../utils.js';
 
 const PantallaEventos = (() => {
   let _vista = null;
@@ -18,11 +23,9 @@ const PantallaEventos = (() => {
     _vista.className = 'view';
     _vista.innerHTML = `
       <div class="eventos-fondo" id="eventosFondo"></div>
-
       <button class="btn-volver" id="btnVolverEventos" style="position:absolute; top:10px; left:10px; z-index:10; background:transparent; border:none; color:var(--color-text-sec); font-size:1.3rem; cursor:pointer; transition: color 0.2s;" title="Volver a la bienvenida">
         <i class="fas fa-arrow-left"></i>
       </button>
-
       <header class="eventos-header">
         <h1 id="eventosTitulo">🎉 Eventos en Vivo</h1>
         <p class="eventos-sub" id="eventosSub">Conectate a la energía de La Taberna</p>
@@ -30,17 +33,13 @@ const PantallaEventos = (() => {
           <span class="eventos-punto"></span> En vivo
         </div>
       </header>
-
-      <section class="eventos-contenido" id="eventosContenido">
-      </section>
+      <section class="eventos-contenido" id="eventosContenido"></section>
     `;
 
     document.body.appendChild(_vista);
 
     document.getElementById('btnVolverEventos').addEventListener('click', () => {
-      if (typeof window.App !== 'undefined' && typeof window.App.showView === 'function') {
-        window.App.showView('bienvenida');
-      }
+      EventBus.emit('app:cambiarVista', 'bienvenida');
     });
 
     _initRealtime();
@@ -50,7 +49,6 @@ const PantallaEventos = (() => {
   function mostrar() {
     const viewEventos = document.getElementById('view-eventos');
     if (viewEventos) viewEventos.classList.remove('active');
-
     if (_vista) {
       _vista.classList.add('active');
       _renderizarEvento();
@@ -68,9 +66,8 @@ const PantallaEventos = (() => {
     if (!container) return;
 
     container.classList.add('fade-out');
-
     setTimeout(() => {
-      const state = window.Store?.getState?.() || {};
+      const state = Store.getState();
       const eventos = state.eventos_en_vivo || [];
       const activo = eventos.find(e => e.estado === 'activo');
 
@@ -79,7 +76,6 @@ const PantallaEventos = (() => {
       } else {
         _mostrarEventoActivo(container, badge, sub, activo);
       }
-
       container.classList.remove('fade-out');
     }, 350);
   }
@@ -87,16 +83,13 @@ const PantallaEventos = (() => {
   function _mostrarSinEvento(container, badge, sub) {
     if (badge) badge.style.display = 'none';
     if (sub) sub.textContent = 'Próximo evento a las 22:00 hrs';
-
     container.innerHTML = `
       <div class="eventos-card">
         <div class="eventos-vacio">
           <i class="fa-solid fa-calendar-alt"></i>
           <h2>No hay eventos activos ahora</h2>
           <p>Volvé más tarde o consultá el cronograma en la barra.</p>
-          <div class="ecualizador inactivo">
-            <span></span><span></span><span></span><span></span><span></span>
-          </div>
+          <div class="ecualizador inactivo"><span></span><span></span><span></span><span></span><span></span></div>
         </div>
       </div>
     `;
@@ -111,13 +104,9 @@ const PantallaEventos = (() => {
     const descripcion = evento.descripcion || '';
     let contenidoExtra = '';
 
-    if (tipo === 'bingo') {
-      contenidoExtra = _renderBingo(evento);
-    } else if (tipo === 'karaoke') {
-      contenidoExtra = _renderKaraoke(evento);
-    } else if (tipo === 'votacion') {
-      contenidoExtra = _renderVotacion(evento);
-    }
+    if (tipo === 'bingo') contenidoExtra = _renderBingo(evento);
+    else if (tipo === 'karaoke') contenidoExtra = _renderKaraoke(evento);
+    else if (tipo === 'votacion') contenidoExtra = _renderVotacion(evento);
 
     container.innerHTML = `
       <div class="eventos-card">
@@ -128,9 +117,7 @@ const PantallaEventos = (() => {
       </div>
     `;
 
-    if (tipo === 'votacion') {
-      _configurarVotacion(evento);
-    }
+    if (tipo === 'votacion') _configurarVotacion(evento);
   }
 
   function _renderBingo(evento) {
@@ -138,38 +125,23 @@ const PantallaEventos = (() => {
     const ultimo = numeros.length ? numeros[numeros.length - 1] : '—';
     return `
       <div class="eventos-bingo">
-        <div class="bingo-ultimo">
-          <span>Último número</span>
-          <strong>${ultimo}</strong>
-        </div>
-        <div class="bingo-historial">
-          ${numeros.slice(-10).reverse().map(n => `<span class="bingo-numero">${n}</span>`).join('')}
-        </div>
+        <div class="bingo-ultimo"><span>Último número</span><strong>${ultimo}</strong></div>
+        <div class="bingo-historial">${numeros.slice(-10).reverse().map(n => `<span class="bingo-numero">${n}</span>`).join('')}</div>
       </div>
     `;
   }
 
   function _renderKaraoke(evento) {
     const letra = evento.letra || 'Esperando la próxima canción...';
-    return `
-      <div class="eventos-karaoke">
-        <p class="karaoke-letra">${letra}</p>
-      </div>
-    `;
+    return `<div class="eventos-karaoke"><p class="karaoke-letra">${letra}</p></div>`;
   }
 
   function _renderVotacion(evento) {
     const opciones = evento.opciones || [];
-    if (!opciones.length) {
-      return '<p class="eventos-descripcion">Esperando opciones de votación...</p>';
-    }
+    if (!opciones.length) return '<p class="eventos-descripcion">Esperando opciones de votación...</p>';
     return `
       <div class="eventos-votacion" id="votacionOpciones">
-        ${opciones.map((op, i) => `
-          <button class="votacion-opcion" data-indice="${i}" data-valor="${op.nombre || op}">
-            ${op.nombre || op}
-          </button>
-        `).join('')}
+        ${opciones.map((op, i) => `<button class="votacion-opcion" data-indice="${i}" data-valor="${op.nombre || op}">${op.nombre || op}</button>`).join('')}
       </div>
     `;
   }
@@ -178,46 +150,35 @@ const PantallaEventos = (() => {
     const opciones = evento.opciones || [];
     const botones = document.querySelectorAll('.votacion-opcion');
     const idEvento = evento.id;
-    
+
     botones.forEach(btn => {
       btn.addEventListener('click', async () => {
         const valor = btn.dataset.valor;
-        
-        // Feedback visual inmediato
         botones.forEach(b => b.classList.remove('seleccionada'));
         btn.classList.add('seleccionada');
         _votoSeleccionado = { indice: btn.dataset.indice, valor };
-        
-        // Obtener el documento actual desde el Store
-        const state = window.Store?.getState?.() || {};
+
+        const state = Store.getState();
         const eventos = state.eventos_en_vivo || [];
         const eventoActual = eventos.find(e => e.id === idEvento);
-        
+
         if (!eventoActual) {
-          _mostrarToast('error', 'No se encontró el evento. Reintentá.');
+          showToast('error', 'No se encontró el evento. Reintentá.');
           btn.classList.remove('seleccionada');
           return;
         }
-        
-        // Construir resultados incrementando localmente
+
         const resultados = { ...(eventoActual.resultados || {}) };
         resultados[valor] = (resultados[valor] || 0) + 1;
-        
+
         try {
-          const actualizado = await window.DBAppwrite?.actualizar?.('eventos_en_vivo', idEvento, {
-            datos: { resultados }
-          });
-          
-          if (!actualizado) {
-            throw new Error('No se pudo actualizar');
-          }
-          
-          _mostrarToast('success', `Votaste por "${valor}". ¡Gracias por participar!`);
+          const actualizado = await DBAppwrite.actualizar('eventos_en_vivo', idEvento, { datos: { resultados } });
+          if (!actualizado) throw new Error('No se pudo actualizar');
+          showToast('success', `Votaste por "${valor}". ¡Gracias por participar!`);
         } catch (e) {
-          // Revertir feedback visual
           btn.classList.remove('seleccionada');
           _votoSeleccionado = null;
-          _mostrarToast('error', 'Error al enviar tu voto. Intentá de nuevo.');
+          showToast('error', 'Error al enviar tu voto. Intentá de nuevo.');
           console.error('[PantallaEventos] Error al votar:', e);
         }
       });
@@ -233,24 +194,10 @@ const PantallaEventos = (() => {
     }
   }
 
-  function _mostrarToast(tipo, mensaje) {
-    const contenedor = document.getElementById('toastContainer');
-    if (!contenedor) return;
-    const toast = document.createElement('div');
-    toast.className = `toast ${tipo}`;
-    toast.innerHTML = `<i class="fas fa-${tipo === 'success' ? 'check-circle' : tipo === 'error' ? 'exclamation-circle' : 'info-circle'}"></i> ${mensaje}`;
-    contenedor.appendChild(toast);
-    setTimeout(() => toast.remove(), 2500);
-  }
-
   function _initRealtime() {
-    if (typeof window.EventBus !== 'undefined') {
-      window.EventBus.on('eventos_en_vivo:actualizada', () => {
-        if (_vista?.classList.contains('active')) {
-          _renderizarEvento();
-        }
-      });
-    }
+    EventBus.on('eventos_en_vivo:actualizada', () => {
+      if (_vista?.classList.contains('active')) _renderizarEvento();
+    });
   }
 
   return { render, mostrar, ocultar };

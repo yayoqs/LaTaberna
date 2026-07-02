@@ -1,41 +1,60 @@
 /* ================================================================
-   LaTaberna - PubPOS — MÓDULO JS
+   LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/managers/turno-manager.js
-   Versión: 1.0.0
+   Versión: 1.0.4
    Propósito: Cierre de turno, respaldo en Google Drive y reseteo del sistema.
-   Dependencias: js/managers/pedido-manager.js, js/lib/logger.js, js/db.js, js/utils.js (showToast), js/lib/eventBus.js, js/ui/mesas.js, js/ui/kds.js, js/ui/caja.js, js/ui/reparto.js, js/db-core.js (mesaVacia)
+              Comunicación con PedidoManager vía EventBus/Store.
    ================================================================ */
-const TurnoManager = (() => {
 
-  /**
-   * Cierra el turno actual, guarda respaldo en Drive y resetea el sistema.
-   * @returns {Promise<{exito: boolean, mensaje: string, urlArchivo?: string}>}
-   */
+import { EventBus } from '../lib/eventBus.js';
+import { Logger } from '../lib/logger.js';
+import { DB } from '../db.js';
+import { showToast } from '../utils.js';
+import { mesaVacia } from '../db-core.js';
+import { Mesas } from '../ui/mesas.js';
+import { KDS } from '../ui/kds.js';
+import { Caja } from '../ui/caja.js';
+import { Reparto } from '../ui/reparto.js';
+
+export const TurnoManager = (() => {
+
+  function _getTurnoActual() {
+    const raw = localStorage.getItem('pubpos_turno_actual');
+    if (!raw) return null;
+    try { return JSON.parse(raw); } catch { return null; }
+  }
+
+  function _getAuditLog(turnoId) {
+    const raw = localStorage.getItem('pubpos_audit_' + turnoId);
+    if (!raw) return [];
+    try { return JSON.parse(raw); } catch { return []; }
+  }
+
   async function cerrarTurno() {
-    if (typeof PedidoManager === 'undefined' || !PedidoManager.getTurnoActual) {
-      return { exito: false, mensaje: 'Sistema de turnos no disponible.' };
-    }
-    const turno = PedidoManager.getTurnoActual();
+    const turno = _getTurnoActual();
     if (!turno || turno.estado !== 'abierto') {
+      Logger.warn('[TurnoManager] No hay un turno abierto para cerrar.');
       return { exito: false, mensaje: 'No hay un turno abierto para cerrar.' };
     }
+
+    const auditLog = _getAuditLog(turno.id);
 
     const datosTurno = {
       turnoId: turno.id,
       inicio: turno.inicio,
       cierre: new Date().toISOString(),
-      pedidos: (typeof DB !== 'undefined' && DB.pedidos) ? DB.pedidos : [],
-      pedidosDelivery: (typeof DB !== 'undefined' && DB.pedidosDelivery) ? DB.pedidosDelivery : [],
-      auditLog: (typeof PedidoManager.getAuditLog === 'function') ? PedidoManager.getAuditLog() : [],
-      mesas: (typeof DB !== 'undefined' && DB.mesas) ? DB.mesas.filter(m => m.estado !== 'libre') : [],
-      syncQueue: (typeof DB !== 'undefined' && DB.syncQueue) ? DB.syncQueue : []
+      pedidos: DB.pedidos || [],
+      pedidosDelivery: DB.pedidosDelivery || [],
+      auditLog: auditLog,
+      mesas: DB.mesas ? DB.mesas.filter(m => m.estado !== 'libre') : [],
+      syncQueue: DB.syncQueue || []
     };
 
     Logger.info(`[TurnoManager] Cerrando turno ${turno.id}...`);
 
     let urlArchivo = null;
     try {
-      if (typeof DB !== 'undefined' && typeof DB.llamar === 'function') {
+      if (DB.llamar) {
         showToast('info', '<i class="fas fa-cloud-upload-alt fa-spin"></i> Subiendo cierre de turno...');
         const respuesta = await DB.llamar('guardarCierreTurno', {
           turnoId: turno.id,
@@ -60,17 +79,16 @@ const TurnoManager = (() => {
     }
 
     try {
-      _resetearLocalStorage();
+      _resetearLocalStorage(turno);
       Logger.info('[TurnoManager] Sistema local reseteado.');
     } catch (e) {
       Logger.error('[TurnoManager] Error al resetear:', e);
       return { exito: false, mensaje: 'El archivo se subió, pero hubo un error al resetear el sistema local.' };
     }
 
-    if (typeof PedidoManager.init === 'function') {
-      const nuevoTurno = PedidoManager.init();
-      Logger.info(`[TurnoManager] Nuevo turno iniciado: ${nuevoTurno.id}`);
-    }
+    localStorage.setItem('pubpos_turno_actual', JSON.stringify({ ...turno, estado: 'cerrado' }));
+
+    EventBus.emit('turno:cerrado', { timestamp: new Date().toISOString() });
 
     return {
       exito: true,
@@ -79,8 +97,8 @@ const TurnoManager = (() => {
     };
   }
 
-  function _resetearLocalStorage() {
-    if (typeof DB !== 'undefined' && DB.mesas) {
+  function _resetearLocalStorage(turno) {
+    if (DB.mesas) {
       DB.mesas.forEach(m => {
         if (!m.esVirtual) {
           const idx = DB.mesas.findIndex(x => x.numero === m.numero);
@@ -91,59 +109,49 @@ const TurnoManager = (() => {
       DB.saveMesas();
     }
 
-    if (typeof DB !== 'undefined' && DB.pedidos) {
+    if (DB.pedidos) {
       DB.pedidos = [];
       DB.savePedidos();
     }
 
-    if (typeof DB !== 'undefined' && DB.pedidosDelivery) {
+    if (DB.pedidosDelivery) {
       DB.pedidosDelivery = [];
       DB.savePedidosDelivery();
     }
 
-    if (typeof DB !== 'undefined' && DB.comandas) {
+    if (DB.comandas) {
       DB.comandas = [];
       DB.saveComandas();
     }
 
-    if (typeof DB !== 'undefined' && DB.syncQueue) {
+    if (DB.syncQueue) {
       DB.syncQueue = [];
       if (typeof DB._saveSyncQueue === 'function') {
         DB._saveSyncQueue();
       }
     }
 
-    const turno = PedidoManager.getTurnoActual();
-    if (turno) {
-      localStorage.removeItem('pubpos_audit_' + turno.id);
-    }
+    localStorage.removeItem('pubpos_audit_' + turno.id);
 
-    localStorage.setItem('pubpos_turno_actual', JSON.stringify({ ...turno, estado: 'cerrado' }));
-
-    if (window.Mesas) Mesas.render();
-    if (window.KDS) KDS.refresh();
-    if (window.Caja) Caja.render();
-    if (window.Reparto) Reparto.render();
-
-    EventBus.emit('turno:cerrado', { timestamp: new Date().toISOString() });
+    if (Mesas && Mesas.render) Mesas.render();
+    if (KDS && KDS.refresh) KDS.refresh();
+    if (Caja && Caja.render) Caja.render();
+    if (Reparto && Reparto.render) Reparto.render();
   }
 
-  /**
-   * Devuelve el estado del turno actual sin modificarlo.
-   * @returns {object|null}
-   */
   function obtenerEstado() {
-    if (typeof PedidoManager !== 'undefined' && PedidoManager.getTurnoActual) {
-      return PedidoManager.getTurnoActual();
-    }
-    const raw = localStorage.getItem('pubpos_turno_actual');
-    return raw ? JSON.parse(raw) : null;
+    return _getTurnoActual();
   }
+
+  EventBus.on('turno:solicitar_cierre', async () => {
+    const resultado = await cerrarTurno();
+    if (resultado.exito) {
+      EventBus.emit('turno:cerrado', { timestamp: new Date().toISOString() });
+    }
+  });
 
   return {
     cerrarTurno,
     obtenerEstado
   };
 })();
-
-window.TurnoManager = TurnoManager;

@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test Automatizado — Célula B3</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #1a1a2e; color: #eee; padding: 20px; }
+    h1 { color: #f5a623; margin-bottom: 10px; }
+    .toolbar { display: flex; gap: 12px; align-items: center; margin-bottom: 20px; }
+    button { background: #0f3460; color: #eee; border: 1px solid #e2c044; padding: 10px 20px; border-radius: 4px; cursor: pointer; font-size: 14px; }
+    button:hover { background: #1a508b; }
+    button.primary { background: #2e7d32; border-color: #4caf50; }
+    .results { width: 100%; border-collapse: collapse; margin-top: 16px; }
+    .results th { background: #16213e; padding: 10px; text-align: left; font-size: 12px; text-transform: uppercase; color: #aaa; }
+    .results td { padding: 10px; border-bottom: 1px solid #333; font-size: 13px; }
+    .pass { color: #4caf50; font-weight: bold; }
+    .fail { color: #e53935; font-weight: bold; }
+    .log-panel { background: #0d1117; border-radius: 4px; padding: 10px; height: 250px; overflow-y: auto; font-family: monospace; font-size: 12px; white-space: pre-wrap; margin-top: 16px; }
+    .ticket-preview { background: #fff; color: #000; font-family: monospace; font-size: 11px; padding: 10px; margin-top: 8px; border-radius: 4px; max-height: 300px; overflow-y: auto; white-space: pre-wrap; display: none; }
+    .toast-container { position: fixed; top: 10px; right: 10px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+    .toast { padding: 10px 16px; border-radius: 6px; font-size: 13px; animation: slideIn 0.3s; }
+    .toast.success { background: #2e7d32; }
+    .toast.error { background: #b71c1c; }
+    .toast.warning { background: #e65100; }
+    .toast.info { background: #1565c0; }
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  </style>
+</head>
+<body>
+
+<h1>🧪 Test Automatizado — Célula B3 (Caja)</h1>
+
+<div class="toolbar">
+  <button class="primary" id="btnEjecutarTests">▶ Ejecutar todos los tests</button>
+  <span id="estadoTest" style="font-size:13px; color:#aaa;">Cargando módulos...</span>
+</div>
+
+<table class="results">
+  <thead><tr><th>#</th><th>Caso</th><th>Resultado</th><th>Detalle</th></tr></thead>
+  <tbody id="resultadosBody"></tbody>
+</table>
+
+<div style="margin-top:16px;">
+  <strong>Vista previa del último ticket:</strong>
+  <div class="ticket-preview" id="ticketPreview"></div>
+</div>
+
+<div class="log-panel" id="logPanel"></div>
+<div class="toast-container" id="toastContainer"></div>
+
+<script type="module">
+  import { DB } from './js/db.js';
+  import { Store } from './js/lib/store.js';
+  import { Deps } from './js/lib/deps.js';
+  import { CommandBus } from './js/lib/command-bus.js';
+  import { Comanda } from './js/ui/comanda.js';
+  import { Cobro } from './js/ui/cobro.js';
+  import { Tickets } from './js/ui/tickets.js';
+  import { TurnoManager } from './js/managers/turno-manager.js';
+  import { PedidoManager } from './js/managers/pedido-manager.js';
+  import { PedidoService } from './js/servicios/pedido-service.js';
+  import { PedidoRepositoryLocal } from './js/repositorios/pedido-repository.js';
+  import { Auth, inicializarAuth } from './js/auth.js';
+  import { fmtMoney } from './js/utils.js';
+
+  function log(canal, msg) {
+    const panel = document.getElementById('logPanel');
+    if (!panel) return;
+    const hora = new Date().toLocaleTimeString('es-CL');
+    panel.innerHTML += `[${hora}] [${canal}] ${msg}\n`;
+    panel.scrollTop = panel.scrollHeight;
+  }
+
+  function esperar(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  function esperarElemento(selector, timeout = 3000) {
+    return new Promise((resolve, reject) => {
+      const start = Date.now();
+      const check = () => {
+        const el = document.querySelector(selector);
+        if (el) return resolve(el);
+        if (Date.now() - start > timeout) return reject(new Error(`Timeout esperando ${selector}`));
+        setTimeout(check, 100);
+      };
+      check();
+    });
+  }
+
+  function esperarCondicion(fn, timeout = 5000) {
+    return new Promise((resolve, reject) => {
+      const start = Date.now();
+      const check = () => {
+        try { if (fn()) return resolve(); } catch {}
+        if (Date.now() - start > timeout) return reject(new Error('Timeout esperando condición'));
+        setTimeout(check, 100);
+      };
+      check();
+    });
+  }
+
+  const resultados = [];
+  function agregarResultado(caso, paso, exito, detalle) {
+    resultados.push({ caso, paso, exito, detalle });
+    const body = document.getElementById('resultadosBody');
+    body.innerHTML = resultados.map((r, i) => `
+      <tr>
+        <td>${i + 1}</td>
+        <td>${r.caso}</td>
+        <td class="${r.exito ? 'pass' : 'fail'}">${r.exito ? '✅ PASÓ' : '❌ FALLÓ'}</td>
+        <td>${r.detalle}</td>
+      </tr>
+    `).join('');
+    const pasados = resultados.filter(r => r.exito).length;
+    const fallidos = resultados.filter(r => !r.exito).length;
+    document.getElementById('estadoTest').textContent = `${pasados} pasaron, ${fallidos} fallaron de ${resultados.length}`;
+  }
+
+  function assert(condicion, mensaje) { if (!condicion) throw new Error(mensaje); }
+  function assertEqual(real, esperado, mensaje) {
+    if (real !== esperado) throw new Error(`${mensaje}. Esperado: ${esperado}, Real: ${real}`);
+  }
+
+  // ── Inicialización ────────────────────────────────────────
+  DB.mesas.length = 0;
+  DB.pedidos.length = 0;
+  DB.comandas = [];
+  DB.pedidosDelivery = [];
+  DB.syncQueue = [];
+
+  await inicializarAuth();
+  await Auth.login('caja', 'caja');
+  log('TEST', 'Sesión cajero iniciada.');
+
+  PedidoService.configurar(PedidoRepositoryLocal);
+  Deps.registrar('pedidoService', PedidoService);
+  PedidoManager.init({ pedidoRepo: PedidoRepositoryLocal });
+
+  CommandBus.registrar('liberarMesa', async (cmd) => {
+    return await PedidoRepositoryLocal.liberarMesa(cmd.datos.numeroMesa);
+  });
+
+  function limpiarModales() {
+    document.querySelectorAll('.modal-overlay').forEach(m => { m.style.display = 'none'; m.remove(); });
+    document.querySelectorAll('[id^="ticket-modal-"]').forEach(m => m.remove());
+    document.querySelectorAll('[id^="ticket-dual-"]').forEach(m => m.remove());
+  }
+
+  function obtenerMesa(num) { return DB.mesas.find(m => m.numero === num); }
+  function obtenerPedido(id) { return DB.pedidos.find(p => p.id === id); }
+
+  // ── Función auxiliar para mantener sincronizados DB.pedidos y Store ──
+  function actualizarPedidoEnDB(id, cambios) {
+    const idx = DB.pedidos.findIndex(p => p.id === id);
+    if (idx >= 0) {
+      // Si se pasan items como array, mantenerlos como array (el repositorio ya serializa al sincronizar)
+      if (cambios.items && Array.isArray(cambios.items)) {
+        cambios.items = cambios.items; // mantener array
+      }
+      Object.assign(DB.pedidos[idx], cambios);
+    }
+    Store.dispatch({ type: 'PEDIDO_ACTUALIZADO', payload: { id, cambios } });
+  }
+
+  // Asegurar que los pedidos recién creados tengan items como array en DB.pedidos
+  function normalizarItemsPedido(pedido) {
+    if (typeof pedido.items === 'string') {
+      try { pedido.items = JSON.parse(pedido.items); } catch { pedido.items = []; }
+    }
+  }
+
+  document.getElementById('estadoTest').textContent = 'Listo. Presiona "Ejecutar todos los tests".';
+
+  document.getElementById('btnEjecutarTests').addEventListener('click', async () => {
+    resultados.length = 0;
+    document.getElementById('resultadosBody').innerHTML = '';
+    document.getElementById('logPanel').innerHTML = '';
+
+    try {
+      DB.mesas.length = 0;
+      DB.pedidos.length = 0;
+      DB.mesas.push({
+        numero: 5, estado: 'libre', pedidoId: '', items: [], mozo: '', comensales: 1,
+        abiertaEn: null, observaciones: '', zona: 'salon', mesasFusionadas: [], esVirtual: false
+      });
+      Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: [...DB.mesas] });
+      Store.dispatch({ type: 'PEDIDOS_INICIALIZAR', payload: [] });
+      limpiarModales();
+
+      // ═══ Caso 1: Apertura ═══
+      log('TEST', '═══ INICIO: Caso 1 — Apertura ═══');
+      let pedido = await PedidoRepositoryLocal.abrirMesa(5, 'Mozo Test', 3);
+      normalizarItemsPedido(pedido); // Asegurar que items sea array
+      let mesa5 = obtenerMesa(5);
+      try {
+        assertEqual(mesa5.estado, 'ocupada', 'Mesa ocupada');
+        assert(pedido.id, 'Pedido con id');
+        agregarResultado('Caso 1 — Apertura', 'Abrir mesa', true, `Pedido: ${pedido.id}`);
+      } catch (e) { agregarResultado('Caso 1 — Apertura', 'Abrir mesa', false, e.message); }
+
+      // ═══ Caso 2: Pago único ═══
+      log('TEST', '═══ INICIO: Caso 2 — Pago único ═══');
+      const itemsCaso2 = [
+        { nombre: 'Cerveza', precio: 3500, qty: 2, persona: 'General' },
+        { nombre: 'Pizza', precio: 8900, qty: 1, persona: 'General' }
+      ];
+      mesa5.items = itemsCaso2;
+      mesa5.total = 15900;
+      // Actualizar directamente DB.pedidos con items como array
+      actualizarPedidoEnDB(pedido.id, { items: itemsCaso2, total: 15900, comensales: 3 });
+      await esperar(100);
+
+      Comanda.setMesaActiva(mesa5);
+      Cobro.abrirModalCierre(mesa5);
+      try {
+        await esperarElemento('#cierreDescuento');
+        const descuentoInput = document.getElementById('cierreDescuento');
+        descuentoInput.value = 10;
+        descuentoInput.dispatchEvent(new Event('input'));
+        await esperar(100);
+        await Cobro.confirmarCierre();
+        await esperar(800);
+
+        const toastError = document.querySelector('.toast.error');
+        if (toastError) throw new Error(`Toast de error: ${toastError.textContent.trim()}`);
+
+        await esperarCondicion(() => {
+          const p = obtenerPedido(pedido.id);
+          return p && p.estado === 'cerrada';
+        }, 4000);
+
+        pedido = obtenerPedido(pedido.id);
+        normalizarItemsPedido(pedido);
+        mesa5 = obtenerMesa(5);
+        assertEqual(pedido.estado, 'cerrada', 'Pedido cerrado');
+        assertEqual(mesa5.estado, 'pagada', 'Mesa pagada');
+        agregarResultado('Caso 2 — Pago único', 'Cierre 10% desc', true, `Total: ${fmtMoney(pedido.total)}`);
+      } catch (e) { agregarResultado('Caso 2 — Pago único', 'Cierre 10% desc', false, e.message); }
+
+      limpiarModales();
+      mesa5 = obtenerMesa(5);
+
+      // ═══ Caso 3: Liberación ═══
+      log('TEST', '═══ INICIO: Caso 3 — Liberación ═══');
+      try {
+        const res = await CommandBus.ejecutar({ type: 'liberarMesa', datos: { numeroMesa: 5 } });
+        assert(res.exito, 'Liberación exitosa');
+        mesa5 = obtenerMesa(5);
+        assertEqual(mesa5.estado, 'libre', 'Mesa libre');
+        agregarResultado('Caso 3 — Liberación', 'Liberar mesa', true, 'OK');
+      } catch (e) { agregarResultado('Caso 3 — Liberación', 'Liberar mesa', false, e.message); }
+
+      limpiarModales();
+
+      // ═══ Caso 4: Split Bill ═══
+      log('TEST', '═══ INICIO: Caso 4 — Split Bill ═══');
+      pedido = await PedidoRepositoryLocal.abrirMesa(5, 'Mozo Test', 3);
+      normalizarItemsPedido(pedido);
+      mesa5 = obtenerMesa(5);
+      const itemsSplit = [
+        { nombre: 'Cerveza', precio: 3500, qty: 2, persona: 'Juan' },
+        { nombre: 'Pizza', precio: 8900, qty: 1, persona: 'Juan' },
+        { nombre: 'Cerveza', precio: 3500, qty: 1, persona: 'María' },
+        { nombre: 'Empanadas', precio: 4500, qty: 1, persona: 'María' },
+        { nombre: 'Mojito', precio: 5200, qty: 1, persona: 'Pedro' },
+        { nombre: 'Papas', precio: 3800, qty: 1, persona: 'Pedro' }
+      ];
+      mesa5.items = itemsSplit;
+      mesa5.total = 32900;
+      actualizarPedidoEnDB(pedido.id, { items: itemsSplit, total: 32900, comensales: 3 });
+      await esperar(100);
+
+      Comanda.setMesaActiva(mesa5);
+      Cobro.abrirModalCierre(mesa5);
+      try {
+        await esperarElemento('.btn-cobrar-persona[data-persona="Juan"]', 4000);
+        agregarResultado('Caso 4 — Split Bill', 'Split habilitado', true, '3 personas');
+      } catch (e) { agregarResultado('Caso 4 — Split Bill', 'Split habilitado', false, e.message); }
+
+      try {
+        const btnJuan = document.querySelector('.btn-cobrar-persona[data-persona="Juan"]');
+        assert(btnJuan, 'Botón Juan');
+        btnJuan.click();
+        await esperarCondicion(() => {
+          const p = obtenerPedido(pedido.id);
+          return (p?.transacciones || []).some(t => t.persona === 'Juan');
+        }, 4000);
+        agregarResultado('Caso 4 — Split Bill', 'Cobrar a Juan', true, 'OK');
+      } catch (e) { agregarResultado('Caso 4 — Split Bill', 'Cobrar a Juan', false, e.message); }
+
+      try {
+        const btnMaria = document.querySelector('.btn-cobrar-persona[data-persona="María"]');
+        assert(btnMaria, 'Botón María');
+        btnMaria.click();
+        await esperar(500);
+        agregarResultado('Caso 4 — Split Bill', 'Cobrar a María', true, 'OK');
+      } catch (e) { agregarResultado('Caso 4 — Split Bill', 'Cobrar a María', false, e.message); }
+
+      try {
+        const btnPedro = document.querySelector('.btn-cobrar-persona[data-persona="Pedro"]');
+        assert(btnPedro, 'Botón Pedro');
+        btnPedro.click();
+        await esperarCondicion(() => {
+          const p = obtenerPedido(pedido.id);
+          return p && p.estado === 'cerrada';
+        }, 4000);
+        mesa5 = obtenerMesa(5);
+        pedido = obtenerPedido(pedido.id);
+        normalizarItemsPedido(pedido);
+        assertEqual(pedido.estado, 'cerrada', 'Pedido cerrado');
+        assertEqual(mesa5.estado, 'pagada', 'Mesa pagada');
+        agregarResultado('Caso 4 — Split Bill', 'Cierre automático', true, 'Completado');
+      } catch (e) { agregarResultado('Caso 4 — Split Bill', 'Cierre automático', false, e.message); }
+
+      limpiarModales();
+
+      try {
+        const res = await CommandBus.ejecutar({ type: 'liberarMesa', datos: { numeroMesa: 5 } });
+        assert(res.exito, 'Liberación exitosa');
+        mesa5 = obtenerMesa(5);
+        assertEqual(mesa5.estado, 'libre', 'Mesa libre');
+        agregarResultado('Caso 4 — Split Bill', 'Liberar post split', true, 'OK');
+      } catch (e) { agregarResultado('Caso 4 — Split Bill', 'Liberar post split', false, e.message); }
+
+      // ═══ Caso 5: Cierre de turno ═══
+      log('TEST', '═══ INICIO: Caso 5 — Cierre de turno ═══');
+      try {
+        const res = await TurnoManager.cerrarTurno();
+        assert(res.exito, 'Cierre exitoso');
+        agregarResultado('Caso 5 — Cierre de turno', 'Cerrar turno', true, res.mensaje);
+      } catch (e) { agregarResultado('Caso 5 — Cierre de turno', 'Cerrar turno', false, e.message); }
+
+    } catch (e) {
+      log('TEST', '❌ Error global: ' + e.message);
+    }
+  });
+</script>
+</body>
+</html>

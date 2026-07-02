@@ -1,10 +1,17 @@
 /* ================================================================
-   LaTaberna - PubPOS — MÓDULO JS
+   LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-appwrite.js
-   Versión: 1.0.0
+   Versión: 1.0.5
    Propósito: Cliente de Appwrite (API TablesDB), Realtime y operadores.
+              Soporte para Row Security (permisos por fila),
+              operadores atómicos y transacciones.
+              Incluye imports de Logger, EventBus.
    ================================================================ */
-var DBAppwrite = (function() {
+
+import { Logger } from './lib/logger.js';
+import { EventBus } from './lib/eventBus.js';
+
+export const DBAppwrite = (function() {
   var modulo = {};
 
   modulo.cliente = null;
@@ -35,7 +42,6 @@ var DBAppwrite = (function() {
    */
   function _limpiarFila(fila) {
     var datos = Object.assign({}, fila);
-    // Extraer timestamps antes de borrar las claves $
     var creado = datos.$createdAt || null;
     var actualizado = datos.$updatedAt || null;
 
@@ -68,7 +74,6 @@ var DBAppwrite = (function() {
         .setEndpoint(endpoint)
         .setProject(projectId);
 
-      // Crear sesión anónima
       modulo.cuenta = new Appwrite.Account(modulo.cliente);
       try {
         await modulo.cuenta.createAnonymousSession();
@@ -77,7 +82,6 @@ var DBAppwrite = (function() {
         Logger.info('[Appwrite] Usando sesión anónima existente.');
       }
 
-      // Usar la nueva API TablesDB
       modulo.baseDeDatos = new Appwrite.TablesDB(modulo.cliente);
       modulo.habilitado = true;
       Logger.info('[Appwrite] Cliente inicializado (API TablesDB).');
@@ -103,24 +107,41 @@ var DBAppwrite = (function() {
     }
   };
 
-  modulo.crear = async function(coleccion, idFila, datos) {
+  /**
+   * Crea una fila en una colección.
+   * @param {string} coleccion - Clave de la colección en COLECCIONES.
+   * @param {string} idFila - ID único o 'unique()' para autogenerado.
+   * @param {object} datos - Datos de la fila.
+   * @param {string[]} [permisos] - Array opcional de permisos para Row Security.
+   * @param {string} [idTransaccion] - ID opcional de transacción.
+   * @returns {object|null} Fila creada o null si falla.
+   */
+  modulo.crear = async function(coleccion, idFila, datos, permisos, idTransaccion) {
     if (!modulo.habilitado || !modulo.baseDeDatos) return null;
     try {
       var id = idFila || Appwrite.ID.unique();
       var datosLimpios = Object.assign({}, datos);
       delete datosLimpios.id;
-      // Eliminar timestamps manuales si vienen (usaremos los automáticos)
       delete datosLimpios.creadoEn;
       delete datosLimpios.actualizadoEn;
       delete datosLimpios.created_at;
       delete datosLimpios.updated_at;
 
-      var respuesta = await modulo.baseDeDatos.createRow({
+      var params = {
         databaseId: modulo.idBaseDeDatos,
         tableId: modulo.COLECCIONES[coleccion],
         rowId: id,
         data: datosLimpios
-      });
+      };
+
+      if (permisos && Array.isArray(permisos) && permisos.length > 0) {
+        params.permissions = permisos;
+      }
+      if (idTransaccion) {
+        params.transactionId = idTransaccion;
+      }
+
+      var respuesta = await modulo.baseDeDatos.createRow(params);
       return _limpiarFila(respuesta);
     } catch (e) {
       if (e.code !== 409) {
@@ -130,10 +151,17 @@ var DBAppwrite = (function() {
     }
   };
 
-  modulo.actualizar = async function(coleccion, id, cambios) {
+  /**
+   * Actualiza una fila existente.
+   * @param {string} coleccion - Clave de la colección.
+   * @param {string} id - ID de la fila a actualizar.
+   * @param {object} cambios - Campos a modificar.
+   * @param {string} [idTransaccion] - ID opcional de transacción.
+   * @returns {object|null} Fila actualizada o null si falla.
+   */
+  modulo.actualizar = async function(coleccion, id, cambios, idTransaccion) {
     if (!modulo.habilitado || !modulo.baseDeDatos) return null;
     try {
-      // Eliminar timestamps manuales si vienen (Appwrite actualiza $updatedAt solo)
       var cambiosLimpios = Object.assign({}, cambios);
       delete cambiosLimpios.creadoEn;
       delete cambiosLimpios.actualizadoEn;
@@ -141,12 +169,18 @@ var DBAppwrite = (function() {
       delete cambiosLimpios.updated_at;
       delete cambiosLimpios.id;
 
-      var respuesta = await modulo.baseDeDatos.updateRow({
+      var params = {
         databaseId: modulo.idBaseDeDatos,
         tableId: modulo.COLECCIONES[coleccion],
         rowId: id,
         data: cambiosLimpios
-      });
+      };
+
+      if (idTransaccion) {
+        params.transactionId = idTransaccion;
+      }
+
+      var respuesta = await modulo.baseDeDatos.updateRow(params);
       return _limpiarFila(respuesta);
     } catch (e) {
       if (e.code !== 404) {
@@ -156,14 +190,27 @@ var DBAppwrite = (function() {
     }
   };
 
-  modulo.eliminar = async function(coleccion, id) {
+  /**
+   * Elimina una fila.
+   * @param {string} coleccion - Clave de la colección.
+   * @param {string} id - ID de la fila a eliminar.
+   * @param {string} [idTransaccion] - ID opcional de transacción.
+   * @returns {boolean} true si se eliminó correctamente.
+   */
+  modulo.eliminar = async function(coleccion, id, idTransaccion) {
     if (!modulo.habilitado || !modulo.baseDeDatos) return false;
     try {
-      await modulo.baseDeDatos.deleteRow({
+      var params = {
         databaseId: modulo.idBaseDeDatos,
         tableId: modulo.COLECCIONES[coleccion],
         rowId: id
-      });
+      };
+
+      if (idTransaccion) {
+        params.transactionId = idTransaccion;
+      }
+
+      await modulo.baseDeDatos.deleteRow(params);
       return true;
     } catch (e) {
       Logger.error('[Appwrite] Error al eliminar en ' + coleccion + ':', e);
@@ -172,7 +219,18 @@ var DBAppwrite = (function() {
   };
 
   // ── Operadores atómicos ──────────────────────────────────
-  modulo.incrementarCampo = async function(coleccion, id, columna, valor, maximo) {
+
+  /**
+   * Incrementa un campo numérico atómicamente.
+   * @param {string} coleccion - Clave de la colección.
+   * @param {string} id - ID de la fila.
+   * @param {string} columna - Nombre del campo a incrementar.
+   * @param {number} valor - Cantidad a incrementar.
+   * @param {number} [maximo] - Valor máximo permitido (opcional).
+   * @param {string} [idTransaccion] - ID opcional de transacción.
+   * @returns {object|null} Resultado de la operación.
+   */
+  modulo.incrementarCampo = async function(coleccion, id, columna, valor, maximo, idTransaccion) {
     if (!modulo.habilitado || !modulo.baseDeDatos) return null;
     try {
       var params = {
@@ -183,6 +241,8 @@ var DBAppwrite = (function() {
         value: valor
       };
       if (maximo !== undefined) params.max = maximo;
+      if (idTransaccion) params.transactionId = idTransaccion;
+
       return await modulo.baseDeDatos.incrementRowColumn(params);
     } catch (e) {
       Logger.error('[Appwrite] Error al incrementar ' + columna + ':', e);
@@ -190,7 +250,17 @@ var DBAppwrite = (function() {
     }
   };
 
-  modulo.decrementarCampo = async function(coleccion, id, columna, valor, minimo) {
+  /**
+   * Decrementa un campo numérico atómicamente.
+   * @param {string} coleccion - Clave de la colección.
+   * @param {string} id - ID de la fila.
+   * @param {string} columna - Nombre del campo a decrementar.
+   * @param {number} valor - Cantidad a decrementar.
+   * @param {number} [minimo] - Valor mínimo permitido (opcional).
+   * @param {string} [idTransaccion] - ID opcional de transacción.
+   * @returns {object|null} Resultado de la operación.
+   */
+  modulo.decrementarCampo = async function(coleccion, id, columna, valor, minimo, idTransaccion) {
     if (!modulo.habilitado || !modulo.baseDeDatos) return null;
     try {
       var params = {
@@ -201,6 +271,8 @@ var DBAppwrite = (function() {
         value: valor
       };
       if (minimo !== undefined) params.min = minimo;
+      if (idTransaccion) params.transactionId = idTransaccion;
+
       return await modulo.baseDeDatos.decrementRowColumn(params);
     } catch (e) {
       Logger.error('[Appwrite] Error al decrementar ' + columna + ':', e);
@@ -208,15 +280,26 @@ var DBAppwrite = (function() {
     }
   };
 
-  modulo.actualizarConOperadores = async function(coleccion, id, datosConOperadores) {
+  /**
+   * Actualiza una fila usando operadores atómicos (Operator.increment, etc.).
+   * @param {string} coleccion - Clave de la colección.
+   * @param {string} id - ID de la fila.
+   * @param {object} datosConOperadores - Objeto con valores y operadores.
+   * @param {string} [idTransaccion] - ID opcional de transacción.
+   * @returns {object|null} Fila actualizada o null si falla.
+   */
+  modulo.actualizarConOperadores = async function(coleccion, id, datosConOperadores, idTransaccion) {
     if (!modulo.habilitado || !modulo.baseDeDatos) return null;
     try {
-      var respuesta = await modulo.baseDeDatos.updateRow({
+      var params = {
         databaseId: modulo.idBaseDeDatos,
         tableId: modulo.COLECCIONES[coleccion],
         rowId: id,
         data: datosConOperadores
-      });
+      };
+      if (idTransaccion) params.transactionId = idTransaccion;
+
+      var respuesta = await modulo.baseDeDatos.updateRow(params);
       return _limpiarFila(respuesta);
     } catch (e) {
       Logger.error('[Appwrite] Error al actualizar con operadores:', e);
@@ -267,19 +350,6 @@ var DBAppwrite = (function() {
   // ── Realtime ────────────────────────────────────────────
   var _callbacksRealtime = [];
 
-  function _actualizarArrayLocal(nombreArray, datos, campoId) {
-    if (!window.DB) window.DB = {};
-    if (!window.DB[nombreArray]) window.DB[nombreArray] = [];
-    var idx = window.DB[nombreArray].findIndex(function(item) {
-      return item[campoId] === datos[campoId];
-    });
-    if (idx >= 0) {
-      window.DB[nombreArray][idx] = datos;
-    } else {
-      window.DB[nombreArray].push(datos);
-    }
-  }
-
   modulo.suscribirRealtime = function(alCambiar) {
     if (!modulo.habilitado || !modulo.cliente) return;
     _callbacksRealtime.push(alCambiar);
@@ -327,30 +397,20 @@ var DBAppwrite = (function() {
       }).then(function(doc) {
         var datos = _limpiarFila(doc);
 
+        EventBus.emit('realtime:documento_actualizado', {
+          coleccion: coleccion,
+          tipo: tipo,
+          datos: datos
+        });
+
         if (coleccion === 'pedidos') {
-          datos.items = typeof datos.items === 'string' ? datos.items : JSON.stringify(datos.items);
-          _actualizarArrayLocal('pedidos', datos, 'id');
-          if (typeof Store !== 'undefined') Store.dispatch({ type: 'PEDIDOS_INICIALIZAR', payload: window.DB.pedidos });
           EventBus.emit('sincronizacion:completada');
         } else if (coleccion === 'comandas') {
-          datos.items = typeof datos.items === 'string' ? JSON.parse(datos.items) : datos.items;
-          _actualizarArrayLocal('comandas', datos, 'id');
-          if (typeof Store !== 'undefined') Store.dispatch({ type: 'COMANDA_AGREGADA', payload: datos });
           EventBus.emit('comanda:enviada', datos);
         } else if (coleccion === 'mesas') {
-          if (typeof window.DB._normalizarMesa === 'function') {
-            datos = window.DB._normalizarMesa(datos);
-          }
-          _actualizarArrayLocal('mesas', datos, 'numero');
-          if (typeof Store !== 'undefined') Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: window.DB.mesas });
           EventBus.emit('mesa:actualizada', { mesa: datos.numero, estado: datos.estado });
         } else {
-          var eventoGenerico = coleccion + ':actualizada';
-          if (typeof Store !== 'undefined') {
-            Store.dispatch({ type: coleccion.toUpperCase() + '_INICIALIZAR', payload: [datos] });
-          }
-          EventBus.emit(eventoGenerico, datos);
-          Logger.debug('[Realtime] Evento genérico: ' + eventoGenerico);
+          EventBus.emit(coleccion + ':actualizada', datos);
         }
       }).catch(function(e) {
         Logger.warn('[Realtime] Error al obtener fila de ' + coleccion + ':', e);
@@ -360,5 +420,3 @@ var DBAppwrite = (function() {
 
   return modulo;
 })();
-
-window.DBAppwrite = DBAppwrite;

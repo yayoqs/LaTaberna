@@ -2,8 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Test Célula C — Frontend Cliente (v2.0.0)</title>
+  <title>Test Célula C — Frontend Cliente (v3.0.1)</title>
   <style>
     body { font-family: system-ui, sans-serif; padding: 20px; background: #0f0f14; color: #f1f5f9; }
     h1 { color: #f59e0b; }
@@ -15,10 +14,25 @@
   </style>
 </head>
 <body>
-  <h1>Tests — Célula C (Frontend Cliente) v2.0.0</h1>
+  <h1>Tests — Célula C (Frontend Cliente) v3.0.1</h1>
   <div id="resultados"></div>
 
+  <!-- Cargar el núcleo real para que los imports de los módulos funcionen -->
+  <script type="module" src="/js/lib/logger.js"></script>
+  <script type="module" src="/js/lib/eventBus.js"></script>
+  <script type="module" src="/js/lib/store.js"></script>
+  <script type="module" src="/js/utils.js"></script>
+  <script type="module" src="/js/roles.js"></script>
+  <script type="module" src="/js/db-appwrite.js"></script>
+  <script type="module" src="/js/auth.js"></script>
+
   <script type="module">
+    // Inicializar Auth con usuario de prueba
+    import { Auth, inicializarAuth } from '../js/auth.js';
+    await inicializarAuth();
+    await Auth.login('cliente', 'cliente');
+
+    // Ahora los módulos de la Célula C verán el Auth real con sesión activa
     import { PantallaInicio } from '../js/modulos/cliente/pantalla-inicio.js';
     import { PantallaBienvenida } from '../js/modulos/cliente/pantalla-bienvenida.js';
     import { MenuDigital } from '../js/modulos/cliente/menu-digital.js';
@@ -46,17 +60,8 @@
       }
     }
 
-    // Mocks del sistema (necesarios para PantallaBienvenida)
-    if (!window.Auth) {
-      window.Auth = {
-        getNombre: () => 'Diego Test',
-        esCliente: () => true,
-        getUsuarioActual: () => ({ nombre: 'Diego Test', rol: 'cliente' })
-      };
-    }
-
-    // ── Tests de PantallaInicio (v1.1.0) ──────────────────
-    log('info', '── PantallaInicio (v1.1.0) ──');
+    // ── Tests de PantallaInicio ──────────────────────────
+    log('info', '── PantallaInicio ──');
 
     let vistaInicio = PantallaInicio.render();
     assert(vistaInicio !== null, 'render() devuelve una vista');
@@ -81,8 +86,8 @@
     PantallaInicio.ocultar();
     assert(!vistaInicio.classList.contains('active'), 'ocultar() quita clase active');
 
-    // ── Tests de PantallaBienvenida (v2.0.0) ──────────────
-    log('info', '── PantallaBienvenida (v2.0.0) ──');
+    // ── Tests de PantallaBienvenida ──────────────────────
+    log('info', '── PantallaBienvenida ──');
 
     let vistaBienvenida = PantallaBienvenida.render();
     assert(vistaBienvenida !== null, 'render() devuelve una vista');
@@ -93,7 +98,8 @@
     const nombreEl = vistaBienvenida.querySelector('#bienvenidaNombre');
     assert(topBar !== null, 'Barra superior existe');
     assert(avatar !== null, 'Avatar existe');
-    assert(avatar.textContent === 'DT', 'Avatar muestra iniciales');
+    // Con login real, el nombre es 'cliente' y las iniciales 'C'
+    assert(avatar.textContent === 'C', 'Avatar muestra inicial C (cliente)');
     assert(nombreEl !== null, 'Nombre del cliente visible');
 
     const inputMesa = vistaBienvenida.querySelector('#inputMesa');
@@ -103,10 +109,10 @@
     assert(btnVincular !== null, 'Botón Vincular existe');
     assert(btnLogout !== null, 'Botón de cerrar sesión existe');
 
-    const cardGastro = vistaBienvenida.querySelector('#cardGastronomica');
-    const cardEventos = vistaBienvenida.querySelector('#cardEntretenimiento');
-    assert(cardGastro !== null, 'Tarjeta Armar mi Pedido existe');
-    assert(cardEventos !== null, 'Tarjeta Eventos en Vivo existe');
+    const cardGastroInicial = vistaBienvenida.querySelector('#cardGastronomicaInicial');
+    const cardEventosInicial = vistaBienvenida.querySelector('#cardEntretenimientoInicial');
+    assert(cardGastroInicial !== null, 'Tarjeta Armar mi Pedido (inicial) existe');
+    assert(cardEventosInicial !== null, 'Tarjeta Eventos en Vivo (inicial) existe');
 
     assert(PantallaBienvenida.obtenerMesa() === null, 'obtenerMesa() devuelve null sin mesa guardada');
     assert(PantallaBienvenida.permitePrepedidos() === false, 'permitePrepedidos() es false por defecto');
@@ -185,6 +191,7 @@
 
     PantallaEventos.mostrar();
     assert(vistaEventos.classList.contains('active'), 'mostrar() agrega clase active');
+    await new Promise(r => setTimeout(r, 400));
     assert(eventosContenido.innerHTML.includes('No hay eventos activos'), 'Muestra mensaje sin eventos activos');
     PantallaEventos.ocultar();
     assert(!vistaEventos.classList.contains('active'), 'ocultar() quita clase active');
@@ -199,7 +206,7 @@
     // ── Resumen ──────────────────────────────────────────
     log('info', `── Resultado: ${pasaron} pasaron, ${fallaron} fallaron ──`);
     if (fallaron === 0) {
-      log('ok', '🎉 Todos los tests pasaron. Módulos de Célula C v2.0.0 operativos.');
+      log('ok', '🎉 Todos los tests pasaron. Módulos de Célula C v3.0.1 operativos.');
     } else {
       log('fallo', `⚠️ ${fallaron} test(s) fallaron. Revisar antes del PR.`);
     }

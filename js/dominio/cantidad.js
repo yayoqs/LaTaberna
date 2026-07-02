@@ -1,11 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — DOMINIO JS (ES6)
    Archivo: js/dominio/cantidad.js
-   Versión: 1.1.0
+   Versión: 1.1.2
    Propósito: Objeto de Valor Cantidad: entero positivo inmutable.
-              Migrado a módulo ES6 con export.
-   Dependencias: (ninguna externa)
+              Sin asignaciones window.
    ================================================================ */
+
 export class Cantidad {
   constructor(valor) {
     if (!Number.isInteger(valor) || valor <= 0) {
@@ -30,7 +30,3 @@ export class Cantidad {
 export function crearCantidad(valor) {
   try { return new Cantidad(valor); } catch { return null; }
 }
-
-// Retrocompatibilidad con scripts legacy
-window.Cantidad = Cantidad;
-window.crearCantidad = crearCantidad;

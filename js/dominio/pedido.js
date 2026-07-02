@@ -1,18 +1,20 @@
 /* ================================================================
    LaTaberna - PubPOS — DOMINIO JS (ES6)
    Archivo: js/dominio/pedido.js
-   Versión: 1.1.0
+   Versión: 1.1.5
    Propósito: Agregado PedidoAgregado: pedido de mesa, ítems, totales.
-              Migrado a módulo ES6 con export.
-   Dependencias: js/dominio/dinero.js, js/dominio/cantidad.js
+              Sin asignaciones window. Todos los imports explícitos.
+              Fallback cantidad || qty en reconstruirPedidoAgregado.
    ================================================================ */
-   
+
+import { Cantidad, crearCantidad } from './cantidad.js';
+import { Dinero, crearDinero } from './dinero.js';
+
 export class PedidoAgregado {
   constructor(id, mesa, mozo, comensales) {
     if (!id) throw new Error('Pedido debe tener un ID');
     if (!mesa) throw new Error('Pedido debe tener una mesa');
     if (!(comensales instanceof Cantidad)) throw new Error('comensales debe ser una Cantidad');
-
     this._id         = id;
     this._mesa       = mesa;
     this._mozo       = mozo || 'Sin mozo';
@@ -38,13 +40,9 @@ export class PedidoAgregado {
     if (this._estado === 'cerrado') throw new Error('No se puede modificar un pedido cerrado');
     if (!(precio instanceof Dinero)) throw new Error('Precio inválido');
     if (!(cantidad instanceof Cantidad)) throw new Error('Cantidad inválida');
-
     const existente = this._items.find(it => it.nombre === nombre);
-    if (existente) {
-      existente.cantidad = existente.cantidad.sumar(cantidad);
-    } else {
-      this._items.push({ nombre, precio, cantidad });
-    }
+    if (existente) { existente.cantidad = existente.cantidad.sumar(cantidad); }
+    else { this._items.push({ nombre, precio, cantidad }); }
   }
 
   eliminarItem(indice) {
@@ -61,9 +59,7 @@ export class PedidoAgregado {
 
   calcularSubtotal() {
     if (this._items.length === 0) return new Dinero(0);
-    return this._items.reduce((total, it) => {
-      return total.sumar(it.precio.multiplicar(it.cantidad.valor));
-    }, new Dinero(0));
+    return this._items.reduce((total, it) => total.sumar(it.precio.multiplicar(it.cantidad.valor)), new Dinero(0));
   }
 
   calcularTotal() {
@@ -77,51 +73,26 @@ export class PedidoAgregado {
     this._estado = 'cerrado';
   }
 
-  setObservaciones(obs) {
-    this._observaciones = obs || '';
-  }
+  setObservaciones(obs) { this._observaciones = obs || ''; }
 
   toJSON() {
     return {
-      id:           this._id,
-      mesa:         this._mesa,
-      mozo:         this._mozo,
-      comensales:   this._comensales.toJSON(),
-      items:        this._items.map(it => ({
-                      nombre:   it.nombre,
-                      precio:   it.precio.toJSON(),
-                      cantidad: it.cantidad.toJSON()
-                    })),
-      descuento:    this._descuento,
-      estado:       this._estado,
-      creadoEn:     this._creadoEn,
-      observaciones: this._observaciones
+      id: this._id, mesa: this._mesa, mozo: this._mozo, comensales: this._comensales.toJSON(),
+      items: this._items.map(it => ({ nombre: it.nombre, precio: it.precio.toJSON(), cantidad: it.cantidad.toJSON() })),
+      descuento: this._descuento, estado: this._estado, creadoEn: this._creadoEn, observaciones: this._observaciones
     };
   }
 }
 
 export function reconstruirPedidoAgregado(datos) {
-  const pedido = new PedidoAgregado(
-    datos.id,
-    datos.mesa,
-    datos.mozo,
-    crearCantidad(datos.comensales)
-  );
-
-  (datos.items || []).forEach(it => {
-    pedido.agregarItem(
-      it.nombre,
-      crearDinero(it.precio),
-      crearCantidad(it.cantidad)
-    );
-  });
-
+  const pedido = new PedidoAgregado(datos.id, datos.mesa, datos.mozo, crearCantidad(datos.comensales));
+  (datos.items || []).forEach(it => pedido.agregarItem(
+    it.nombre,
+    crearDinero(it.precio),
+    crearCantidad(it.cantidad || it.qty)
+  ));
   if (datos.descuento) pedido.aplicarDescuento(datos.descuento);
   if (datos.estado === 'cerrado') pedido.cerrar();
   pedido.setObservaciones(datos.observaciones);
-
   return pedido;
 }
-
-window.PedidoAgregado = PedidoAgregado;
-window.reconstruirPedidoAgregado = reconstruirPedidoAgregado;

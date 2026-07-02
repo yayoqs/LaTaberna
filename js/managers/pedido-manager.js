@@ -1,32 +1,28 @@
-
 /* ================================================================
-   LaTaberna - PubPOS — MÓDULO JS
+   LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/managers/pedido-manager.js
-   Versión: 1.0.0
+   Versión: 1.0.4
    Propósito: Gestor de pedidos de mesa y delivery, turnos y auditoría.
-   Dependencias: js/lib/command-bus.js, js/lib/logger.js, js/db.js, js/lib/eventBus.js, js/auth.js (Auth.getNombre), js/managers/turno-manager.js, js/repositorios/pedido-repository.js
+              Eliminado stub agregarItemAPedido (sin consumidores reales).
    ================================================================ */
 
+import { Logger } from '../lib/logger.js';
+import { EventBus } from '../lib/eventBus.js';
+import { CommandBus } from '../lib/command-bus.js';
+import { DB } from '../db.js';
+import { Auth } from '../auth.js';
+import { PedidoRepositoryLocal } from '../repositorios/pedido-repository.js';
 
-const PedidoManager = (() => {
-
+export const PedidoManager = (() => {
   let turnoActual = null;
   let auditLog = [];
   let _pedidoRepo = null;
 
-  /**
-   * Inicializa el gestor de pedidos: carga el turno actual o crea uno nuevo.
-   * @param {object} options - Opciones { pedidoRepo }
-   * @returns {object|null} El turno actual o null si falla
-   */
   function init(options = {}) {
     if (options.pedidoRepo) {
       _pedidoRepo = options.pedidoRepo;
-    } else if (typeof PedidoRepositoryLocal !== 'undefined') {
-      _pedidoRepo = PedidoRepositoryLocal;
     } else {
-      Logger.error('[PedidoManager] No se encontró un repositorio de pedidos válido.');
-      return null;
+      _pedidoRepo = PedidoRepositoryLocal;
     }
 
     const turnoGuardado = localStorage.getItem('pubpos_turno_actual');
@@ -78,7 +74,7 @@ const PedidoManager = (() => {
       id: 'aud_' + Date.now() + '_' + Math.random().toString(36).substr(2,6),
       timestamp: new Date().toISOString(),
       tipo, datos,
-      usuario: (typeof Auth !== 'undefined' && Auth.getNombre) ? Auth.getNombre() : 'sistema'
+      usuario: Auth.getNombre ? Auth.getNombre() : 'sistema'
     };
     auditLog.push(entrada);
     _guardarAuditLog();
@@ -86,7 +82,7 @@ const PedidoManager = (() => {
   }
 
   async function crearPedidoMesa(numeroMesa, mozo, comensales) {
-    if (typeof CommandBus !== 'undefined' && CommandBus.ejecutar) {
+    try {
       const resultado = await CommandBus.ejecutar({
         type: 'crearPedidoMesa',
         datos: { numeroMesa, mozo, comensales, repo: _pedidoRepo }
@@ -94,30 +90,12 @@ const PedidoManager = (() => {
       if (resultado.exito) return resultado.data;
       Logger.error('[PedidoManager] Error vía CommandBus:', resultado.error);
       return null;
-    }
-    try {
-      const pedido = await _pedidoRepo.crearPedidoMesa({
-        mesa: numeroMesa,
-        mozo: mozo || 'Sin mozo',
-        comensales: comensales || 1
-      });
-      return pedido;
     } catch (e) {
       Logger.error('[PedidoManager] Error al crear pedido:', e);
       return null;
     }
   }
 
-  function agregarItemAPedido(pedidoId, item) {
-    Logger.warn('[PedidoManager] agregarItemAPedido no implementado (se gestiona en UI).');
-    return false;
-  }
-
-  /**
-   * Crea un pedido de delivery y lo guarda en DB.
-   * @param {object} datos - Datos del delivery
-   * @returns {object} El pedido de delivery creado
-   */
   function crearPedidoDelivery(datos) {
     const nuevo = {
       id: 'deliv_' + Date.now(),
@@ -130,7 +108,7 @@ const PedidoManager = (() => {
       creadoEn: new Date().toISOString(),
       observaciones: datos.observaciones || ''
     };
-    if (typeof DB !== 'undefined' && DB.pedidosDelivery) {
+    if (DB.pedidosDelivery) {
       DB.pedidosDelivery.push(nuevo);
       DB.savePedidosDelivery();
     }
@@ -139,7 +117,7 @@ const PedidoManager = (() => {
   }
 
   function enviarPedidoDeliveryACocina(deliveryId) {
-    if (typeof DB === 'undefined' || !DB.pedidosDelivery) return false;
+    if (!DB.pedidosDelivery) return false;
     const pedido = DB.pedidosDelivery.find(p => p.id === deliveryId);
     if (!pedido) return false;
     if (pedido.estado !== 'pendiente') return false;
@@ -152,11 +130,8 @@ const PedidoManager = (() => {
     return true;
   }
 
-  async function finalizarTurno() {
-    if (typeof TurnoManager === 'undefined') {
-      return { exito: false, mensaje: 'TurnoManager no disponible.' };
-    }
-    return await TurnoManager.cerrarTurno();
+  function finalizarTurno() {
+    EventBus.emit('turno:solicitar_cierre');
   }
 
   return {
@@ -164,12 +139,9 @@ const PedidoManager = (() => {
     getTurnoActual: () => turnoActual,
     getAuditLog: () => auditLog,
     crearPedidoMesa,
-    agregarItemAPedido,
     crearPedidoDelivery,
     enviarPedidoDeliveryACocina,
     registrar: _registrarAuditoria,
     finalizarTurno
   };
 })();
-
-window.PedidoManager = PedidoManager;

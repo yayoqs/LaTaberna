@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Test B — Recetario Unificado</title>
+  <title>Test B — Recetario Unificado (ES6 v2.0.2)</title>
   <style>
     body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
     h1 { color: #f59e0b; }
@@ -16,172 +16,98 @@
   </style>
 </head>
 <body>
-  <h1>🧪 Test B — Recetario Unificado</h1>
-  <p class="info">Valida que el módulo unificado Recetas.render('consulta') muestre recetas correctamente y maneje el caso sin datos.</p>
+  <h1>🧪 Test B — Recetario Unificado (ES6 v2.0.2)</h1>
+  <p class="info">Valida que Recetas.render('consulta') muestre recetas correctamente y maneje el caso sin datos.</p>
   <div id="results"></div>
 
-  <!-- Mocks tempranos para evitar errores -->
-  <script>
-    window.DBInventario = {
-      validarStockParaItems: function() { return { ok: true, faltantes: [] }; }
+  <script type="module">
+    import { Store } from '../js/lib/store.js';
+    import { Auth } from '../js/auth.js';
+    import { DB } from '../js/db.js';
+    import { Logger } from '../js/lib/logger.js';
+    import { Recetas } from '../js/ui/recetas.js';
+
+    Logger.setLevel('ERROR');
+
+    // ── Configuración de mocks ──────────────────────────
+    // State base
+    const stateBase = {
+      productos: DB.productos || [],
+      recetas: DB.recetas || [],
+      ingredientes: DB.ingredientes || []
     };
-    window.DBFusion = {
-      fusionarMesas: function() { return null; }
-    };
-  </script>
+    Store.getState = () => ({ ...stateBase, productos: DB.productos, recetas: DB.recetas, ingredientes: DB.ingredientes });
+    Store.subscribe = () => {};
 
-  <!-- Dependencias básicas -->
-  <script src="/js/utils.js"></script>
-  <script src="/js/lib/logger.js"></script>
-  <script src="/js/lib/eventBus.js"></script>
-  <script src="/js/lib/store.js"></script>
-  <script src="/js/lib/command-bus.js"></script>
-  <script src="/js/lib/deps.js"></script>
-  <script src="/js/dominio/resultado.js"></script>
-  <script src="/js/dominio/dinero.js"></script>
-  <script src="/js/dominio/cantidad.js"></script>
-  <script src="/js/db-core.js"></script>
-  <script src="/js/db-appwrite.js"></script>
-  <script src="/js/puente-appwrite.js"></script>
-  <script src="/js/db.js"></script>
+    Auth.getRol = () => 'admin';
 
-  <!-- Mock del módulo unificado Recetas (simula lo que hace la Célula D) -->
-  <script>
-    window.Recetas = {
-      render: function(modo) {
-        if (modo !== 'consulta') return;
+    // Datos iniciales
+    DB.productos = [{ id: 'prod_1', nombre: 'Hamburguesa', activo: true, destino: 'cocina' }];
+    DB.recetas = [
+      { productoId: 'prod_1', ingredientes: [{ ingredienteId: 'ing_a', cantidad: 200, unidad: 'g' }], instrucciones: 'Cocinar 10 min' }
+    ];
+    DB.ingredientes = [{ id: 'ing_a', nombre: 'Carne', unidad: 'g', stock: 1000, valor_unitario: 0.05 }];
 
-        // Eliminar vista anterior si existe
-        var vieja = document.getElementById('view-recetario');
-        if (vieja) vieja.remove();
+    const resultsEl = document.getElementById('results');
+    let passed = 0, failed = 0;
+    function assert(cond, msg) {
+      if (cond) { passed++; resultsEl.innerHTML += '<div class="test pass">✔ ' + msg + '</div>'; }
+      else { failed++; resultsEl.innerHTML += '<div class="test fail">✘ ' + msg + '</div>'; }
+    }
+    const esperar = (ms) => new Promise(res => setTimeout(res, ms));
 
-        var main = document.createElement('main');
-        main.id = 'view-recetario';
-        main.className = 'view';
-        main.innerHTML = `
-          <div class="view-toolbar">
-            <h2><i class="fas fa-book"></i> Recetario (consulta)</h2>
-            <button class="btn-secondary" onclick="Recetas.render('consulta')">
-              <i class="fas fa-sync-alt"></i> Actualizar
-            </button>
-          </div>
-          <div id="recetarioGrid" class="recetario-grid"></div>
-        `;
-        document.body.appendChild(main);
+    async function runTests() {
+      resultsEl.innerHTML = '';
 
-        var grid = document.getElementById('recetarioGrid');
-        if (!grid) return;
-
-        // Obtener datos desde DB (mockeado en el test)
-        var recetas = window.DB && window.DB.recetas ? window.DB.recetas : [];
-        if (!recetas.length) {
-          grid.innerHTML = '<p style="color:var(--color-text-muted);">No hay recetas disponibles.</p>';
-          return;
-        }
-
-        var html = '';
-        recetas.forEach(function(receta) {
-          var producto = (window.DB.productos || []).find(function(p) { return p.id === receta.productoId; });
-          var nombreProducto = producto ? producto.nombre : receta.productoId;
-          var ingredientes = Array.isArray(receta.ingredientes) ? receta.ingredientes : [];
-          var ingHTML = '';
-          ingredientes.forEach(function(ing) {
-            var ingData = (window.DB.ingredientes || []).find(function(i) { return i.id === ing.ingredienteId; });
-            var nombreIng = ingData ? ingData.nombre : ing.ingredienteId;
-            var unidad = ingData ? ingData.unidad : '';
-            ingHTML += '<li>' + nombreIng + ': ' + ing.cantidad + ' ' + unidad + '</li>';
-          });
-          html += `
-            <div class="receta-card">
-              <h3>${nombreProducto}</h3>
-              ${receta.instrucciones ? '<p class="receta-instr">' + receta.instrucciones + '</p>' : ''}
-              <ul>${ingHTML || '<li>Sin ingredientes</li>'}</ul>
-            </div>
-          `;
-        });
-        grid.innerHTML = html;
-      }
-    };
-  </script>
-
-  <script>
-    (function() {
-      var resultsEl = document.getElementById('results');
-      var passed = 0, failed = 0;
-
-      function assert(condition, msg) {
-        if (condition) {
-          passed++;
-          resultsEl.innerHTML += '<div class="test pass">✔ ' + msg + '</div>';
-        } else {
-          failed++;
-          resultsEl.innerHTML += '<div class="test fail">✘ ' + msg + '</div>';
-        }
+      // Asegurar toastContainer
+      if (!document.getElementById('toastContainer')) {
+        const tc = document.createElement('div'); tc.id = 'toastContainer'; document.body.appendChild(tc);
       }
 
-      function esperar(ms) {
-        return new Promise(function(resolve) { setTimeout(resolve, ms); });
-      }
+      // ── Suite 1: Render con recetas ──────────────────
+      resultsEl.innerHTML += '<div class="suite"><h2>1. Render con recetas</h2></div>';
+      Recetas.render('consulta');
+      await esperar(50);
 
-      async function runTests() {
-        resultsEl.innerHTML = '';
-        Logger.setLevel('ERROR');
-
-        // ── Configurar mocks ──────────────────────────
-        window.DB = window.DB || {};
-        DB.recetas = [];
-        DB.productos = [];
-        DB.ingredientes = [];
-
-        // ── Suite 1: Render con recetas ───────────────
-        resultsEl.innerHTML += '<div class="suite"><h2>1. Render con recetas</h2></div>';
-
-        DB.recetas = [
-          { productoId: 'prod_1', ingredientes: [{ ingredienteId: 'ing_a', cantidad: 200, unidad: 'g' }], instrucciones: 'Cocinar 10 min' }
-        ];
-        DB.productos = [{ id: 'prod_1', nombre: 'Hamburguesa' }];
-        DB.ingredientes = [{ id: 'ing_a', nombre: 'Carne', unidad: 'g' }];
-
-        window.Recetas.render('consulta');
+      const tarjeta = document.querySelector('.receta-card');
+      assert(!!tarjeta, 'Aparece tarjeta de receta');
+      if (tarjeta) {
+        assert(tarjeta.textContent.includes('Hamburguesa'), 'Muestra nombre del producto');
+        // Probar detalle
+        tarjeta.click();
+        await esperar(150);
+        const modal = document.getElementById('modalRecetaDetalle');
+        assert(!!modal && modal.style.display === 'flex', 'Modal de detalle abierto');
+        const contenido = modal ? modal.textContent : '';
+        assert(contenido.includes('Carne'), 'Muestra ingrediente');
+        assert(contenido.includes('200'), 'Muestra cantidad');
+        assert(contenido.includes('Cocinar 10 min'), 'Muestra instrucciones');
+        // Cerrar detalle
+        document.getElementById('btnCerrarDetalle')?.click();
         await esperar(50);
-
-        var tarjeta = document.querySelector('.receta-card');
-        assert(!!tarjeta, 'Aparece tarjeta de receta');
-        if (tarjeta) {
-          assert(tarjeta.textContent.includes('Hamburguesa'), 'Muestra nombre del producto');
-          assert(tarjeta.textContent.includes('Carne'), 'Muestra ingrediente');
-          assert(tarjeta.textContent.includes('200'), 'Muestra cantidad');
-        }
-
-        // ── Suite 2: Sin recetas ──────────────────────
-        resultsEl.innerHTML += '<div class="suite"><h2>2. Vista sin recetas</h2></div>';
-
-        DB.recetas = [];
-        window.Recetas.render('consulta');
-        await esperar(50);
-
-        var grid = document.getElementById('recetarioGrid');
-        assert(!!grid, 'El grid existe');
-        assert(grid.textContent.includes('No hay recetas'), 'Muestra mensaje de vacío');
-
-        // ── Limpiar DOM ───────────────────────────────
-        var main = document.getElementById('view-recetario');
-        if (main) main.remove();
-
-        // ── Resumen ───────────────────────────────────
-        resultsEl.innerHTML += '<div class="summary">' + passed + ' pasaron, ' + failed + ' fallaron</div>';
-        if (failed === 0) {
-          resultsEl.innerHTML += '<div class="test pass">✔ Todos los tests del recetario unificado pasaron.</div>';
-        }
       }
 
-      window.addEventListener('load', function() {
-        runTests().catch(function(e) {
-          resultsEl.innerHTML += '<div class="error">Error en tests: ' + e.message + '</div>';
-          console.error(e);
-        });
-      });
-    })();
+      // ── Suite 2: Sin recetas ──────────────────────────
+      resultsEl.innerHTML += '<div class="suite"><h2>2. Vista sin recetas</h2></div>';
+      DB.recetas = [];
+      Recetas.render('consulta');
+      await esperar(50);
+      const grid = document.getElementById('recetasGrid');
+      assert(!!grid, 'El grid existe');
+      assert(grid.textContent.includes('No se encontraron recetas'), 'Muestra mensaje de vacío');
+
+      // Limpiar
+      document.getElementById('view-recetas')?.remove();
+      document.querySelectorAll('.modal-overlay').forEach(o => o.remove());
+
+      resultsEl.innerHTML += `<div class="summary">${passed} pasaron, ${failed} fallaron</div>`;
+      if (failed === 0) resultsEl.innerHTML += '<div class="test pass">✔ Todos los tests del recetario unificado v2.0.2 pasaron.</div>';
+    }
+
+    window.addEventListener('load', () => runTests().catch(e => {
+      resultsEl.innerHTML += `<div class="error">Error en tests: ${e.message}</div>`;
+      console.error(e);
+    }));
   </script>
 </body>
 </html>

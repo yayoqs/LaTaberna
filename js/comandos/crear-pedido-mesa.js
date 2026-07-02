@@ -1,13 +1,19 @@
 /* ================================================================
-   LaTaberna - PubPOS — COMANDO JS
+   LaTaberna - PubPOS — COMANDO JS (ES6)
    Archivo: js/comandos/crear-pedido-mesa.js
-   Versión: 1.0.0
-   Propósito: Comando para crear un pedido asociado a una mesa, con recreación automática de la mesa en Appwrite si faltara.
-   Dependencias: CommandBus, Deps, EventBus, PedidoManager, DBAppwrite, DB, Logger
+   Versión: 1.0.2
+   Propósito: Comando para crear un pedido asociado a una mesa.
+              Con imports explícitos.
    ================================================================ */
 
+import { CommandBus } from '../lib/command-bus.js';
+import { Deps } from '../lib/deps.js';
+import { EventBus } from '../lib/eventBus.js';
+import { Logger } from '../lib/logger.js';
+import { DBAppwrite } from '../db-appwrite.js';
+import { DB } from '../db.js';
 
-function crearComandoPedidoMesa(datos) {
+export function crearComandoPedidoMesa(datos) {
   return {
     type: 'crearPedidoMesa',
     datos: {
@@ -21,7 +27,6 @@ function crearComandoPedidoMesa(datos) {
 async function handleCrearPedidoMesa(comando) {
   const { numeroMesa, mozo, comensales } = comando.datos;
 
-  // 1. Validar turno
   if (typeof PedidoManager === 'undefined' || !PedidoManager.getTurnoActual) {
     throw new Error('Sistema de turnos no disponible');
   }
@@ -30,7 +35,6 @@ async function handleCrearPedidoMesa(comando) {
     throw new Error('No hay turno abierto para crear pedidos');
   }
 
-  // 2. Obtener repositorio
   let repo;
   try {
     repo = Deps.obtener('pedidoRepo');
@@ -41,7 +45,6 @@ async function handleCrearPedidoMesa(comando) {
     throw new Error('El repositorio no soporta la operación abrirMesa');
   }
 
-  // 3. Asegurar que la mesa existe en Appwrite (anti-desaparición)
   if (typeof DBAppwrite !== 'undefined' && DBAppwrite.habilitado) {
     try {
       const mesas = await DBAppwrite.listar('mesas');
@@ -71,7 +74,6 @@ async function handleCrearPedidoMesa(comando) {
     }
   }
 
-  // 4. Delegar creación del pedido
   let pedido;
   try {
     pedido = await repo.abrirMesa(numeroMesa, mozo || 'Sin mozo', comensales || 1);
@@ -80,12 +82,10 @@ async function handleCrearPedidoMesa(comando) {
   }
   if (!pedido) throw new Error('No se pudo crear el pedido');
 
-  // 5. Activar permite_prepedidos
   if (typeof DBAppwrite !== 'undefined' && DBAppwrite.habilitado) {
     await DBAppwrite.actualizar('mesas', String(numeroMesa), { permite_prepedidos: true });
   }
 
-  // 6. Auditoría
   if (typeof PedidoManager.registrar === 'function') {
     PedidoManager.registrar('mesa:abierta', {
       mesa: numeroMesa,
@@ -95,7 +95,6 @@ async function handleCrearPedidoMesa(comando) {
     });
   }
 
-  // 7. Notificar
   EventBus.emit('mesa:actualizada', { mesa: numeroMesa, estado: 'ocupada' });
   EventBus.emit('pedido:creado', pedido);
 
@@ -103,4 +102,3 @@ async function handleCrearPedidoMesa(comando) {
 }
 
 CommandBus.registrar('crearPedidoMesa', handleCrearPedidoMesa);
-window.crearComandoPedidoMesa = crearComandoPedidoMesa;

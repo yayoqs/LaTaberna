@@ -1,12 +1,19 @@
 /* ================================================================
-   LaTaberna - PubPOS — COMANDO JS
+   LaTaberna - PubPOS — COMANDO JS (ES6)
    Archivo: js/comandos/enviar-comanda.js
-   Versión: 1.0.0
-   Propósito: Enviar comanda a cocina/barra con validación de stock y soporte para override de bloqueo.
-   Dependencias: CommandBus, Deps, EventBus, PedidoManager, InventarioService, DB, Logger, showToast
+   Versión: 1.0.2
+   Propósito: Enviar comanda a cocina/barra con validación de stock.
+              Con imports explícitos.
    ================================================================ */
 
-function crearComandoEnviarComanda(datos) {
+import { CommandBus } from '../lib/command-bus.js';
+import { Deps } from '../lib/deps.js';
+import { EventBus } from '../lib/eventBus.js';
+import { Logger } from '../lib/logger.js';
+import { DB } from '../db.js';
+import { showToast } from '../utils.js';
+
+export function crearComandoEnviarComanda(datos) {
   return {
     type: 'enviarComanda',
     datos: {
@@ -15,7 +22,7 @@ function crearComandoEnviarComanda(datos) {
       comensales: datos.comensales,
       observaciones: datos.observaciones || '',
       itemsPendientes: datos.itemsPendientes,
-      overrideStock: datos.overrideStock || false   // ← nuevo flag
+      overrideStock: datos.overrideStock || false
     }
   };
 }
@@ -26,10 +33,8 @@ async function handleEnviarComanda(comando) {
   if (!mesa) throw new Error('Mesa no especificada');
   if (!itemsPendientes || !itemsPendientes.length) throw new Error('No hay ítems pendientes');
 
-  // ── 0. Leer configuración de bloqueo ─────────────────
-  const bloquearStock = (DB.config?.bloquearStockInsuficiente !== false); // true por defecto
+  const bloquearStock = (DB.config?.bloquearStockInsuficiente !== false);
 
-  // ── 1. Validación de stock ──────────────────────────
   let resultadoStock = { ok: true, faltantes: [] };
   try {
     const inventarioSvc = Deps.obtener('inventarioService');
@@ -39,7 +44,6 @@ async function handleEnviarComanda(comando) {
   }
 
   if (!resultadoStock.ok && bloquearStock && !overrideStock) {
-    // Bloqueamos y devolvemos un error especial con los faltantes
     const faltantes = resultadoStock.faltantes.map(f =>
       `${f.ingrediente} (faltan ${f.faltante} ${f.unidad})`
     ).join(', ');
@@ -50,7 +54,6 @@ async function handleEnviarComanda(comando) {
   }
 
   if (!resultadoStock.ok) {
-    // Log de advertencia si se ignoró el bloqueo
     const faltantes = resultadoStock.faltantes.map(f =>
       `${f.ingrediente} (faltan ${f.faltante} ${f.unidad})`
     ).join(', ');
@@ -65,7 +68,6 @@ async function handleEnviarComanda(comando) {
     }
   }
 
-  // ── 2. Obtener repositorio ──────────────────────────
   let repo;
   try {
     repo = Deps.obtener('pedidoRepo');
@@ -77,7 +79,6 @@ async function handleEnviarComanda(comando) {
     throw new Error('El repositorio no soporta la operación enviarComanda');
   }
 
-  // ── 3. Delegar toda la persistencia ─────────────────
   let resultado;
   try {
     resultado = await repo.enviarComanda(mesa, itemsPendientes, mozo, comensales, observaciones);
@@ -85,11 +86,9 @@ async function handleEnviarComanda(comando) {
     throw new Error('Error al enviar comanda: ' + e.message);
   }
 
-  // ── 4. Actualizar estado de la mesa ─────────────────
   if (mesa.estado === 'libre') mesa.estado = 'ocupada';
   DB.saveMesas();
 
-  // ── 5. Notificar a otros módulos ────────────────────
   resultado.comandas.forEach(c => EventBus.emit('comanda:enviada', c));
   EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: mesa.estado });
   Logger.info(`[EnviarComanda] ${resultado.comandas.length} comanda(s) enviada(s).`);
@@ -98,4 +97,3 @@ async function handleEnviarComanda(comando) {
 }
 
 CommandBus.registrar('enviarComanda', handleEnviarComanda);
-window.crearComandoEnviarComanda = crearComandoEnviarComanda;

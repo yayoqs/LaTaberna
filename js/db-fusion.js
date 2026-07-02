@@ -1,15 +1,15 @@
 /* ================================================================
-   LaTaberna - PubPOS — MÓDULO JS
+   LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-fusion.js
-   Versión: 1.0.2
+   Versión: 1.0.5
    Propósito: Lógica de fusión y liberación de mesas virtuales.
-              Ahora permite identificadores personalizados mediante
-              prompt. Si no se ingresa nombre, se usa formato
-              automático "1+2".
-   Dependencias: DB, EventBus, Logger
+              Incluye imports de Logger y EventBus.
    ================================================================ */
 
-const DBFusion = (function() {
+import { Logger } from './lib/logger.js';
+import { EventBus } from './lib/eventBus.js';
+
+export const DBFusion = (function() {
   const module = {};
 
   /**
@@ -129,5 +129,3 @@ const DBFusion = (function() {
 
   return module;
 })();
-
-window.DBFusion = DBFusion;

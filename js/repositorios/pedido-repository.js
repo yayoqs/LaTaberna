@@ -1,18 +1,30 @@
 /* ================================================================
-   LaTaberna - PubPOS — REPOSITORIO JS
+   LaTaberna - PubPOS — REPOSITORIO JS (ES6)
    Archivo: js/repositorios/pedido-repository.js
-   Versión: 1.0.1
-   Propósito: Implementación local del repositorio de pedidos con sincronización directa a Appwrite.
-              Agregado método guardarPedido para persistir cambios de PedidoService.
-   Dependencias: js/db.js, js/db-appwrite.js, js/lib/logger.js, js/lib/store.js, js/lib/eventBus.js, js/utils.js (calcularTotal)
+   Versión: 1.0.7
+   Propósito: Implementación local del repositorio de pedidos con
+              sincronización directa a Appwrite.
+              Soporte para split bill (transacciones múltiples),
+              cierre automático al completar pago, estado 'pagada',
+              y persistencia correcta de comensales.
    ================================================================ */
-   
-   
+
+import { DB } from '../db.js';
+import { DBAppwrite } from '../db-appwrite.js';
+import { Logger } from '../lib/logger.js';
+import { Store } from '../lib/store.js';
+import { EventBus } from '../lib/eventBus.js';
+import { calcularTotal } from '../utils.js';
+import { mesaVacia } from '../db-core.js';
+
 const PedidoRepository = {
   async crearPedidoMesa(datos) { throw new Error('No implementado'); },
   async obtenerPorId(id)   { throw new Error('No implementado'); },
   async cerrarPedido(id, datosCierre) { throw new Error('No implementado'); },
+  async cerrarPedidoSinLiberar(id, datosCierre) { throw new Error('No implementado'); },
+  async agregarTransaccion(pedidoId, datosTransaccion) { throw new Error('No implementado'); },
   async obtenerTodos()     { throw new Error('No implementado'); },
+  async obtenerPedidosConSaldoPendiente() { throw new Error('No implementado'); },
   async abrirMesa(numeroMesa, mozo, comensales) { throw new Error('No implementado'); },
   async enviarComanda(mesa, itemsPendientes, mozo, comensales, observaciones) { throw new Error('No implementado'); },
   async agregarMesa(datosMesa) { throw new Error('No implementado'); },
@@ -21,8 +33,6 @@ const PedidoRepository = {
 };
 
 const PedidoRepositoryLocal = (() => {
-
-  // ── Utilidades de sincronización con Appwrite ──────────
   function _normalizarFecha(valor) {
     if (!valor) return null;
     if (typeof valor === 'number') return new Date(valor).toISOString();
@@ -53,6 +63,10 @@ const PedidoRepositoryLocal = (() => {
     delete data.id;
     if (Array.isArray(data.items)) data.items = JSON.stringify(data.items).substring(0, 5000);
     else data.items = String(data.items || '[]').substring(0, 5000);
+    if (Array.isArray(data.transacciones)) data.transacciones = JSON.stringify(data.transacciones).substring(0, 5000);
+    else data.transacciones = String(data.transacciones || '[]').substring(0, 5000);
+    // Asegurar que comensales se persista
+    data.comensales = Number(data.comensales) || 1;
     return data;
   }
 
@@ -65,13 +79,10 @@ const PedidoRepositoryLocal = (() => {
   }
 
   async function _guardarEnAppwrite(coleccion, id, datos, esNuevo) {
-    if (!window.DBAppwrite || !DBAppwrite.habilitado) return;
+    if (!DBAppwrite || !DBAppwrite.habilitado) return;
     try {
-      if (esNuevo) {
-        await DBAppwrite.crear(coleccion, id, datos);
-      } else {
-        await DBAppwrite.actualizar(coleccion, id, datos);
-      }
+      if (esNuevo) await DBAppwrite.crear(coleccion, id, datos);
+      else await DBAppwrite.actualizar(coleccion, id, datos);
     } catch (e) {
       if (esNuevo && e.code === 409) {
         try { await DBAppwrite.actualizar(coleccion, id, datos); } catch (e2) {}
@@ -98,11 +109,8 @@ const PedidoRepositoryLocal = (() => {
     await _guardarEnAppwrite('comandas', comanda.id, _sanitizarComanda(comanda), esNuevo);
   }
 
-  // ── MÉTODOS DEL REPOSITORIO ────────────────────────────
-
   async function abrirMesa(numeroMesa, mozo, comensales) {
-    if (!window.DB || !DB.getMesa) throw new Error('DB.core no disponible');
-
+    if (!DB || !DB.getMesa) throw new Error('DB.core no disponible');
     const mesa = DB.getMesa(numeroMesa);
     if (!mesa) throw new Error(`La mesa ${numeroMesa} no existe`);
     if (mesa.estado !== 'libre') throw new Error(`La mesa ${numeroMesa} no está libre`);
@@ -117,54 +125,41 @@ const PedidoRepositoryLocal = (() => {
 
     const pedidoLocal = await DB.crearPedido(numeroMesa, mozo, comensales);
     if (!pedidoLocal) throw new Error('No se pudo crear el pedido localmente');
-
+    pedidoLocal.transacciones = [];
     mesa.pedidoId = pedidoLocal.id;
     DB.saveMesas();
 
     await _syncMesa(mesa);
     await _syncPedido(pedidoLocal, true);
-
     return pedidoLocal;
   }
 
   async function enviarComanda(mesa, itemsPendientes, mozo, comensales, observaciones) {
-    if (!window.DB || !DB.comandas) throw new Error('DB.comandas no disponible');
+    if (!DB || !DB.comandas) throw new Error('DB.comandas no disponible');
 
     const cocinaItems = itemsPendientes.filter(it => it.destino === 'cocina' || it.destino === 'ambos');
     const barraItems  = itemsPendientes.filter(it => it.destino === 'barra'  || it.destino === 'ambos');
     if (!cocinaItems.length && !barraItems.length) throw new Error('Los ítems no tienen un destino válido');
 
     const _crearComanda = (items, destinoKds) => {
-      items.forEach(it => {
-        it.enviado = true;
-        it.enviadoA = destinoKds;
-        it.enviadoTs = Date.now();
-      });
-
+      items.forEach(it => { it.enviado = true; it.enviadoA = destinoKds; it.enviadoTs = Date.now(); });
       const comanda = {
         id: 'kds_' + Date.now() + '_' + Math.random().toString(36).substr(2,6),
-        mesa: mesa.numero,
-        mozo: mozo,
-        destino: destinoKds,
-        items: items.map(it => ({ ...it })),
-        observaciones: observaciones || '',
-        estado: 'nueva',
-        ts: Date.now()
+        mesa: mesa.numero, mozo, destino: destinoKds,
+        items: items.map(it => ({ ...it })), observaciones: observaciones || '', estado: 'nueva', ts: Date.now()
       };
-
       DB.comandas.push(comanda);
       return comanda;
     };
 
     const comandasCreadas = [];
-
     if (cocinaItems.length && barraItems.length) {
       comandasCreadas.push(_crearComanda(cocinaItems, 'cocina'));
-      comandasCreadas.push(_crearComanda(barraItems,  'barra'));
+      comandasCreadas.push(_crearComanda(barraItems, 'barra'));
     } else if (cocinaItems.length) {
       comandasCreadas.push(_crearComanda(cocinaItems, 'cocina'));
     } else if (barraItems.length) {
-      comandasCreadas.push(_crearComanda(barraItems,  'barra'));
+      comandasCreadas.push(_crearComanda(barraItems, 'barra'));
     }
 
     DB.saveComandas();
@@ -174,42 +169,35 @@ const PedidoRepositoryLocal = (() => {
         estado: 'en_proceso',
         items: JSON.stringify(mesa.items),
         total: calcularTotal(mesa.items),
-        mozo: mesa.mozo,
-        comensales: mesa.comensales,
-        observaciones: mesa.observaciones
+        mozo: mesa.mozo, comensales: mesa.comensales, observaciones: mesa.observaciones
       });
     }
 
-    for (const c of comandasCreadas) {
-      await _syncComanda(c, true);
-    }
+    for (const c of comandasCreadas) await _syncComanda(c, true);
     if (mesa.pedidoId) {
       const pedidoActualizado = DB.pedidos.find(p => p.id === mesa.pedidoId);
-      if (pedidoActualizado) {
-        await _syncPedido(pedidoActualizado, false);
-      }
+      if (pedidoActualizado) await _syncPedido(pedidoActualizado, false);
     }
 
     return { comandas: comandasCreadas, ticketsHTML: {} };
   }
 
   async function crearPedidoMesa(datos) {
-    if (!window.DB || !DB.crearPedido) throw new Error('DB.core no disponible');
-
+    if (!DB || !DB.crearPedido) throw new Error('DB.core no disponible');
     const pedidoLocal = await DB.crearPedido(datos.mesa, datos.mozo, datos.comensales);
     if (!pedidoLocal) throw new Error('No se pudo crear el pedido localmente');
-
+    pedidoLocal.transacciones = [];
     await _syncPedido(pedidoLocal, true);
     return pedidoLocal;
   }
 
   async function obtenerPorId(id) {
-    if (!window.DB || !DB.pedidos) return null;
+    if (!DB || !DB.pedidos) return null;
     return DB.pedidos.find(p => p.id === id) || null;
   }
 
   async function cerrarPedido(id, datosCierre) {
-    if (!window.DB || typeof DB.cerrarPedido !== 'function') throw new Error('DB.cerrarPedido no disponible');
+    if (!DB || typeof DB.cerrarPedido !== 'function') throw new Error('DB.cerrarPedido no disponible');
     const pedido = DB.pedidos.find(p => p.id === id);
     if (!pedido) throw new Error('Pedido no encontrado');
 
@@ -218,51 +206,150 @@ const PedidoRepositoryLocal = (() => {
 
     if (pedidoCerrado) {
       await _syncPedido(pedidoCerrado, false);
-
       const mesa = DB.mesas.find(m => m.pedidoId === id);
       if (mesa && !mesa.esVirtual) {
-        mesa.estado = 'libre';
-        mesa.pedidoId = '';
-        mesa.items = [];
-        mesa.mozo = '';
-        mesa.comensales = 1;
-        mesa.observaciones = '';
+        mesa.estado = 'libre'; mesa.pedidoId = ''; mesa.items = []; mesa.mozo = ''; mesa.comensales = 1; mesa.observaciones = '';
         DB.saveMesas();
         await _syncMesa(mesa);
         EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: 'libre' });
       }
     }
-
     return pedidoCerrado;
   }
 
+  async function cerrarPedidoSinLiberar(id, datosCierre) {
+    if (!DB || typeof DB.cerrarPedido !== 'function') throw new Error('DB.cerrarPedido no disponible');
+    const pedido = DB.pedidos.find(p => p.id === id);
+    if (!pedido) throw new Error('Pedido no encontrado');
+
+    await DB.cerrarPedido(id, datosCierre.formaPago, datosCierre.total, datosCierre.descuento || 0);
+    const pedidoCerrado = DB.pedidos.find(p => p.id === id);
+
+    if (pedidoCerrado) {
+      if (datosCierre.transacciones) {
+        pedidoCerrado.transacciones = datosCierre.transacciones;
+      }
+      await _syncPedido(pedidoCerrado, false);
+      const mesa = DB.mesas.find(m => m.pedidoId === id);
+      if (mesa && !mesa.esVirtual) {
+        mesa.estado = 'pagada';
+        DB.saveMesas();
+        await _syncMesa(mesa);
+        EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: 'pagada' });
+      }
+    }
+    return pedidoCerrado;
+  }
+
+  async function agregarTransaccion(pedidoId, datosTransaccion) {
+    if (!DB || !DB.pedidos) throw new Error('DB no disponible');
+    const pedido = DB.pedidos.find(p => p.id === pedidoId);
+    if (!pedido) throw new Error('Pedido no encontrado');
+
+    if (pedido.estado === 'cerrada') {
+      return { exito: false, error: 'El pedido ya está cerrado' };
+    }
+
+    if (!Array.isArray(pedido.transacciones)) {
+      pedido.transacciones = [];
+    }
+
+    var totalCubierto = pedido.transacciones.reduce(function(sum, t) {
+      return sum + (t.monto || 0);
+    }, 0);
+
+    var totalPedido = pedido.total || 0;
+    var saldoPendiente = totalPedido - totalCubierto;
+
+    if (datosTransaccion.monto > saldoPendiente) {
+      return {
+        exito: false,
+        error: 'El monto excede el saldo pendiente',
+        saldoRestante: saldoPendiente
+      };
+    }
+
+    var nuevaTransaccion = {
+      persona: datosTransaccion.persona || 'General',
+      monto: datosTransaccion.monto,
+      formaPago: datosTransaccion.formaPago || 'efectivo',
+      timestamp: datosTransaccion.timestamp || Date.now()
+    };
+    pedido.transacciones.push(nuevaTransaccion);
+
+    totalCubierto = pedido.transacciones.reduce(function(sum, t) {
+      return sum + (t.monto || 0);
+    }, 0);
+
+    var nuevoSaldo = totalPedido - totalCubierto;
+    var pedidoCerrado = false;
+
+    if (nuevoSaldo <= 0) {
+      pedido.estado = 'cerrada';
+      pedidoCerrado = true;
+      DB.savePedidos();
+      await _syncPedido(pedido, false);
+
+      var mesa = DB.mesas.find(function(m) { return m.pedidoId === pedidoId; });
+      if (mesa && !mesa.esVirtual) {
+        mesa.estado = 'pagada';
+        DB.saveMesas();
+        await _syncMesa(mesa);
+        EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: 'pagada' });
+      }
+    } else {
+      DB.savePedidos();
+      await _syncPedido(pedido, false);
+    }
+
+    return {
+      exito: true,
+      saldoRestante: nuevoSaldo > 0 ? nuevoSaldo : 0,
+      pedidoCerrado: pedidoCerrado
+    };
+  }
+
   async function obtenerTodos() {
-    if (!window.DB || !DB.pedidos) return [];
-    return DB.pedidos;
+    if (!DB || !DB.pedidos) return [];
+    return DB.pedidos.map(function(p) {
+      if (!p.transacciones) p.transacciones = [];
+      return p;
+    });
+  }
+
+  async function obtenerPedidosConSaldoPendiente() {
+    if (!DB || !DB.pedidos) return [];
+    return DB.pedidos.filter(function(p) {
+      if (p.estado === 'cerrada') return false;
+      var totalCubierto = (Array.isArray(p.transacciones) ? p.transacciones : [])
+        .reduce(function(sum, t) { return sum + (t.monto || 0); }, 0);
+      var totalPedido = p.total || 0;
+      return totalCubierto < totalPedido;
+    }).map(function(p) {
+      if (!p.transacciones) p.transacciones = [];
+      return p;
+    });
   }
 
   async function agregarMesa(datosMesa) {
-    if (!window.DB || !DB.mesas) throw new Error('DB no disponible');
-
+    if (!DB || !DB.mesas) throw new Error('DB no disponible');
     const existente = DB.mesas.find(m => m.numero === datosMesa.numero);
     if (existente) throw new Error(`Ya existe una mesa con el número ${datosMesa.numero}`);
-
     DB.mesas.push(datosMesa);
     DB.saveMesas();
-
-    if (typeof Store !== 'undefined') {
-      Store.dispatch({ type: 'MESA_AGREGAR', payload: datosMesa });
-    }
-
+    Store.dispatch({ type: 'MESA_AGREGAR', payload: datosMesa });
     await _syncMesa(datosMesa);
     return datosMesa;
   }
 
   async function liberarMesa(numeroMesa) {
-    if (!window.DB || !DB.mesas) throw new Error('DB no disponible');
-
+    if (!DB || !DB.mesas) throw new Error('DB no disponible');
     const mesa = DB.mesas.find(m => m.numero == numeroMesa);
     if (!mesa) throw new Error('Mesa no encontrada');
+
+    if (mesa.estado !== 'ocupada' && mesa.estado !== 'pagada' && !mesa.esVirtual) {
+      throw new Error(`La mesa ${numeroMesa} no se puede liberar en su estado actual (${mesa.estado})`);
+    }
 
     if (mesa.esVirtual) {
       DB.liberarMesasFusionadas(mesa);
@@ -272,15 +359,11 @@ const PedidoRepositoryLocal = (() => {
     }
     DB.saveMesas();
 
-    if (typeof Store !== 'undefined') {
-      if (mesa.esVirtual) {
-        (mesa.mesasFusionadas || []).forEach(num => {
-          Store.dispatch({ type: 'MESA_CAMBIAR_ESTADO', payload: { numero: num, estado: 'libre' } });
-        });
-        Store.dispatch({ type: 'MESA_ELIMINAR', payload: mesa.numero });
-      } else {
-        Store.dispatch({ type: 'MESA_CAMBIAR_ESTADO', payload: { numero: mesa.numero, estado: 'libre' } });
-      }
+    if (mesa.esVirtual) {
+      (mesa.mesasFusionadas || []).forEach(num => Store.dispatch({ type: 'MESA_CAMBIAR_ESTADO', payload: { numero: num, estado: 'libre' } }));
+      Store.dispatch({ type: 'MESA_ELIMINAR', payload: mesa.numero });
+    } else {
+      Store.dispatch({ type: 'MESA_CAMBIAR_ESTADO', payload: { numero: mesa.numero, estado: 'libre' } });
     }
 
     if (!mesa.esVirtual) {
@@ -297,23 +380,14 @@ const PedidoRepositoryLocal = (() => {
     return mesa;
   }
 
-  /**
-   * Guarda un pedido existente. Actualiza el array local y sincroniza con Appwrite.
-   * @param {object} datosPedido - objeto con los datos actualizados del pedido.
-   * @returns {Promise<object>}
-   */
   async function guardarPedido(datosPedido) {
-    if (!window.DB || !DB.pedidos) throw new Error('DB no disponible');
+    if (!DB || !DB.pedidos) throw new Error('DB no disponible');
     const idx = DB.pedidos.findIndex(p => p.id === datosPedido.id);
     if (idx === -1) throw new Error('Pedido no encontrado para guardar');
 
     DB.pedidos[idx] = { ...DB.pedidos[idx], ...datosPedido };
     DB.savePedidos();
-
-    if (typeof Store !== 'undefined') {
-      Store.dispatch({ type: 'PEDIDO_ACTUALIZADO', payload: { id: datosPedido.id, cambios: datosPedido } });
-    }
-
+    Store.dispatch({ type: 'PEDIDO_ACTUALIZADO', payload: { id: datosPedido.id, cambios: datosPedido } });
     await _syncPedido(DB.pedidos[idx], false);
     return DB.pedidos[idx];
   }
@@ -324,12 +398,14 @@ const PedidoRepositoryLocal = (() => {
     crearPedidoMesa,
     obtenerPorId,
     cerrarPedido,
+    cerrarPedidoSinLiberar,
+    agregarTransaccion,
     obtenerTodos,
+    obtenerPedidosConSaldoPendiente,
     agregarMesa,
     liberarMesa,
     guardarPedido
   };
 })();
 
-window.PedidoRepository = PedidoRepository;
-window.PedidoRepositoryLocal = PedidoRepositoryLocal;
+export { PedidoRepository, PedidoRepositoryLocal };

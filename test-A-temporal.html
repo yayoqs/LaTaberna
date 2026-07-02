@@ -2,141 +2,90 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Test A — Diagnóstico Appwrite (TablesDB)</title>
-  <style>
-    body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
-    h1 { color: #f59e0b; }
-    h2 { color: #94a3b8; margin-top: 24px; }
-    .suite { margin-bottom: 16px; border-bottom: 1px solid #2e2e42; padding-bottom: 8px; }
-    .test { margin: 4px 0; padding: 4px 8px; border-radius: 4px; }
-    .pass { background: rgba(34,197,94,.2); }
-    .fail { background: rgba(239,68,68,.2); }
-    .summary { margin-top: 20px; font-weight: bold; }
-    .info { color: #94a3b8; font-size: 12px; margin: 2px 0; }
-    button { margin-top: 16px; padding: 12px 24px; background: #f59e0b; color: #000; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
-  </style>
+  <title>Test de carga completa</title>
 </head>
 <body>
-  <h1>🧪 Test A — Diagnóstico Appwrite (TablesDB)</h1>
-  <p class="info">Verifica conexión, listado de colecciones, CRUD e integración con Store (sesión anónima).</p>
-  <div id="results"></div>
-  <button onclick="location.reload()">🔄 Ejecutar de nuevo</button>
+  <h1>Test de carga completa</h1>
+  <div id="resultado"></div>
 
-  <script src="/js/utils.js"></script>
-  <script src="/js/lib/logger.js"></script>
-  <script src="/js/lib/eventBus.js"></script>
-  <script src="/js/lib/store.js"></script>
   <script src="/js/appwrite.min.js"></script>
-  <script src="/js/db-appwrite.js"></script>
-  <script src="/js/db-core.js"></script>
-  <script src="/js/db-inventario.js"></script>
-  <script src="/js/db-fusion.js"></script>
-  <script src="/js/db-shim.js"></script>
-  <script src="/js/db.js"></script>
+  <script type="module">
+    const resultado = document.getElementById('resultado');
+    const modulos = [
+      { nombre: 'utils',              ruta: '/js/utils.js' },
+      { nombre: 'logger',             ruta: '/js/lib/logger.js' },
+      { nombre: 'eventBus',           ruta: '/js/lib/eventBus.js' },
+      { nombre: 'commandBus',         ruta: '/js/lib/command-bus.js' },
+      { nombre: 'store',              ruta: '/js/lib/store.js' },
+      { nombre: 'deps',               ruta: '/js/lib/deps.js' },
+      { nombre: 'dominio/resultado',  ruta: '/js/dominio/resultado.js' },
+      { nombre: 'dominio/dinero',     ruta: '/js/dominio/dinero.js' },
+      { nombre: 'dominio/cantidad',   ruta: '/js/dominio/cantidad.js' },
+      { nombre: 'dominio/direccion',  ruta: '/js/dominio/direccion.js' },
+      { nombre: 'dominio/pedido',     ruta: '/js/dominio/pedido.js' },
+      { nombre: 'dominio/delivery',   ruta: '/js/dominio/delivery.js' },
+      { nombre: 'dominio/ingrediente', ruta: '/js/dominio/ingrediente.js' },
+      { nombre: 'db-core',            ruta: '/js/db-core.js' },
+      { nombre: 'db-inventario',      ruta: '/js/db-inventario.js' },
+      { nombre: 'db-fusion',          ruta: '/js/db-fusion.js' },
+      { nombre: 'db-shim',            ruta: '/js/db-shim.js' },
+      { nombre: 'db-appwrite',        ruta: '/js/db-appwrite.js' },
+      { nombre: 'db',                 ruta: '/js/db.js' },
+      { nombre: 'roles',              ruta: '/js/roles.js' },
+      { nombre: 'auth',               ruta: '/js/auth.js' },
+      { nombre: 'loader',             ruta: '/js/lib/loader.js' },
+      { nombre: 'pedido-service',     ruta: '/js/servicios/pedido-service.js' },
+      { nombre: 'delivery-service',   ruta: '/js/servicios/delivery-service.js' },
+      { nombre: 'inventario-service', ruta: '/js/servicios/inventario-service.js' },
+      { nombre: 'crear-pedido-mesa',  ruta: '/js/comandos/crear-pedido-mesa.js' },
+      { nombre: 'enviar-comanda',     ruta: '/js/comandos/enviar-comanda.js' },
+      { nombre: 'agregar-mesa',       ruta: '/js/comandos/agregar-mesa.js' },
+      { nombre: 'liberar-mesa',       ruta: '/js/comandos/liberar-mesa.js' },
+      { nombre: 'completar-subcomanda', ruta: '/js/comandos/completar-subcomanda.js' },
+      { nombre: 'pedido-repository',  ruta: '/js/repositorios/pedido-repository.js' },
+      { nombre: 'pedido-manager',     ruta: '/js/managers/pedido-manager.js' },
+      { nombre: 'turno-manager',      ruta: '/js/managers/turno-manager.js' },
+      { nombre: 'carta',              ruta: '/js/ui/carta.js' },
+      { nombre: 'comanda',            ruta: '/js/ui/comanda.js' },
+      { nombre: 'caja',               ruta: '/js/ui/caja.js' },
+      { nombre: 'cobro',              ruta: '/js/ui/cobro.js' },
+      { nombre: 'config',             ruta: '/js/ui/config.js' },
+      { nombre: 'cuenta',             ruta: '/js/ui/cuenta.js' },
+      { nombre: 'despensa',           ruta: '/js/ui/despensa.js' },
+      { nombre: 'eventos',            ruta: '/js/ui/eventos.js' },
+      { nombre: 'kds',                ruta: '/js/ui/kds.js' },
+      { nombre: 'menu',               ruta: '/js/ui/menu.js' },
+      { nombre: 'mesa-detalles',      ruta: '/js/ui/mesa-detalles.js' },
+      { nombre: 'mesas',              ruta: '/js/ui/mesas.js' },
+      { nombre: 'pedido-ui',          ruta: '/js/ui/pedido-ui.js' },
+      { nombre: 'perfil',             ruta: '/js/ui/perfil.js' },
+      { nombre: 'recetas',            ruta: '/js/ui/recetas.js' },
+      { nombre: 'reparto',            ruta: '/js/ui/reparto.js' },
+      { nombre: 'tickets',            ruta: '/js/ui/tickets.js' },
+      { nombre: 'guia-mesero',        ruta: '/js/modulos/interno/guia-mesero.js' },
+      { nombre: 'precarga-control',   ruta: '/js/modulos/interno/precarga-control.js' },
+      { nombre: 'eventos-en-vivo',    ruta: '/js/modulos/admin/eventos-en-vivo.js' },
+      { nombre: 'principal-cliente',  ruta: '/js/modulos/cliente/principal.js' },
+    ];
 
-  <script>
-    (function() {
-      var resultsEl = document.getElementById('results');
-      var passed = 0, failed = 0;
+    let todosOk = true;
 
-      function assert(condition, msg) {
-        if (condition) {
-          passed++;
-          resultsEl.innerHTML += '<div class="test pass">✔ ' + msg + '</div>';
-        } else {
-          failed++;
-          resultsEl.innerHTML += '<div class="test fail">✘ ' + msg + '</div>';
-        }
+    for (const mod of modulos) {
+      try {
+        await import(mod.ruta);
+        resultado.innerHTML += `<p style="color:green">✔ ${mod.nombre}</p>`;
+      } catch (error) {
+        resultado.innerHTML += `<p style="color:red">✘ ${mod.nombre}: ${error.message}</p>`;
+        console.error(`Error en ${mod.nombre}:`, error);
+        todosOk = false;
       }
+    }
 
-      async function runTests() {
-        resultsEl.innerHTML = '';
-        Logger.setLevel('ERROR');
-
-        // ── Suite 1: Iniciar DBAppwrite (sesión anónima) ──
-        resultsEl.innerHTML += '<h2>1. Iniciar DBAppwrite (TablesDB)</h2>';
-        var appwriteOk = await DBAppwrite.iniciar();
-        assert(appwriteOk === true, 'DBAppwrite.iniciar() exitoso');
-        assert(DBAppwrite.habilitado === true, 'DBAppwrite.habilitado = true');
-        if (!appwriteOk) {
-          resultsEl.innerHTML += '<div class="fail">No se pudo conectar a Appwrite. Revisa endpoint y projectId en localStorage.</div>';
-          return;
-        }
-
-        // ── Suite 2: Listar colecciones ──────────────────────
-        resultsEl.innerHTML += '<h2>2. Listar colecciones</h2>';
-        var colecciones = ['productos','pedidos','mesas','comandas','ingredientes','recetas','pedidos_delivery','usuarios','configuracion','precargas_cliente','eventos_en_vivo'];
-        for (var i = 0; i < colecciones.length; i++) {
-          try {
-            var lista = await DBAppwrite.listar(colecciones[i]);
-            assert(Array.isArray(lista), colecciones[i] + ': ' + lista.length + ' documentos');
-          } catch(e) {
-            assert(false, colecciones[i] + ': Error - ' + e.message);
-          }
-        }
-
-        // ── Suite 3: CRUD básico ─────────────────────────────
-        resultsEl.innerHTML += '<h2>3. CRUD básico en pedidos</h2>';
-        try {
-          var doc = {
-            mesa: 999, mozo: 'Test', comensales: 1, estado: 'abierta',
-            items: '[]', total: 0
-          };
-          var creado = await DBAppwrite.crear('pedidos', 'unique()', doc);
-          assert(!!creado && !!creado.id, 'Documento creado: ' + (creado ? creado.id : 'falló'));
-          var leido = await DBAppwrite.listar('pedidos').then(l => l.find(p => p.id === creado.id));
-          assert(leido && leido.mesa === 999, 'Lectura correcta');
-          await DBAppwrite.eliminar('pedidos', creado.id);
-          assert(true, 'Documento eliminado');
-        } catch(e) {
-          assert(false, 'Error CRUD: ' + e.message);
-        }
-
-        // ── Suite 4: Integración con Store ───────────────────
-        resultsEl.innerHTML += '<h2>4. Integración Appwrite → Store</h2>';
-        window.Auth = window.Auth || { getEspacioActivo: function() { return { id: 'esp_taberna' }; } };
-        window.PedidoManager = window.PedidoManager || { getTurnoActual: function() { return { id: 'test', estado: 'abierto' }; }, registrar: function() {} };
-
-        var productos = await DBAppwrite.listar('productos');
-        var pedidos = await DBAppwrite.listar('pedidos');
-        var mesas = await DBAppwrite.listar('mesas');
-        var ingredientes = await DBAppwrite.listar('ingredientes');
-        var recetas = await DBAppwrite.listar('recetas');
-
-        DB.productos = productos.map(p => DB._normalizarProducto(p));
-        DB.pedidos = pedidos;
-        DB.mesas = mesas.length ? mesas.map(m => DB._normalizarMesa(m)) : DB.mesas;
-        DB.ingredientes = ingredientes.map(i => DB._normalizarIngrediente(i));
-        DB.recetas = recetas;
-
-        Store.dispatch({ type: 'PRODUCTOS_INICIALIZAR', payload: DB.productos });
-        Store.dispatch({ type: 'PEDIDOS_INICIALIZAR', payload: DB.pedidos });
-        Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
-        Store.dispatch({ type: 'INGREDIENTES_INICIALIZAR', payload: DB.ingredientes });
-        Store.dispatch({ type: 'RECETAS_INICIALIZAR', payload: DB.recetas });
-
-        var state = Store.getState();
-        assert(state.productos.length === productos.length, 'Store tiene ' + state.productos.length + ' productos');
-        assert(state.pedidos.length === pedidos.length, 'Store tiene ' + state.pedidos.length + ' pedidos');
-        assert(state.ingredientes.length === ingredientes.length, 'Store tiene ingredientes');
-        assert(state.recetas.length === recetas.length, 'Store tiene recetas');
-
-        if (productos.length === 0 && pedidos.length === 0 && mesas.length === 0) {
-          resultsEl.innerHTML += '<div class="info">⚠️ Todas las colecciones están vacías. ¿Ejecutaste la migración inicial?</div>';
-        }
-
-        // ── Resumen ──────────────────────────────────────────
-        resultsEl.innerHTML += '<h2>Resultado</h2>';
-        resultsEl.innerHTML += '<p>' + passed + ' pasaron, ' + failed + ' fallaron.</p>';
-        if (failed === 0) {
-          resultsEl.innerHTML += '<div class="test pass">✔ Appwrite operativo y Store sincronizado.</div>';
-        }
-      }
-
-      window.addEventListener('load', function() {
-        setTimeout(runTests, 500);
-      });
-    })();
+    if (todosOk) {
+      resultado.innerHTML += '<hr><p style="color:green"><strong>Todos los módulos cargaron correctamente.</strong></p>';
+    } else {
+      resultado.innerHTML += '<hr><p style="color:red"><strong>Algunos módulos fallaron.</strong></p>';
+    }
   </script>
 </body>
 </html>

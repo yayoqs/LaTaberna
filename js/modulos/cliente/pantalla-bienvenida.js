@@ -1,19 +1,19 @@
 /* ================================================================
-   LaTaberna - PubPOS — Módulo
+   LaTaberna - PubPOS — Módulo (ES6)
    Archivo: js/modulos/cliente/pantalla-bienvenida.js
-   Versión: 1.0.7
-   Propósito: Pantalla de bienvenida post-login.
-             - Oculta la tarjeta de ingreso al vincular.
-             - Muestra una tarjeta de confirmación con detalles
-               de la mesa cuando el garzón la activa.
-   Dependencias: Auth, Store, EventBus, App
+   Versión: 2.1.6
+   Propósito: Sincroniza estado de permiso y mesa con el Store.
    ================================================================ */
+
+import { EventBus } from '../../lib/eventBus.js';
+import { Store } from '../../lib/store.js';
+import { Auth } from '../../auth.js';
 
 const PantallaBienvenida = (() => {
   let _vista = null;
   let _mesa = null;
   let _permitePrepedidos = false;
-  let _interfazActivada = false;   // evita re-renderizar la tarjeta activada
+  let _interfazActivada = false;
 
   function render() {
     if (_vista) return _vista;
@@ -35,8 +35,7 @@ const PantallaBienvenida = (() => {
         </button>
       </div>
 
-      <div class="welcome-container">
-        <!-- Tarjeta de ingreso (se oculta al vincular) -->
+      <div class="welcome-container" id="welcomeContainer">
         <div class="status-card" id="cardIngresoMesa">
           <h2><i class="fa-solid fa-chair" style="color:var(--color-accent)"></i> ¿Dónde te ubicas?</h2>
           <p style="color:var(--color-text-sec);font-size:0.9rem;">Ingresa el número de tu mesa física para activar tu sesión de atención.</p>
@@ -52,24 +51,21 @@ const PantallaBienvenida = (() => {
           </div>
         </div>
 
-        <!-- Tarjeta de espera / activación -->
-        <div class="status-card" id="cardEspera" style="display:none;">
-          <!-- Contenido dinámico: se llena en _verificarPermisoMesa() -->
-        </div>
+        <div class="status-card" id="cardEspera" style="display:none;"></div>
 
-        <div class="menu-grid">
-          <div class="action-card order-mode" id="cardGastronomica">
+        <div class="menu-grid" id="menuGridInicial">
+          <div class="action-card order-mode" id="cardGastronomicaInicial">
             <div class="action-icon"><i class="fa-solid fa-scroll"></i></div>
             <div class="action-details">
               <h4>Armar mi Pedido</h4>
-              <p id="mensajeGastro">Explora la carta digital y arma tu orden.</p>
+              <p id="mensajeGastroInicial">Vincula tu mesa para comenzar.</p>
             </div>
           </div>
-          <div class="action-card events-mode" id="cardEntretenimiento">
+          <div class="action-card events-mode" id="cardEntretenimientoInicial">
             <div class="action-icon"><i class="fa-solid fa-cake-candles"></i></div>
             <div class="action-details">
               <h4>Eventos en Vivo & Karaoke</h4>
-              <p id="mensajeEvento">Próximo evento a las 22:00 hrs</p>
+              <p id="mensajeEventoInicial">Próximo evento a las 22:00 hrs</p>
             </div>
           </div>
         </div>
@@ -86,17 +82,19 @@ const PantallaBienvenida = (() => {
   function _configurarEventos() {
     document.getElementById('btnGuardarMesa').addEventListener('click', _guardarMesa);
     document.getElementById('btnBarra').addEventListener('click', _vincularBarra);
-    document.getElementById('cardGastronomica').addEventListener('click', _irAlMenu);
-    document.getElementById('cardEntretenimiento').addEventListener('click', _irAEventos);
-    document.getElementById('btnLogout').addEventListener('click', () => {
-      if (typeof window.Auth !== 'undefined' && typeof window.Auth.logout === 'function') {
-        window.Auth.logout();
+    document.getElementById('btnLogout').addEventListener('click', () => { if (typeof Auth.logout === 'function') Auth.logout(); });
+    document.getElementById('cardEntretenimientoInicial').addEventListener('click', _irAEventos);
+    document.getElementById('cardGastronomicaInicial').addEventListener('click', () => {
+      if (!_permitePrepedidos) {
+        document.getElementById('mensajeGastroInicial').textContent = 'Espera la activación del garzón.';
+        return;
       }
+      _irAlMenu();
     });
   }
 
   function _actualizarPerfil() {
-    const nombre = window.Auth?.getNombre?.() || 'Comensal';
+    const nombre = Auth.getNombre() || 'Comensal';
     const iniciales = nombre.split(' ').map(n => n.charAt(0).toUpperCase()).slice(0, 2).join('');
     document.getElementById('bienvenidaNombre').textContent = nombre;
     document.getElementById('bienvenidaAvatar').textContent = iniciales;
@@ -106,41 +104,24 @@ const PantallaBienvenida = (() => {
     const input = document.getElementById('inputMesa');
     const valor = parseInt(input?.value, 10);
     const estadoEl = document.getElementById('estadoMesa');
-    
-    if (!valor || valor < 1) {
-      estadoEl.textContent = 'Ingresá un número válido.';
-      return;
-    }
-
-    const state = window.Store?.getState?.() || {};
+    if (!valor || valor < 1) { estadoEl.textContent = 'Ingresá un número válido.'; return; }
+    const state = Store.getState();
     const mesas = state.mesas || [];
     const mesaExiste = mesas.some(m => m.numero === valor);
-
-    if (!mesaExiste) {
-      estadoEl.textContent = `La mesa ${valor} no existe. Verificá el número.`;
-      return;
-    }
-
+    if (!mesaExiste) { estadoEl.textContent = `La mesa ${valor} no existe. Verificá el número.`; return; }
     _vincular(valor, estadoEl);
   }
 
-  function _vincularBarra() {
-    const estadoEl = document.getElementById('estadoMesa');
-    _vincular('barra', estadoEl);
-  }
+  function _vincularBarra() { _vincular('barra', document.getElementById('estadoMesa')); }
 
   function _vincular(mesaId, estadoEl) {
     _mesa = mesaId;
     estadoEl.textContent = `Vinculado a ${_mesa === 'barra' ? 'Barra' : 'Mesa ' + _mesa}.`;
-
-    if (typeof window.EventBus !== 'undefined') {
-      window.EventBus.emit('cliente:mesa_ingresada', { mesa: _mesa });
-    }
-
-    // Ocultar tarjeta de ingreso
+    EventBus.emit('cliente:mesa_ingresada', { mesa: _mesa });
     document.getElementById('cardIngresoMesa').style.display = 'none';
 
-    // Mostrar tarjeta de espera con contenido inicial
+    Store.dispatch({ type: 'CLIENTE_MESA_ASIGNADA', payload: _mesa });
+
     const cardEspera = document.getElementById('cardEspera');
     cardEspera.style.display = 'block';
     cardEspera.innerHTML = `
@@ -150,133 +131,170 @@ const PantallaBienvenida = (() => {
         <p style="font-size:0.9rem;font-weight:600;">Esperando validación del garzón...</p>
         <p style="color:var(--color-text-sec);font-size:0.8rem;">Estamos confirmando tu presencia en el mesón.</p>
       </div>
-      <span class="pre-order-badge visible" id="badgePrepedidos" style="display:none;">
-        <i class="fa-solid fa-wand-magic-sparkles"></i> Modo Pre-pedido Habilitado
-      </span>
     `;
-
-    _verificarPermisoMesa();
+    document.getElementById('mensajeGastroInicial').textContent = 'Espera la activación del garzón.';
   }
 
   function _verificarPermisoMesa() {
     if (!_mesa) return;
-    const state = window.Store?.getState?.() || {};
+    const state = Store.getState();
     const mesas = state.mesas || [];
-    const mesaActual = _mesa === 'barra'
-      ? mesas.find(m => m.numero === 0 || m.nombre === 'barra')
-      : mesas.find(m => m.numero === _mesa);
-      
+    const mesaActual = _mesa === 'barra' ? mesas.find(m => m.numero === 0 || m.nombre === 'barra') : mesas.find(m => m.numero === _mesa);
     const permite = mesaActual && mesaActual.permite_prepedidos === true;
 
     if (permite && !_interfazActivada) {
       _interfazActivada = true;
       _permitePrepedidos = true;
-
-      // Transformar la tarjeta de espera en la vista de activación
-      const cardEspera = document.getElementById('cardEspera');
-      const esBarra = _mesa === 'barra';
-      const icono = esBarra ? 'fa-solid fa-wine-bottle' : 'fa-solid fa-chair';
-      const titulo = esBarra ? 'Barra activada' : `Mesa ${_mesa} activada`;
-      const detalle = esBarra
-        ? 'Estás vinculado a la barra. Solo verás tus propios consumos.'
-        : '¡Todo listo! Podés armar tu pedido y disfrutar de La Taberna.';
-
-      cardEspera.innerHTML = `
-        <div style="text-align: center;">
-          <i class="${icono}" style="font-size: 2.5rem; color: var(--color-accent);"></i>
-          <h2 style="margin-top: 10px;">${titulo}</h2>
-          <p style="color: var(--color-text-sec); margin-top: 6px;">${detalle}</p>
-        </div>
-        <span class="pre-order-badge visible" style="display:inline-block; margin-top:15px;">
-          <i class="fa-solid fa-wand-magic-sparkles"></i> Modo Pre-pedido Habilitado
-        </span>
-      `;
-
-      document.getElementById('mensajeGastro').textContent = '🎉 ¡Pantalla Activada! Comenzá tu selección.';
+      Store.dispatch({ type: 'CLIENTE_PERMISO_PREPEDIDOS', payload: true });
+      _construirPanelControl();
     } else if (!permite && _interfazActivada) {
-      // Por si el garzón desactiva la mesa (improbable pero posible)
       _interfazActivada = false;
       _permitePrepedidos = false;
-      // Volver a mostrar el estado de espera
+      Store.dispatch({ type: 'CLIENTE_PERMISO_PREPEDIDOS', payload: false });
       const cardEspera = document.getElementById('cardEspera');
-      cardEspera.innerHTML = `
-        <h2>Mesa asignada: <span style="color:var(--color-accent)">${_mesa === 'barra' ? 'Barra' : 'Mesa ' + _mesa}</span></h2>
-        <div class="waiting-status">
-          <div class="spinner"></div>
-          <p style="font-size:0.9rem;font-weight:600;">Esperando validación del garzón...</p>
-          <p style="color:var(--color-text-sec);font-size:0.8rem;">Estamos confirmando tu presencia en el mesón.</p>
-        </div>
-        <span class="pre-order-badge visible" id="badgePrepedidos" style="display:none;"></span>
-      `;
-      document.getElementById('mensajeGastro').textContent = 'Explora la carta digital y arma tu orden.';
+      if (cardEspera) {
+        cardEspera.style.display = 'block';
+        cardEspera.innerHTML = `
+          <h2>Mesa asignada: <span style="color:var(--color-accent)">${_mesa === 'barra' ? 'Barra' : 'Mesa ' + _mesa}</span></h2>
+          <div class="waiting-status"><div class="spinner"></div><p style="font-size:0.9rem;font-weight:600;">Esperando validación del garzón...</p><p style="color:var(--color-text-sec);font-size:0.8rem;">Estamos confirmando tu presencia en el mesón.</p></div>
+        `;
+      }
+      document.getElementById('mensajeGastroInicial').textContent = 'Espera la activación del garzón.';
     }
+  }
+
+  function _construirPanelControl() {
+    const container = document.getElementById('welcomeContainer');
+    const esBarra = _mesa === 'barra';
+    const nombreMesa = esBarra ? 'Barra' : `Mesa ${_mesa}`;
+
+    container.innerHTML = `
+      <div class="hero-row">
+        <div class="hero-estado">
+          <div class="icono-mesa">
+            <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+              <rect x="30" y="30" width="40" height="40" rx="4" fill="none" stroke="var(--color-accent)" stroke-width="3" />
+              <rect x="42" y="14" width="16" height="10" rx="3" fill="none" stroke="var(--color-accent)" stroke-width="2" />
+              <rect x="76" y="42" width="10" height="16" rx="3" fill="none" stroke="var(--color-accent)" stroke-width="2" />
+              <rect x="42" y="76" width="16" height="10" rx="3" fill="none" stroke="var(--color-accent)" stroke-width="2" />
+              <rect x="14" y="42" width="10" height="16" rx="3" fill="none" stroke="var(--color-accent)" stroke-width="2" />
+              <text x="50" y="55" text-anchor="middle" fill="var(--color-accent)" font-size="16" font-weight="800">${esBarra ? 'B' : _mesa}</text>
+            </svg>
+          </div>
+          <h1>${nombreMesa}</h1>
+          <p>${esBarra ? 'Estás en la barra. Solo verás tus propios consumos.' : `Te encuentras en la mesa ${_mesa}. ¡Todo listo para disfrutar!`}</p>
+        </div>
+        <div class="sidebar-comensales" id="sidebarComensales">
+          <h4><i class="fa-solid fa-users"></i> Comensales</h4>
+          <div class="avatar-list-vertical" id="listaComensales">
+            <div class="avatar-mini activo" id="avatarPrincipal"></div>
+          </div>
+          <button class="btn-agregar-comensal" id="btnAgregarComensal">+</button>
+        </div>
+      </div>
+      <div class="acciones-grid">
+        <button class="btn-accion btn-pedido" id="btnHacerPedido"><i class="fa-solid fa-scroll"></i> Hacer un Pedido</button>
+        <button class="btn-accion btn-llamar" id="btnLlamarGarzon"><i class="fa-solid fa-bell"></i> Llamar al Garzón</button>
+      </div>
+      <div class="pedido-vistazo" id="pedidoVistazo">
+        <div class="pedido-icono">📋</div>
+        <div class="pedido-detalle"><h4>Mi Pedido</h4><p id="textoEstadoPedido">Aún no has hecho ningún pedido.</p></div>
+        <div class="pedido-badge" id="badgeCantidadPedidos" style="display:none;">0 activo</div>
+      </div>
+      <div class="menu-grid">
+        <div class="action-card order-mode" id="cardGastronomica"><div class="action-icon"><i class="fa-solid fa-scroll"></i></div><div class="action-details"><h4>Armar mi Pedido</h4><p>Explora la carta digital y arma tu orden.</p></div></div>
+        <div class="action-card events-mode" id="cardEntretenimiento"><div class="action-icon"><i class="fa-solid fa-cake-candles"></i></div><div class="action-details"><h4>Eventos en Vivo & Karaoke</h4><p id="mensajeEvento">Próximo evento a las 22:00 hrs</p></div></div>
+      </div>
+    `;
+
+    const iniciales = Auth.getNombre()?.split(' ').map(n => n.charAt(0).toUpperCase()).slice(0, 2).join('') || '??';
+    const avatarPrincipal = document.getElementById('avatarPrincipal');
+    if (avatarPrincipal) avatarPrincipal.textContent = iniciales;
+
+    document.getElementById('btnHacerPedido').addEventListener('click', _irAlMenu);
+    document.getElementById('btnLlamarGarzon').addEventListener('click', _llamarGarzon);
+    document.getElementById('cardGastronomica').addEventListener('click', _irAlMenu);
+    document.getElementById('cardEntretenimiento').addEventListener('click', _irAEventos);
+    document.getElementById('btnAgregarComensal').addEventListener('click', _agregarComensal);
+
+    EventBus.on('precargas_cliente:actualizada', _actualizarVistazoPedido);
+    _actualizarVistazoPedido();
+  }
+
+  function _llamarGarzon() {
+    EventBus.emit('cliente:llamar_garzon', { mesa: _mesa });
+    const btn = document.getElementById('btnLlamarGarzon');
+    if (btn) {
+      btn.innerHTML = '<i class="fa-solid fa-check"></i> Garzón notificado';
+      btn.style.pointerEvents = 'none';
+      setTimeout(() => { btn.innerHTML = '<i class="fa-solid fa-bell"></i> Llamar al Garzón'; btn.style.pointerEvents = ''; }, 3000);
+    }
+  }
+
+  function _agregarComensal() {
+    const nombre = prompt('Nombre del nuevo comensal:');
+    if (!nombre) return;
+    const iniciales = nombre.split(' ').map(n => n.charAt(0).toUpperCase()).slice(0, 2).join('');
+    const lista = document.getElementById('listaComensales');
+    if (lista) {
+      const avatar = document.createElement('div');
+      avatar.className = 'avatar-mini';
+      avatar.textContent = iniciales;
+      avatar.title = nombre;
+      lista.appendChild(avatar);
+    }
+    EventBus.emit('cliente:comensal_agregado', { mesa: _mesa, nombre, iniciales });
+  }
+
+  function _actualizarVistazoPedido() {
+    const state = Store.getState();
+    const precargas = state.precargas_cliente || [];
+    const misPrecargas = precargas.filter(p => p.id_usuario === (Auth.getAppwriteUserId?.() || ''));
+    const texto = document.getElementById('textoEstadoPedido');
+    const badge = document.getElementById('badgeCantidadPedidos');
+    if (misPrecargas.length === 0) { if (texto) texto.textContent = 'Aún no has hecho ningún pedido.'; if (badge) badge.style.display = 'none'; return; }
+    const ultima = misPrecargas[misPrecargas.length - 1];
+    const items = typeof ultima.productos === 'string' ? JSON.parse(ultima.productos) : ultima.productos;
+    const totalItems = items.reduce((sum, i) => sum + i.qty, 0);
+    if (texto) texto.innerHTML = `${items[0]?.nombre || 'Producto'} x${totalItems} — <span style="color:#f59e0b;">${ultima.estado || 'pendiente'}</span>`;
+    if (badge) { badge.style.display = 'inline-block'; badge.textContent = `${misPrecargas.length} activo${misPrecargas.length > 1 ? 's' : ''}`; }
   }
 
   function obtenerMesa() { return _mesa; }
   function permitePrepedidos() { return _permitePrepedidos; }
 
-  function _irAlMenu() {
-    if (!_mesa) {
-      return;
-    }
-    if (!_permitePrepedidos) {
-      return;
-    }
-    if (typeof window.App !== 'undefined' && typeof window.App.showView === 'function') {
-      window.App.showView('menu');
-    }
-  }
-
-  function _irAEventos() {
-    if (typeof window.App !== 'undefined' && typeof window.App.showView === 'function') {
-      window.App.showView('eventos');
-    }
-  }
+  function _irAlMenu() { if (!_mesa || !_permitePrepedidos) return; EventBus.emit('app:cambiarVista', 'menu'); }
+  function _irAEventos() { EventBus.emit('app:cambiarVista', 'eventos'); }
 
   function mostrar() {
     if (_vista) {
       const viewMenu = document.getElementById('view-menu');
       if (viewMenu) viewMenu.classList.remove('active');
-
       _vista.classList.add('active');
       _actualizarPerfil();
-      // Si ya estaba vinculado, la tarjeta de ingreso debe estar oculta
       if (_mesa) {
-        document.getElementById('cardIngresoMesa').style.display = 'none';
-        document.getElementById('cardEspera').style.display = 'block';
-        _verificarPermisoMesa();
+        const cardIngreso = document.getElementById('cardIngresoMesa');
+        const cardEspera = document.getElementById('cardEspera');
+        if (_interfazActivada) { if (cardIngreso) cardIngreso.style.display = 'none'; if (cardEspera) cardEspera.style.display = 'none'; }
+        else { if (cardIngreso) cardIngreso.style.display = 'none'; if (cardEspera) cardEspera.style.display = 'block'; }
       }
     }
   }
 
-  function ocultar() {
-    if (_vista) {
-      _vista.classList.remove('active');
-    }
-  }
+  function ocultar() { if (_vista) _vista.classList.remove('active'); }
 
   function _initRealtime() {
-    if (typeof window.EventBus !== 'undefined') {
-      window.EventBus.on('mesas:actualizada', (datos) => {
-        if (_mesa && datos) {
-          const coincide = _mesa === 'barra'
-            ? (datos.numero === 0 || datos.nombre === 'barra')
-            : (datos.numero === _mesa);
-          if (coincide) _verificarPermisoMesa();
-        }
-      });
-      window.EventBus.on('eventos_en_vivo:actualizada', () => {
-        const state = window.Store?.getState?.() || {};
-        const eventos = state.eventos_en_vivo || [];
-        const activo = eventos.find(e => e.estado === 'activo');
-        const mensaje = document.getElementById('mensajeEvento');
-        if (activo && mensaje) {
-          mensaje.textContent = `🎤 ${activo.tipo || 'Evento'} en vivo ahora`;
-        } else if (mensaje) {
-          mensaje.textContent = 'Próximo evento a las 22:00 hrs';
-        }
-      });
-    }
+    EventBus.on('mesas:actualizada', (datos) => {
+      if (_mesa && datos) { const coincide = _mesa === 'barra' ? (datos.numero === 0 || datos.nombre === 'barra') : (datos.numero === _mesa); if (coincide) _verificarPermisoMesa(); }
+    });
+    EventBus.on('eventos_en_vivo:actualizada', () => {
+      const state = Store.getState();
+      const eventos = state.eventos_en_vivo || [];
+      const activo = eventos.find(e => e.estado === 'activo');
+      const mensaje = document.getElementById('mensajeEvento') || document.getElementById('mensajeEventoInicial');
+      if (activo && mensaje) mensaje.textContent = `🎤 ${activo.tipo || 'Evento'} en vivo ahora`;
+      else if (mensaje) mensaje.textContent = 'Próximo evento a las 22:00 hrs';
+    });
   }
 
   return { render, mostrar, ocultar, obtenerMesa, permitePrepedidos };

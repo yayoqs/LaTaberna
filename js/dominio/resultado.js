@@ -1,11 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — DOMINIO JS (ES6)
    Archivo: js/dominio/resultado.js
-   Versión: 1.1.0
+   Versión: 1.1.2
    Propósito: Objeto de Valor Resultado: patrón Either para éxito/fallo.
-              Migrado a módulo ES6 con export.
-   Dependencias: (ninguna externa)
+              Sin asignaciones window.
    ================================================================ */
+
 export class Resultado {
   constructor(exito, datos = null, error = null) {
     this._exito = exito;
@@ -30,6 +30,3 @@ export class Resultado {
     return this._exito ? `Éxito: ${JSON.stringify(this._datos)}` : `Error: ${this._error}`;
   }
 }
-
-// Retrocompatibilidad con scripts legacy
-window.Resultado = Resultado;

@@ -1,10 +1,15 @@
 /* ================================================================
-   LaTaberna - PubPOS — MÓDULO JS
+   LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-core.js
-   Versión: 1.0.0
+   Versión: 1.0.6
    Propósito: Núcleo de datos: mesas, pedidos, productos, persistencia local.
+              Incluye imports de Logger, EventBus.
    ================================================================ */
-const DBCore = (function() {
+
+import { Logger } from './lib/logger.js';
+import { EventBus } from './lib/eventBus.js';
+
+export const DBCore = (function() {
   const module = {};
 
   module.productos = [];
@@ -64,8 +69,8 @@ const DBCore = (function() {
       total: this._validarNumero(pd.total, 0),
       estado: ['pendiente','en_preparacion','en_camino','entregado'].includes(pd.estado) ? pd.estado : 'pendiente',
       repartidor: this._validarString(pd.repartidor, ''),
-      creadoEn: pd.creadoEn || pd.$createdAt || pd.created_at || new Date().toISOString(),  // ← actualizado
-      actualizadoEn: pd.actualizadoEn || pd.$updatedAt || pd.updated_at || null,              // ← nuevo
+      creadoEn: pd.creadoEn || pd.$createdAt || pd.created_at || new Date().toISOString(),
+      actualizadoEn: pd.actualizadoEn || pd.$updatedAt || pd.updated_at || null,
       observaciones: this._validarString(pd.observaciones, '')
     };
   };
@@ -92,7 +97,7 @@ const DBCore = (function() {
     return destinos.includes(val) ? val : 'cocina';
   };
   module._validarEstadoMesa = function(val) {
-    const estados = ['libre', 'ocupada', 'esperando', 'cuenta', 'fusionada'];
+    const estados = ['libre', 'ocupada', 'esperando', 'cuenta', 'fusionada', 'pagada'];
     return estados.includes(val) ? val : 'libre';
   };
 
@@ -234,13 +239,11 @@ const DBCore = (function() {
   /* ── GUARDADO ────────────────────────────────────────────── */
   module.saveConfig = function() {
     localStorage.setItem('pubpos_config', JSON.stringify(this.config));
-    if (typeof Store !== 'undefined') Store.dispatch({ type: 'CONFIG_INICIALIZAR', payload: this.config });
   };
 
   module.saveMesas = function() {
     localStorage.setItem('pubpos_mesas', JSON.stringify(this.mesas));
     EventBus.emit('mesas:guardadas', this.mesas);
-    if (typeof Store !== 'undefined') Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: this.mesas });
   };
 
   module.saveComandas = function() {
@@ -251,18 +254,15 @@ const DBCore = (function() {
   module.savePedidos = function() {
     localStorage.setItem('pubpos_pedidos', JSON.stringify(this.pedidos));
     EventBus.emit('pedidos:guardados', this.pedidos);
-    if (typeof Store !== 'undefined') Store.dispatch({ type: 'PEDIDOS_INICIALIZAR', payload: this.pedidos });
   };
 
   module.saveMozos = function() {
     localStorage.setItem('pubpos_mozos', JSON.stringify(this.mozos));
-    if (typeof Store !== 'undefined') Store.dispatch({ type: 'MOZOS_INICIALIZAR', payload: this.mozos });
   };
 
   module.savePedidosDelivery = function() {
     localStorage.setItem('pubpos_pedidos_delivery', JSON.stringify(this.pedidosDelivery));
     EventBus.emit('pedidosDelivery:guardados', this.pedidosDelivery);
-    if (typeof Store !== 'undefined') Store.dispatch({ type: 'PEDIDOSDELIVERY_INICIALIZAR', payload: this.pedidosDelivery });
   };
 
   /* ── GESTIÓN DE PEDIDOS (mesa) ───────────────────────────── */
@@ -273,8 +273,8 @@ const DBCore = (function() {
       estado: 'abierta',
       items: '[]',
       total: 0,
-      creadoEn: new Date().toISOString(),         // ← actualizado
-      actualizadoEn: new Date().toISOString()      // ← nuevo
+      creadoEn: new Date().toISOString(),
+      actualizadoEn: new Date().toISOString()
     };
     this.pedidos.push(nuevo);
     this.savePedidos();
@@ -287,7 +287,6 @@ const DBCore = (function() {
       if (cambios.items && Array.isArray(cambios.items)) {
         cambios.items = JSON.stringify(cambios.items);
       }
-      // Asegurar que actualizadoEn se actualice
       cambios.actualizadoEn = new Date().toISOString();
       this.pedidos[idx] = { ...this.pedidos[idx], ...cambios };
       this.savePedidos();
@@ -308,7 +307,7 @@ const DBCore = (function() {
     const nuevo = this._normalizarPedidoDelivery({
       ...datos,
       id: 'deliv_' + Date.now(),
-      creadoEn: new Date().toISOString()          // ← actualizado
+      creadoEn: new Date().toISOString()
     });
     this.pedidosDelivery.push(nuevo);
     this.savePedidosDelivery();
@@ -318,7 +317,6 @@ const DBCore = (function() {
   module.actualizarPedidoDelivery = function(id, cambios) {
     const idx = this.pedidosDelivery.findIndex(p => p.id === id);
     if (idx >= 0) {
-      // Asegurar que actualizadoEn se refresque
       cambios.actualizadoEn = new Date().toISOString();
       this.pedidosDelivery[idx] = { ...this.pedidosDelivery[idx], ...cambios };
       this.savePedidosDelivery();
@@ -334,8 +332,7 @@ const DBCore = (function() {
   return module;
 })();
 
-/* ── FÁBRICA DE MESA VACÍA ────────────────────────────── */
-function mesaVacia(num, zona = 'salon') {
+export function mesaVacia(num, zona = 'salon') {
   return {
     numero: num,
     estado: 'libre',

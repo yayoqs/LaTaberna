@@ -1,12 +1,17 @@
 /* ================================================================
-   LaTaberna - PubPOS — UI JS
+   LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/eventos.js
-   Versión: 1.0.0
-   Propósito: Vista de gestión de eventos administrativos (carpetas Drive, presupuestos, menús) usando Google Apps Script.
-   Dependencias: js/db.js (DB.llamar), js/auth.js, js/lib/logger.js, js/lib/eventBus.js, js/utils.js (showToast)
+   Versión: 1.0.2
+   Propósito: Vista de gestión de eventos administrativos (carpetas Drive, presupuestos, menús).
+              Sin onclick. Usa addEventListener.
    ================================================================ */
-   
-   
+
+import { DB } from '../db.js';
+import { Auth } from '../auth.js';
+import { Logger } from '../lib/logger.js';
+import { EventBus } from '../lib/eventBus.js';
+import { showToast } from '../utils.js';
+
 const Eventos = (() => {
 
   function _asegurarVista() {
@@ -19,10 +24,10 @@ const Eventos = (() => {
       <div class="view-toolbar">
         <h2><i class="fas fa-calendar-alt"></i> Gestión de Eventos</h2>
         <div class="toolbar-actions">
-          <button class="btn-primary" onclick="Eventos.mostrarFormulario()" data-rol="artista,eventos,admin,master">
+          <button class="btn-primary" id="btnNuevoEvento" data-rol="artista,eventos,admin,master">
             <i class="fas fa-plus"></i> Nuevo Evento
           </button>
-          <button class="btn-secondary" onclick="Eventos.render()">
+          <button class="btn-secondary" id="btnActualizarEventos">
             <i class="fas fa-sync-alt"></i> Actualizar
           </button>
         </div>
@@ -41,6 +46,10 @@ const Eventos = (() => {
     `;
     const referencia = document.getElementById('toastContainer') || document.body.lastChild;
     document.body.insertBefore(main, referencia);
+
+    // Vincular eventos del toolbar
+    document.getElementById('btnNuevoEvento').addEventListener('click', mostrarFormulario);
+    document.getElementById('btnActualizarEventos').addEventListener('click', render);
   }
 
   async function render() {
@@ -94,7 +103,7 @@ const Eventos = (() => {
         <div class="modal-small">
           <div class="modal-header">
             <h3><i class="fas fa-calendar-plus"></i> Nuevo Evento</h3>
-            <button class="modal-close" onclick="Eventos.cerrarFormulario()"><i class="fas fa-times"></i></button>
+            <button class="modal-close" id="btnCerrarFormularioEvento"><i class="fas fa-times"></i></button>
           </div>
           <div class="modal-small-body">
             <label>Fecha *</label><input type="date" id="evtFecha" value="${new Date().toISOString().slice(0,10)}">
@@ -108,13 +117,18 @@ const Eventos = (() => {
             <label>Lugar</label><input type="text" id="evtLugar" placeholder="Salón principal, terraza, etc.">
             <label>Observaciones</label><input type="text" id="evtObs" placeholder="Detalles adicionales">
             <div class="modal-small-footer">
-              <button class="btn-secondary" onclick="Eventos.cerrarFormulario()">Cancelar</button>
-              <button class="btn-primary" onclick="Eventos.guardarEvento()"><i class="fas fa-save"></i> Crear Evento</button>
+              <button class="btn-secondary" id="btnCancelarFormularioEvento">Cancelar</button>
+              <button class="btn-primary" id="btnGuardarEvento"><i class="fas fa-save"></i> Crear Evento</button>
             </div>
           </div>
         </div>
       `;
       document.body.appendChild(modal);
+
+      // Vincular eventos del modal
+      document.getElementById('btnCerrarFormularioEvento').addEventListener('click', cerrarFormulario);
+      document.getElementById('btnCancelarFormularioEvento').addEventListener('click', cerrarFormulario);
+      document.getElementById('btnGuardarEvento').addEventListener('click', guardarEvento);
     }
     modal.style.display = 'flex';
   }
@@ -177,8 +191,4 @@ const Eventos = (() => {
   };
 })();
 
-// Compatibilidad global
-window.Eventos = Eventos;
-
-// Exportar como módulo ES6
-export default Eventos;
+export { Eventos };

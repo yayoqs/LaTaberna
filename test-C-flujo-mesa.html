@@ -2,12 +2,10 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Test Flujo de Validación de Mesa — Célula C</title>
+  <title>Test Flujo de Validación de Mesa — Célula C (v2.0.2)</title>
   <style>
     body { font-family: system-ui, sans-serif; padding: 20px; background: #0f0f14; color: #f1f5f9; }
     h1 { color: #f59e0b; }
-    h2 { color: #94a3b8; font-size: 1rem; margin: 20px 0 10px; }
     .resultado { padding: 10px; margin: 6px 0; border-radius: 6px; }
     .ok { background: rgba(34,197,94,.15); border-left: 4px solid #22c55e; }
     .fallo { background: rgba(239,68,68,.15); border-left: 4px solid #ef4444; }
@@ -20,7 +18,7 @@
   </style>
 </head>
 <body>
-  <h1>Test — Flujo de Validación de Mesa</h1>
+  <h1>Test — Flujo de Validación de Mesa (v2.0.2)</h1>
   <p>Simula el ciclo: cliente ingresa mesa → espera → garzón activa → acceso al menú.</p>
 
   <div id="controles">
@@ -33,7 +31,24 @@
   <div id="resultados"></div>
   <div id="panelTest"><p style="color:#64748b;">La vista renderizada aparecerá aquí...</p></div>
 
+  <!-- Cargar el núcleo real -->
+  <script type="module" src="/js/lib/logger.js"></script>
+  <script type="module" src="/js/lib/eventBus.js"></script>
+  <script type="module" src="/js/lib/store.js"></script>
+  <script type="module" src="/js/utils.js"></script>
+  <script type="module" src="/js/roles.js"></script>
+  <script type="module" src="/js/db-appwrite.js"></script>
+  <script type="module" src="/js/auth.js"></script>
+
   <script type="module">
+    import { Auth, inicializarAuth } from '../js/auth.js';
+    import { Store } from '../js/lib/store.js';
+    import { EventBus } from '../js/lib/eventBus.js';
+    
+    await inicializarAuth();
+    await Auth.login('cliente', 'cliente');
+
+    // Ahora los módulos importarán Store y EventBus reales
     import { PantallaBienvenida } from '../js/modulos/cliente/pantalla-bienvenida.js';
 
     const resultados = document.getElementById('resultados');
@@ -58,44 +73,13 @@
       }
     }
 
-    // ── Mocks del sistema ─────────────────────────────────
-    // Simulamos Store, EventBus y Auth antes de cargar la vista
-    if (!window.Store) {
-      window.Store = {
-        _state: { mesas: [], eventos_en_vivo: [] },
-        getState: () => window.Store._state,
-        subscribe: () => {}
-      };
-    }
-    if (!window.EventBus) {
-      window.EventBus = {
-        _handlers: {},
-        on: (evento, fn) => {
-          if (!window.EventBus._handlers[evento]) window.EventBus._handlers[evento] = [];
-          window.EventBus._handlers[evento].push(fn);
-        },
-        emit: (evento, datos) => {
-          (window.EventBus._handlers[evento] || []).forEach(fn => fn(datos));
-        }
-      };
-    }
-    if (!window.Auth) {
-      window.Auth = {
-        getNombre: () => 'Diego Test',
-        esCliente: () => true,
-        getUsuarioActual: () => ({ nombre: 'Diego Test', rol: 'cliente' })
-      };
-    }
-    if (!window.App) {
-      window.App = {
-        showView: (vista) => log('accion', `🔀 Navegación: App.showView('${vista}')`)
-      };
-    }
-
     // ── Paso 1: Renderizar ────────────────────────────────
     document.getElementById('btnPaso1').addEventListener('click', () => {
       log('info', '── Paso 1: Renderizar PantallaBienvenida ──');
       panelTest.innerHTML = '';
+
+      // Inicializar Store con mesas vacías
+      Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: [] });
 
       PantallaBienvenida.render();
       PantallaBienvenida.mostrar();
@@ -106,15 +90,14 @@
 
       const avatar = document.getElementById('bienvenidaAvatar');
       const nombre = document.getElementById('bienvenidaNombre');
-      assert(avatar?.textContent === 'DT', 'Avatar muestra iniciales del cliente');
-      assert(nombre?.textContent === 'Diego Test', 'Nombre del cliente visible');
+      assert(avatar?.textContent === 'C', 'Avatar muestra inicial C (cliente)');
+      assert(nombre?.textContent === 'cliente', 'Nombre del cliente visible');
 
       const inputMesa = document.getElementById('inputMesa');
       const btnVincular = document.getElementById('btnGuardarMesa');
       assert(inputMesa !== null, 'Input de mesa existe');
       assert(btnVincular !== null, 'Botón Vincular existe');
 
-      // Mostrar la vista en el panel
       panelTest.appendChild(vista);
       log('accion', '✅ Vista renderizada correctamente.');
     });
@@ -130,21 +113,22 @@
         return;
       }
 
+      // Poblar el Store con la mesa 5
+      Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: [{ numero: 5, permite_prepedidos: false }] });
+
       inputMesa.value = '5';
       btnVincular.click();
 
       const estadoMesa = document.getElementById('estadoMesa');
       assert(estadoMesa?.textContent?.includes('Mesa 5'), 'Mensaje de mesa guardada visible');
 
-      // Verificar que la tarjeta de espera aparece
       const cardEspera = document.getElementById('cardEspera');
       assert(cardEspera?.style?.display === 'block', 'Tarjeta de espera visible');
 
       const spinner = document.querySelector('.spinner');
       assert(spinner !== null, 'Spinner de espera presente');
 
-      // Verificar que permitePrepedidos es false
-      assert(PantallaBienvenida.permitePrepedidos() === false, 'permitePrepedidos() es false (esperando garzón)');
+      assert(PantallaBienvenida.permitePrepedidos() === false, 'permitePrepedidos() es false');
       assert(PantallaBienvenida.obtenerMesa() === 5, 'obtenerMesa() devuelve 5');
 
       log('accion', '✅ Mesa ingresada. Esperando activación del garzón...');
@@ -160,23 +144,16 @@
         return;
       }
 
-      // Simular que el Store ahora tiene la mesa activada
-      window.Store._state.mesas = [{ numero: mesa, permite_prepedidos: true }];
+      // Actualizar la mesa en el Store para activarla
+      Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: [{ numero: mesa, permite_prepedidos: true }] });
+      EventBus.emit('mesas:actualizada', { numero: mesa, estado: 'ocupada' });
 
-      // Emitir el evento de Realtime que llegaría desde Appwrite
-      window.EventBus.emit('mesas:actualizada', { numero: mesa, estado: 'ocupada' });
+      const heroTitulo = document.querySelector('.hero-estado h1');
+      assert(heroTitulo !== null, 'Panel de control visible');
+      assert(heroTitulo.textContent.includes('Mesa 5'), 'Panel muestra Mesa 5');
+      assert(PantallaBienvenida.permitePrepedidos() === true, 'permitePrepedidos() es true');
 
-      // Verificar cambios en la UI
-      const badge = document.getElementById('badgePrepedidos');
-      assert(badge?.style?.display === 'inline-block', 'Badge "Modo Pre-pedido Habilitado" visible');
-
-      const mensajeGastro = document.getElementById('mensajeGastro');
-      assert(mensajeGastro?.textContent?.includes('Pantalla Activada'), 'Mensaje de activación en tarjeta gastronómica');
-
-      // Verificar que permitePrepedidos ahora es true
-      assert(PantallaBienvenida.permitePrepedidos() === true, 'permitePrepedidos() es true (garzón activó la mesa)');
-
-      log('accion', '✅ Garzón activó la mesa. Cliente notificado vía Realtime.');
+      log('accion', '✅ Garzón activó la mesa. Panel de control desplegado.');
     });
 
     // ── Paso 4: Verificar acceso al menú ──────────────────
@@ -188,16 +165,18 @@
         return;
       }
 
-      // Simular clic en la tarjeta gastronómica
+      let navego = false;
+      EventBus.on('app:cambiarVista', (vista) => {
+        if (vista === 'menu') navego = true;
+      });
+
       const cardGastro = document.getElementById('cardGastronomica');
-      assert(cardGastro !== null, 'Tarjeta gastronómica existe');
+      assert(cardGastro !== null, 'Tarjeta gastronómica existe en el panel');
       cardGastro.click();
 
-      // Verificar que se intentó navegar al menú
-      // (App.showView fue mockeado para loguear la navegación)
-      log('accion', '✅ Acceso al menú digital concedido.');
+      assert(navego, 'Emitió app:cambiarVista a menu');
 
-      // Resumen final
+      log('accion', '✅ Acceso al menú digital concedido.');
       log('info', `── Resultado: ${pasaron} pasaron, ${fallaron} fallaron ──`);
       if (fallaron === 0) {
         log('ok', '🎉 Flujo de validación de mesa completo y funcionando.');

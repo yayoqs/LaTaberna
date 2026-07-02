@@ -1,75 +1,188 @@
-# 📡 Catálogo de Eventos del Sistema – La Taberna (v2.1)
+┌──────────────────────────────────────────────┐
+│ REMITENTE: Coordinador de Integración        │
+│ FECHA:     2026-07-01 23:59 UTC              │
+│ TIPO:      DOCUMENTO OFICIAL                 │
+│ REFERENCIA: Catálogo de Eventos del Sistema  │
+└──────────────────────────────────────────────┘
 
-> **Convención de nombres:** `modulo:accion` (ej: `mesa:actualizada`, `cliente:precarga_enviada`).
+# 📡 Catálogo de Eventos del Sistema – La Taberna (v3.0)
 
----
-
-## Eventos emitidos por el Núcleo (Core)
-
-| Evento | Payload | Cuándo se emite |
-|--------|---------|-----------------|
-| `mesa:actualizada` | `{ mesa: number, estado: string }` | Al cambiar el estado de una mesa |
-| `mesa:liberada` | `{ numero: number }` | Al liberar una mesa después del pago |
-| `mesas:guardadas` | `array de mesas` | Al sincronizar todas las mesas |
-| `pedido:creado` | `objeto pedido` | Al crear un nuevo pedido |
-| `pedido:cerrado` | `{ mesa: number, pedidoId: string, total: number, formaPago: string }` | Al cerrar un pedido |
-| `comanda:enviada` | `objeto comanda` | Al enviar una comanda a cocina/barra |
-| `comanda:lista` | `{ id: string, mesa: number }` | Al marcar una comanda como lista |
-| `comandas:guardadas` | `array de comandas` | Al sincronizar todas las comandas |
-| `productos:cargados` | `array de productos` | Al cargar/actualizar productos |
-| `recetas:actualizadas` | *(sin payload)* | Al modificar recetas (señal para refrescar) |
-| `inventario:actualizado` | *(sin payload)* | Al cambiar el inventario |
-| `inventario:stock_bajo` | `{ ingrediente: string, stock: number, unidad: string }` | Al detectar stock bajo |
-| `sincronizacion:completada` | *(sin payload)* | Al completar una sincronización |
-| `db:inicializada` | *(sin payload)* | Al terminar la carga inicial |
-| `vista:cambiada` | `string` (nombre de vista) | Al cambiar de pestaña en la UI |
+**Última actualización:** 2026-07-01
 
 ---
 
-## Eventos Genéricos de Realtime (v2.10+)
+## Convenciones
 
-Para **cada colección** definida en `DBAppwrite.COLECCIONES`, el sistema emite automáticamente:
-
-| Evento | Payload | Cuándo se emite |
-|--------|---------|-----------------|
-| `{coleccion}:actualizada` | `objeto documento` (el documento modificado) | Al crearse, actualizarse o eliminarse un documento en Appwrite |
-
-**Ejemplos:**
-- `productos:actualizada` → payload: `{ id: 'prod_1', nombre: '...', precio: 1500, ... }`
-- `precargas_cliente:actualizada` → payload: `{ id: 'pre_1', mesa: 5, items: [...], estado: 'pendiente', ... }`
-- `eventos_en_vivo:actualizada` → payload: `{ id: 'evt_1', tipo: 'bingo', datos: {...}, estado: 'activo', ... }`
+- **Nombre del evento:** `modulo:accion` (ej: `mesa:actualizada`, `cliente:precarga_enviada`)
+- **Payload:** objeto JSON con los datos del evento
+- **Emisor:** módulo que emite el evento
+- **Consumidores:** módulos que se suscriben al evento
 
 ---
 
-## Eventos de la Célula C (Frontend Cliente)
+## 1. Eventos del Núcleo (Core)
 
-| Evento | Payload | Cuándo se emite |
-|--------|---------|-----------------|
-| `cliente:precarga_enviada` | `{ id: string, mesa: number, items: array, clienteId: string }` | Al confirmar una precarga desde el menú cliente |
-| `cliente:cuenta_creada` | `{ nombre: string, timestamp: number }` | Al registrarse un nuevo cliente desde el frontend |
-
----
-
-## Eventos de la Célula D (Administración)
-
-| Evento | Payload | Cuándo se emite |
-|--------|---------|-----------------|
-| `eventos_en_vivo:actualizada` | `objeto documento` (el documento modificado) | Automático por Realtime al crearse, actualizarse o eliminarse un documento en la colección `Eventos_en_vivo`. |
-
-**Nota importante:** Los eventos `evento:creado` y `evento:actualizado` han sido eliminados del catálogo oficial. El sistema ya cubre estos cambios automáticamente a través del Realtime. Ningún módulo debe emitirlos manualmente.
+| Evento | Emisor | Payload | Consumidores |
+|--------|--------|---------|--------------|
+| `db:inicializada` | DB (db.js) | *(sin payload)* | Todas las vistas |
+| `sincronizacion:completada` | DB (db.js) | *(sin payload)* | Vistas principales |
+| `vista:cambiada` | App (app.js) | `string` (nombre de vista) | Módulos de cliente, guía, KDS |
+| `state:cambiado` | Store (store.js) | `{ state, action }` | Cualquier suscriptor del Store |
 
 ---
 
-## Cómo suscribirse a un evento
+## 2. Eventos de Mesa
 
-```javascript
-// Suscripción simple
-EventBus.on('mesa:actualizada', (data) => {
-  console.log('Mesa', data.mesa, 'cambió a estado', data.estado);
-});
+| Evento | Emisor | Payload | Consumidores |
+|--------|--------|---------|--------------|
+| `mesa:seleccionada` | Mesas (renderer.js) | `number` (número de mesa) | MesaDetalles, Pedido |
+| `mesa:actualizada` | DB / Store / Comanda | `{ mesa: number, estado: string }` | Mesas, KDS, Caja, Cliente |
+| `mesa:liberada` | PedidoRepository | `{ numero: number }` | Mesas, Store |
+| `mesa:abierta` | Pedido (pedido-ui.js) | `objeto mesa` | Comanda |
+| `mesa:cerrada` | Pedido (pedido-ui.js) | *(sin payload)* | — |
+| `mesas:guardadas` | DB (db-core.js) | `array de mesas` | App (para re-render) |
+| `mesa:agregada` | Comando agregarMesa | `objeto mesa` | Mesas |
+| `mesa:badge_click` | Mesas (renderer.js) | `{ mesa: number, precargaId: string }` | PrecargaControl |
+| `mesas:limpiar_badge` | Comanda | `{ mesa: number }` | Mesas |
+| `mesa-detalle:abierto` | MesaDetalles | *(sin payload)* | Pedido (bloqueo de apertura) |
+| `mesa-detalle:cerrado` | MesaDetalles | *(sin payload)* | Pedido (desbloqueo de apertura) |
+| `mesa:abrir_desde_detalle` | MesaDetalles | `{ mesa: number }` | Pedido |
+| `mesa:tomar_pedido` | MesaDetalles | `{ mesa: number }` | Pedido |
 
-// Suscripción con limpieza
-const callback = (data) => { /* ... */ };
-EventBus.on('comanda:enviada', callback);
-// Para dejar de escuchar:
-EventBus.off('comanda:enviada', callback);
+---
+
+## 3. Eventos de Pedido y Comanda
+
+| Evento | Emisor | Payload | Consumidores |
+|--------|--------|---------|--------------|
+| `pedido:creado` | PedidoService | `objeto pedido` | Store |
+| `pedido:cerrado` | PedidoService / Cobro | `{ mesa, pedidoId, total, formaPago }` | App (Caja.render), Store |
+| `pedido:item_agregado` | PedidoService | `{ pedidoId, nombre, cantidad }` | Store |
+| `pedido:transaccion_agregada` | PedidoService | `{ pedidoId, persona, monto, formaPago, saldoRestante, pedidoCerrado }` | Store |
+| `comanda:enviada` | PedidoRepository | `objeto comanda` | KDS, App (para re-render) |
+| `comanda:lista` | KDS | `{ id: string, mesa: number }` | App, Store |
+| `comanda:completada` | Comando completarSubcomanda | `{ id: string, mesa: number }` | Store |
+| `comanda:subcomanda_completada` | Comando completarSubcomanda | `{ id, destino, ambasListas }` | KDS |
+| `comandas:guardadas` | DB (db-core.js) | `array de comandas` | App (KDS.refresh) |
+| `producto:seleccionado` | Carta | `objeto producto` | Comanda |
+| `cuenta:solicitada` | Cuenta | *(sin payload)* | Cuenta (autoinvocado) |
+| `cobro:solicitado` | Cuenta / MesaDetalles | *(sin payload)* | Cobro |
+| `pago:confirmado` | Cobro | `{ mesa, pedidoId, total }` | Pedido (cerrar modal), Store |
+
+---
+
+## 4. Eventos de Productos e Inventario
+
+| Evento | Emisor | Payload | Consumidores |
+|--------|--------|---------|--------------|
+| `productos:cargados` | DB (db.js) | `array de productos` | Recetas, Menu, App |
+| `productos:actualizada` | Realtime (Appwrite) | `objeto producto` | Vistas de menú |
+| `producto:agotado` | Comando marcarAgotado | `{ prodId: string }` | KDS, Menu, Carta |
+| `ingredientes:actualizados` | DBInventario | `array de ingredientes` | Store |
+| `inventario:actualizado` | DBInventario | *(sin payload)* | Store |
+| `inventario:stock_bajo` | DBInventario | `{ ingrediente, stock, unidad }` | App (showToast) |
+| `recetas:actualizadas` | DBInventario | *(sin payload)* | Recetas, App |
+
+---
+
+## 5. Eventos de Delivery
+
+| Evento | Emisor | Payload | Consumidores |
+|--------|--------|---------|--------------|
+| `delivery:creado` | DeliveryService | `objeto delivery` | Store |
+| `delivery:enviado_a_cocina` | PedidoManager | `{ deliveryId, items }` | Store |
+| `delivery:listo` | KDS | `{ deliveryId, comandaId, estado }` | Store |
+| `pedidosDelivery:guardados` | DB (db-core.js) | `array de pedidos` | Reparto, App |
+
+---
+
+## 6. Eventos de Turno y Auditoría
+
+| Evento | Emisor | Payload | Consumidores |
+|--------|--------|---------|--------------|
+| `turno:iniciado` | PedidoManager | `objeto turno` | App (Caja.render) |
+| `turno:solicitar_cierre` | PedidoManager | *(sin payload)* | TurnoManager |
+| `turno:cerrado` | TurnoManager | `{ timestamp: string }` | App (Caja.render, showToast) |
+| `audit:actualizado` | PedidoManager | `{ turnoId, total }` | App |
+
+---
+
+## 7. Eventos de Cliente y Precarga
+
+| Evento | Emisor | Payload | Consumidores |
+|--------|--------|---------|--------------|
+| `cliente:mesa_ingresada` | PantallaBienvenida | `{ mesa: number }` | Mesas (badge de espera) |
+| `cliente:cuenta_creada` | Auth | `{ nombre, timestamp }` | ClienteModulo (cambio de vista) |
+| `cliente:precarga_enviada` | MenuDigital | `{ id, mesa, items, clienteId, id_usuario, nombre_comensal }` | PrecargaControl |
+| `cliente:llamar_garzon` | PantallaBienvenida | `{ mesa: number }` | Mesas (notificación visual) |
+| `cliente:comensal_agregado` | PantallaBienvenida | `{ mesa, nombre, iniciales }` | Mesas |
+| `precarga:nueva` | PrecargaControl | `{ mesa, cantidad, precargaId }` | Mesas (setBadge) |
+| `precarga:items_listos` | PrecargaControl | `{ mesa, items, precargaId }` | Comanda (agregarItems) |
+| `precarga:cargar_en_comanda` | MesaDetalles | `{ precargaId, mesa }` | PrecargaControl |
+| `precarga:revisada` | PrecargaControl | `{ precargaId, revisadoPor, timestamp }` | EventBus (registro) |
+| `precargas_cliente:actualizada` | Realtime (Appwrite) | `objeto precarga` | PantallaBienvenida |
+
+---
+
+## 8. Eventos de Configuración
+
+| Evento | Emisor | Payload | Consumidores |
+|--------|--------|---------|--------------|
+| `config:actualizada` | Config | *(sin payload)* | Mesas (ciclo-vida: renderGrid + renderZoneButtons) |
+
+---
+
+## 9. Eventos de Sincronización
+
+| Evento | Emisor | Payload | Consumidores |
+|--------|--------|---------|--------------|
+| `sync:colaActualizada` | DBShim | `number` (pendientes) | App (badge) |
+| `sync:completada` | DBShim | `timestamp` | App (indicador visual) |
+| `realtime:documento_actualizado` | DBAppwrite | `{ coleccion, tipo, datos }` | — (interno) |
+
+---
+
+## 10. Eventos de UI
+
+| Evento | Emisor | Payload | Consumidores |
+|--------|--------|---------|--------------|
+| `app:cambiarVista` | Auth / EventBus | `string` (nombre de vista) | App (showView) |
+| `app:error` | DB | `string` (mensaje) | App (showToast) |
+
+---
+
+## 11. Eventos de Autenticación
+
+| Evento | Emisor | Payload | Consumidores |
+|--------|--------|---------|--------------|
+| `auth:mostrarRegistro` | Auth | *(sin payload)* | PantallaInicio |
+
+---
+
+## 12. Cómo suscribirse a un evento
+
+    // Suscripción simple
+    EventBus.on('mesa:actualizada', (data) => {
+      console.log('Mesa', data.mesa, 'cambió a estado', data.estado);
+    });
+
+    // Suscripción con limpieza
+    const callback = (data) => { /* ... */ };
+    const unsubscribe = EventBus.on('comanda:enviada', callback);
+    // Para dejar de escuchar:
+    unsubscribe();
+
+---
+
+## 13. Convención para nuevos eventos
+
+1. Usar el formato `modulo:accion` (ej: `receta:creada`, `cliente:pedido_confirmado`).
+2. Documentar el evento en este archivo antes de hacer el PR.
+3. Incluir siempre el payload en la emisión para que los consumidores puedan reaccionar.
+4. Usar `EventBus.emit()` para emitir y `EventBus.on()` para suscribirse.
+5. La función `EventBus.on()` devuelve una función de limpieza; usarla para evitar memory leaks.
+
+---
+
+*Documento mantenido por el Coordinador de Integración.*
+*Versión 3.0 — 2026-07-01*

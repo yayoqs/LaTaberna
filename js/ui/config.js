@@ -1,14 +1,19 @@
 /* ================================================================
-   LaTaberna - PubPOS — UI JS
+   LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/config.js
-   Versión: 1.0.2
+   Versión: 1.0.5
    Propósito: Vista de configuración: productos, zonas, impresoras, mozos.
-              Corregidos guardarProducto y _eliminarProducto. Agregado
-              botón Resetear Mesas.
-   Dependencias: js/lib/store.js, js/lib/eventBus.js, js/lib/logger.js,
-                 js/auth.js, js/utils.js, js/db.js, js/db-appwrite.js,
-                 js/ui/mesas.js, js/ui/tickets.js
+              v1.0.5: reemplaza Mesas.render() por evento config:actualizada.
    ================================================================ */
+
+import { Store } from '../lib/store.js';
+import { EventBus } from '../lib/eventBus.js';
+import { Logger } from '../lib/logger.js';
+import { Auth } from '../auth.js';
+import { fmtMoney, showToast } from '../utils.js';
+import { DB } from '../db.js';
+import { DBAppwrite } from '../db-appwrite.js';
+
 const Config = (() => {
   function _asegurarVista() {
     if (document.getElementById('view-config')) return;
@@ -24,7 +29,7 @@ const Config = (() => {
         <section class="config-card">
           <h3><i class="fas fa-utensils"></i> Productos / Carta</h3>
           <div class="config-actions">
-            <button class="btn-primary" onclick="Config.abrirModalProducto()" data-rol="admin,master">
+            <button class="btn-primary" id="btnNuevoProducto" data-rol="admin,master">
               <i class="fas fa-plus"></i> Nuevo Producto
             </button>
           </div>
@@ -33,9 +38,9 @@ const Config = (() => {
         <section class="config-card">
           <h3><i class="fas fa-print"></i> Impresoras</h3>
           <div class="impresoras-config">
-            <div class="impresora-item"><span class="impresora-label"><i class="fas fa-fire-burner"></i>Cocina</span><input type="text" id="impCocinaIP" placeholder="IP o nombre" value="192.168.1.100"><select id="impCocinaProto"><option value="network">Red</option><option value="usb" selected>USB</option></select><button class="btn-test" onclick="Tickets.testImpresora('cocina')"><i class="fas fa-vial"></i> Probar</button></div>
-            <div class="impresora-item"><span class="impresora-label"><i class="fas fa-wine-glass"></i>Barra</span><input type="text" id="impBarraIP" placeholder="IP o nombre" value="192.168.1.101"><select id="impBarraProto"><option value="network">Red</option><option value="usb" selected>USB</option></select><button class="btn-test" onclick="Tickets.testImpresora('barra')"><i class="fas fa-vial"></i> Probar</button></div>
-            <div class="impresora-item"><span class="impresora-label"><i class="fas fa-cash-register"></i>Caja</span><input type="text" id="impCajaIP" placeholder="IP o nombre" value="192.168.1.102"><select id="impCajaProto"><option value="network">Red</option><option value="usb" selected>USB</option></select><button class="btn-test" onclick="Tickets.testImpresora('caja')"><i class="fas fa-vial"></i> Probar</button></div>
+            <div class="impresora-item"><span class="impresora-label"><i class="fas fa-fire-burner"></i>Cocina</span><input type="text" id="impCocinaIP" placeholder="IP o nombre" value="192.168.1.100"><select id="impCocinaProto"><option value="network">Red</option><option value="usb" selected>USB</option></select><button class="btn-test" id="btnTestImpresoraCocina"><i class="fas fa-vial"></i> Probar</button></div>
+            <div class="impresora-item"><span class="impresora-label"><i class="fas fa-wine-glass"></i>Barra</span><input type="text" id="impBarraIP" placeholder="IP o nombre" value="192.168.1.101"><select id="impBarraProto"><option value="network">Red</option><option value="usb" selected>USB</option></select><button class="btn-test" id="btnTestImpresoraBarra"><i class="fas fa-vial"></i> Probar</button></div>
+            <div class="impresora-item"><span class="impresora-label"><i class="fas fa-cash-register"></i>Caja</span><input type="text" id="impCajaIP" placeholder="IP o nombre" value="192.168.1.102"><select id="impCajaProto"><option value="network">Red</option><option value="usb" selected>USB</option></select><button class="btn-test" id="btnTestImpresoraCaja"><i class="fas fa-vial"></i> Probar</button></div>
             <div class="info-box"><i class="fas fa-info-circle"></i><p>Para impresión directa instalá QZ Tray.</p></div>
           </div>
         </section>
@@ -48,8 +53,8 @@ const Config = (() => {
             <label>Pie de ticket</label><input type="text" id="cfgPie" value="¡Gracias por visitarnos!">
             <label>Zonas / Espacios</label>
             <div id="zonasContainer" style="display:flex; flex-direction:column; gap:6px;"></div>
-            <button class="btn-secondary" onclick="Config.agregarZona()"><i class="fas fa-plus"></i> Añadir Zona</button>
-            <button class="btn-danger" onclick="Config.resetearMesas()" style="margin-top:8px;"><i class="fas fa-sync-alt"></i> Resetear Mesas</button>
+            <button class="btn-secondary" id="btnAgregarZona"><i class="fas fa-plus"></i> Añadir Zona</button>
+            <button class="btn-danger" id="btnResetearMesas" style="margin-top:8px;"><i class="fas fa-sync-alt"></i> Resetear Mesas</button>
 
             <div style="margin-top:16px; padding-top:12px; border-top:1px solid var(--color-border);">
               <label style="display:flex; align-items:center; gap:8px; font-size:13px; cursor:pointer;">
@@ -62,7 +67,7 @@ const Config = (() => {
               </p>
             </div>
 
-            <button class="btn-primary" onclick="Config.guardar()"><i class="fas fa-save"></i> Guardar</button>
+            <button class="btn-primary" id="btnGuardarConfig"><i class="fas fa-save"></i> Guardar</button>
           </div>
         </section>
         <section class="config-card">
@@ -71,7 +76,7 @@ const Config = (() => {
             <div id="mozosLista" style="display:flex; flex-direction:column; gap:6px; max-height:180px; overflow-y:auto;"></div>
             <div style="display:flex; gap:8px; margin-top:8px;">
               <input type="text" id="nuevoMozoNombre" placeholder="Nombre del mozo">
-              <button class="btn-secondary" onclick="Config.agregarMozo()"><i class="fas fa-plus"></i> Añadir</button>
+              <button class="btn-secondary" id="btnAgregarMozo"><i class="fas fa-plus"></i> Añadir</button>
             </div>
           </div>
         </section>
@@ -86,9 +91,64 @@ const Config = (() => {
     `;
     const referencia = document.getElementById('toastContainer') || document.body.lastChild;
     document.body.insertBefore(main, referencia);
+
+    _vincularEventos();
   }
 
-  /** Carga los valores actuales de configuración */
+  function _vincularEventos() {
+    document.getElementById('btnNuevoProducto')?.addEventListener('click', () => abrirModalProducto());
+    document.getElementById('btnAgregarZona')?.addEventListener('click', agregarZona);
+    document.getElementById('btnResetearMesas')?.addEventListener('click', resetearMesas);
+    document.getElementById('btnGuardarConfig')?.addEventListener('click', guardar);
+    document.getElementById('btnAgregarMozo')?.addEventListener('click', agregarMozo);
+
+    // Delegación de eventos en listas dinámicas
+    document.getElementById('productosLista')?.addEventListener('click', (e) => {
+      const editBtn = e.target.closest('.btn-icon-sm.edit');
+      const delBtn = e.target.closest('.btn-icon-sm.del');
+      if (editBtn) {
+        const id = editBtn.getAttribute('data-id');
+        if (id) _editarProducto(id);
+      }
+      if (delBtn) {
+        const id = delBtn.getAttribute('data-id');
+        if (id) _eliminarProducto(id);
+      }
+    });
+
+    document.getElementById('zonasContainer')?.addEventListener('click', (e) => {
+      const delBtn = e.target.closest('.btn-icon-sm.del');
+      if (delBtn) {
+        const idx = parseInt(delBtn.getAttribute('data-idx'));
+        if (!isNaN(idx)) eliminarZona(idx);
+      }
+    });
+
+    document.getElementById('zonasContainer')?.addEventListener('change', (e) => {
+      if (e.target.matches('input[type="text"]') || e.target.matches('input[type="number"]')) {
+        const idx = parseInt(e.target.getAttribute('data-idx'));
+        const campo = e.target.getAttribute('data-campo');
+        if (!isNaN(idx) && campo) _updateZona(idx, campo, e.target.value);
+      }
+    });
+
+    document.getElementById('mozosLista')?.addEventListener('click', (e) => {
+      const delBtn = e.target.closest('.btn-icon-sm.del');
+      if (delBtn) {
+        const idx = parseInt(delBtn.getAttribute('data-idx'));
+        if (!isNaN(idx)) eliminarMozo(idx);
+      }
+    });
+
+    document.getElementById('usuariosLista')?.addEventListener('click', (e) => {
+      const btn = e.target.closest('.btn-ajuste');
+      if (btn) {
+        const nombre = btn.getAttribute('data-nombre');
+        if (nombre) _mostrarCambiarPassword(nombre);
+      }
+    });
+  }
+
   function cargar() {
     _asegurarVista();
     const config = Store.getState().config || DB.config || {};
@@ -115,7 +175,6 @@ const Config = (() => {
     _renderUsuarios();
   }
 
-  // ── USUARIOS (solo master) ────────────────────────────────
   function _renderUsuarios() {
     const card = document.getElementById('usuariosCard');
     if (!card) return;
@@ -146,7 +205,7 @@ const Config = (() => {
     lista.innerHTML = usuarios.map(function(u) {
       return '<div style="display:flex; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--color-border);">' +
                '<span style="flex:1;"><strong>' + u.nombre + '</strong> (' + u.rol + ')</span>' +
-               '<button class="btn-ajuste" onclick="Config._mostrarCambiarPassword(\'' + u.nombre + '\')">' +
+               '<button class="btn-ajuste" data-nombre="' + u.nombre + '">' +
                  '<i class="fas fa-key"></i> Cambiar' +
                '</button>' +
              '</div>';
@@ -178,7 +237,6 @@ const Config = (() => {
     }
   }
 
-  // ── ZONAS ─────────────────────────────────────────────────
   function _renderZonas() {
     const container = document.getElementById('zonasContainer');
     if (!container) return;
@@ -187,10 +245,10 @@ const Config = (() => {
     container.innerHTML = zonas.map((z, idx) => `
       <div style="display:flex; align-items:center; gap:8px;">
         <input type="text" value="${z.nombre}" placeholder="Nombre zona" 
-               onchange="Config._updateZona(${idx}, 'nombre', this.value)" style="flex:1;">
+               data-idx="${idx}" data-campo="nombre" style="flex:1;">
         <input type="number" value="${z.cantidad}" min="0" step="1" style="width:80px;"
-               onchange="Config._updateZona(${idx}, 'cantidad', this.value)">
-        <button class="btn-icon-sm del" onclick="Config.eliminarZona(${idx})"><i class="fas fa-trash"></i></button>
+               data-idx="${idx}" data-campo="cantidad">
+        <button class="btn-icon-sm del" data-idx="${idx}"><i class="fas fa-trash"></i></button>
       </div>
     `).join('');
   }
@@ -224,7 +282,6 @@ const Config = (() => {
     _renderZonas();
   }
 
-  /** Guarda la configuración general */
   async function guardar() {
     const zonasContainer = document.getElementById('zonasContainer');
     let config = Store.getState().config || {};
@@ -265,7 +322,9 @@ const Config = (() => {
       await DB.sincronizarMesasConConfig();
     }
 
-    if (window.Mesas) Mesas.render();
+    // Notificar a Mesas que la configuración cambió (reemplaza Mesas.render())
+    EventBus.emit('config:actualizada');
+
     showToast('success', '<i class="fas fa-check-circle"></i> Configuración guardada');
 
     if (typeof DBAppwrite !== 'undefined' && DBAppwrite.habilitado) {
@@ -289,7 +348,6 @@ const Config = (() => {
     }
   }
 
-  // ── PRODUCTOS ─────────────────────────────────────────────
   function renderProductos() {
     _asegurarVista();
     const cont = document.getElementById('productosLista');
@@ -313,8 +371,8 @@ const Config = (() => {
         <span class="prod-config-cat">${p.destino}</span>
         <span class="prod-config-precio">${fmtMoney(p.precio)}</span>
         ${p.imagen ? '<span class="prod-config-img"><i class="fas fa-image"></i></span>' : ''}
-        <button class="btn-icon-sm edit" onclick="Config._editarProducto('${p.id}')"><i class="fas fa-pen"></i></button>
-        <button class="btn-icon-sm del" onclick="Config._eliminarProducto('${p.id}')"><i class="fas fa-trash"></i></button>
+        <button class="btn-icon-sm edit" data-id="${p.id}"><i class="fas fa-pen"></i></button>
+        <button class="btn-icon-sm del" data-id="${p.id}"><i class="fas fa-trash"></i></button>
       </div>`;
   }
 
@@ -327,21 +385,25 @@ const Config = (() => {
       modal.style.display = 'none';
       modal.innerHTML = `
         <div class="modal-small">
-          <div class="modal-header"><h3><i class="fas fa-utensils"></i> <span id="productoModalTitulo">Nuevo Producto</span></h3><button class="modal-close" onclick="Config.cerrarModalProducto()"><i class="fas fa-times"></i></button></div>
+          <div class="modal-header"><h3><i class="fas fa-utensils"></i> <span id="productoModalTitulo">Nuevo Producto</span></h3><button class="modal-close" id="btnCerrarModalProducto"><i class="fas fa-times"></i></button></div>
           <div class="modal-small-body">
             <input type="hidden" id="prodId">
             <label for="prodNombre">Nombre *</label><input type="text" id="prodNombre" placeholder="Nombre del producto" autocomplete="off">
-            <label for="prodPrecio">Precio *</label><input type="number" id="prodPrecio" placeholder="0.00" min="0" step="0.01" onchange="Config._autoajustarPrecio()">
+            <label for="prodPrecio">Precio *</label><input type="number" id="prodPrecio" placeholder="0.00" min="0" step="0.01">
             <label for="prodCategoria">Categoría *</label><select id="prodCategoria"><option>Bebidas</option><option>Cervezas</option><option>Cocteles</option><option>Vinos</option><option>Entradas</option><option>Comidas</option><option>Postres</option></select>
             <label for="prodDestino">Destino Comanda *</label><select id="prodDestino"><option value="barra">Barra</option><option value="cocina">Cocina</option><option value="ambos">Ambos</option></select>
             <label for="prodDescripcion">Descripción</label><input type="text" id="prodDescripcion" placeholder="Descripción breve (opcional)">
-            <label for="prodImagen">Imagen (URL)</label><input type="text" id="prodImagen" placeholder="https://... (opcional)" oninput="Config._vistaPreviaImagen()">
+            <label for="prodImagen">Imagen (URL)</label><input type="text" id="prodImagen" placeholder="https://... (opcional)">
             <div id="vistaPreviaImagen" style="margin-top:8px; max-width:200px;"></div>
             <div class="prod-activo-row"><label for="prodActivo">Activo</label><input type="checkbox" id="prodActivo" checked></div>
-            <div class="modal-small-footer"><button class="btn-secondary" onclick="Config.cerrarModalProducto()">Cancelar</button><button class="btn-primary" onclick="Config.guardarProducto()"><i class="fas fa-save"></i> Guardar</button></div>
+            <div class="modal-small-footer"><button class="btn-secondary" id="btnCancelarProducto">Cancelar</button><button class="btn-primary" id="btnGuardarProducto"><i class="fas fa-save"></i> Guardar</button></div>
           </div>
         </div>`;
       document.body.appendChild(modal);
+
+      document.getElementById('btnCerrarModalProducto').addEventListener('click', cerrarModalProducto);
+      document.getElementById('btnCancelarProducto').addEventListener('click', cerrarModalProducto);
+      document.getElementById('btnGuardarProducto').addEventListener('click', guardarProducto);
     }
 
     document.getElementById('productoModalTitulo').textContent = prod ? 'Editar Producto' : 'Nuevo Producto';
@@ -357,7 +419,10 @@ const Config = (() => {
     modal.style.display = 'flex';
   }
 
-  function cerrarModalProducto() { document.getElementById('modalProducto').style.display = 'none'; }
+  function cerrarModalProducto() {
+    const modal = document.getElementById('modalProducto');
+    if (modal) modal.style.display = 'none';
+  }
 
   function _autoajustarPrecio() {
     const precioInput = document.getElementById('prodPrecio');
@@ -401,11 +466,8 @@ const Config = (() => {
     } else {
       DB.productos.push(producto);
     }
-    if (typeof DB.saveProductos === 'function') {
-      DB.saveProductos();
-    } else {
-      localStorage.setItem('pubpos_productos', JSON.stringify(DB.productos));
-    }
+
+    localStorage.setItem('pubpos_productos', JSON.stringify(DB.productos));
 
     if (typeof DBAppwrite !== 'undefined' && DBAppwrite.habilitado) {
       try {
@@ -422,14 +484,11 @@ const Config = (() => {
       }
     }
 
-    if (typeof Store !== 'undefined') {
-      Store.dispatch({ type: 'PRODUCTOS_INICIALIZAR', payload: DB.productos });
-    }
+    Store.dispatch({ type: 'PRODUCTOS_INICIALIZAR', payload: DB.productos });
 
     showToast('success', 'Producto guardado y sincronizado');
     cerrarModalProducto();
     renderProductos();
-    if (typeof Pedido !== 'undefined' && Pedido._setCat) Pedido._setCat('Todos');
   }
 
   async function _editarProducto(id) {
@@ -442,11 +501,7 @@ const Config = (() => {
 
     if (DB.productos) {
       DB.productos = DB.productos.filter(function(p) { return p.id !== id; });
-      if (typeof DB.saveProductos === 'function') {
-        DB.saveProductos();
-      } else {
-        localStorage.setItem('pubpos_productos', JSON.stringify(DB.productos));
-      }
+      localStorage.setItem('pubpos_productos', JSON.stringify(DB.productos));
     }
 
     if (typeof DBAppwrite !== 'undefined' && DBAppwrite.habilitado) {
@@ -457,9 +512,7 @@ const Config = (() => {
       }
     }
 
-    if (typeof Store !== 'undefined') {
-      Store.dispatch({ type: 'PRODUCTOS_INICIALIZAR', payload: DB.productos });
-    }
+    Store.dispatch({ type: 'PRODUCTOS_INICIALIZAR', payload: DB.productos });
 
     renderProductos();
     showToast('success', 'Producto eliminado');
@@ -469,14 +522,14 @@ const Config = (() => {
     if (!confirm('¿Resetear todas las mesas? Se eliminarán las mesas libres y se recrearán según las zonas configuradas. Las mesas ocupadas se conservarán al final.')) return;
     if (typeof DB.resetearMesas === 'function') {
       await DB.resetearMesas();
-      if (window.Mesas) Mesas.render();
+      // Notificar a Mesas que la configuración cambió (reemplaza Mesas.render())
+      EventBus.emit('config:actualizada');
       showToast('success', 'Mesas reseteadas correctamente');
     } else {
       showToast('error', 'Función no disponible');
     }
   }
 
-  // ── MOZOS ────────────────────────────────────────────────
   function renderMozos() {
     const container = document.getElementById('mozosLista');
     if (!container) return;
@@ -487,7 +540,7 @@ const Config = (() => {
         <span style="font-size:10px; color:${m.activo !== false ? 'var(--color-success)' : 'var(--color-text-muted)'};">
           ${m.activo !== false ? 'Activo' : 'Inactivo'}
         </span>
-        <button class="btn-icon-sm del" onclick="Config.eliminarMozo(${idx})"><i class="fas fa-trash"></i></button>
+        <button class="btn-icon-sm del" data-idx="${idx}"><i class="fas fa-trash"></i></button>
       </div>
     `).join('');
   }
@@ -508,7 +561,6 @@ const Config = (() => {
     showToast('warning', 'Mozo eliminado');
   }
 
-  // ── INICIALIZACIÓN ────────────────────────────────────────
   function _initListeners() {
       Store.subscribe((state, action) => {
         if (action.type.startsWith('PRODUCTO')) renderProductos();
@@ -545,4 +597,4 @@ const Config = (() => {
     };
   })();
 
-window.Config = Config;
+export { Config };

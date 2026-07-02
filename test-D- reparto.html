@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Test D – Reparto</title>
+  <title>Test D – Reparto (Estructura Modular)</title>
   <style>
     body { font-family: system-ui, sans-serif; background: #1a1a1a; color: #e0e0e0; padding: 30px; max-width: 700px; margin: auto; }
     h1 { color: #f59e0b; }
@@ -13,12 +13,11 @@
   </style>
 </head>
 <body>
-  <h1>Test D – Reparto (v5.2)</h1>
-  <p style="color:#a0a0a0; font-size:13px;">Prueba filtro, edición, duplicación y protección contra ids nulos.</p>
+  <h1>Test D – Reparto (v2.0.0 — Modular)</h1>
+  <p style="color:#a0a0a0; font-size:13px;">Prueba de protección contra ids nulos con la nueva estructura modular.</p>
   <div id="resultados"></div>
 
   <script>
-    // ─── Stubs ────────────────────────────────────────────
     const Logger = { info: console.log, warn: console.warn, error: console.error, debug: console.log };
     const EventBus = { events: {}, on(ev, cb) { (this.events[ev] = this.events[ev] || []).push(cb); }, emit(ev, data) { (this.events[ev] || []).forEach(cb => cb(data)); } };
     const Store = { state: {}, getState() { return this.state; }, subscribe() {} };
@@ -48,7 +47,12 @@
     window.fmtMoney = (val) => `$${val.toFixed(0)}`;
   </script>
 
-  <script src="js/ui/reparto.js"></script>
+  <!-- Cargar el orquestador como módulo -->
+  <script type="module" src="js/ui/reparto.js"></script>
+  <script type="module">
+    import { Reparto } from './js/ui/reparto.js';
+    window.Reparto = Reparto;
+  </script>
 
   <script>
     function resultado(ok, seccion, mensaje) {
@@ -59,7 +63,6 @@
     }
 
     async function iniciarTests() {
-      // Datos con caso problemático: un pedido nulo y uno con id null
       const pedidoValido = {
         id: 'deliv_001',
         direccion: 'Av. Siempre Viva 742',
@@ -84,23 +87,18 @@
       Store.state = { pedidosDelivery: [pedidoValido, pedidoNulo, pedidoIdNulo] };
       DB.pedidosDelivery = [pedidoValido];
 
-      // Test: Render con ids problemáticos no debe lanzar error
-      EventBus.emit('vista:cambiada', 'reparto');
-      await new Promise(r => setTimeout(r, 100));
+      // Llamar a render directamente
+      window.Reparto.render();
+      await new Promise(r => setTimeout(r, 150));
       const filas = document.querySelectorAll('#repartoBody tr');
       resultado(filas.length === 1, 'Protección', 'Solo se renderiza 1 pedido (el válido)');
       resultado(!document.querySelector('#repartoBody').textContent.includes('Calle Falsa'), 'Protección', 'Pedido con id nulo no aparece');
 
-      // Limpiar para el resto de pruebas normales (que ya estaban antes)
       document.getElementById('view-reparto').style.display = 'none';
-
-      // Resto de pruebas (filtro, edición, duplicación) se mantienen...
-      // [Se omite por brevedad, pero se ejecutan exactamente igual que en v5.1]
-
-      console.log('Tests de reparto con protección nulos finalizados.');
+      console.log('Tests de reparto con estructura modular finalizados.');
     }
 
-    window.addEventListener('load', () => setTimeout(iniciarTests, 200));
+    window.addEventListener('load', () => setTimeout(iniciarTests, 150));
   </script>
 </body>
 </html>

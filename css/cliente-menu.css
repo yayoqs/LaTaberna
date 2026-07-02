@@ -1,10 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/cliente-menu.css
-   Versión: 1.0.0
+   Versión: 1.0.1
    Propósito: Menú digital del cliente: banner, búsqueda y botón flotante.
    ================================================================ */
-   
    
 .menu-estado {
   display: flex;

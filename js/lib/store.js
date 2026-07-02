@@ -1,11 +1,15 @@
 /* ================================================================
-   LaTaberna - PubPOS — MÓDULO JS
+   LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/lib/store.js
-   Versión: 1.0.2
-   Propósito: Store centralizado con reducer pattern. Soporte
-              multi-espacio básico. Eliminado alias DELIVERY_INICIALIZAR.
-   Dependencias: js/lib/logger.js, js/lib/eventBus.js
+   Versión: 2.0.2
+   Propósito: Estado centralizado con slice 'cliente' para la Célula C.
+              Incluye reducers para COMANDA_ITEM_* (restaurados).
+              Timestamps unificados en español (creadoEn, actualizadoEn).
    ================================================================ */
+
+import { EventBus } from './eventBus.js';
+import { Logger } from './logger.js';
+
 const Store = (() => {
   let state = {
     mesas: [],
@@ -18,7 +22,8 @@ const Store = (() => {
     mozos: [],
     config: {},
     espacios: [],
-    espacioActivo: null
+    espacioActivo: null,
+    cliente: { permitePrepedidos: false, mesa: null }
   };
 
   const listeners = [];
@@ -77,11 +82,12 @@ const Store = (() => {
     newState.config          = configReducer(newState.config, action, newState);
     newState.espacios        = espaciosReducer(newState.espacios, action, newState);
     newState.espacioActivo   = espacioActivoReducer(newState.espacioActivo, action, newState);
+    newState.cliente         = clienteReducer(newState.cliente, action);
 
     return newState;
   }
 
-  /* ── SUB-REDUCTORES ──────────────────────────────────────── */
+  /* ── SUB-REDUCTORES ────────────────────────────── */
 
   function mesasReducer(mesas, action) {
     switch (action.type) {
@@ -92,49 +98,31 @@ const Store = (() => {
       }
       case 'MESA_AGREGAR': return [...mesas, action.payload];
       case 'MESA_ELIMINAR': return mesas.filter(m => m.numero !== action.payload);
-
       case 'COMANDA_ITEM_AGREGAR': {
         const { numeroMesa, item } = action.payload;
         return mesas.map(m => {
-          if (m.numero !== numeroMesa) return m;
+          if (m.numero != numeroMesa) return m;
           const items = m.items || [];
-          const existenteIdx = items.findIndex(it =>
-            it.prodId === item.prodId && !it.enviado && it.persona === (item.persona || 'General')
-          );
-          let nuevosItems;
-          if (existenteIdx >= 0) {
-            nuevosItems = items.map((it, idx) =>
-              idx === existenteIdx ? { ...it, qty: it.qty + 1 } : it
-            );
-          } else {
-            nuevosItems = [...items, { ...item, qty: 1 }];
-          }
-          return { ...m, items: nuevosItems };
+          const nuevoItem = { ...item, qty: 1, obs: item.obs || '', enviado: false };
+          return { ...m, items: [...items, nuevoItem] };
         });
       }
-
       case 'COMANDA_ITEM_CAMBIAR': {
         const { numeroMesa, index, cambios } = action.payload;
         return mesas.map(m => {
-          if (m.numero !== numeroMesa) return m;
-          const items = m.items || [];
-          const nuevosItems = items.map((it, idx) =>
-            idx === index ? { ...it, ...cambios } : it
-          );
-          return { ...m, items: nuevosItems };
+          if (m.numero != numeroMesa) return m;
+          const items = (m.items || []).map((item, i) => i === index ? { ...item, ...cambios } : item);
+          return { ...m, items };
         });
       }
-
       case 'COMANDA_ITEM_QUITAR': {
         const { numeroMesa, index } = action.payload;
         return mesas.map(m => {
-          if (m.numero !== numeroMesa) return m;
-          const items = m.items || [];
-          const nuevosItems = items.filter((_, idx) => idx !== index);
-          return { ...m, items: nuevosItems };
+          if (m.numero != numeroMesa) return m;
+          const items = (m.items || []).filter((_, i) => i !== index);
+          return { ...m, items };
         });
       }
-
       default: return mesas;
     }
   }
@@ -148,8 +136,8 @@ const Store = (() => {
         return pedidos.map(p => p.id === id ? { ...p, ...cambios } : p);
       }
       case 'PEDIDO_CERRADO': {
-        const { id, total, updated_at } = action.payload;
-        return pedidos.map(p => p.id === id ? { ...p, estado: 'cerrada', total, updated_at } : p);
+        const { id, total, actualizadoEn } = action.payload;
+        return pedidos.map(p => p.id === id ? { ...p, estado: 'cerrada', total, actualizadoEn } : p);
       }
       default: return pedidos;
     }
@@ -158,6 +146,7 @@ const Store = (() => {
   function deliveryReducer(deliveries, action) {
     switch (action.type) {
       case 'PEDIDOSDELIVERY_INICIALIZAR':
+      case 'DELIVERY_INICIALIZAR':
         return action.payload || [];
       case 'DELIVERY_CREADO': return [...deliveries, action.payload];
       case 'DELIVERY_ACTUALIZADO': {
@@ -238,6 +227,17 @@ const Store = (() => {
     }
   }
 
+  function clienteReducer(cliente, action) {
+    switch (action.type) {
+      case 'CLIENTE_PERMISO_PREPEDIDOS':
+        return { ...cliente, permitePrepedidos: action.payload };
+      case 'CLIENTE_MESA_ASIGNADA':
+        return { ...cliente, mesa: action.payload };
+      default:
+        return cliente;
+    }
+  }
+
   return {
     getState,
     dispatch,
@@ -245,4 +245,4 @@ const Store = (() => {
   };
 })();
 
-window.Store = Store;
+export { Store };

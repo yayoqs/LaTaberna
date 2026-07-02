@@ -2,7 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const EXTENSIONES = ['.js', '.html'];
-const CARPETAS_IGNORAR = ['node_modules', '.git'];
+const CARPETAS_IGNORAR = ['node_modules', '.git', '.vscode', 'tests', 'Vendor'];
 const ARCHIVO_REPORTE = 'reporte_fallas.txt';
 
 let funcionesDefinidas = {};

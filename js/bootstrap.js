@@ -1,16 +1,29 @@
 /* ================================================================
-   LaTaberna - PubPOS — MÓDULO JS
+   LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/bootstrap.js
-   Versión: 1.0.0
+   Versión: 1.0.5
    Propósito: Secuencia de arranque: Auth, DB, Store, dependencias.
+              Incluye imports de TurnoManager y App. 
+              Código muerto de Config eliminado.
    ================================================================ */
+
+import { Logger } from './lib/logger.js';
+import { EventBus } from './lib/eventBus.js';
+import { Store } from './lib/store.js';
+import { Deps } from './lib/deps.js';
+import { Auth } from './auth.js';
+import { DB } from './db.js';
+import { showToast } from './utils.js';
+import { TurnoManager } from './managers/turno-manager.js';
+import { App } from './app.js';
+
 const Bootstrap = (() => {
 
   async function arrancar() {
     Logger.setLevel('DEBUG');
     Logger.info('[Bootstrap] Iniciando aplicación...');
 
-    // ── 1. Autenticación ──────────────────────────────────
+    // 1. Inicializar autenticación
     try {
       Auth.init();
       Logger.info('[Bootstrap] Auth listo.');
@@ -20,19 +33,17 @@ const Bootstrap = (() => {
       return;
     }
 
-    // ── 2. Base de datos (Appwrite) ───────────────────────
-   
+    // 2. Inicializar base de datos (Appwrite + localStorage)
     try {
       await DB.init();
       Logger.info('[Bootstrap] DB lista.');
-
     } catch (e) {
       Logger.error('[Bootstrap] Error en DB:', e);
       showToast('error', 'Error crítico al cargar los datos');
       return;
     }
 
-    // ── 3. Poblar el Store con datos iniciales ────────────
+    // 3. Poblar Store con los datos iniciales
     if (typeof Store !== 'undefined') {
       Store.dispatch({ type: 'MESAS_INICIALIZAR',       payload: DB.mesas || [] });
       Store.dispatch({ type: 'PEDIDOS_INICIALIZAR',     payload: DB.pedidos || [] });
@@ -45,28 +56,15 @@ const Bootstrap = (() => {
       Logger.info('[Bootstrap] Store poblado con datos iniciales.');
     }
 
-    // ── 4. Configuración ──────────────────────────────────
-    try {
-      if (typeof Config !== 'undefined' && Config.cargar) Config.cargar();
-    } catch (e) {
-      Logger.warn('[Bootstrap] Config no disponible:', e);
-    }
-
-    // ── 5. Inyección de dependencias (REPOSITORIOS) ──────
+    // 4. Configurar repositorios y servicios
     let pedidoRepo = typeof PedidoRepositoryLocal !== 'undefined' ? PedidoRepositoryLocal : null;
 
     const deliveryRepo = {
-      async crearDelivery(datos) {
-        return DB.crearPedidoDelivery(datos);
-      },
-      async obtenerPorId(id) {
-        return (DB.pedidosDelivery || []).find(p => p.id === id) || null;
-      },
+      async crearDelivery(datos) { return DB.crearPedidoDelivery(datos); },
+      async obtenerPorId(id) { return (DB.pedidosDelivery || []).find(p => p.id === id) || null; },
       async guardarDelivery(datos) {
         const idx = (DB.pedidosDelivery || []).findIndex(p => p.id === datos.id);
-        if (idx >= 0) {
-          DB.pedidosDelivery[idx] = { ...DB.pedidosDelivery[idx], ...datos };
-        }
+        if (idx >= 0) { DB.pedidosDelivery[idx] = { ...DB.pedidosDelivery[idx], ...datos }; }
       }
     };
 
@@ -77,9 +75,7 @@ const Bootstrap = (() => {
         }
         return datos;
       },
-      async obtenerPorId(id) {
-        return (DB.ingredientes || []).find(i => i.id == id) || null;
-      },
+      async obtenerPorId(id) { return (DB.ingredientes || []).find(i => i.id == id) || null; },
       async registrarMovimiento(movimiento) {
         if (typeof DB.ajustarStock === 'function') {
           DB.ajustarStock(movimiento.ingredienteId, movimiento.cantidad, movimiento.motivo);
@@ -94,7 +90,6 @@ const Bootstrap = (() => {
       Logger.info('[Bootstrap] Dependencias registradas en el contenedor.');
     }
 
-    // ── 6. Configurar Servicios de Dominio ────────────────
     if (typeof PedidoService !== 'undefined' && pedidoRepo) {
       PedidoService.configurar(pedidoRepo);
       if (typeof Deps !== 'undefined') Deps.registrar('pedidoService', PedidoService);
@@ -111,7 +106,7 @@ const Bootstrap = (() => {
       Logger.info('[Bootstrap] InventarioService configurado.');
     }
 
-    // ── 7. Iniciar PedidoManager ──────────────────────────
+    // 5. Inicializar gestor de turnos y pedidos
     try {
       if (typeof PedidoManager !== 'undefined') {
         const turno = PedidoManager.init({ pedidoRepo });
@@ -121,24 +116,24 @@ const Bootstrap = (() => {
       Logger.error('[Bootstrap] Error al iniciar PedidoManager:', e);
     }
 
-    // ── 8. TurnoManager ───────────────────────────────────
     if (typeof TurnoManager === 'undefined') {
       Logger.warn('[Bootstrap] TurnoManager no encontrado.');
     }
 
-    // ── 9. Iniciar Realtime de Appwrite ───────────────────
+    // 6. Activar tiempo real de Appwrite
     if (typeof DBAppwrite !== 'undefined' && DBAppwrite.habilitado) {
       DBAppwrite.iniciarRealtime();
       Logger.info('[Bootstrap] Realtime de Appwrite iniciado.');
     }
 
-    // ── 10. Inicializar UI ────────────────────────────────
+    // 7. Inicializar UI y mostrar vista según rol
     if (typeof App !== 'undefined' && App.init) {
       App.init();
       Logger.info('[Bootstrap] UI iniciada.');
+    } else {
+      Logger.warn('[Bootstrap] App no disponible, la UI no se iniciará automáticamente.');
     }
 
-    // ── 11. Mostrar vista inicial ─────────────────────────
     try {
       if (Auth.getRol()) {
         const vistaDefecto = Auth.getDefaultView();
@@ -146,7 +141,6 @@ const Bootstrap = (() => {
           App.showView(vistaDefecto);
         }
       } else {
-        // Sin sesión, mostrar la vista pública 'inicio'
         if (typeof App !== 'undefined' && App.showView) {
           App.showView('inicio');
         }
@@ -161,14 +155,12 @@ const Bootstrap = (() => {
   return { arrancar };
 })();
 
-// ── Iniciar todo después de que el Loader confirme las dependencias ──
-document.addEventListener('DOMContentLoaded', function() {
-  if (typeof Loader !== 'undefined') {
-    Loader.cuandoListo(function() {
-      Bootstrap.arrancar();
-    });
-  } else {
-    // Si el loader falla en cargar, arrancar igual después de un pequeño retraso
-    setTimeout(function() { Bootstrap.arrancar(); }, 1000);
-  }
-});
+// Arranque seguro para módulos ES6
+function _bootstrapArrancar() {
+  Bootstrap.arrancar();
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', _bootstrapArrancar);
+} else {
+  _bootstrapArrancar();
+}

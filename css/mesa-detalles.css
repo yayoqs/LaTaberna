@@ -1,0 +1,235 @@
+/* ================================================================
+   LaTaberna - PubPOS — CSS
+   Archivo: css/mesa-detalles.css
+   Versión: 1.0.0
+   Propósito: Estilos para el panel de detalle de la mesa.
+   ================================================================ */
+
+#modalMesaDetalles {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mesa-detalles-card {
+  width: 100%;
+  max-width: 460px;
+  min-height: 500px;
+  background: var(--color-bg);
+  border-radius: var(--radius);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 0 40px rgba(0,0,0,.5), 0 0 0 1px var(--color-border);
+}
+
+.md-fondo {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(245,158,11,.12) 0%, transparent 55%),
+    radial-gradient(circle at 70% 70%, rgba(99,102,241,.08) 0%, transparent 55%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.md-contenido {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  gap: 14px;
+  overflow-y: auto;
+}
+
+.md-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-shrink: 0;
+}
+
+.md-mesa-info h2 {
+  font-size: 1.4rem;
+  font-weight: 800;
+  background: linear-gradient(to right, var(--color-accent), var(--color-primary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.md-mesa-info .badge-estado {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 99px;
+  text-transform: uppercase;
+  display: inline-block;
+  margin-top: 4px;
+}
+
+.badge-estado.libre { background: rgba(34,197,94,.2); color: #22c55e; }
+.badge-estado.ocupada { background: rgba(59,130,246,.2); color: #3b82f6; }
+.badge-estado.esperando { background: rgba(245,158,11,.2); color: #f59e0b; }
+.badge-estado.cuenta { background: rgba(239,68,68,.2); color: #ef4444; }
+
+.md-cerrar {
+  background: transparent;
+  border: none;
+  color: var(--color-text-sec);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 4px;
+}
+.md-cerrar:hover { color: #fff; }
+
+.md-datos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.md-dato {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+.md-dato-label {
+  font-size: 0.65rem;
+  color: var(--color-text-sec);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.md-dato-valor {
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin-top: 2px;
+}
+
+.md-atencion {
+  background: rgba(99,102,241,.1);
+  border: 1px solid rgba(99,102,241,.25);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.md-atencion.precarga {
+  background: rgba(245,158,11,.1);
+  border-color: rgba(245,158,11,.25);
+}
+
+.atencion-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 0.8rem;
+  color: #fff;
+  flex-shrink: 0;
+}
+.md-atencion.precarga .atencion-avatar {
+  background: linear-gradient(135deg, var(--color-accent), #d97706);
+}
+
+.atencion-texto {
+  flex: 1;
+  font-size: 0.8rem;
+}
+.atencion-texto strong { color: #a5b4fc; }
+.md-atencion.precarga .atencion-texto strong { color: #fbbf24; }
+
+.btn-atender {
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  padding: 8px 14px;
+  border-radius: 20px;
+  font-weight: 700;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: var(--t);
+  flex-shrink: 0;
+}
+.btn-atender:hover { background: #818cf8; }
+.btn-atender.precarga {
+  background: var(--color-accent);
+  color: #000;
+}
+.btn-atender.precarga:hover { background: #d97706; }
+
+.md-acciones {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.action-card {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  text-align: left;
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.action-card::after {
+  content: '\f105';
+  font-family: 'Font Awesome 6 Free';
+  font-weight: 900;
+  position: absolute;
+  right: 16px;
+  color: var(--color-text-muted, #64748b);
+  font-size: 1rem;
+  transition: transform 0.2s;
+}
+.action-card:hover {
+  border-color: var(--color-accent);
+  transform: translateY(-2px);
+}
+.action-card:hover::after {
+  transform: translateX(3px);
+  color: #fff;
+}
+.action-card.primaria {
+  border-color: rgba(245,158,11,.3);
+  background: rgba(245,158,11,.05);
+}
+.action-card.primaria .action-icon { color: var(--color-accent); }
+.action-card.verde .action-icon { color: #22c55e; }
+.action-card.roja .action-icon { color: #ef4444; }
+.action-icon {
+  font-size: 1.4rem;
+  width: 32px;
+  display: flex;
+  justify-content: center;
+}
+.action-details h4 {
+  font-size: 0.9rem;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+.action-details p {
+  font-size: 0.7rem;
+  color: var(--color-text-sec);
+}

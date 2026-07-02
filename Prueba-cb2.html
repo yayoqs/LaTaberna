@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Test KDS – Sonido opcional</title>
+  <!-- Font Awesome por CDN -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <style>
+    /* ========== CSS GLOBAL MÍNIMO (variables y reseteo) ========== */
+    :root {
+      --color-bg: #0f0f0f;
+      --color-card: #1a1a1a;
+      --color-panel: #262626;
+      --color-border: #333;
+      --color-text: #e0e0e0;
+      --color-text-sec: #b0b0b0;
+      --color-text-muted: #888;
+      --color-accent: #f59e0b;
+      --color-success: #22c55e;
+      --color-info: #3b82f6;
+      --color-warning: #f59e0b;
+      --color-danger: #ef4444;
+      --color-cocina: #f97316;
+      --color-barra: #8b5cf6;
+      --radius: 12px;
+      --radius-xs: 6px;
+      --radius-sm: 8px;
+      --shadow-sm: 0 2px 6px rgba(0,0,0,.3);
+      --t: .2s ease;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--color-bg);
+      color: var(--color-text);
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    .view { display: flex; flex-direction: column; flex: 1; }
+    .view-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 20px;
+      background: var(--color-panel);
+      border-bottom: 1px solid var(--color-border);
+    }
+    .view-toolbar h2 {
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .toolbar-actions { display: flex; gap: 8px; }
+    .btn-secondary {
+      background: var(--color-panel);
+      color: var(--color-text);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      padding: 8px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: var(--t);
+    }
+    .btn-secondary:hover { background: var(--color-border); }
+    /* ========== KDS CSS (igual al original) ========== */
+    .kds-grid {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 16px;
+      align-content: start;
+    }
+    .kds-card {
+      background: var(--color-card);
+      border: 2px solid var(--color-border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+      transition: var(--t);
+      display: flex;
+      flex-direction: column;
+    }
+    .kds-card.nueva {
+      border-color: var(--color-warning);
+      animation: kds-pulse 2s infinite;
+    }
+    .kds-card.en-proceso { border-color: var(--color-info); }
+    .kds-card.lista      { border-color: var(--color-success); opacity: .75; }
+    @keyframes kds-pulse {
+      0%,100% { box-shadow: 0 0 0 0   rgba(245,158,11,.35); }
+      50%      { box-shadow: 0 0 0 8px rgba(245,158,11,0); }
+    }
+    .kds-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 14px;
+      background: var(--color-panel);
+      gap: 8px;
+    }
+    .kds-mesa {
+      font-size: 16px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .kds-mesa i { color: var(--color-accent); }
+    .kds-mozo { font-size: 11px; color: var(--color-text-muted); font-weight: 400; }
+    .kds-meta {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 3px;
+    }
+    .kds-destino-tag {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 10px;
+      border-radius: 99px;
+      text-transform: uppercase;
+    }
+    .kds-destino-tag.cocina { background: rgba(249,115,22,.2); color: var(--color-cocina); }
+    .kds-destino-tag.barra  { background: rgba(139,92,246,.2); color: var(--color-barra); }
+    .kds-destino-tag.ambos  { background: rgba(245,158,11,.2); color: var(--color-accent); }
+    .kds-time { font-size: 11px; color: var(--color-text-muted); }
+    .kds-time.urgente { color: var(--color-danger); font-weight: 700; }
+    .kds-grupo-tag {
+      font-size: 10px;
+      background: rgba(139,92,246,.15);
+      color: #c4b5fd;
+      padding: 2px 8px;
+      border-radius: 99px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .kds-items {
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      flex: 1;
+    }
+    .kds-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 13px;
+    }
+    .kds-qty {
+      background: var(--color-accent);
+      color: #000;
+      font-weight: 800;
+      width: 26px;
+      height: 26px;
+      border-radius: var(--radius-xs);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      flex-shrink: 0;
+    }
+    .kds-item-name  { font-weight: 500; flex: 1; display: flex; align-items: center; gap: 6px; }
+    .kds-item-obs   { font-size: 11px; color: var(--color-warning); margin-top: 2px; }
+    .kds-obs {
+      padding: 0 14px 10px;
+      font-size: 11px;
+      color: var(--color-warning);
+      font-style: italic;
+    }
+    .kds-panico-btn {
+      background: transparent;
+      border: 1px solid var(--color-danger);
+      color: var(--color-danger);
+      border-radius: 50%;
+      width: 20px;
+      height: 20px;
+      font-size: 10px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      margin-left: 4px;
+      transition: all 0.15s;
+    }
+    .kds-panico-btn:hover {
+      background: var(--color-danger);
+      color: #fff;
+    }
+    .kds-footer {
+      padding: 10px 14px;
+      border-top: 1px solid var(--color-border);
+      display: flex;
+      gap: 8px;
+    }
+    .kds-btn {
+      flex: 1;
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      padding: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: var(--t);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+    }
+    .kds-btn-proceso {
+      background: rgba(59,130,246,.2);
+      color: var(--color-info);
+      border-color: rgba(59,130,246,.3);
+    }
+    .kds-btn-proceso:hover { background: var(--color-info); color: #fff; }
+    .kds-btn-lista {
+      background: rgba(34,197,94,.2);
+      color: var(--color-success);
+      border-color: rgba(34,197,94,.3);
+    }
+    .kds-btn-lista:hover { background: var(--color-success); color: #fff; }
+    .kds-lista-ok {
+      flex: 1;
+      text-align: center;
+      color: var(--color-success);
+      font-weight: 700;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+    .kds-empty {
+      grid-column: 1/-1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 60px;
+      color: var(--color-text-muted);
+      text-align: center;
+    }
+    .kds-empty i { font-size: 48px; opacity: .2; }
+    .kds-empty-title { font-size: 16px; font-weight: 700; color: var(--color-text-sec); }
+    @media (max-width: 600px) {
+      .kds-grid {
+        grid-template-columns: 1fr;
+        padding: 12px;
+        gap: 10px;
+      }
+      .kds-header { padding: 8px 10px; }
+      .kds-mesa { font-size: 14px; }
+      .kds-items { padding: 8px 10px; gap: 5px; }
+      .kds-item { font-size: 12px; }
+      .kds-qty { width: 22px; height: 22px; font-size: 11px; }
+      .kds-btn { padding: 6px; font-size: 11px; }
+      .kds-footer { padding: 8px 10px; }
+    }
+    /* estilos para el toast del test */
+    #toastContainer {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 9999;
+    }
+    .toast {
+      padding: 12px 20px;
+      border-radius: 8px;
+      background: #333;
+      color: white;
+      font-weight: 600;
+      box-shadow: 0 4px 12px rgba(0,0,0,.3);
+      animation: slideIn .3s ease;
+    }
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    /* panel de control para test */
+    .test-panel {
+      background: var(--color-panel);
+      padding: 10px 20px;
+      border-bottom: 1px solid var(--color-border);
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .test-panel button {
+      background: var(--color-accent);
+      color: #000;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <!-- Panel de control para las pruebas -->
+  <div class="test-panel">
+    <strong>Panel de pruebas</strong>
+    <button onclick="simularComandaEnviada()">Simular comanda:enviada</button>
+    <button onclick="KDS.refresh()">Refrescar KDS</button>
+    <small style="color:var(--color-text-muted);">(Revisa la consola y el sonido cuando lo implementes)</small>
+  </div>
+
+  <!-- Aquí se inyectará la vista de cocina -->
+  <div id="toastContainer"></div>
+
+  <script>
+    // ==================== MOCKS ====================
+    // Logger
+    window.Logger = {
+      debug: (msg, ...args) => console.debug(`[DEBUG] ${msg}`, ...args),
+      info: (msg, ...args) => console.info(`[INFO] ${msg}`, ...args),
+      error: (msg, ...args) => console.error(`[ERROR] ${msg}`, ...args),
+    };
+
+    // Simple EventBus
+    window.EventBus = (() => {
+      const listeners = {};
+      return {
+        on(event, fn) {
+          if (!listeners[event]) listeners[event] = [];
+          listeners[event].push(fn);
+        },
+        off(event, fn) {
+          if (!listeners[event]) return;
+          listeners[event] = listeners[event].filter(f => f !== fn);
+        },
+        emit(event, data) {
+          if (!listeners[event]) return;
+          listeners[event].forEach(fn => {
+            try { fn(data); } catch (e) { Logger.error(`EventBus ${event}`, e); }
+          });
+        }
+      };
+    })();
+
+    // Auth mock (admin por defecto, cambiable)
+    window.Auth = {
+      _rol: 'admin',
+      getRol() { return this._rol; },
+      setRol(rol) { this._rol = rol; KDS.refresh(); }
+    };
+
+    // Mock de DBAppwrite para botón de pánico
+    window.DBAppwrite = {
+      actualizar: (coleccion, id, cambios) => {
+        Logger.info(`DBAppwrite.actualizar(${coleccion}, ${id},`, cambios, ')');
+        return Promise.resolve();
+      }
+    };
+
+    // CommandBus mínimo (solo completarSubcomanda)
+    window.CommandBus = {
+      ejecutar: (cmd) => {
+        if (cmd.type === 'completarSubcomanda') {
+          Logger.info(`CommandBus.ejecutar completarSubcomanda`, cmd.datos);
+          // Simulamos éxito simple
+          return Promise.resolve({ exito: true, ambasListas: false });
+        }
+        return Promise.reject('Comando desconocido');
+      }
+    };
+
+    // Store simplificado con estado inicial
+    window.Store = (() => {
+      let state = {
+        comandas: [],
+        productos: [],
+        recetas: [],
+        ingredientes: []
+      };
+      const listeners = [];
+
+      function getState() { return state; }
+      function dispatch(action) {
+        console.log('Store.dispatch', action);
+        // En test no modificamos realmente el estado; el KDS lo usará para refrescar.
+        // Para simular cambios, actualizaremos directamente el array comandas.
+        listeners.forEach(fn => fn(state, action));
+      }
+      function subscribe(fn) {
+        listeners.push(fn);
+      }
+      return { getState, dispatch, subscribe };
+    })();
+
+    // Toast simple
+    window.showToast = (type, msg) => {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.innerHTML = msg;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    };
+
+    // Utilidad $id
+    window.$id = (id) => document.getElementById(id);
+
+    // fmtMoney
+    window.fmtMoney = (val) => `$${val.toFixed(2)}`;
+
+    // ==================== DATOS DE PRUEBA ====================
+    const ahora = Date.now();
+    const comandasPrueba = [
+      {
+        id: 'c1',
+        mesa: 'Mesa 1',
+        mozo: 'Juan',
+        destino: 'cocina',
+        estado: 'nueva',
+        ts: ahora - 5 * 60000, // 5 min
+        items: [
+          { prodId: 'p1', nombre: 'Hamburguesa', qty: 2, destino: 'cocina', obs: 'sin cebolla' },
+          { prodId: 'p2', nombre: 'Papas fritas', qty: 1, destino: 'cocina' }
+        ],
+        observaciones: '',
+        deliveryId: null
+      },
+      {
+        id: 'c2',
+        mesa: 'Mesa 3',
+        mozo: 'Ana',
+        destino: 'ambos',
+        estado: 'nueva',
+        ts: ahora - 1 * 60000, // 1 min
+        items: [
+          { prodId: 'p3', nombre: 'Margarita', qty: 1, destino: 'barra', obs: null },
+          { prodId: 'p4', nombre: 'Nachos', qty: 1, destino: 'cocina' }
+        ],
+        observaciones: 'Combo pareja',
+        deliveryId: null
+      },
+      {
+        id: 'c3',
+        mesa: 'Delivery 5',
+        mozo: 'App',
+        destino: 'barra',
+        estado: 'nueva',
+        ts: ahora - 20 * 60000, // 20 min (urgente)
+        items: [
+          { prodId: 'p5', nombre: 'Cerveza artesanal', qty: 3, destino: 'barra' }
+        ],
+        observaciones: 'Entregar rápido',
+        deliveryId: 'd5'
+      },
+      {
+        id: 'c4',
+        mesa: 'Mesa 6',
+        mozo: 'Pedro',
+        destino: 'cocina',
+        estado: 'en-proceso',
+        ts: ahora - 10 * 60000, // 10 min
+        items: [
+          { prodId: 'p6', nombre: 'Pizza', qty: 1, destino: 'cocina' }
+        ],
+        observaciones: null
+      },
+      {
+        id: 'c5',
+        mesa: 'Mesa 8',
+        mozo: 'Lucía',
+        destino: 'cocina',
+        estado: 'lista',
+        ts: ahora - 8 * 60000, // 8 min (se oculta tras 10 min)
+        items: [
+          { prodId: 'p7', nombre: 'Ensalada', qty: 1, destino: 'cocina' }
+        ]
+      }
+    ];
+
+    Store.getState().comandas = comandasPrueba;
+    Store.getState().productos = comandasPrueba.flatMap(c => c.items.map(it => ({ id: it.prodId, nombre: it.nombre, activo: true, destino: it.destino })));
+    Store.getState().recetas = [];  // no necesario para el KDS
+    Store.getState().ingredientes = [];
+
+    // ==================== MÓDULO KDS (copia exacta del original, con pequeñas adaptaciones) ====================
+    // Incluimos el código tal cual, pero reemplazamos DB por un mock mínimo para salvar operaciones.
+    // Mock de DB para _setEstado
+    window.DB = {
+      comandas: comandasPrueba,
+      mesas: [],
+      recetas: [],
+      getMesa(mesaNombre) { return this.mesas.find(m => m.nombre === mesaNombre); },
+      saveComandas() { Logger.info('DB.saveComandas (mock)'); },
+      saveMesas() { Logger.info('DB.saveMesas (mock)'); },
+      saveRecetas() { Logger.info('DB.saveRecetas (mock)'); }
+    };
+    // Ajuste para que DB.comandas sea un array (ya lo tenemos)
+
+    // Ahora el código KDS (idéntico al proporcionado, con excepción del acceso a DB que ahora es nuestro mock)
+    const KDS = (() => {
+      const MINUTOS_URGENTE = 15;
+      const MINUTOS_OCULTAR_LISTA = 10;
+
+      function _asegurarVista() {
+        if ($id('view-cocina')) return;
+
+        const main = document.createElement('main');
+        main.id = 'view-cocina';
+        main.className = 'view';
+        main.innerHTML = `
+          <div class="view-toolbar">
+            <h2><i class="fas fa-fire-burner"></i> Monitor de Cocina</h2>
+            <div class="toolbar-actions">
+              <button class="btn-secondary" onclick="KDS.refresh()">
+                <i class="fas fa-sync-alt"></i> Actualizar
+              </button>
+              <button class="btn-secondary" onclick="window.Recetas.render('consulta')">
+                <i class="fas fa-book-open"></i> Recetario
+              </button>
+            </div>
+          </div>
+          <div id="cocinaKDS" class="kds-grid"></div>
+        `;
+        const referencia = $id('toastContainer') || document.body.lastChild;
+        document.body.insertBefore(main, referencia);
+      }
+
+      function refresh() {
+        _asegurarVista();
+        const cont = $id('cocinaKDS');
+        if (!cont) return;
+
+        const ahora = Date.now();
+        const rol = Auth.getRol();
+
+        let comandas = Store.getState().comandas || [];
+        comandas = comandas.filter(c => c && Array.isArray(c.items));
+
+        const procesadas = [];
+        comandas.forEach(c => {
+          if (c.destino === 'ambos') {
+            const itemsCocina = c.items.filter(it => it.destino === 'cocina' || it.destino === 'ambos');
+            const itemsBarra = c.items.filter(it => it.destino === 'barra' || it.destino === 'ambos');
+
+            if (itemsCocina.length > 0) {
+              procesadas.push({
+                ...c,
+                id: c.id + '_cocina',
+                destino: 'cocina',
+                items: itemsCocina,
+                _originalId: c.id,
+                _grupo: c.observaciones || 'Combo'
+              });
+            }
+            if (itemsBarra.length > 0) {
+              procesadas.push({
+                ...c,
+                id: c.id + '_barra',
+                destino: 'barra',
+                items: itemsBarra,
+                _originalId: c.id,
+                _grupo: c.observaciones || 'Combo'
+              });
+            }
+          } else {
+            procesadas.push(c);
+          }
+        });
+
+        comandas = procesadas;
+
+        comandas = comandas.filter(c => {
+          if (c.estado === 'lista') {
+            return (ahora - c.ts) < MINUTOS_OCULTAR_LISTA * 60 * 1000;
+          }
+          return true;
+        });
+
+        if (rol === 'cocina') {
+          comandas = comandas.filter(c => c.destino === 'cocina');
+        } else if (rol === 'barra') {
+          comandas = comandas.filter(c => c.destino === 'barra');
+        }
+
+        Logger.debug(`[KDS] ${comandas.length} comandas activas en Store.`);
+
+        if (!comandas.length) {
+          cont.innerHTML = `<div class="kds-empty"><i class="fas fa-check-circle"></i><p class="kds-empty-title">Todo en orden</p><p>No hay comandas pendientes</p></div>`;
+          return;
+        }
+
+        cont.innerHTML = comandas.map(_htmlKdsCard).join('');
+      }
+
+      function _htmlKdsCard(c) {
+        const minutos = Math.floor((Date.now() - c.ts) / 60000);
+        const urgente = minutos > MINUTOS_URGENTE;
+        const tiempoTxt = minutos === 0 ? 'Ahora' : `Hace ${minutos} min`;
+        const destLabel = { cocina: 'Cocina', barra: 'Barra' }[c.destino] || c.destino;
+        const destCss = c.destino === 'barra' ? 'barra' : 'cocina';
+        const esDelivery = !!c.deliveryId;
+        const etiquetaDelivery = esDelivery ? `<span class="kds-destino-tag" style="background:rgba(34,197,94,.2);color:var(--color-success);">Delivery</span>` : '';
+        const etiquetaGrupo = c._grupo ? `<span class="kds-grupo-tag"><i class="fas fa-layer-group"></i> ${c._grupo}</span>` : '';
+
+        const rol = Auth.getRol();
+        const puedePanico = rol === 'admin' || rol === 'master';
+
+        const items = c.items || [];
+        const itemsHTML = items.map(it => {
+          const icono = it.enviadoA === 'barra' ? '🍹' : '🍳';
+          const botonPanico = puedePanico ? `<button class="kds-panico-btn" title="Marcar como agotado" onclick="KDS._panico('${it.prodId}')"><i class="fas fa-exclamation-triangle"></i></button>` : '';
+          return `
+            <div class="kds-item">
+              <span class="kds-qty">${it.qty}</span>
+              <div>
+                <div class="kds-item-name">${it.nombre} ${icono} ${botonPanico}</div>
+                ${it.obs ? `<div class="kds-item-obs"><i class="fas fa-exclamation-circle"></i> ${it.obs}</div>` : ''}
+              </div>
+            </div>`;
+        }).join('');
+
+        let botonesHTML = '';
+        if (c.estado !== 'lista') {
+          botonesHTML += c.estado === 'nueva'
+            ? `<button class="kds-btn kds-btn-proceso" onclick="KDS._setEstado('${c.id}','en-proceso')"><i class="fas fa-fire"></i> En proceso</button>`
+            : '';
+          botonesHTML += `<button class="kds-btn kds-btn-lista" onclick="KDS._setEstado('${c.id}','lista')"><i class="fas fa-check"></i> Listo</button>`;
+        } else {
+          botonesHTML = `<div class="kds-lista-ok"><i class="fas fa-check-circle"></i> LISTO</div>`;
+        }
+
+        return `
+          <article class="kds-card ${c.estado}" id="kds-${c.id}">
+            <div class="kds-header">
+              <div class="kds-mesa"><i class="fas fa-chair"></i> ${c.mesa} ${etiquetaDelivery} ${etiquetaGrupo} <span class="kds-mozo">${c.mozo}</span></div>
+              <div class="kds-meta"><span class="kds-destino-tag ${destCss}">${destLabel}</span><span class="kds-time${urgente ? ' urgente' : ''}">${tiempoTxt}</span></div>
+            </div>
+            <div class="kds-items">${itemsHTML}</div>
+            ${c.observaciones ? `<p class="kds-obs"><i class="fas fa-comment"></i> ${c.observaciones}</p>` : ''}
+            <div class="kds-footer">${botonesHTML}</div>
+          </article>`;
+      }
+
+      function _panico(prodId) {
+        if (!confirm('¿Marcar este producto como NO disponible?')) return;
+        DBAppwrite.actualizar('productos', prodId, { disponible: false })
+          .then(() => showToast('success', 'Producto marcado como agotado.'))
+          .catch(err => Logger.error('[KDS] Error en botón de pánico:', err));
+      }
+
+      function _setEstado(id, estado) {
+        const comandas = Store.getState().comandas || [];
+        let c = comandas.find(x => x.id === id);
+
+        if (!c && (id.endsWith('_cocina') || id.endsWith('_barra'))) {
+          const idOriginal = id.replace(/_(cocina|barra)$/, '');
+          c = comandas.find(x => x.id === idOriginal);
+        }
+
+        if (!c) return;
+
+        if (estado === 'en-proceso') {
+          Store.dispatch({ type: 'COMANDA_ACTUALIZADA', payload: { id, cambios: { estado } } });
+          const idx = DB.comandas.findIndex(x => x.id === id);
+          if (idx >= 0) {
+            DB.comandas[idx].estado = estado;
+            DB.saveComandas();
+          }
+          showToast('success', `<i class="fas fa-check"></i> ${c.mesa} → En proceso`);
+          return;
+        }
+
+        if (estado === 'lista') {
+          if (id.endsWith('_cocina') || id.endsWith('_barra')) {
+            const idOriginal = id.replace(/_(cocina|barra)$/, '');
+            const destino = id.endsWith('_cocina') ? 'cocina' : 'barra';
+
+            CommandBus.ejecutar({
+              type: 'completarSubcomanda',
+              datos: { idOriginal, destino }
+            }).then(resultado => {
+              if (resultado.exito) {
+                showToast('success', `<i class="fas fa-check"></i> ${c.mesa} → ${destino} LISTA ✓`);
+                if (resultado.ambasListas) {
+                  showToast('success', `<i class="fas fa-check-double"></i> Comanda completada en ambos destinos`);
+                }
+                setTimeout(refresh, 300);
+              } else {
+                showToast('error', 'Error al marcar como listo');
+              }
+            }).catch(err => {
+              Logger.error('[KDS] Error en completarSubcomanda:', err);
+            });
+            return;
+          }
+
+          Store.dispatch({ type: 'COMANDA_ACTUALIZADA', payload: { id, cambios: { estado } } });
+
+          const mesa = DB.getMesa(c.mesa);
+          if (mesa && mesa.estado === 'ocupada') {
+            mesa.estado = 'esperando';
+            DB.saveMesas();
+            EventBus.emit('mesa:actualizada', { mesa: c.mesa, estado: 'esperando' });
+          }
+          EventBus.emit('comanda:lista', { id, mesa: c.mesa });
+
+          if (c.deliveryId) {
+            EventBus.emit('delivery:listo', { deliveryId: c.deliveryId, comandaId: id, estado: 'listo' });
+            Logger.info(`[KDS] Delivery listo: ${c.deliveryId}`);
+          }
+
+          const idx = DB.comandas.findIndex(x => x.id === id);
+          if (idx >= 0) {
+            DB.comandas[idx].estado = estado;
+            DB.saveComandas();
+          }
+
+          showToast('success', `<i class="fas fa-check"></i> ${c.mesa} → LISTA ✓`);
+        }
+      }
+
+      function _initListeners() {
+        Store.subscribe((state, action) => {
+          if (action.type.startsWith('COMANDA')) {
+            Logger.debug('[KDS] Cambio detectado en Store, refrescando...');
+            refresh();
+          }
+        });
+
+        EventBus.on('comanda:enviada', (comanda) => {
+          Logger.debug(`[KDS] Evento comanda:enviada recibido: ${comanda.id}`);
+          refresh();
+        });
+
+        EventBus.on('db:inicializada', () => {
+          setTimeout(refresh, 100);
+        });
+        EventBus.on('vista:cambiada', (vista) => {
+          if (vista === 'cocina') refresh();
+        });
+      }
+
+      _initListeners();
+
+      return { refresh, _setEstado, _panico };
+    })();
+
+    window.KDS = KDS;
+
+    // Mock de Recetas (solo para que no falle el botón Recetario)
+    window.Recetas = {
+      render: (modo) => {
+        alert(`Recetario abierto en modo: ${modo} (mock)`);
+      }
+    };
+
+    // ==================== SIMULACIONES ====================
+    function simularComandaEnviada() {
+      const nuevaComanda = {
+        id: 'c' + (Store.getState().comandas.length + 1),
+        mesa: 'Mesa 7',
+        mozo: 'Test',
+        destino: 'cocina',
+        estado: 'nueva',
+        ts: Date.now(),
+        items: [{ prodId: 'p8', nombre: 'Taco', qty: 2, destino: 'cocina' }],
+        observaciones: 'recién llegada',
+        deliveryId: null
+      };
+      Store.getState().comandas.push(nuevaComanda);
+      // Emitir el evento
+      EventBus.emit('comanda:enviada', nuevaComanda);
+      // El KDS ya se refresca automáticamente por el listener
+    }
+
+    // Forzar la primera renderización al cargar la página
+    window.addEventListener('DOMContentLoaded', () => {
+      // Simulamos db:inicializada para que el KDS haga refresh
+      EventBus.emit('db:inicializada');
+      // Opcional: también forzamos la vista cocina
+      EventBus.emit('vista:cambiada', 'cocina');
+    });
+
+    console.log('Sandbox KDS listo. Prueba el panel y el botón "Simular comanda:enviada".');
+    console.log('Comandas iniciales:', Store.getState().comandas);
+  </script>
+</body>
+</html>

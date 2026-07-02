@@ -1,20 +1,15 @@
 /* ================================================================
-   LaTaberna - PubPOS — MÓDULO JS
+   LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/modulos/cliente/orden.js
-   Versión: 1.0.0
+   Versión: 1.0.1
    Propósito: Gestión local de la orden del cliente antes de confirmarla.
+              Sin asignaciones window.
    Dependencias: (ninguna externa)
    ================================================================ */
-   
+
 const Orden = (() => {
-  /** @type {Array<{prodId: string, nombre: string, precio: number, categoria: string, destino: string, qty: number, obs: string}>} */
   let _items = [];
 
-  /**
-   * Agrega un producto a la orden.
-   * Si ya existe, incrementa la cantidad en 1.
-   * @param {object} producto - Producto desde el Store
-   */
   function agregarItem(producto) {
     const existente = _items.find(item => item.prodId === producto.id);
     if (existente) {
@@ -32,71 +27,35 @@ const Orden = (() => {
     }
   }
 
-  /**
-   * Elimina un producto de la orden.
-   * @param {string} prodId - ID del producto
-   */
   function quitarItem(prodId) {
     _items = _items.filter(item => item.prodId !== prodId);
   }
 
-  /**
-   * Modifica la cantidad de un ítem. Si es 0, lo elimina.
-   * @param {string} prodId - ID del producto
-   * @param {number} nuevaCantidad - Nueva cantidad (debe ser >= 0)
-   */
   function modificarCantidad(prodId, nuevaCantidad) {
     if (nuevaCantidad <= 0) {
       quitarItem(prodId);
       return;
     }
     const item = _items.find(item => item.prodId === prodId);
-    if (item) {
-      item.qty = nuevaCantidad;
-    }
+    if (item) item.qty = nuevaCantidad;
   }
 
-  /**
-   * Modifica la observación de un ítem.
-   * @param {string} prodId - ID del producto
-   * @param {string} obs - Texto de observación
-   */
   function modificarObservacion(prodId, obs) {
     const item = _items.find(item => item.prodId === prodId);
-    if (item) {
-      item.obs = obs;
-    }
+    if (item) item.obs = obs;
   }
 
-  /** Vacía la orden por completo */
-  function vaciar() {
-    _items = [];
-  }
+  function vaciar() { _items = []; }
 
-  /**
-   * Devuelve una copia de los ítems para evitar mutaciones externas.
-   * @returns {Array} Copia del array de ítems
-   */
-  function obtenerItems() {
-    return _items.slice();
-  }
+  function obtenerItems() { return _items.slice(); }
 
-  /**
-   * Calcula el total de la orden.
-   * @returns {number} Suma de precio * qty de todos los ítems
-   */
   function obtenerTotal() {
     return _items.reduce((total, item) => total + item.precio * item.qty, 0);
   }
 
   return {
-    agregarItem,
-    quitarItem,
-    modificarCantidad,
-    modificarObservacion,
-    vaciar,
-    obtenerItems,
-    obtenerTotal
+    agregarItem, quitarItem, modificarCantidad,
+    modificarObservacion, vaciar, obtenerItems, obtenerTotal
   };
 })();
 

@@ -1,107 +1,25 @@
 /* ================================================================
-   LaTaberna - PubPOS — MÓDULO JS
+   LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/roles.js
-   Versión: 1.0.0
+   Versión: 1.0.2
    Propósito: Definición de roles y matriz de permisos del sistema.
+              Sin asignaciones window.
    ================================================================ */
-const Roles = {
+
+export const Roles = {
   lista: ['master', 'admin', 'cocina', 'barra', 'caja', 'mesero', 'despensa', 'eventos', 'reparto', 'cliente', 'artista'],
-
   permisos: {
-    master: {
-      verMesas: true, verCocina: true, verCaja: true, verConfig: true,
-      tomarPedido: true, modificarPedidoEnviado: true, eliminarItemEnviado: true,
-      cerrarMesa: true, accederCaja: true, accederCocina: true, cambiarEstadoComanda: true,
-      editarProductos: true, editarUsuarios: true, editarPrecios: true,
-      verRecetasCocina: true, verRecetasBarra: true,
-      editarInventarioCocina: true, editarInventarioBarra: true
-    },
-    admin: {
-      verMesas: true, verCocina: true, verCaja: true, verConfig: true,
-      tomarPedido: true, modificarPedidoEnviado: true, eliminarItemEnviado: true,
-      cerrarMesa: true, accederCaja: true, accederCocina: true, cambiarEstadoComanda: true,
-      editarProductos: true, editarUsuarios: false, editarPrecios: true,
-      verRecetasCocina: true, verRecetasBarra: true,
-      editarInventarioCocina: true, editarInventarioBarra: true
-    },
-    cocina: {
-      verMesas: false, verCocina: true, verCaja: false, verConfig: false,
-      tomarPedido: false, modificarPedidoEnviado: false, eliminarItemEnviado: false,
-      cerrarMesa: false, accederCaja: false, accederCocina: true, cambiarEstadoComanda: true,
-      editarProductos: false, editarUsuarios: false, editarPrecios: false,
-      verRecetasCocina: true, verRecetasBarra: false,
-      editarInventarioCocina: true, editarInventarioBarra: false
-    },
-    barra: {
-      verMesas: false, verCocina: true, verCaja: false, verConfig: false,
-      tomarPedido: false, modificarPedidoEnviado: false, eliminarItemEnviado: false,
-      cerrarMesa: false, accederCaja: false, accederCocina: true, cambiarEstadoComanda: true,
-      editarProductos: false, editarUsuarios: false, editarPrecios: false,
-      verRecetasCocina: false, verRecetasBarra: true,
-      editarInventarioCocina: false, editarInventarioBarra: true
-    },
-    caja: {
-      verMesas: false, verCocina: false, verCaja: true, verConfig: false,
-      tomarPedido: false, modificarPedidoEnviado: false, eliminarItemEnviado: false,
-      cerrarMesa: true, accederCaja: true, accederCocina: false, cambiarEstadoComanda: false,
-      editarProductos: false, editarUsuarios: false, editarPrecios: true,
-      verRecetasCocina: false, verRecetasBarra: false,
-      editarInventarioCocina: false, editarInventarioBarra: false
-    },
-    mesero: {
-      verMesas: true, verCocina: false, verCaja: false, verConfig: false,
-      tomarPedido: true, modificarPedidoEnviado: false, eliminarItemEnviado: false,
-      cerrarMesa: false, accederCaja: false, accederCocina: false, cambiarEstadoComanda: false,
-      editarProductos: false, editarUsuarios: false, editarPrecios: false,
-      verRecetasCocina: false, verRecetasBarra: false,
-      editarInventarioCocina: false, editarInventarioBarra: false
-    },
-    despensa: {
-      verMesas: false, verCocina: false, verCaja: false, verConfig: false,
-      tomarPedido: false, modificarPedidoEnviado: false, eliminarItemEnviado: false,
-      cerrarMesa: false, accederCaja: false, accederCocina: false, cambiarEstadoComanda: false,
-      editarProductos: false, editarUsuarios: false, editarPrecios: false,
-      verRecetasCocina: true, verRecetasBarra: true,
-      editarInventarioCocina: true, editarInventarioBarra: true
-    },
-    eventos: {
-      verMesas: true, verCocina: true, verCaja: false, verConfig: false,
-      tomarPedido: true, modificarPedidoEnviado: false, eliminarItemEnviado: false,
-      cerrarMesa: false, accederCaja: false, accederCocina: true, cambiarEstadoComanda: false,
-      editarProductos: false, editarUsuarios: false, editarPrecios: false,
-      verRecetasCocina: true, verRecetasBarra: true,
-      editarInventarioCocina: false, editarInventarioBarra: false
-    },
-    reparto: {
-      verMesas: false, verCocina: false, verCaja: false, verConfig: false,
-      tomarPedido: false, modificarPedidoEnviado: false, eliminarItemEnviado: false,
-      cerrarMesa: false, accederCaja: false, accederCocina: false, cambiarEstadoComanda: false,
-      editarProductos: false, editarUsuarios: false, editarPrecios: false,
-      verRecetasCocina: false, verRecetasBarra: false,
-      editarInventarioCocina: false, editarInventarioBarra: false
-    },
-    cliente: {
-      verMesas: false, verCocina: false, verCaja: false, verConfig: false,
-      tomarPedido: false, modificarPedidoEnviado: false, eliminarItemEnviado: false,
-      cerrarMesa: false, accederCaja: false, accederCocina: false, cambiarEstadoComanda: false,
-      editarProductos: false, editarUsuarios: false, editarPrecios: false,
-      verRecetasCocina: false, verRecetasBarra: false,
-      editarInventarioCocina: false, editarInventarioBarra: false
-    },
-    artista: {
-      verMesas: false, verCocina: false, verCaja: false, verConfig: false,
-      tomarPedido: false, modificarPedidoEnviado: false, eliminarItemEnviado: false,
-      cerrarMesa: false, accederCaja: false, accederCocina: false, cambiarEstadoComanda: false,
-      editarProductos: false, editarUsuarios: false, editarPrecios: false,
-      verRecetasCocina: false, verRecetasBarra: false,
-      editarInventarioCocina: false, editarInventarioBarra: false,
-      verEventos: true, crearEventos: true, editarPerfil: true
-    }
+    master: { verMesas: true, verCocina: true, verCaja: true, verConfig: true, tomarPedido: true, modificarPedidoEnviado: true, eliminarItemEnviado: true, cerrarMesa: true, accederCaja: true, accederCocina: true, cambiarEstadoComanda: true, editarProductos: true, editarUsuarios: true, editarPrecios: true, verRecetasCocina: true, verRecetasBarra: true, editarInventarioCocina: true, editarInventarioBarra: true },
+    admin: { verMesas: true, verCocina: true, verCaja: true, verConfig: true, tomarPedido: true, modificarPedidoEnviado: true, eliminarItemEnviado: true, cerrarMesa: true, accederCaja: true, accederCocina: true, cambiarEstadoComanda: true, editarProductos: true, editarUsuarios: false, editarPrecios: true, verRecetasCocina: true, verRecetasBarra: true, editarInventarioCocina: true, editarInventarioBarra: true },
+    cocina: { verMesas: false, verCocina: true, verCaja: false, verConfig: false, tomarPedido: false, modificarPedidoEnviado: false, eliminarItemEnviado: false, cerrarMesa: false, accederCaja: false, accederCocina: true, cambiarEstadoComanda: true, editarProductos: false, editarUsuarios: false, editarPrecios: false, verRecetasCocina: true, verRecetasBarra: false, editarInventarioCocina: true, editarInventarioBarra: false },
+    barra: { verMesas: false, verCocina: true, verCaja: false, verConfig: false, tomarPedido: false, modificarPedidoEnviado: false, eliminarItemEnviado: false, cerrarMesa: false, accederCaja: false, accederCocina: true, cambiarEstadoComanda: true, editarProductos: false, editarUsuarios: false, editarPrecios: false, verRecetasCocina: false, verRecetasBarra: true, editarInventarioCocina: false, editarInventarioBarra: true },
+    caja: { verMesas: false, verCocina: false, verCaja: true, verConfig: false, tomarPedido: false, modificarPedidoEnviado: false, eliminarItemEnviado: false, cerrarMesa: true, accederCaja: true, accederCocina: false, cambiarEstadoComanda: false, editarProductos: false, editarUsuarios: false, editarPrecios: true, verRecetasCocina: false, verRecetasBarra: false, editarInventarioCocina: false, editarInventarioBarra: false },
+    mesero: { verMesas: true, verCocina: false, verCaja: false, verConfig: false, tomarPedido: true, modificarPedidoEnviado: false, eliminarItemEnviado: false, cerrarMesa: false, accederCaja: false, accederCocina: false, cambiarEstadoComanda: false, editarProductos: false, editarUsuarios: false, editarPrecios: false, verRecetasCocina: false, verRecetasBarra: false, editarInventarioCocina: false, editarInventarioBarra: false },
+    despensa: { verMesas: false, verCocina: false, verCaja: false, verConfig: false, tomarPedido: false, modificarPedidoEnviado: false, eliminarItemEnviado: false, cerrarMesa: false, accederCaja: false, accederCocina: false, cambiarEstadoComanda: false, editarProductos: false, editarUsuarios: false, editarPrecios: false, verRecetasCocina: true, verRecetasBarra: true, editarInventarioCocina: true, editarInventarioBarra: true },
+    eventos: { verMesas: true, verCocina: true, verCaja: false, verConfig: false, tomarPedido: true, modificarPedidoEnviado: false, eliminarItemEnviado: false, cerrarMesa: false, accederCaja: false, accederCocina: true, cambiarEstadoComanda: false, editarProductos: false, editarUsuarios: false, editarPrecios: false, verRecetasCocina: true, verRecetasBarra: true, editarInventarioCocina: false, editarInventarioBarra: false },
+    reparto: { verMesas: false, verCocina: false, verCaja: false, verConfig: false, tomarPedido: false, modificarPedidoEnviado: false, eliminarItemEnviado: false, cerrarMesa: false, accederCaja: false, accederCocina: false, cambiarEstadoComanda: false, editarProductos: false, editarUsuarios: false, editarPrecios: false, verRecetasCocina: false, verRecetasBarra: false, editarInventarioCocina: false, editarInventarioBarra: false },
+    cliente: { verMesas: false, verCocina: false, verCaja: false, verConfig: false, tomarPedido: false, modificarPedidoEnviado: false, eliminarItemEnviado: false, cerrarMesa: false, accederCaja: false, accederCocina: false, cambiarEstadoComanda: false, editarProductos: false, editarUsuarios: false, editarPrecios: false, verRecetasCocina: false, verRecetasBarra: false, editarInventarioCocina: false, editarInventarioBarra: false },
+    artista: { verMesas: false, verCocina: false, verCaja: false, verConfig: false, tomarPedido: false, modificarPedidoEnviado: false, eliminarItemEnviado: false, cerrarMesa: false, accederCaja: false, accederCocina: false, cambiarEstadoComanda: false, editarProductos: false, editarUsuarios: false, editarPrecios: false, verRecetasCocina: false, verRecetasBarra: false, editarInventarioCocina: false, editarInventarioBarra: false, verEventos: true, crearEventos: true, editarPerfil: true }
   },
-
-  getPermisos(rol) {
-    return this.permisos[rol] || this.permisos.cliente;
-  }
+  getPermisos(rol) { return this.permisos[rol] || this.permisos.cliente; }
 };
-
-window.Roles = Roles;

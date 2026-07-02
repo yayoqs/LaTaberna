@@ -1,10 +1,14 @@
 /* ================================================================
-   LaTaberna - PubPOS — MÓDULO JS
+   LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-shim.js
-   Versión: 1.0.0
+   Versión: 1.0.3
    Propósito: Compatibilidad con Google Apps Script (funciones legacy).
+              Incluye import de Logger.
    ================================================================ */
-var DBShim = (function() {
+
+import { Logger } from './lib/logger.js';
+
+export const DBShim = (function() {
   var module = {};
 
   // URL del Google Apps Script (actualizada con CORS habilitado)
@@ -58,5 +62,3 @@ var DBShim = (function() {
 
   return module;
 })();
-
-window.DBShim = DBShim;

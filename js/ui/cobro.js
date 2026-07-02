@@ -1,17 +1,37 @@
 /* ================================================================
-   LaTaberna - PubPOS — UI JS
+   LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/cobro.js
-   Versión: 1.0.0
-   Propósito: Modal de cierre de mesa, split bill, pago y liberación.
-   Dependencias: js/auth.js, js/utils.js, js/lib/logger.js,
-                 js/lib/deps.js, js/lib/command-bus.js, js/lib/eventBus.js,
-                 js/db.js, js/ui/comanda.js, js/ui/tickets.js,
-                 js/ui/pedido.js
+   Versión: 2.0.2
+   Propósito: Modal de cierre de mesa, split bill con pagos por persona,
+              pago total y liberación controlada por caja.
+              Desacoplado de Comanda y Pedido vía EventBus.
    ================================================================ */
+
+import { Auth } from '../auth.js';
+import { fmtMoney, showToast, calcularTotal, $id } from '../utils.js';
+import { Logger } from '../lib/logger.js';
+import { Deps } from '../lib/deps.js';
+import { CommandBus } from '../lib/command-bus.js';
+import { EventBus } from '../lib/eventBus.js';
+import { DB } from '../db.js';
+import { Store } from '../lib/store.js';
+import { Tickets } from './tickets.js';
+
 const Cobro = (() => {
   let _mesaACerrar = null;
   let _formaPago = 'Efectivo';
   let _pagosParciales = [];
+  let _pedidoService = null;
+
+  function _getPedidoService() {
+    if (_pedidoService) return _pedidoService;
+    try {
+      _pedidoService = Deps.obtener('pedidoService');
+    } catch (e) {
+      Logger.error('[Cobro] No se pudo obtener pedidoService');
+    }
+    return _pedidoService;
+  }
 
   function _asegurarModalCierre() {
     if ($id('modalCierre')) return;
@@ -24,44 +44,60 @@ const Cobro = (() => {
       <div class="modal-small" style="max-width:500px;">
         <div class="modal-header">
           <h3><i class="fas fa-file-invoice-dollar"></i> Cierre de Mesa</h3>
-          <button class="modal-close" onclick="Cobro.cerrarModalCierre()"><i class="fas fa-times"></i></button>
+          <button class="modal-close" id="btnCerrarModalCierre"><i class="fas fa-times"></i></button>
         </div>
         <div class="modal-small-body">
           <div class="cierre-resumen" id="cierreResumen"></div>
           <div id="pagosParcialesContainer" style="display:none;"></div>
-          <label>Forma de Pago (si no se divide)</label>
-          <div class="formas-pago">
-            <button class="pago-btn active" data-pago="Efectivo" onclick="Cobro.selectPago(this)"><i class="fas fa-money-bill"></i> Efectivo</button>
-            <button class="pago-btn" data-pago="Débito" onclick="Cobro.selectPago(this)"><i class="fas fa-credit-card"></i> Débito</button>
-            <button class="pago-btn" data-pago="Crédito" onclick="Cobro.selectPago(this)"><i class="fas fa-credit-card"></i> Crédito</button>
-            <button class="pago-btn" data-pago="Transferencia" onclick="Cobro.selectPago(this)"><i class="fas fa-mobile-alt"></i> Transf.</button>
-            <button class="pago-btn" data-pago="Mixto" onclick="Cobro.selectPago(this)"><i class="fas fa-layer-group"></i> Mixto</button>
+          <div id="cierreSingleContainer">
+            <label>Forma de Pago</label>
+            <div class="formas-pago" id="formasPagoContainer">
+              <button class="pago-btn active" data-pago="Efectivo"><i class="fas fa-money-bill"></i> Efectivo</button>
+              <button class="pago-btn" data-pago="Débito"><i class="fas fa-credit-card"></i> Débito</button>
+              <button class="pago-btn" data-pago="Crédito"><i class="fas fa-credit-card"></i> Crédito</button>
+              <button class="pago-btn" data-pago="Transferencia"><i class="fas fa-mobile-alt"></i> Transf.</button>
+              <button class="pago-btn" data-pago="Mixto"><i class="fas fa-layer-group"></i> Mixto</button>
+            </div>
+            <label for="cierreDescuento">Descuento (%)</label>
+            <input type="number" id="cierreDescuento" value="0" min="0" max="100">
+            <div class="cierre-total-final" id="cierreTotalFinal"></div>
           </div>
-          <label for="cierreDescuento">Descuento (%)</label>
-          <input type="number" id="cierreDescuento" value="0" min="0" max="100" oninput="Cobro.actualizarTotalCierre()">
-          <div class="cierre-total-final" id="cierreTotalFinal"></div>
           <div class="modal-small-footer" style="flex-wrap:wrap; gap:8px;">
-            <button class="btn-secondary" onclick="Cobro.cerrarModalCierre()">Cancelar</button>
-            <button class="btn-secondary" onclick="Cobro.cobrarTodoJunto()" style="margin-right:auto;">
-              <i class="fas fa-layer-group"></i> Cobrar todo junto
-            </button>
-            <button class="btn-primary" onclick="Cobro.confirmarCierre()"><i class="fas fa-check-circle"></i> Confirmar y Cobrar</button>
+            <button class="btn-secondary" id="btnCancelarCierre">Cancelar</button>
+            <button class="btn-primary" id="btnConfirmarCierre"><i class="fas fa-check-circle"></i> Confirmar y Cobrar</button>
           </div>
         </div>
       </div>
     `;
     document.body.appendChild(modal);
+
+    document.getElementById('btnCerrarModalCierre').addEventListener('click', cerrarModalCierre);
+    document.getElementById('btnCancelarCierre').addEventListener('click', cerrarModalCierre);
+    document.getElementById('btnConfirmarCierre').addEventListener('click', confirmarCierre);
+    document.getElementById('cierreDescuento').addEventListener('input', actualizarTotalCierre);
+
+    document.getElementById('formasPagoContainer').addEventListener('click', (e) => {
+      const btn = e.target.closest('.pago-btn');
+      if (btn) selectPago(btn);
+    });
   }
 
-  function abrirModalCierre() {
+  function abrirModalCierre(mesaOpcional) {
     if (!Auth.puedeCerrarMesa()) {
       showToast('error', 'No tienes permiso para cerrar mesas');
       return;
     }
 
-    _mesaACerrar = Comanda.getMesaActiva();
+    // Obtener la mesa activa: usar la opcional o la que tenga estado 'cuenta'/'ocupada'
+    if (!mesaOpcional) {
+      const mesas = Store.getState().mesas || [];
+      _mesaACerrar = mesas.find(m => m.estado === 'cuenta' || m.estado === 'ocupada');
+    } else {
+      _mesaACerrar = mesaOpcional;
+    }
+
     if (!_mesaACerrar) {
-      showToast('warning', 'No hay ninguna mesa abierta.');
+      showToast('warning', 'No hay ninguna mesa para cerrar.');
       return;
     }
     if (!_mesaACerrar.items || _mesaACerrar.items.length === 0) {
@@ -79,7 +115,9 @@ const Cobro = (() => {
     const modal = document.getElementById('modalCierre');
     if (modal) {
       const ppContainer = document.getElementById('pagosParcialesContainer');
+      const singleContainer = document.getElementById('cierreSingleContainer');
       if (ppContainer) ppContainer.style.display = 'none';
+      if (singleContainer) singleContainer.style.display = 'block';
       modal.style.display = 'flex';
     }
   }
@@ -109,7 +147,9 @@ const Cobro = (() => {
       _renderPagosParciales(porPersona);
     } else {
       const ppContainer = document.getElementById('pagosParcialesContainer');
+      const singleContainer = document.getElementById('cierreSingleContainer');
       if (ppContainer) ppContainer.style.display = 'none';
+      if (singleContainer) singleContainer.style.display = 'block';
     }
 
     _actualizarTotalFinal();
@@ -117,7 +157,11 @@ const Cobro = (() => {
 
   function _renderPagosParciales(porPersona) {
     const container = document.getElementById('pagosParcialesContainer');
+    const singleContainer = document.getElementById('cierreSingleContainer');
     if (!container) return;
+
+    if (singleContainer) singleContainer.style.display = 'none';
+
     let html = '<h4>Pago por persona</h4>';
     for (const persona of Object.keys(porPersona)) {
       const pagoExistente = _pagosParciales.find(p => p.persona === persona);
@@ -125,19 +169,47 @@ const Cobro = (() => {
       const monto = pagoExistente ? pagoExistente.monto : montoSugerido;
       const forma = pagoExistente ? pagoExistente.formaPago : 'Efectivo';
 
-      html += `<div class="pago-persona-row">
+      html += `<div class="pago-persona-row" id="fila-${persona.replace(/\s/g, '_')}">
         <span>${persona}: ${fmtMoney(montoSugerido)}</span>
-        <select id="formaPago_${persona}" onchange="Cobro.actualizarFormaPagoPersona('${persona}', this.value)">
+        <select class="select-forma-pago" data-persona="${persona}">
           <option value="Efectivo" ${forma === 'Efectivo' ? 'selected' : ''}>Efectivo</option>
           <option value="Débito" ${forma === 'Débito' ? 'selected' : ''}>Débito</option>
           <option value="Crédito" ${forma === 'Crédito' ? 'selected' : ''}>Crédito</option>
+          <option value="Transferencia" ${forma === 'Transferencia' ? 'selected' : ''}>Transf.</option>
         </select>
-        <input type="number" id="monto_${persona}" value="${monto}" step="0.01" min="0" onchange="Cobro.actualizarMontoPersona('${persona}', this.value)">
+        <input type="number" class="input-monto-persona" data-persona="${persona}" value="${monto}" step="0.01" min="0">
+        <button class="btn-primary btn-cobrar-persona" data-persona="${persona}" style="font-size:12px; padding:4px 8px;">Cobrar</button>
       </div>`;
     }
-    html += `<button class="btn-secondary" onclick="Cobro.cobrarTodoJunto()" style="margin-top:8px;">Cobrar todo junto</button>`;
+    html += `<button class="btn-secondary" id="btnCobrarTodoJuntoSplit" style="margin-top:8px;">Cobrar todo junto</button>`;
+    html += `<div id="saldoPendienteInfo" style="margin-top:8px; font-weight:bold;"></div>`;
     container.innerHTML = html;
     container.style.display = 'block';
+
+    container.querySelectorAll('.select-forma-pago').forEach(select => {
+      select.addEventListener('change', function() {
+        actualizarFormaPagoPersona(this.dataset.persona, this.value);
+      });
+    });
+
+    container.querySelectorAll('.input-monto-persona').forEach(input => {
+      input.addEventListener('change', function() {
+        actualizarMontoPersona(this.dataset.persona, this.value);
+      });
+    });
+
+    container.querySelectorAll('.btn-cobrar-persona').forEach(btn => {
+      btn.addEventListener('click', function() {
+        cobrarPersona(this.dataset.persona);
+      });
+    });
+
+    document.getElementById('btnCobrarTodoJuntoSplit')?.addEventListener('click', () => {
+      document.getElementById('pagosParcialesContainer').style.display = 'none';
+      document.getElementById('cierreSingleContainer').style.display = 'block';
+    });
+
+    _actualizarSaldoPendiente();
   }
 
   function _inicializarPagosParciales() {
@@ -153,6 +225,17 @@ const Cobro = (() => {
     }
   }
 
+  function _actualizarSaldoPendiente() {
+    const infoEl = document.getElementById('saldoPendienteInfo');
+    if (!infoEl || !_mesaACerrar) return;
+    const total = calcularTotal(_mesaACerrar.items);
+    const pagado = _pagosParciales
+      .filter(p => p.pagado)
+      .reduce((s, p) => s + p.monto, 0);
+    const pendiente = total - pagado;
+    infoEl.textContent = `Pagado: ${fmtMoney(pagado)} | Pendiente: ${fmtMoney(pendiente)}`;
+  }
+
   function actualizarFormaPagoPersona(persona, forma) {
     const pago = _pagosParciales.find(p => p.persona === persona);
     if (pago) pago.formaPago = forma;
@@ -165,9 +248,79 @@ const Cobro = (() => {
     if (pago) pago.monto = monto;
   }
 
+  async function cobrarPersona(persona) {
+    const pago = _pagosParciales.find(p => p.persona === persona);
+    if (!pago) return showToast('error', 'Persona no encontrada en pagos');
+
+    if (!_mesaACerrar || !_mesaACerrar.pedidoId) {
+      return showToast('error', 'La mesa no tiene un pedido asociado.');
+    }
+
+    const pedidoService = _getPedidoService();
+    if (!pedidoService) {
+      return showToast('error', 'Servicio de pedidos no disponible.');
+    }
+
+    const resultado = await pedidoService.agregarTransaccion(_mesaACerrar.pedidoId, {
+      persona,
+      monto: pago.monto,
+      formaPago: pago.formaPago
+    });
+
+    if (!resultado.exito) {
+      return showToast('error', resultado.error || 'Error al cobrar');
+    }
+
+    pago.pagado = true;
+
+    const fila = document.getElementById(`fila-${persona.replace(/\s/g, '_')}`);
+    if (fila) fila.style.opacity = '0.5';
+
+    _actualizarSaldoPendiente();
+
+    if (resultado.datos && resultado.datos.pedidoCerrado) {
+      cerrarModalCierre();
+      const ticketHTML = Tickets.generarCierre(_mesaACerrar, calcularTotal(_mesaACerrar.items), 0, 'Mixto');
+      Tickets.mostrar(ticketHTML, `Comprobante — Mesa ${_mesaACerrar.numero}`, {
+        textoImprimir: 'Imprimir',
+        claseImprimir: 'btn-print',
+        onImprimir: () => true,
+        textoExtra: 'Liberar Mesa',
+        onExtra: async () => {
+          // Emitir evento en lugar de llamar a Pedido directamente
+          EventBus.emit('pago:confirmado', {
+            mesa: _mesaACerrar.numero,
+            pedidoId: _mesaACerrar.pedidoId,
+            total: calcularTotal(_mesaACerrar.items)
+          });
+
+          try {
+            const res = await CommandBus.ejecutar({
+              type: 'liberarMesa',
+              datos: { numeroMesa: _mesaACerrar.numero }
+            });
+            if (res.exito) {
+              EventBus.emit('pedido:cerrado', { mesa: _mesaACerrar.numero });
+              showToast('success', `Mesa ${_mesaACerrar.numero} liberada.`);
+            } else {
+              showToast('error', 'Error al liberar la mesa: ' + res.error);
+            }
+          } catch (err) {
+            Logger.error('[Cobro] Error al liberar mesa:', err);
+            showToast('error', 'Error inesperado al liberar la mesa.');
+          }
+          _mesaACerrar = null;
+        }
+      });
+    } else {
+      showToast('success', `${persona} pagó ${fmtMoney(pago.monto)}. Saldo pendiente: ${fmtMoney(resultado.datos.saldoRestante)}`);
+    }
+  }
+
   function cobrarTodoJunto() {
     const container = document.getElementById('pagosParcialesContainer');
     if (container) container.style.display = 'none';
+    document.getElementById('cierreSingleContainer').style.display = 'block';
     document.getElementById('cierreDescuento').value = 0;
     _actualizarTotalFinal();
   }
@@ -198,30 +351,27 @@ const Cobro = (() => {
 
     const ppContainer = document.getElementById('pagosParcialesContainer');
     const usarSplit = ppContainer && ppContainer.style.display !== 'none';
-    let pagos = [];
 
     if (usarSplit) {
-      pagos = _pagosParciales.filter(p => p.monto > 0);
-      if (pagos.length === 0) { showToast('error', 'No hay pagos registrados.'); return; }
-      const sumaPagos = pagos.reduce((s, p) => s + p.monto, 0);
-      const total = calcularTotal(_mesaACerrar.items);
-      if (Math.abs(sumaPagos - total) > 0.01) {
-        showToast('warning', `La suma de pagos (${fmtMoney(sumaPagos)}) no coincide con el total (${fmtMoney(total)}).`);
+      const pendientes = _pagosParciales.filter(p => !p.pagado);
+      if (pendientes.length === 0) {
+        showToast('warning', 'No hay pagos pendientes.');
         return;
       }
-    } else {
-      const subtotal = calcularTotal(_mesaACerrar.items);
-      const descuentoInput = document.getElementById('cierreDescuento');
-      const descuento = parseFloat(descuentoInput?.value) || 0;
-      const totalFinal = Math.round(subtotal * (1 - descuento / 100));
-      pagos = [{ persona: 'Total', monto: totalFinal, formaPago: _formaPago }];
+      for (const pago of pendientes) {
+        await cobrarPersona(pago.persona);
+      }
+      return;
     }
 
-    // ── 1. Cerrar el pedido a través del Servicio de Dominio ──
-    let pedidoService;
-    try {
-      pedidoService = Deps.obtener('pedidoService');
-    } catch (e) {
+    // Modo pago único
+    const subtotal = calcularTotal(_mesaACerrar.items);
+    const descuentoInput = document.getElementById('cierreDescuento');
+    const descuento = parseFloat(descuentoInput?.value) || 0;
+    const totalFinal = Math.round(subtotal * (1 - descuento / 100));
+
+    const pedidoService = _getPedidoService();
+    if (!pedidoService) {
       showToast('error', 'Servicio de pedidos no disponible.');
       return;
     }
@@ -231,11 +381,14 @@ const Cobro = (() => {
       return;
     }
 
+    const descuentoAplicado = parseFloat(document.getElementById('cierreDescuento')?.value) || 0;
+
+    let resultado;
     try {
-      await pedidoService.cerrarPedido(_mesaACerrar.pedidoId, {
-        formaPago: pagos[0].formaPago,
-        totalFinal: pagos[0].monto,
-        descuento: parseFloat(document.getElementById('cierreDescuento')?.value) || 0
+      resultado = await pedidoService.cerrarPedidoSinLiberar(_mesaACerrar.pedidoId, {
+        formaPago: _formaPago,
+        totalFinal,
+        descuento: descuentoAplicado
       });
     } catch (e) {
       Logger.error('[Cobro] Error al cerrar pedido:', e);
@@ -243,8 +396,11 @@ const Cobro = (() => {
       return;
     }
 
-    // ── 2. Sincronización inmediata con Sheets (se delega en el servicio, pero forzamos igual) ──
-    //    El servicio ya incluye sincronización. Se mantiene la lógica de respaldo.
+    if (!resultado.exito) {
+      showToast('error', resultado.error || 'Error al procesar el pago');
+      return;
+    }
+
     const pedidoCerrado = DB.pedidos.find(p => p.id === _mesaACerrar.pedidoId);
     if (pedidoCerrado && typeof DB.syncGuardarPedido === 'function') {
       const pedidoParaSync = {
@@ -253,14 +409,11 @@ const Cobro = (() => {
         mozo:        pedidoCerrado.mozo || 'Sin mozo',
         comensales:  pedidoCerrado.comensales || 1,
         estado:      'cerrada',
-        items:       Array.isArray(pedidoCerrado.items)
-                       ? JSON.stringify(pedidoCerrado.items)
-                       : (pedidoCerrado.items || '[]'),
+        items:       Array.isArray(pedidoCerrado.items) ? JSON.stringify(pedidoCerrado.items) : (pedidoCerrado.items || '[]'),
         total:       pedidoCerrado.total || 0,
         created_at:  pedidoCerrado.created_at,
         updated_at:  pedidoCerrado.updated_at || new Date().toISOString()
       };
-
       try {
         await DB.syncGuardarPedido(pedidoParaSync);
         Logger.info('[Cobro] Pedido sincronizado con Sheets tras el cierre.');
@@ -270,42 +423,32 @@ const Cobro = (() => {
       }
     }
 
-    // ── 3. Cerrar el modal y mostrar ticket con acciones ──
     cerrarModalCierre();
 
-    const ticketHTML = Tickets.generarCierre(_mesaACerrar, pagos[0].monto, 0, pagos[0].formaPago);
+    const ticketHTML = Tickets.generarCierre(_mesaACerrar, totalFinal, descuentoAplicado, _formaPago);
     Tickets.mostrar(ticketHTML, `Comprobante — Mesa ${_mesaACerrar.numero}`, {
       textoImprimir: 'Imprimir',
       claseImprimir: 'btn-print',
       onImprimir: () => true,
-      textoExtra: 'Pagado',
+      textoExtra: 'Liberar Mesa',
       onExtra: async () => {
-        // ── Liberar la mesa usando el comando ──
+        // Emitir evento en lugar de llamar a Pedido directamente
+        EventBus.emit('pago:confirmado', {
+          mesa: _mesaACerrar.numero,
+          pedidoId: _mesaACerrar.pedidoId,
+          total: totalFinal
+        });
+
         try {
-          if (typeof CommandBus !== 'undefined') {
-            const res = await CommandBus.ejecutar({
-              type: 'liberarMesa',
-              datos: { numeroMesa: _mesaACerrar.numero }
-            });
-            if (res.exito) {
-              EventBus.emit('pedido:cerrado', { mesa: _mesaACerrar.numero });
-              if (typeof Pedido !== 'undefined' && Pedido.cerrar) Pedido.cerrar();
-              showToast('success', `Mesa ${_mesaACerrar.numero} pagada y liberada.`);
-            } else {
-              showToast('error', 'Error al liberar la mesa: ' + res.error);
-            }
-          } else {
-            // Fallback si CommandBus no está disponible (mantenemos acceso directo mínimo)
-            if (_mesaACerrar.esVirtual) {
-              DB.liberarMesasFusionadas(_mesaACerrar);
-            } else {
-              const idx = DB.mesas.findIndex(m => m.numero === _mesaACerrar.numero);
-              if (idx >= 0) DB.mesas[idx] = mesaVacia(_mesaACerrar.numero);
-            }
-            DB.saveMesas();
+          const res = await CommandBus.ejecutar({
+            type: 'liberarMesa',
+            datos: { numeroMesa: _mesaACerrar.numero }
+          });
+          if (res.exito) {
             EventBus.emit('pedido:cerrado', { mesa: _mesaACerrar.numero });
-            if (typeof Pedido !== 'undefined' && Pedido.cerrar) Pedido.cerrar();
-            showToast('success', `Mesa ${_mesaACerrar.numero} pagada y liberada.`);
+            showToast('success', `Mesa ${_mesaACerrar.numero} liberada.`);
+          } else {
+            showToast('error', 'Error al liberar la mesa: ' + res.error);
           }
         } catch (err) {
           Logger.error('[Cobro] Error al liberar mesa:', err);
@@ -321,7 +464,7 @@ const Cobro = (() => {
     if (modal) modal.style.display = 'none';
   }
 
-  EventBus.on('cobro:solicitado', abrirModalCierre);
+  EventBus.on('cobro:solicitado', () => abrirModalCierre());
 
   return {
     abrirModalCierre,
@@ -331,8 +474,9 @@ const Cobro = (() => {
     confirmarCierre,
     actualizarFormaPagoPersona,
     actualizarMontoPersona,
-    cobrarTodoJunto
+    cobrarTodoJunto,
+    cobrarPersona
   };
 })();
 
-window.Cobro = Cobro;
+export { Cobro };

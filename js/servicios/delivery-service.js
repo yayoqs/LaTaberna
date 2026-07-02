@@ -1,24 +1,28 @@
 /* ================================================================
-   LaTaberna - PubPOS — SERVICIO JS
+   LaTaberna - PubPOS — SERVICIO JS (ES6)
    Archivo: js/servicios/delivery-service.js
-   Versión: 1.0.0
+   Versión: 1.0.1
    Propósito: Servicio de casos de uso para pedidos de delivery.
-   Dependencias: js/dominio/delivery.js, js/dominio/direccion.js, js/dominio/dinero.js, js/dominio/cantidad.js, js/dominio/resultado.js, js/lib/eventBus.js, js/lib/logger.js
+              Sin asignaciones window.
+   Dependencias: js/dominio/delivery.js, js/dominio/direccion.js,
+                 js/dominio/dinero.js, js/dominio/cantidad.js,
+                 js/dominio/resultado.js, js/lib/eventBus.js,
+                 js/lib/logger.js
    ================================================================ */
-const DeliveryService = (() => {
 
+import { Delivery, reconstruirDelivery } from '../dominio/delivery.js';
+import { Direccion, crearDireccion } from '../dominio/direccion.js';
+import { Dinero, crearDinero } from '../dominio/dinero.js';
+import { Cantidad, crearCantidad } from '../dominio/cantidad.js';
+import { Resultado } from '../dominio/resultado.js';
+import { EventBus } from '../lib/eventBus.js';
+import { Logger } from '../lib/logger.js';
+
+const DeliveryService = (() => {
   let _deliveryRepo = null;
 
-  /** @param {object} repo – repositorio de delivery */
-  function configurar(repo) {
-    _deliveryRepo = repo;
-  }
+  function configurar(repo) { _deliveryRepo = repo; }
 
-  /**
-   * Crea un nuevo pedido de delivery.
-   * @param {{ direccion: object, items: Array, repartidor: string, observaciones: string }} datos
-   * @returns {Promise<Resultado>}
-   */
   async function crearDelivery({ direccion, items, repartidor, observaciones }) {
     if (!_deliveryRepo) return Resultado.fallo('Repositorio de delivery no configurado');
 
@@ -54,20 +58,14 @@ const DeliveryService = (() => {
     return Resultado.ok(delivery);
   }
 
-  /**
-   * Envía un pedido de delivery a cocina.
-   * @param {string} deliveryId
-   * @returns {Promise<Resultado>}
-   */
   async function enviarACocina(deliveryId) {
     if (!_deliveryRepo) return Resultado.fallo('Repositorio no configurado');
-
     const datos = await _deliveryRepo.obtenerPorId(deliveryId);
     if (!datos) return Resultado.fallo('Delivery no encontrado');
 
     let delivery;
     try {
-      delivery = _reconstruirDelivery(datos);
+      delivery = reconstruirDelivery(datos);
       delivery.enviarACocina();
     } catch (e) {
       return Resultado.fallo(`No se pudo enviar a cocina: ${e.message}`);
@@ -83,20 +81,14 @@ const DeliveryService = (() => {
     return Resultado.ok(delivery);
   }
 
-  /**
-   * Despacha el pedido (estado 'en camino').
-   * @param {string} deliveryId
-   * @returns {Promise<Resultado>}
-   */
   async function despachar(deliveryId) {
     if (!_deliveryRepo) return Resultado.fallo('Repositorio no configurado');
-
     const datos = await _deliveryRepo.obtenerPorId(deliveryId);
     if (!datos) return Resultado.fallo('Delivery no encontrado');
 
     let delivery;
     try {
-      delivery = _reconstruirDelivery(datos);
+      delivery = reconstruirDelivery(datos);
       delivery.despachar();
     } catch (e) {
       return Resultado.fallo(`No se pudo despachar: ${e.message}`);
@@ -111,20 +103,14 @@ const DeliveryService = (() => {
     return Resultado.ok(delivery);
   }
 
-  /**
-   * Confirma la entrega del pedido.
-   * @param {string} deliveryId
-   * @returns {Promise<Resultado>}
-   */
   async function confirmarEntrega(deliveryId) {
     if (!_deliveryRepo) return Resultado.fallo('Repositorio no configurado');
-
     const datos = await _deliveryRepo.obtenerPorId(deliveryId);
     if (!datos) return Resultado.fallo('Delivery no encontrado');
 
     let delivery;
     try {
-      delivery = _reconstruirDelivery(datos);
+      delivery = reconstruirDelivery(datos);
       delivery.confirmarEntrega();
     } catch (e) {
       return Resultado.fallo(`No se pudo confirmar entrega: ${e.message}`);
@@ -139,20 +125,14 @@ const DeliveryService = (() => {
     return Resultado.ok(delivery);
   }
 
-  /**
-   * Cancela un pedido de delivery.
-   * @param {string} deliveryId
-   * @returns {Promise<Resultado>}
-   */
   async function cancelar(deliveryId) {
     if (!_deliveryRepo) return Resultado.fallo('Repositorio no configurado');
-
     const datos = await _deliveryRepo.obtenerPorId(deliveryId);
     if (!datos) return Resultado.fallo('Delivery no encontrado');
 
     let delivery;
     try {
-      delivery = _reconstruirDelivery(datos);
+      delivery = reconstruirDelivery(datos);
       delivery.cancelar();
     } catch (e) {
       return Resultado.fallo(`No se pudo cancelar: ${e.message}`);
@@ -167,34 +147,7 @@ const DeliveryService = (() => {
     return Resultado.ok(delivery);
   }
 
-  /** @private Reconstruye un Delivery desde datos planos */
-  function _reconstruirDelivery(datos) {
-    const dir = new Direccion(
-      datos.direccion?.calle || datos.direccion,
-      datos.direccion?.numero || '',
-      datos.direccion?.depto || '',
-      datos.direccion?.referencia || '',
-      datos.direccion?.telefono || ''
-    );
-    const delivery = new Delivery(datos.id, dir, datos.repartidor);
-    (datos.items || []).forEach(it => {
-      delivery.agregarItem(it.nombre, crearDinero(it.precio), crearCantidad(it.cantidad));
-    });
-    delivery.setObservaciones(datos.observaciones);
-    if (datos.estado === 'en_preparacion') { delivery.enviarACocina(); }
-    if (datos.estado === 'en_camino')       { delivery.enviarACocina(); delivery.despachar(); }
-    if (datos.estado === 'entregado')       { delivery.enviarACocina(); delivery.despachar(); delivery.confirmarEntrega(); }
-    if (datos.estado === 'cancelado')       { delivery.cancelar(); }
-    return delivery;
-  }
-
-  return {
-    configurar,
-    crearDelivery,
-    enviarACocina,
-    despachar,
-    confirmarEntrega,
-    cancelar
-  };
+  return { configurar, crearDelivery, enviarACocina, despachar, confirmarEntrega, cancelar };
 })();
-window.DeliveryService = DeliveryService;
+
+export { DeliveryService };

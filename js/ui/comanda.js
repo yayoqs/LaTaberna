@@ -1,22 +1,22 @@
 /* ================================================================
-   LaTaberna - PubPOS — UI
+   LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/comanda.js
-   Versión: 1.0.2
+   Versión: 2.0.3
    Propósito: Gestión de la comanda actual (ítems, cantidades,
-              observaciones, split bill). Fase 2: eliminada la
-              escritura directa a DB.saveMesas(). La sincronización
-              del estado local con DB se hace mediante un suscriptor
-              del Store, manteniendo la compatibilidad con el flujo
-              de envío a cocina.
-   Dependencias: Store, EventBus, DB, Auth, Logger
+              observaciones, split bill). Sin onclick. Usa delegación.
+              Incluye listener para precarga:items_listos.
    ================================================================ */
+
+import { Store } from '../lib/store.js';
+import { EventBus } from '../lib/eventBus.js';
+import { Logger } from '../lib/logger.js';
+import { fmtMoney, showToast } from '../utils.js';
+import { Auth } from '../auth.js';
+import { DB } from '../db.js';
+
 const Comanda = (() => {
   let _mesaActiva = null;
 
-  /**
-   * Sincroniza los cambios del Store con DB.mesas.
-   * Reemplaza la antigua llamada a DB.saveMesas().
-   */
   function _syncMesaStoreADB(mesaActualizada) {
     if (!mesaActualizada) return;
     const idx = DB.mesas.findIndex(m => m.numero == mesaActualizada.numero);
@@ -30,16 +30,13 @@ const Comanda = (() => {
 
   function _initStoreSync() {
     Store.subscribe((state, action) => {
-      // Solo reaccionar a acciones de comanda
       if (!action || !action.type) return;
       if (!['COMANDA_ITEM_AGREGAR', 'COMANDA_ITEM_CAMBIAR', 'COMANDA_ITEM_QUITAR'].includes(action.type)) return;
       if (!_mesaActiva) return;
 
-      // Obtener la mesa actualizada desde el Store
       const mesaStore = state.mesas.find(m => m.numero == _mesaActiva.numero);
       if (!mesaStore) return;
 
-      // Sincronizar con DB y emitir evento
       _syncMesaStoreADB(mesaStore);
       _mesaActiva = mesaStore;
       EventBus.emit('mesa:actualizada', { mesa: _mesaActiva.numero, estado: _mesaActiva.estado });
@@ -50,13 +47,8 @@ const Comanda = (() => {
     });
   }
 
-  // Activar la sincronización al cargar el módulo
   _initStoreSync();
 
-  /**
-   * Establece la mesa activa y sincroniza la UI.
-   * @param {object} mesa
-   */
   function setMesaActiva(mesa) {
     _mesaActiva = mesa;
     _render();
@@ -100,24 +92,24 @@ const Comanda = (() => {
     const opciones = _mesaActiva.personas.map(p => `<option value="${p}" ${p === personaActual ? 'selected' : ''}>${p}</option>`).join('');
     container.innerHTML = `
       <i class="fas fa-user"></i>
-      <select id="personaActivaSelect" onchange="Comanda.setPersonaActiva(this.value)">
+      <select id="personaActivaSelect">
         ${opciones}
       </select>
-      <button class="btn-icon-sm" onclick="Comanda.agregarPersona()" title="Agregar persona"><i class="fas fa-plus"></i></button>
+      <button class="btn-icon-sm" id="btnAgregarPersona" title="Agregar persona"><i class="fas fa-plus"></i></button>
     `;
+
+    document.getElementById('personaActivaSelect').addEventListener('change', function() {
+      setPersonaActiva(this.value);
+    });
+    document.getElementById('btnAgregarPersona').addEventListener('click', agregarPersona);
   }
 
-  /**
-   * Cambia la persona activa para asignar ítems en split bill.
-   * @param {string} nombre
-   */
   function setPersonaActiva(nombre) {
     if (_mesaActiva) {
       _mesaActiva.personaActiva = nombre;
     }
   }
 
-  /** Agrega una nueva persona a la mesa */
   function agregarPersona() {
     const nombre = prompt('Nombre de la persona:');
     if (!nombre) return;
@@ -129,10 +121,6 @@ const Comanda = (() => {
     _renderSelectorPersona();
   }
 
-  /**
-   * Agrega un producto a la comanda.
-   * @param {object} producto
-   */
   function agregarItem(producto) {
     if (!_mesaActiva) return;
     const persona = _mesaActiva.personaActiva || 'General';
@@ -155,11 +143,6 @@ const Comanda = (() => {
     });
   }
 
-  /**
-   * Cambia la cantidad de un ítem.
-   * @param {number} idx - Índice del ítem
-   * @param {number} delta - Incremento (+1 o -1)
-   */
   function cambiarCantidad(idx, delta) {
     if (!_mesaActiva) return;
     const item = _mesaActiva.items[idx];
@@ -175,11 +158,6 @@ const Comanda = (() => {
     });
   }
 
-  /**
-   * Establece la observación de un ítem.
-   * @param {number} idx
-   * @param {string} valor
-   */
   function setObservacion(idx, valor) {
     if (_mesaActiva?.items[idx]) {
       Store.dispatch({
@@ -189,7 +167,6 @@ const Comanda = (() => {
     }
   }
 
-  /** Elimina un ítem de la comanda */
   function quitarItem(idx) {
     if (!_mesaActiva) return;
     const item = _mesaActiva.items[idx];
@@ -203,7 +180,6 @@ const Comanda = (() => {
     });
   }
 
-  /** @param {string} mozo */
   function setMozo(mozo) {
     if (_mesaActiva) {
       _mesaActiva.mozo = mozo;
@@ -211,7 +187,6 @@ const Comanda = (() => {
     }
   }
 
-  /** @param {number} cant */
   function setComensales(cant) {
     if (_mesaActiva) {
       _mesaActiva.comensales = parseInt(cant) || 1;
@@ -219,14 +194,12 @@ const Comanda = (() => {
     }
   }
 
-  /** @param {string} obs */
   function setObservacionGeneral(obs) {
     if (_mesaActiva) {
       _mesaActiva.observaciones = obs;
     }
   }
 
-  /** Renderiza la lista de ítems de la comanda */
   function render() {
     _render();
   }
@@ -236,7 +209,6 @@ const Comanda = (() => {
     const subtotalEl = document.getElementById('subtotalDisplay');
     if (!contenedor || !_mesaActiva) return;
 
-    // Leer los ítems desde el Store para asegurar consistencia
     const state = Store.getState();
     const mesaDelStore = state.mesas.find(m => m.numero == _mesaActiva.numero);
     const items = mesaDelStore ? mesaDelStore.items : _mesaActiva.items;
@@ -255,6 +227,28 @@ const Comanda = (() => {
     contenedor.innerHTML = items.map((item, idx) => _htmlItem(item, idx)).join('');
     if (subtotalEl) subtotalEl.textContent = fmtMoney(mesaDelStore?.total || _mesaActiva.total || 0);
     _renderSelectorPersona();
+
+    contenedor.querySelectorAll('.qty-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const idx = parseInt(this.dataset.idx);
+        const delta = parseInt(this.dataset.delta);
+        if (!isNaN(idx) && !isNaN(delta)) cambiarCantidad(idx, delta);
+      });
+    });
+
+    contenedor.querySelectorAll('.item-obs-input').forEach(input => {
+      input.addEventListener('input', function() {
+        const idx = parseInt(this.dataset.idx);
+        if (!isNaN(idx)) setObservacion(idx, this.value);
+      });
+    });
+
+    contenedor.querySelectorAll('.item-remove').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const idx = parseInt(this.dataset.idx);
+        if (!isNaN(idx)) quitarItem(idx);
+      });
+    });
   }
 
   function _htmlItem(item, idx) {
@@ -264,17 +258,16 @@ const Comanda = (() => {
     return `
       <div class="comanda-item${enviado ? ' enviado' : ''}">
         <div class="item-qty-controls">
-          <button class="qty-btn" onclick="Comanda.cambiarCantidad(${idx}, -1)" ${disabledAttr}>−</button>
+          <button class="qty-btn" data-idx="${idx}" data-delta="-1" ${disabledAttr}>−</button>
           <span class="item-qty">${item.qty}</span>
-          <button class="qty-btn" onclick="Comanda.cambiarCantidad(${idx}, 1)" ${disabledAttr}>+</button>
+          <button class="qty-btn" data-idx="${idx}" data-delta="1" ${disabledAttr}>+</button>
         </div>
         <div class="item-info">
           <div class="item-nombre">${item.nombre} ${personaBadge}</div>
-          <input class="item-obs-input" placeholder="Aclaración..." value="${item.obs || ''}"
-                 oninput="Comanda.setObservacion(${idx}, this.value)" ${disabledAttr}>
+          <input class="item-obs-input" data-idx="${idx}" placeholder="Aclaración..." value="${item.obs || ''}" ${disabledAttr}>
         </div>
         <span class="item-precio">${fmtMoney(item.precio * item.qty)}</span>
-        <button class="item-remove" onclick="Comanda.quitarItem(${idx})">
+        <button class="item-remove" data-idx="${idx}">
           <i class="fas fa-times"></i>
         </button>
       </div>`;
@@ -283,6 +276,29 @@ const Comanda = (() => {
   function _initEventListeners() {
     EventBus.on('producto:seleccionado', agregarItem);
     EventBus.on('mesa:abierta', setMesaActiva);
+
+    // Listener para cargar ítems desde precarga
+    EventBus.on('precarga:items_listos', (payload) => {
+      const mesaActiva = Comanda.getMesaActiva();
+      if (!mesaActiva || mesaActiva.numero !== payload.mesa) {
+        showToast('warning', 'Abrí la mesa antes de cargar la precarga.');
+        return;
+      }
+      payload.items.forEach(item => {
+        const producto = {
+          id: item.prodId,
+          nombre: item.nombre,
+          precio: item.precio,
+          categoria: item.categoria,
+          destino: item.destino
+        };
+        for (let i = 0; i < (item.qty || 1); i++) {
+          Comanda.agregarItem(producto);
+        }
+      });
+      // Limpiar el badge después de cargar
+      EventBus.emit('mesas:limpiar_badge', { mesa: payload.mesa });
+    });
   }
 
   _initEventListeners();
@@ -303,4 +319,4 @@ const Comanda = (() => {
   };
 })();
 
-window.Comanda = Comanda;
+export { Comanda };

@@ -1,139 +1,128 @@
 /* ================================================================
-   LaTaberna - PubPOS — SERVICIO JS
+   LaTaberna - PubPOS — SERVICIO JS (ES6)
    Archivo: js/servicios/pedido-service.js
-   Versión: 1.0.0
+   Versión: 1.0.4
    Propósito: Servicio de casos de uso para pedidos de mesa.
-   Dependencias: js/dominio/pedido.js, js/dominio/cantidad.js, js/dominio/dinero.js, js/dominio/resultado.js, js/lib/eventBus.js, js/lib/logger.js
+              Corregido _reconstruirPedido para usar qty o cantidad.
    ================================================================ */
 
+import { PedidoAgregado } from '../dominio/pedido.js';
+import { Cantidad, crearCantidad } from '../dominio/cantidad.js';
+import { Dinero, crearDinero } from '../dominio/dinero.js';
+import { Resultado } from '../dominio/resultado.js';
+import { EventBus } from '../lib/eventBus.js';
+import { Logger } from '../lib/logger.js';
 
 const PedidoService = (() => {
-
   let _pedidoRepo = null;
 
-  /** @param {object} repo – repositorio con crearPedidoMesa, cerrarPedido, etc. */
   function configurar(repo) { _pedidoRepo = repo; }
 
-  /**
-   * Crea un pedido de mesa usando el agregado PedidoAgregado.
-   * @param {{ numeroMesa: number, mozo: string, comensales: number }} datos
-   * @returns {Promise<Resultado>}
-   */
   async function crearPedidoMesa({ numeroMesa, mozo, comensales }) {
     if (!_pedidoRepo) return Resultado.fallo('Repositorio no configurado');
-
     const cantComensales = crearCantidad(comensales || 1);
     if (!cantComensales) return Resultado.fallo('Cantidad de comensales inválida');
-
     let pedido;
     try {
-      pedido = new PedidoAgregado(
-        'ped_' + Date.now(),
-        numeroMesa,
-        mozo || 'Sin mozo',
-        cantComensales
-      );
+      pedido = new PedidoAgregado('ped_' + Date.now(), numeroMesa, mozo || 'Sin mozo', cantComensales);
     } catch (e) {
       return Resultado.fallo(`Error al crear pedido: ${e.message}`);
     }
-
     try {
       await _pedidoRepo.crearPedidoMesa(pedido.toJSON());
     } catch (e) {
       return Resultado.fallo(`Error al guardar pedido: ${e.message}`);
     }
-
     EventBus.emit('pedido:creado', pedido.toJSON());
     return Resultado.ok(pedido);
   }
 
-  /**
-   * Agrega un ítem a un pedido existente.
-   * @param {string} pedidoId
-   * @param {{ nombre: string, precio: number, cantidad: number }} datos
-   * @returns {Promise<Resultado>}
-   */
   async function agregarItem(pedidoId, { nombre, precio, cantidad }) {
     if (!_pedidoRepo) return Resultado.fallo('Repositorio no configurado');
-
     const datos = await _pedidoRepo.obtenerPorId(pedidoId);
     if (!datos) return Resultado.fallo('Pedido no encontrado');
-
     let pedido;
-    try {
-      pedido = _reconstruirPedido(datos);
-    } catch (e) {
-      return Resultado.fallo(`Error al reconstruir pedido: ${e.message}`);
-    }
-
+    try { pedido = _reconstruirPedido(datos); } catch (e) { return Resultado.fallo(`Error al reconstruir pedido: ${e.message}`); }
     const dineroPrecio = crearDinero(precio);
     const cant = crearCantidad(cantidad);
     if (!dineroPrecio || !cant) return Resultado.fallo('Datos de ítem inválidos');
-
-    try {
-      pedido.agregarItem(nombre, dineroPrecio, cant);
-    } catch (e) {
-      return Resultado.fallo(`No se pudo agregar el ítem: ${e.message}`);
-    }
-
-    try {
-      await _pedidoRepo.guardarPedido(pedido.toJSON());
-    } catch (e) {
-      return Resultado.fallo(`Error al guardar pedido: ${e.message}`);
-    }
-
+    try { pedido.agregarItem(nombre, dineroPrecio, cant); } catch (e) { return Resultado.fallo(`No se pudo agregar el ítem: ${e.message}`); }
+    try { await _pedidoRepo.guardarPedido(pedido.toJSON()); } catch (e) { return Resultado.fallo(`Error al guardar pedido: ${e.message}`); }
     EventBus.emit('pedido:item_agregado', { pedidoId, nombre, cantidad });
     return Resultado.ok(pedido);
   }
 
-  /**
-   * Cierra un pedido: aplica descuento, cierra el agregado y persiste.
-   * @param {string} pedidoId
-   * @param {{ formaPago: string, totalFinal: number, descuento?: number }} datos
-   * @returns {Promise<Resultado>}
-   */
   async function cerrarPedido(pedidoId, { formaPago, totalFinal, descuento = 0 }) {
     if (!_pedidoRepo) return Resultado.fallo('Repositorio no configurado');
+    const datos = await _pedidoRepo.obtenerPorId(pedidoId);
+    if (!datos) return Resultado.fallo('Pedido no encontrado');
+    let pedido;
+    try { pedido = _reconstruirPedido(datos); } catch (e) { return Resultado.fallo(`Error al reconstruir pedido: ${e.message}`); }
+    try { if (descuento > 0) pedido.aplicarDescuento(descuento); pedido.cerrar(); } catch (e) { return Resultado.fallo(`No se pudo cerrar el pedido: ${e.message}`); }
+    try { await _pedidoRepo.cerrarPedido(pedidoId, { formaPago, total: totalFinal, descuento, pedido: pedido.toJSON() }); } catch (e) { return Resultado.fallo(`Error al guardar cierre: ${e.message}`); }
+    EventBus.emit('pedido:cerrado', { mesa: pedido.mesa, pedidoId, total: totalFinal, formaPago });
+    return Resultado.ok(pedido);
+  }
+
+  async function cerrarPedidoSinLiberar(pedidoId, { formaPago, totalFinal, descuento = 0 }) {
+    if (!_pedidoRepo) return Resultado.fallo('Repositorio no configurado');
+    const datos = await _pedidoRepo.obtenerPorId(pedidoId);
+    if (!datos) return Resultado.fallo('Pedido no encontrado');
+    let pedido;
+    try { pedido = _reconstruirPedido(datos); } catch (e) { return Resultado.fallo(`Error al reconstruir pedido: ${e.message}`); }
+    try { if (descuento > 0) pedido.aplicarDescuento(descuento); pedido.cerrar(); } catch (e) { return Resultado.fallo(`No se pudo cerrar el pedido: ${e.message}`); }
+    try { await _pedidoRepo.cerrarPedidoSinLiberar(pedidoId, { formaPago, total: totalFinal, descuento, pedido: pedido.toJSON() }); } catch (e) { return Resultado.fallo(`Error al guardar cierre: ${e.message}`); }
+    EventBus.emit('pedido:cerrado', { mesa: pedido.mesa, pedidoId, total: totalFinal, formaPago });
+    return Resultado.ok(pedido);
+  }
+
+  async function agregarTransaccion(pedidoId, { persona, monto, formaPago }) {
+    if (!_pedidoRepo) return Resultado.fallo('Repositorio no configurado');
+    if (!monto || monto <= 0) return Resultado.fallo('El monto debe ser mayor a cero');
 
     const datos = await _pedidoRepo.obtenerPorId(pedidoId);
     if (!datos) return Resultado.fallo('Pedido no encontrado');
 
-    let pedido;
     try {
-      pedido = _reconstruirPedido(datos);
-    } catch (e) {
-      return Resultado.fallo(`Error al reconstruir pedido: ${e.message}`);
-    }
+      const resultado = await _pedidoRepo.agregarTransaccion(pedidoId, {
+        persona: persona || 'General',
+        monto,
+        formaPago: formaPago || 'efectivo',
+        timestamp: Date.now()
+      });
 
-    try {
-      if (descuento > 0) pedido.aplicarDescuento(descuento);
-      pedido.cerrar();
-    } catch (e) {
-      return Resultado.fallo(`No se pudo cerrar el pedido: ${e.message}`);
-    }
+      if (!resultado.exito) {
+        return Resultado.fallo(resultado.error || 'Error al agregar transacción');
+      }
 
-    try {
-      await _pedidoRepo.cerrarPedido(pedidoId, {
+      EventBus.emit('pedido:transaccion_agregada', {
+        pedidoId,
+        persona,
+        monto,
         formaPago,
-        total: totalFinal,
-        descuento,
-        pedido: pedido.toJSON()
+        saldoRestante: resultado.saldoRestante,
+        pedidoCerrado: resultado.pedidoCerrado
+      });
+
+      if (resultado.pedidoCerrado) {
+        const pedidoCerrado = await _pedidoRepo.obtenerPorId(pedidoId);
+        EventBus.emit('pedido:cerrado', {
+          mesa: pedidoCerrado.mesa,
+          pedidoId,
+          total: pedidoCerrado.total,
+          formaPago: 'Mixto'
+        });
+      }
+
+      return Resultado.ok({
+        saldoRestante: resultado.saldoRestante,
+        pedidoCerrado: resultado.pedidoCerrado
       });
     } catch (e) {
-      return Resultado.fallo(`Error al guardar cierre: ${e.message}`);
+      return Resultado.fallo(`Error al agregar transacción: ${e.message}`);
     }
-
-    EventBus.emit('pedido:cerrado', {
-      mesa: pedido.mesa,
-      pedidoId,
-      total: totalFinal,
-      formaPago
-    });
-
-    return Resultado.ok(pedido);
   }
 
-  /** @private Reconstruye un PedidoAgregado desde datos planos */
   function _reconstruirPedido(datos) {
     const pedido = new PedidoAgregado(
       datos.id,
@@ -141,11 +130,12 @@ const PedidoService = (() => {
       datos.mozo,
       crearCantidad(datos.comensales)
     );
+    // CORRECCIÓN: usar it.cantidad || it.qty para aceptar ambos nombres de campo
     (datos.items || []).forEach(it => {
       pedido.agregarItem(
         it.nombre,
         crearDinero(it.precio),
-        crearCantidad(it.cantidad)
+        crearCantidad(it.cantidad || it.qty)
       );
     });
     if (datos.descuento) pedido.aplicarDescuento(datos.descuento);
@@ -154,11 +144,7 @@ const PedidoService = (() => {
     return pedido;
   }
 
-  return {
-    configurar,
-    crearPedidoMesa,
-    agregarItem,
-    cerrarPedido
-  };
+  return { configurar, crearPedidoMesa, agregarItem, cerrarPedido, cerrarPedidoSinLiberar, agregarTransaccion };
 })();
-window.PedidoService = PedidoService;
+
+export { PedidoService };

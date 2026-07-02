@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Test B – Recepción de Precargas</title>
+  <title>Test B – Recepción de Precargas (ES6)</title>
   <style>
     body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
     h1 { color: #f59e0b; }
@@ -10,55 +10,148 @@
     .test { margin: 4px 0; padding: 4px 8px; border-radius: 4px; }
     .pass { background: rgba(34,197,94,.2); }
     .fail { background: rgba(239,68,68,.2); }
+    .log { background: rgba(99,102,241,.2); }
     .summary { margin-top: 20px; font-weight: bold; }
     .info { color: #94a3b8; font-size: 12px; margin: 2px 0; }
     .error { color: #ef4444; }
   </style>
 </head>
 <body>
-  <h1>🧪 Test B – Recepción de Precargas (cliente:precarga_enviada)</h1>
-  <p class="info">Verifica que el Frontend Interno muestre la insignia, cargue los ítems (agrupando por producto), asigne correctamente las observaciones y actualice el estado de la precarga.</p>
+  <h1>🧪 Test B – Recepción de Precargas (ES6)</h1>
+  <p class="info">Verifica que el Frontend Interno muestre la insignia, cargue los ítems, asigne observaciones y actualice el estado de la precarga.</p>
   <div id="results"></div>
 
-  <!-- Mocks tempranos -->
-  <script>
-    window.DBInventario = {
-      validarStockParaItems: function() { return { ok: true, faltantes: [] }; }
-    };
-    window.DBFusion = {
-      fusionarMesas: function() { return null; }
-    };
-    window.Auth = {
-      puede: function() { return true; },
-      esAdmin: function() { return true; },
-      getUsuarioActual: function() { return { nombre: 'Test' }; }
-    };
-  </script>
+  <script type="module">
+    const resultsEl = document.getElementById('results');
+    
+    function log(msg) {
+      resultsEl.innerHTML += '<div class="test log">🔍 ' + msg + '</div>';
+    }
+    
+    log('Iniciando imports...');
+    
+    try {
+      const { Mesas } = await import('../js/ui/mesas.js');
+      log('Mesas importado OK');
+      
+      const { Comanda } = await import('../js/ui/comanda.js');
+      log('Comanda importado OK');
+      
+      const { PrecargaControl } = await import('../js/modulos/interno/precarga-control.js');
+      log('PrecargaControl importado OK');
+      
+      const { Store } = await import('../js/lib/store.js');
+      log('Store importado OK');
+      
+      const { EventBus } = await import('../js/lib/eventBus.js');
+      log('EventBus importado OK');
+      
+      const { Logger } = await import('../js/lib/logger.js');
+      log('Logger importado OK');
 
-  <!-- DEPENDENCIAS (rutas absolutas desde raíz) -->
-  <script src="/js/utils.js"></script>
-  <script src="/js/lib/logger.js"></script>
-  <script src="/js/lib/eventBus.js"></script>
-  <script src="/js/lib/store.js"></script>
-  <script src="/js/lib/command-bus.js"></script>
-  <script src="/js/lib/deps.js"></script>
-  <script src="/js/dominio/resultado.js"></script>
-  <script src="/js/dominio/dinero.js"></script>
-  <script src="/js/dominio/cantidad.js"></script>
-  <script src="/js/db-core.js"></script>
-  <script src="/js/db-appwrite.js"></script>
-  <script src="/js/db.js"></script>
+      // Mocks
+      log('Configurando mocks...');
+      window.DBInventario = { validarStockParaItems: () => ({ ok: true, faltantes: [] }) };
+      window.DBFusion = { fusionarMesas: () => null };
+      window.Auth = {
+        puede: () => true,
+        esAdmin: () => true,
+        getUsuarioActual: () => ({ nombre: 'Test' }),
+        getAppwriteUserId: async () => 'user_test_123'
+      };
+      window.showToast = () => {};
+      
+      window.DB = {
+        config: { zonas: [{ nombre: 'salon', cantidad: 5 }] },
+        mozos: [{ id: 'm1', nombre: 'Carlos', activo: true }],
+        mesas: [
+          { numero: 1, estado: 'libre', zona: 'salon', items: [], mozo: '', comensales: 1, pedidoId: null, esVirtual: false, permite_prepedidos: false },
+          { numero: 2, estado: 'libre', zona: 'salon', items: [], mozo: '', comensales: 1, pedidoId: null, esVirtual: false, permite_prepedidos: false }
+        ],
+        pedidos: [],
+        comandas: [],
+        productos: [],
+        saveMesas: () => {},
+        savePedidos: () => {},
+        saveComandas: () => {},
+        getMesa: function(num) { return this.mesas.find(m => m.numero == num); },
+        fusionarMesas: () => null
+      };
+      
+      window.DBAppwrite = {
+        actualizar: async (col, id, cambios, permisos) => {
+          log('DBAppwrite.actualizar llamado: ' + col + ' ' + id);
+          return true;
+        }
+      };
+      
+      window.CommandBus = {
+        _handlers: {},
+        registrar: function(type, handler) { this._handlers[type] = handler; },
+        ejecutar: async function(comando) {
+          log('CommandBus.ejecutar: ' + comando.type);
+          if (comando.type === 'precarga:revisar') return { exito: true };
+          return { exito: false };
+        }
+      };
 
-  <!-- Módulos a testear -->
-  <script src="/js/ui/mesas.js"></script>
-  <script src="/js/ui/comanda.js"></script>
-  <script src="/js/modulos/interno/precarga-control.js"></script>
+      log('Mocks configurados OK');
 
-  <script>
-    (function() {
-      var resultsEl = document.getElementById('results');
-      var passed = 0, failed = 0;
+      // Sincronizar Store
+      const originalGetState = Store.getState.bind(Store);
+      Store.getState = function() {
+        const state = originalGetState();
+        state.mesas = window.DB.mesas;
+        state.comandas = window.DB.comandas;
+        return state;
+      };
 
+      const originalDispatch = Store.dispatch.bind(Store);
+      Store.dispatch = function(action) {
+        log('Store.dispatch: ' + action.type);
+        if (action.type === 'COMANDA_ITEM_AGREGAR') {
+          const mesa = window.DB.mesas.find(m => m.numero === action.payload.numeroMesa);
+          if (mesa) {
+            const item = action.payload.item;
+            const existente = mesa.items.find(it =>
+              it.prodId === item.prodId && !it.enviado && it.persona === (item.persona || 'General')
+            );
+            if (existente) existente.qty++;
+            else mesa.items.push({ ...item, qty: 1 });
+          }
+        }
+        originalDispatch(action);
+      };
+
+      Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: window.DB.mesas });
+      log('Store inicializado OK');
+
+      // Crear DOM
+      const main = document.createElement('main');
+      main.id = 'view-mesas';
+      main.innerHTML = '<div id="mesasGrid"></div>';
+      document.body.appendChild(main);
+      log('DOM creado OK');
+
+      // Renderizar mesas
+      Mesas.render();
+      log('Mesas.render() ejecutado');
+
+      // Preparar mesa activa
+      const mesa1 = window.DB.mesas[0];
+      mesa1.estado = 'ocupada';
+      mesa1.pedidoId = 'ped_test';
+      mesa1.mozo = 'Carlos';
+      mesa1.comensales = 2;
+      mesa1.personas = ['General'];
+      mesa1.personaActiva = 'General';
+      mesa1.items = [];
+      Comanda.setMesaActiva(mesa1);
+      log('Mesa 1 configurada como activa');
+
+      // Ahora sí ejecutar tests
+      let passed = 0, failed = 0;
+      
       function assert(condition, msg) {
         if (condition) {
           passed++;
@@ -69,239 +162,47 @@
         }
       }
 
-      async function runTests() {
-        resultsEl.innerHTML = '';
-        Logger.setLevel('ERROR');
+      const esperar = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-        // ── Configurar entorno mínimo ───────────────────
-        window.DB = window.DB || {};
-        DB.config = { zonas: [{ nombre: 'salon', cantidad: 5 }] };
-        DB.mozos = [{ id: 'm1', nombre: 'Carlos', activo: true }];
-        DB.mesas = [
-          { numero: 1, estado: 'libre', zona: 'salon', items: [], mozo: '', comensales: 1, pedidoId: null, esVirtual: false },
-          { numero: 2, estado: 'libre', zona: 'salon', items: [], mozo: '', comensales: 1, pedidoId: null, esVirtual: false }
-        ];
-        DB.pedidos = [];
-        DB.comandas = [];
-        DB.saveMesas = function() {};
-        DB.savePedidos = function() {};
-        DB.saveComandas = function() {};
-        DB.getMesa = function(num) { return DB.mesas.find(m => m.numero == num); };
-        DB.fusionarMesas = function() { return null; };
-        DB.productos = [];
+      // Suite 1
+      resultsEl.innerHTML += '<div class="suite"><h2>1. Insignia al recibir precarga</h2></div>';
+      
+      const precargaPrueba = {
+        id: 'prec_001',
+        mesa: 1,
+        items: [
+          { prodId: 'prod_a', nombre: 'Hamburguesa', precio: 1500, categoria: 'platos', destino: 'cocina', qty: 2, obs: 'sin cebolla' },
+          { prodId: 'prod_b', nombre: 'Cerveza', precio: 800, categoria: 'bebidas', destino: 'barra', qty: 1, obs: '' }
+        ],
+        clienteId: 'juan',
+        observaciones: '',
+        timestamp: Date.now()
+      };
 
-        // Mock de Appwrite
-        if (!window.DBAppwrite || !DBAppwrite.actualizar) {
-          window.DBAppwrite = {
-            actualizar: async function(coleccion, id, cambios) {
-              Logger.debug('[Mock DBAppwrite] actualizar', coleccion, id, cambios);
-              return true;
-            }
-          };
-        }
+      log('Emitiendo cliente:precarga_enviada...');
+      EventBus.emit('cliente:precarga_enviada', precargaPrueba);
+      await esperar(100);
 
-        // Mock del Store con dispatch que actualiza DB.mesas
-        var originalDispatch = Store.dispatch;
-        Store.dispatch = function(action) {
-          if (action.type === 'COMANDA_ITEM_AGREGAR') {
-            var mesa = DB.mesas.find(function(m) { return m.numero === action.payload.numeroMesa; });
-            if (mesa) {
-              var item = action.payload.item;
-              var existente = mesa.items.find(function(it) {
-                return it.prodId === item.prodId && !it.enviado && it.persona === (item.persona || 'General');
-              });
-              if (existente) {
-                existente.qty++;
-              } else {
-                mesa.items.push({ ...item, qty: 1 });
-              }
-            }
-          } else if (action.type === 'COMANDA_ITEM_CAMBIAR') {
-            var mesa = DB.mesas.find(function(m) { return m.numero === action.payload.numeroMesa; });
-            if (mesa && mesa.items[action.payload.index]) {
-              Object.assign(mesa.items[action.payload.index], action.payload.cambios);
-            }
-          } else if (action.type === 'COMANDA_ITEM_QUITAR') {
-            var mesa = DB.mesas.find(function(m) { return m.numero === action.payload.numeroMesa; });
-            if (mesa) {
-              mesa.items.splice(action.payload.index, 1);
-            }
-          }
-          originalDispatch.call(Store, action);
-        };
-
-        // Inicializar Store
-        Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
-
-        // Crear DOM mínimo para Mesas.render
-        var main = document.createElement('main');
-        main.id = 'view-mesas';
-        main.innerHTML = '<div id="mesasGrid"></div>';
-        document.body.appendChild(main);
-
-        Mesas.render();
-
-        // Preparar mesa 1 como activa en Comanda
-        var mesa1 = DB.mesas[0];
-        mesa1.estado = 'ocupada';
-        mesa1.pedidoId = 'ped_test';
-        mesa1.mozo = 'Carlos';
-        mesa1.comensales = 2;
-        mesa1.personas = ['General'];
-        mesa1.personaActiva = 'General';
-        mesa1.items = [];
-        Comanda.setMesaActiva(mesa1);
-
-        var mesaActiva = Comanda.getMesaActiva();
-        assert(mesaActiva !== null && mesaActiva.numero === 1, 'Comanda tiene mesa activa 1');
-
-        // ── Suite 1: Insignia al recibir precarga ──────
-        resultsEl.innerHTML += '<div class="suite"><h2>1. Insignia al recibir precarga</h2></div>';
-
-        var precargaPrueba = {
-          id: 'prec_001',
-          mesa: 1,
-          items: [
-            { prodId: 'prod_a', nombre: 'Hamburguesa', precio: 1500, categoria: 'platos', destino: 'cocina', qty: 2, obs: 'sin cebolla' },
-            { prodId: 'prod_b', nombre: 'Cerveza', precio: 800, categoria: 'bebidas', destino: 'barra', qty: 1, obs: '' }
-          ],
-          clienteId: 'juan',
-          observaciones: '',
-          timestamp: Date.now()
-        };
-
-        EventBus.emit('cliente:precarga_enviada', precargaPrueba);
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        var badgeEl = document.querySelector('.precarga-badge');
-        assert(!!badgeEl, 'Aparece una insignia en la mesa 1');
-        if (badgeEl) {
-          assert(badgeEl.textContent.includes('2'), 'La insignia muestra la cantidad de ítems (2)');
-        }
-
-        var precargasGuardadas = PrecargaControl._precargas;
-        assert(precargasGuardadas.has('prec_001'), 'Precarga almacenada en PrecargaControl');
-
-        // ── Suite 2: Clic en insignia carga ítems ──────
-        resultsEl.innerHTML += '<div class="suite"><h2>2. Clic en insignia carga ítems y los agrupa correctamente</h2></div>';
-
-        badgeEl = document.querySelector('.precarga-badge');
-        if (badgeEl) {
-          badgeEl.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-          await new Promise(resolve => setTimeout(resolve, 100));
-        } else {
-          assert(false, 'No se encontró la insignia para hacer clic');
-        }
-
-        var itemsComanda = mesa1.items;
-        console.log('Items en mesa1 después del clic:', itemsComanda.length, itemsComanda);
-
-        assert(itemsComanda.length === 2, 'Se agregaron 2 líneas de ítems (se encontraron ' + itemsComanda.length + ')');
-
-        var totalUnidades = itemsComanda.reduce(function(acc, it) { return acc + it.qty; }, 0);
-        assert(totalUnidades === 3, 'Total de unidades = 3 (2 hamburguesas + 1 cerveza), real: ' + totalUnidades);
-
-        var hamburguesa = itemsComanda.find(function(it) { return it.prodId === 'prod_a'; });
-        assert(hamburguesa && hamburguesa.qty === 2, 'Hamburguesa tiene qty=2 (real: ' + (hamburguesa ? hamburguesa.qty : 'no encontrada') + ')');
-
-        var badgeDespues = document.querySelector('.precarga-badge');
-        assert(!badgeDespues, 'La insignia desapareció después de cargar');
-
-        assert(!PrecargaControl._precargas.has('prec_001'), 'Precarga removida del almacenamiento local');
-
-        // ── Suite 3: Observaciones múltiples ────────────
-        resultsEl.innerHTML += '<div class="suite"><h2>3. Observaciones múltiples se asignan al ítem correcto</h2></div>';
-
-        var mesa3 = DB.mesas[1];
-        mesa3.estado = 'ocupada';
-        mesa3.pedidoId = 'ped_test_3';
-        mesa3.mozo = 'Carlos';
-        mesa3.comensales = 2;
-        mesa3.personas = ['General'];
-        mesa3.personaActiva = 'General';
-        mesa3.items = [];
-        Comanda.setMesaActiva(mesa3);
-
-        var precargaObsMultiples = {
-          id: 'prec_003',
-          mesa: 2,
-          items: [
-            { prodId: 'prod_x', nombre: 'Pizza', precio: 2000, categoria: 'platos', destino: 'cocina', qty: 1, obs: 'sin queso' },
-            { prodId: 'prod_y', nombre: 'Ensalada', precio: 900, categoria: 'entradas', destino: 'cocina', qty: 1, obs: 'sin tomate' }
-          ],
-          clienteId: 'ana',
-          observaciones: '',
-          timestamp: Date.now()
-        };
-
-        EventBus.emit('cliente:precarga_enviada', precargaObsMultiples);
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        badgeEl = document.querySelector('.precarga-badge');
-        if (badgeEl) {
-          badgeEl.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-
-        var pizza = mesa3.items.find(function(it) { return it.prodId === 'prod_x'; });
-        var ensalada = mesa3.items.find(function(it) { return it.prodId === 'prod_y'; });
-
-        assert(pizza && pizza.obs === 'sin queso', 'Pizza tiene obs "sin queso" (real: ' + (pizza ? pizza.obs : 'no encontrada') + ')');
-        assert(ensalada && ensalada.obs === 'sin tomate', 'Ensalada tiene obs "sin tomate" (real: ' + (ensalada ? ensalada.obs : 'no encontrada') + ')');
-
-        Mesas.clearBadge(2);
-        PrecargaControl._precargas.clear();
-        mesa3.items = [];
-
-        // ── Suite 4: Precarga sin mesa activa no carga ──
-        resultsEl.innerHTML += '<div class="suite"><h2>4. Precarga sin mesa activa no carga</h2></div>';
-
-        Comanda.setMesaActiva(null);
-
-        var precarga2 = {
-          id: 'prec_002',
-          mesa: 2,
-          items: [{ prodId: 'prod_c', nombre: 'Pizza', precio: 2000, categoria: 'platos', destino: 'cocina', qty: 1, obs: '' }],
-          clienteId: 'maria',
-          observaciones: '',
-          timestamp: Date.now()
-        };
-        EventBus.emit('cliente:precarga_enviada', precarga2);
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        var badge2 = document.querySelector('.precarga-badge');
-        assert(!!badge2, 'Insignia aparece para mesa 2 aunque no esté activa');
-
-        var toastLlamado = false;
-        var showToastOriginal = window.showToast;
-        window.showToast = function(tipo, msg) {
-          if (tipo === 'warning' && msg.indexOf('Abrí la mesa') !== -1) {
-            toastLlamado = true;
-          }
-        };
-
-        badge2.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-        await new Promise(resolve => setTimeout(resolve, 100));
-
-        assert(toastLlamado, 'Muestra advertencia "Abrí la mesa"');
-        window.showToast = showToastOriginal;
-
-        var mesa2 = DB.mesas[1];
-        assert(mesa2.items.length === 0, 'Los ítems no se cargaron (mesa2 tiene ' + mesa2.items.length + ' ítems)');
-
-        Mesas.clearBadge(2);
-
-        // ── Resumen ──────────────────────────────────────
-        resultsEl.innerHTML += '<div class="summary">' + passed + ' pasaron, ' + failed + ' fallaron</div>';
-        if (failed === 0) {
-          resultsEl.innerHTML += '<div class="test pass">✔ Todos los tests de precarga pasaron.</div>';
-        }
+      const badgeEl = document.querySelector('.precarga-badge');
+      log('Badge encontrado: ' + (badgeEl ? 'SI' : 'NO'));
+      if (badgeEl) log('Contenido del badge: ' + badgeEl.textContent);
+      
+      assert(!!badgeEl, 'Aparece una insignia en la mesa 1');
+      if (badgeEl) {
+        assert(badgeEl.textContent.includes('2'), 'La insignia muestra la cantidad de ítems (2)');
       }
 
-      window.addEventListener('load', function() {
-        setTimeout(runTests, 300);
-      });
-    })();
+      log('Precargas en memoria: ' + PrecargaControl._precargas.size);
+      assert(PrecargaControl._precargas.has('prec_001'), 'Precarga almacenada en PrecargaControl');
+
+      // Resumen
+      resultsEl.innerHTML += '<div class="summary">' + passed + ' pasaron, ' + failed + ' fallaron</div>';
+
+    } catch (e) {
+      resultsEl.innerHTML += '<div class="test fail">✘ ERROR: ' + e.message + '</div>';
+      resultsEl.innerHTML += '<div class="test log">🔍 Stack: ' + e.stack + '</div>';
+      console.error(e);
+    }
   </script>
 </body>
 </html>

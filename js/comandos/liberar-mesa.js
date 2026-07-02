@@ -1,12 +1,15 @@
 /* ================================================================
-   LaTaberna - PubPOS — COMANDO JS
+   LaTaberna - PubPOS — COMANDO JS (ES6)
    Archivo: js/comandos/liberar-mesa.js
-   Versión: 1.0.0
-   Propósito: Liberar una mesa después del pago, restaurando su estado.
-   Dependencias: CommandBus, Deps, EventBus, PedidoManager
+   Versión: 1.0.2
+   Propósito: Liberar una mesa después del pago.
+              Con imports explícitos.
    ================================================================ */
 
-function crearComandoLiberarMesa(datos) {
+import { CommandBus } from '../lib/command-bus.js';
+import { Deps } from '../lib/deps.js';
+
+export function crearComandoLiberarMesa(datos) {
   return {
     type: 'liberarMesa',
     datos: {
@@ -18,7 +21,6 @@ function crearComandoLiberarMesa(datos) {
 async function handleLiberarMesa(comando) {
   const { numeroMesa } = comando.datos;
 
-  // ── 1. Validar turno ──────────────────────────────────
   if (typeof PedidoManager === 'undefined' || !PedidoManager.getTurnoActual) {
     throw new Error('Sistema de turnos no disponible');
   }
@@ -27,7 +29,6 @@ async function handleLiberarMesa(comando) {
     throw new Error('No hay turno abierto');
   }
 
-  // ── 2. Obtener repositorio ────────────────────────────
   let repo;
   try {
     repo = Deps.obtener('pedidoRepo');
@@ -39,14 +40,12 @@ async function handleLiberarMesa(comando) {
     throw new Error('El repositorio no soporta la operación liberarMesa');
   }
 
-  // ── 3. Ejecutar liberación ────────────────────────────
   try {
     await repo.liberarMesa(numeroMesa);
   } catch (e) {
     throw new Error('Error al liberar la mesa: ' + e.message);
   }
 
-  // ── 4. Auditoría ──────────────────────────────────────
   if (typeof PedidoManager.registrar === 'function') {
     PedidoManager.registrar('mesa:liberada', { mesa: numeroMesa });
   }
@@ -55,4 +54,3 @@ async function handleLiberarMesa(comando) {
 }
 
 CommandBus.registrar('liberarMesa', handleLiberarMesa);
-window.crearComandoLiberarMesa = crearComandoLiberarMesa;

@@ -1,14 +1,17 @@
-/* ================================================================
-   LaTaberna - PubPOS — UI JS
+/* =======================================================
+   LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/menu.js
-   Versión: 1.0.0
-   Propósito: Vista de menú digital: categorías, búsqueda y detalle.
-   Dependencias: js/lib/store.js, js/lib/eventBus.js, js/utils.js
-   ================================================================ */
-   
-const Menu = (() => {
+   Versión: 1.0.3
+   Propósito: Vista de menú para el mesero. Utiliza la función unificada
+              obtenerColorDesdeNombre desde utils.js.
+   ==================================================== */
 
-  let _categoriaActiva = 'Todas';
+import { Store } from '../lib/store.js';
+import { EventBus } from '../lib/eventBus.js';
+import { $id, fmtMoney, obtenerColorDesdeNombre } from '../utils.js';
+
+const Menu = (() => {
+  let _categoriaActiva = 'Todos';
   let _terminoBusqueda = '';
 
   function _asegurarVista() {
@@ -18,194 +21,164 @@ const Menu = (() => {
     main.id = 'view-menu';
     main.className = 'view';
     main.innerHTML = `
-      <div class="menu-banner">
-        <div class="menu-banner-content">
-          <p>🗺️ “Donde cada trago es una aventura”</p>
-          <div class="menu-banner-search">
+      <div class="view-toolbar">
+        <h2><i class="fas fa-utensils"></i> Menú</h2>
+        <div class="toolbar-actions">
+          <div class="menu-search">
             <i class="fas fa-search"></i>
-            <input type="text" id="menuSearch" placeholder="Buscar en el menú..." oninput="Menu.filtrar()">
+            <input type="text" id="menuSearch" placeholder="Buscar producto..." autocomplete="off">
           </div>
+          <div class="menu-categorias" id="menuCategorias"></div>
         </div>
       </div>
-      <div class="menu-categorias" id="menuCategorias"></div>
       <div class="menu-grid" id="menuGrid"></div>
     `;
     const referencia = $id('toastContainer') || document.body.lastChild;
     document.body.insertBefore(main, referencia);
   }
 
-  /** Renderiza las categorías y la grilla de productos */
   function render() {
     _asegurarVista();
     _renderCategorias();
     _renderProductos();
+
+    $id('menuSearch').addEventListener('input', filtrar);
   }
 
   function _renderCategorias() {
-    const container = $id('menuCategorias');
+    const container = document.getElementById('menuCategorias');
     if (!container) return;
 
     const productos = Store.getState().productos || [];
-    const categorias = ['Todas', ...new Set(
+    const categorias = ['Todos', ...new Set(
       productos.filter(p => p.activo !== false).map(p => p.categoria)
     )].filter(Boolean);
 
-    container.innerHTML = categorias.map(cat => `
-      <button class="menu-cat-btn ${cat === _categoriaActiva ? 'active' : ''}"
-              onclick="Menu.setCategoria('${cat}')">${cat}</button>
-    `).join('');
+    container.innerHTML = categorias
+      .map(cat => `
+        <button class="cat-tab${cat === _categoriaActiva ? ' active' : ''}"
+                data-categoria="${cat}">${cat}</button>
+      `).join('');
+
+    container.querySelectorAll('.cat-tab').forEach(btn => {
+      btn.addEventListener('click', () => setCategoria(btn.dataset.categoria));
+    });
   }
 
-  /** @param {string} cat */
   function setCategoria(cat) {
     _categoriaActiva = cat;
-    _terminoBusqueda = $id('menuSearch')?.value?.trim() || '';
     _renderProductos();
     _renderCategorias();
   }
 
-  /** Filtra productos por el término de búsqueda */
   function filtrar() {
-    _terminoBusqueda = $id('menuSearch')?.value?.trim() || '';
+    _terminoBusqueda = ($id('menuSearch')?.value || '').toLowerCase();
     _renderProductos();
   }
 
   function _renderProductos() {
-    const grid = $id('menuGrid');
-    if (!grid) return;
+    const cont = $id('menuGrid');
+    if (!cont) return;
 
-    let productos = (Store.getState().productos || []).filter(p => p.activo !== false);
+    let productosFiltrados = (Store.getState().productos || []).filter(p => p.activo !== false);
 
-    if (_categoriaActiva !== 'Todas') {
-      productos = productos.filter(p => p.categoria === _categoriaActiva);
+    if (_categoriaActiva !== 'Todos') {
+      productosFiltrados = productosFiltrados.filter(p => p.categoria === _categoriaActiva);
     }
     if (_terminoBusqueda) {
-      const term = _terminoBusqueda.toLowerCase();
-      productos = productos.filter(p =>
-        p.nombre.toLowerCase().includes(term) ||
-        (p.descripcion || '').toLowerCase().includes(term)
+      productosFiltrados = productosFiltrados.filter(p =>
+        p.nombre.toLowerCase().includes(_terminoBusqueda) ||
+        (p.descripcion || '').toLowerCase().includes(_terminoBusqueda)
       );
     }
 
-    if (!productos.length) {
-      grid.innerHTML = `<div class="menu-empty"><i class="fas fa-search"></i><p>No se encontraron productos</p></div>`;
+    if (!productosFiltrados.length) {
+      cont.innerHTML = `
+        <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--color-text-muted)">
+          <i class="fas fa-search" style="font-size:32px;opacity:.25;display:block;margin-bottom:12px"></i>
+          Sin resultados
+        </div>`;
       return;
     }
 
-    productos.sort((a,b) => a.nombre.localeCompare(b.nombre));
-
-    grid.innerHTML = productos.map(prod => {
-      const desc = prod.descripcion || 'Consulta a nuestro personal para más detalles.';
-      const tieneImagen = prod.imagen && prod.imagen.trim() !== '';
-      const estiloImagen = tieneImagen
-        ? `background-image: url('${prod.imagen}');`
-        : `background-color: ${_getColorFromName(prod.nombre)};`;
-      const contenidoImagen = tieneImagen
-        ? ''
-        : `<span class="menu-card-inicial" style="display:block;font-size:52px;font-weight:800;color:rgba(255,255,255,.85);text-shadow:0 4px 12px rgba(0,0,0,.35);">${prod.nombre.charAt(0).toUpperCase()}</span>`;
-
+    cont.innerHTML = productosFiltrados.map(p => {
+      const color = obtenerColorDesdeNombre(p.nombre);
+      const destinoIcon = { barra: 'fa-wine-glass', cocina: 'fa-fire-burner', ambos: 'fa-arrows-split-up-and-left' }[p.destino] || 'fa-fire-burner';
       return `
-        <div class="menu-card" onclick="Menu.mostrarDetalle('${prod.id}')">
-          <div class="menu-card-img" style="${estiloImagen}">
-            ${contenidoImagen}
-            <span class="menu-card-precio">${fmtMoney(prod.precio)}</span>
+        <article class="menu-card" data-prod-id="${p.id}" style="border-left: 5px solid ${color}; background: linear-gradient(135deg, ${color}10 0%, var(--color-card) 100%);">
+          <div class="menu-nombre">${p.nombre}</div>
+          ${p.descripcion ? `<div class="menu-desc">${p.descripcion}</div>` : ''}
+          <div class="menu-footer">
+            <span class="menu-precio">${fmtMoney(p.precio)}</span>
+            <span class="menu-destino-tag ${p.destino}">
+              <i class="fas ${destinoIcon}"></i> ${p.destino}
+            </span>
           </div>
-          <div class="menu-card-body">
-            <h3>${prod.nombre}</h3>
-            <p>${desc.length > 60 ? desc.substring(0,60)+'...' : desc}</p>
-          </div>
-        </div>
-      `;
+        </article>`;
     }).join('');
+
+    cont.querySelectorAll('.menu-card').forEach(card => {
+      card.addEventListener('click', () => mostrarDetalle(card.dataset.prodId));
+    });
   }
 
-  function _getColorFromName(nombre) {
-    let hash = 0;
-    for (let i = 0; i < nombre.length; i++) {
-      hash = nombre.charCodeAt(i) + ((hash << 5) - hash);
-      hash = hash & hash;
-    }
-    const h = Math.abs(hash) % 360;
-    return `hsl(${h}, 55%, 45%)`;
-  }
-
-  /** Muestra el modal de detalle de un producto */
   function mostrarDetalle(prodId) {
     const state = Store.getState();
     const producto = (state.productos || []).find(p => p.id == prodId);
     if (!producto) return;
 
-    let modal = $id('modalMenuDetalle');
-    if (!modal) {
-      modal = document.createElement('div');
-      modal.id = 'modalMenuDetalle';
-      modal.className = 'modal-overlay';
-      modal.style.display = 'none';
-      modal.innerHTML = `
-        <div class="modal-menu-detalle">
-          <div class="modal-header">
-            <h3 id="menuDetalleTitulo"></h3>
-            <button class="modal-close" onclick="Menu.cerrarDetalle()"><i class="fas fa-times"></i></button>
-          </div>
-          <div class="modal-body menu-detalle-body">
-            <div id="menuDetalleImg" class="menu-detalle-img"></div>
-            <p id="menuDetalleDesc" class="menu-detalle-desc"></p>
-            <div id="menuDetallePrecio" class="menu-detalle-precio"></div>
-            <div id="menuDetalleExtra" class="menu-detalle-extra"></div>
-          </div>
-          <div class="modal-footer">
-            <button class="btn-secondary" onclick="Menu.cerrarDetalle()">Cerrar</button>
-          </div>
-        </div>
-      `;
-      document.body.appendChild(modal);
-    }
-
-    const tieneImagen = producto.imagen && producto.imagen.trim() !== '';
-    $id('menuDetalleTitulo').innerHTML = `<i class="fas fa-utensils"></i> ${producto.nombre}`;
-    const imgEl = $id('menuDetalleImg');
-    if (tieneImagen) {
-      imgEl.style.backgroundImage = `url('${producto.imagen}')`;
-      imgEl.style.backgroundColor = '';
-      imgEl.innerHTML = '';
-    } else {
-      imgEl.style.backgroundImage = '';
-      imgEl.style.backgroundColor = _getColorFromName(producto.nombre);
-      imgEl.innerHTML = `<span style="font-size:64px;font-weight:800;color:rgba(255,255,255,.9);text-shadow:0 4px 12px rgba(0,0,0,.4);">${producto.nombre.charAt(0)}</span>`;
-    }
-    $id('menuDetalleDesc').textContent = producto.descripcion || 'Sin descripción disponible.';
-    $id('menuDetallePrecio').innerHTML = `<span class="precio-etiqueta">${fmtMoney(producto.precio)}</span>`;
-
+    let recetaHTML = '';
     const receta = (state.recetas || []).find(r => r.productoId == prodId);
-    if (receta && receta.ingredientes.length) {
+    if (receta && receta.ingredientes && receta.ingredientes.length) {
       const nombres = receta.ingredientes.map(ing => {
         const ingData = (state.ingredientes || []).find(i => i.id == ing.ingredienteId);
-        return ingData ? ingData.nombre : ing.ingredienteId;
+        return ingData ? `${ingData.nombre}: ${ing.cantidad} ${ingData.unidad || 'u'}` : '—';
       }).join(', ');
-      $id('menuDetalleExtra').innerHTML = `<p style="font-size:12px;color:var(--color-text-muted);margin-top:12px;"><strong>Ingredientes principales:</strong> ${nombres}</p>`;
-    } else {
-      $id('menuDetalleExtra').innerHTML = '';
+      recetaHTML = `<p style="font-size:12px;color:var(--color-text-muted);margin-top:6px;"><i class="fas fa-clipboard-list"></i> ${nombres}</p>`;
     }
 
+    const color = obtenerColorDesdeNombre(producto.nombre);
+
+    let modal = $id('modalMenuDetalle');
+    if (modal) modal.remove();
+
+    modal = document.createElement('div');
+    modal.id = 'modalMenuDetalle';
+    modal.className = 'modal-overlay';
     modal.style.display = 'flex';
+    modal.innerHTML = `
+      <div class="modal-small" style="max-width:400px;">
+        <div class="modal-header" style="border-left:5px solid ${color};">
+          <h3><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:${color};margin-right:8px;"></span>${producto.nombre}</h3>
+          <button class="modal-close" id="btnCerrarMenuDetalle"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-small-body">
+          ${producto.descripcion ? `<p>${producto.descripcion}</p>` : ''}
+          <div class="menu-detalle-precio">${fmtMoney(producto.precio)}</div>
+          ${recetaHTML}
+          <p style="font-size:12px;color:var(--color-text-muted);margin-top:8px;">Destino: ${producto.destino} | Categoría: ${producto.categoria}</p>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+
+    $id('btnCerrarMenuDetalle').addEventListener('click', cerrarDetalle);
+    modal.addEventListener('click', (e) => { if (e.target === modal) cerrarDetalle(); });
   }
 
   function cerrarDetalle() {
     const modal = $id('modalMenuDetalle');
-    if (modal) modal.style.display = 'none';
+    if (modal) modal.remove();
   }
 
-  /* ── SUSCRIPCIÓN AL STORE ──────────────────────────────── */
   function _initListeners() {
     Store.subscribe((state, action) => {
       if (action.type.startsWith('PRODUCTO')) {
-        render();
+        _renderProductos();
+        _renderCategorias();
       }
     });
 
-    EventBus.on('db:inicializada', () => {
-      setTimeout(render, 100);
-    });
     EventBus.on('vista:cambiada', (vista) => {
       if (vista === 'menu') render();
     });
@@ -215,11 +188,11 @@ const Menu = (() => {
 
   return {
     render,
-    filtrar,
     setCategoria,
+    filtrar,
     mostrarDetalle,
     cerrarDetalle
   };
 })();
 
-window.Menu = Menu;
+export { Menu };

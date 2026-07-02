@@ -1,30 +1,32 @@
 /* ================================================================
-   LaTaberna - PubPOS — SERVICIO JS
+   LaTaberna - PubPOS — SERVICIO JS (ES6)
    Archivo: js/servicios/inventario-service.js
-   Versión: 1.0.0
+   Versión: 1.0.1
    Propósito: Servicio de casos de uso para inventario e ingredientes.
-   Dependencias: js/dominio/ingrediente.js, js/dominio/cantidad.js, js/dominio/dinero.js, js/dominio/resultado.js, js/lib/eventBus.js, js/db.js, js/lib/logger.js
+              Sin asignaciones window.
+   Dependencias: js/dominio/ingrediente.js, js/dominio/cantidad.js,
+                 js/dominio/dinero.js, js/dominio/resultado.js,
+                 js/lib/eventBus.js, js/db.js, js/lib/logger.js
    ================================================================ */
 
+import { Ingrediente, reconstruirIngrediente } from '../dominio/ingrediente.js';
+import { Cantidad, crearCantidad } from '../dominio/cantidad.js';
+import { Dinero, crearDinero } from '../dominio/dinero.js';
+import { Resultado } from '../dominio/resultado.js';
+import { EventBus } from '../lib/eventBus.js';
+import { DB } from '../db.js';
+import { Logger } from '../lib/logger.js';
 
 const InventarioService = (() => {
-
   let _inventarioRepo = null;
 
-  /** @param {object} repo – implementación del repositorio de inventario */
   function configurar(repo) {
     _inventarioRepo = repo;
   }
 
-  /**
-   * Guarda (crea o actualiza) un ingrediente.
-   * @param {object} datos – { id?, nombre, stock, unidad, stock_minimo, categoria, ubicacion, valor_unitario }
-   * @returns {Promise<Resultado>}
-   */
   async function guardarIngrediente(datos) {
     if (!_inventarioRepo) return Resultado.fallo('Repositorio de inventario no configurado');
 
-    // 1. Validar campos obligatorios con Value Objects
     const stock = crearCantidad(datos.stock);
     const stockMin = crearCantidad(datos.stock_minimo || 5);
     const valorUnit = crearDinero(datos.valor_unitario || 0);
@@ -33,7 +35,6 @@ const InventarioService = (() => {
       return Resultado.fallo('Datos numéricos inválidos (stock, mínimo o valor unitario)');
     }
 
-    // 2. Crear o actualizar el agregado
     let ingrediente;
     try {
       ingrediente = new Ingrediente(
@@ -50,7 +51,6 @@ const InventarioService = (() => {
       return Resultado.fallo(`Error al crear ingrediente: ${e.message}`);
     }
 
-    // 3. Persistir
     try {
       await _inventarioRepo.guardarIngrediente(ingrediente.toJSON());
     } catch (e) {
@@ -61,42 +61,28 @@ const InventarioService = (() => {
     return Resultado.ok(ingrediente);
   }
 
-  /**
-   * Ajusta el stock de un ingrediente.
-   * @param {string} id – ID del ingrediente
-   * @param {number} delta – Cantidad a sumar (positivo) o restar (negativo)
-   * @param {string} motivo – Motivo del ajuste
-   * @returns {Promise<Resultado>}
-   */
   async function ajustarStock(id, delta, motivo = 'Ajuste manual') {
     if (!_inventarioRepo) return Resultado.fallo('Repositorio no configurado');
 
-    // 1. Obtener el estado actual
     const datos = await _inventarioRepo.obtenerPorId(id);
     if (!datos) return Resultado.fallo('Ingrediente no encontrado');
 
     const ingredienteActual = reconstruirIngrediente(datos);
     if (!ingredienteActual) return Resultado.fallo('Error al reconstruir ingrediente');
 
-    // 2. Aplicar ajuste (el agregado valida que no sea negativo)
-    const deltaCant = crearCantidad(delta);
-    if (!deltaCant) return Resultado.fallo('Delta inválido');
-
     let ingredienteNuevo;
     try {
-      ingredienteNuevo = ingredienteActual.ajustarStock(deltaCant);
+      ingredienteNuevo = ingredienteActual.ajustarStock(delta);
     } catch (e) {
       return Resultado.fallo(`Error al ajustar stock: ${e.message}`);
     }
 
-    // 3. Persistir
     try {
       await _inventarioRepo.guardarIngrediente(ingredienteNuevo.toJSON());
     } catch (e) {
       return Resultado.fallo(`Error al guardar ajuste: ${e.message}`);
     }
 
-    // 4. Emitir eventos
     EventBus.emit('inventario:actualizado');
     if (ingredienteNuevo.bajoMinimo) {
       EventBus.emit('inventario:stock_bajo', {
@@ -106,7 +92,6 @@ const InventarioService = (() => {
       });
     }
 
-    // Registrar movimiento (delegamos al repositorio si corresponde)
     if (typeof _inventarioRepo.registrarMovimiento === 'function') {
       _inventarioRepo.registrarMovimiento({
         ingredienteId: id,
@@ -119,13 +104,7 @@ const InventarioService = (() => {
     return Resultado.ok(ingredienteNuevo);
   }
 
-  /**
-   * Valida si hay stock suficiente para una lista de ítems.
-   * @param {Array} items – [{ prodId, nombre, qty }]
-   * @returns {{ ok: boolean, faltantes: Array }}
-   */
   function validarStockParaItems(items) {
-    // Conservamos la misma lógica que estaba en db-inventario.js
     const faltantes = [];
     const totalNecesario = new Map();
 
@@ -165,12 +144,7 @@ const InventarioService = (() => {
     return { ok: faltantes.length === 0, faltantes };
   }
 
-  return {
-    configurar,
-    guardarIngrediente,
-    ajustarStock,
-    validarStockParaItems
-  };
+  return { configurar, guardarIngrediente, ajustarStock, validarStockParaItems };
 })();
 
-window.InventarioService = InventarioService;
+export { InventarioService };

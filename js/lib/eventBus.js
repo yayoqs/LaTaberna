@@ -1,33 +1,35 @@
 /* ================================================================
-   LaTaberna - PubPOS — MÓDULO JS
+   LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/lib/eventBus.js
-   Versión: 1.0.0
-   Propósito: Bus de eventos pub/sub para desacoplar módulos.
-   Dependencias: js/lib/logger.js
+   Versión: 1.2.0
+   Propósito: Bus de eventos pub/sub. on() ahora devuelve función
+              de desuscripción para limpieza funcional.
    ================================================================ */
-const EventBus = (() => {
+
+import { Logger } from './logger.js';
+
+export const EventBus = (() => {
   const eventos = {};
 
   /**
    * Registra un callback para un tipo de evento.
-   * @param {string|Function} eventType - String del evento o clase del evento.
+   * @param {string} eventType - Nombre del evento.
    * @param {function} callback - Función que recibirá los datos del evento.
+   * @returns {function} Función de limpieza: al llamarla, desuscribe el callback.
    */
   function on(eventType, callback) {
     const nombre = _nombreEvento(eventType);
     if (!nombre) {
       Logger.error('[EventBus] Tipo de evento inválido:', eventType);
-      return;
+      return () => {}; // devuelve función vacía para evitar errores
     }
     if (!eventos[nombre]) eventos[nombre] = [];
     eventos[nombre].push(callback);
+
+    // Retornar función de limpieza
+    return () => off(nombre, callback);
   }
 
-  /**
-   * Emite un evento, notificando a todos los suscriptores.
-   * @param {string|object} event - String del evento o instancia de una clase.
-   * @param {any} [datos] - Datos adicionales (solo si el primer parámetro es string).
-   */
   function emit(event, datos) {
     let nombre;
     let payload;
@@ -54,26 +56,16 @@ const EventBus = (() => {
     });
   }
 
-  /**
-   * Elimina un callback registrado.
-   * @param {string|Function} eventType - String o clase del evento.
-   * @param {function} callback - El callback exacto a eliminar.
-   */
   function off(eventType, callback) {
     const nombre = _nombreEvento(eventType);
     if (!nombre || !eventos[nombre]) return;
     eventos[nombre] = eventos[nombre].filter(cb => cb !== callback);
   }
 
-  /**
-   * Lista los eventos registrados y cuántos handlers tiene cada uno.
-   * Útil para depuración.
-   */
   function listar() {
     Logger.debug('EventBus registros:', Object.keys(eventos).map(k => `${k}: ${eventos[k].length} handlers`));
   }
 
-  // ── UTILIDAD PRIVADA ──────────────────────────────────────
   function _nombreEvento(eventType) {
     if (typeof eventType === 'string') return eventType;
     if (typeof eventType === 'function') return eventType.name;
@@ -85,5 +77,3 @@ const EventBus = (() => {
 
   return { on, off, emit, listar };
 })();
-
-window.EventBus = EventBus;

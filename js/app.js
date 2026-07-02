@@ -1,12 +1,112 @@
+
 /* ================================================================
-   LaTaberna - PubPOS — MÓDULO JS
+   LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/app.js
-   Versión: 1.0.2
-   Propósito: Núcleo de la UI. Control de vistas, header y monitoreo.
-              Header oculto en inicio y bienvenida, swipe toggle para master.
-   Dependencias: js/lib/logger.js, js/lib/eventBus.js, js/auth.js
+   Versión: 1.2.3
+   Propósito: Punto de entrada modular. Control de vistas con ciclo
+              de vida (limpiar/activar). Vincula header y eventos.
+              Incluye import del comando marcar-agotado.
    ================================================================ */
-const App = {
+
+// ── Utilidades y librerías ────────────────────────────────
+import { $id, showToast } from './utils.js';
+import { Logger } from './lib/logger.js';
+import { EventBus } from './lib/eventBus.js';
+import { CommandBus } from './lib/command-bus.js';
+import { Store } from './lib/store.js';
+import { Deps } from './lib/deps.js';
+
+// ── Dominio (todos ES6) ───────────────────────────────────
+import './dominio/resultado.js';
+import './dominio/dinero.js';
+import './dominio/cantidad.js';
+import './dominio/direccion.js';
+import './dominio/pedido.js';
+import './dominio/delivery.js';
+import './dominio/ingrediente.js';
+
+// ── Base de datos ─────────────────────────────────────────
+import { DBCore } from './db-core.js';
+import { DBInventario } from './db-inventario.js';
+import { DBFusion } from './db-fusion.js';
+import { DBShim } from './db-shim.js';
+import { DBAppwrite } from './db-appwrite.js';
+import { DB } from './db.js';
+
+// ── Auth y roles ──────────────────────────────────────────
+import { Roles } from './roles.js';
+import { Auth } from './auth.js';
+
+// ── Servicios ─────────────────────────────────────────────
+import './servicios/pedido-service.js';
+import './servicios/delivery-service.js';
+import './servicios/inventario-service.js';
+
+// ── Comandos ──────────────────────────────────────────────
+import './comandos/crear-pedido-mesa.js';
+import './comandos/enviar-comanda.js';
+import './comandos/agregar-mesa.js';
+import './comandos/liberar-mesa.js';
+import './comandos/completar-subcomanda.js';
+import './comandos/marcar-agotado.js';  // ← NUEVO COMANDO D7
+
+// ── Repositorios ──────────────────────────────────────────
+import './repositorios/pedido-repository.js';
+
+// ── Managers ──────────────────────────────────────────────
+import './managers/pedido-manager.js';
+import './managers/turno-manager.js';
+
+// ── Vistas (importadas para que se ejecuten sus registros) ─
+import { Carta } from './ui/carta.js';
+import { Comanda } from './ui/comanda.js';
+import { Caja } from './ui/caja.js';
+import { Cobro } from './ui/cobro.js';
+import { Config } from './ui/config.js';
+import { Cuenta } from './ui/cuenta.js';
+import { Despensa } from './ui/despensa.js';
+import { Eventos } from './ui/eventos.js';
+import { KDS } from './ui/kds.js';
+import { Menu } from './ui/menu.js';
+import { MesaDetalles } from './ui/mesa-detalles.js';
+import { Mesas } from './ui/mesas.js';
+import { Pedido } from './ui/pedido-ui.js';
+import { Perfil } from './ui/perfil.js';
+import { Recetas } from './ui/recetas.js';
+import { Reparto } from './ui/reparto.js';
+import { Tickets } from './ui/tickets.js';
+import { GuiaMesero } from './modulos/interno/guia-mesero.js';
+import { PrecargaControl } from './modulos/interno/precarga-control.js';
+import { EventosEnVivo } from './modulos/admin/eventos-en-vivo.js';
+import './modulos/cliente/principal.js';
+
+// ── Bootstrap (inicia la aplicación) ──────────────────────
+import './bootstrap.js';
+
+// ═══════════════════════════════════════════════════════════
+// Mapa de módulos con soporte de ciclo de vida (limpiar/activar)
+// ═══════════════════════════════════════════════════════════
+const modulosVista = {
+  mesas: Mesas,
+  cocina: KDS,
+  caja: Caja,
+  config: Config,
+  despensa: Despensa,
+  recetas: Recetas,
+  reparto: Reparto,
+  menu: Menu,
+  eventos: Eventos,
+  'eventos-en-vivo': EventosEnVivo,
+  perfil: Perfil
+  // Las vistas 'inicio' y 'bienvenida' se gestionan internamente
+};
+
+// ═══════════════════════════════════════════════════════════
+// Definición del núcleo de la UI
+// ═══════════════════════════════════════════════════════════
+let _vistaActual = null;
+
+export const App = {
   async init() {
     Logger.info('[App] Iniciando UI...');
     this._iniciarReloj();
@@ -60,43 +160,38 @@ const App = {
     });
   },
 
-  /**
-   * Vistas que no requieren autenticación.
-   */
   _vistasPublicas: ['inicio'],
 
   showView(nombre) {
-    // ── Control de header: ocultar en vistas públicas ─────
+    // ── Ciclo de vida: limpiar vista anterior ──────────
+    if (_vistaActual && modulosVista[_vistaActual] && typeof modulosVista[_vistaActual].limpiar === 'function') {
+      modulosVista[_vistaActual].limpiar();
+    }
+
+    // ── Control de header ─────────────────────────────
     const header = document.querySelector('.app-header');
     if (header) {
       header.style.display = (nombre === 'inicio' || nombre === 'bienvenida') ? 'none' : 'flex';
       header.style.transition = 'all 0.3s ease';
     }
 
-    // ── Swipe toggle para revelar/ocultar el header (solo master real en bienvenida) ──
+    // ── Swipe para master en bienvenida ───────────────
     if (nombre === 'bienvenida' && typeof Auth !== 'undefined' && Auth.esMasterReal && Auth.esMasterReal()) {
       let touchStartY = 0;
-      const onTouchStart = (e) => {
-        touchStartY = e.touches[0].clientY;
-      };
+      const onTouchStart = (e) => { touchStartY = e.touches[0].clientY; };
       const onTouchEnd = (e) => {
         if (!header) return;
         const touchEndY = e.changedTouches[0].clientY;
         const deltaY = touchEndY - touchStartY;
-
-        // Swipe hacia abajo desde el borde superior (mostrar header)
         if (touchStartY < 50 && deltaY > 100 && header.style.display === 'none') {
           header.style.display = 'flex';
         }
-        // Swipe hacia arriba desde el borde inferior (ocultar header)
         if (touchStartY > window.innerHeight - 50 && deltaY < -100 && header.style.display === 'flex') {
           header.style.display = 'none';
         }
       };
       document.addEventListener('touchstart', onTouchStart, { passive: true });
       document.addEventListener('touchend', onTouchEnd, { passive: true });
-
-      // Limpiar listeners al cambiar de vista
       const limpiarSwipe = () => {
         document.removeEventListener('touchstart', onTouchStart);
         document.removeEventListener('touchend', onTouchEnd);
@@ -104,13 +199,13 @@ const App = {
       document.addEventListener('vista:cambiada', limpiarSwipe, { once: true });
     }
 
-    // Permitir acceso a vistas públicas sin sesión activa
+    // ── Control de autenticación ──────────────────────
     if (!this._vistasPublicas.includes(nombre) && !Auth.getRol()) {
       Auth.mostrarLogin();
       return;
     }
 
-    // Validaciones de permisos (sin cambios)...
+    // Validaciones de permisos
     if (nombre === 'caja' && !Auth.puedeAccederCaja()) { showToast('error', 'No tienes permiso para acceder a Caja'); return; }
     if (nombre === 'cocina' && !Auth.puedeAccederCocina()) { showToast('error', 'No tienes permiso para acceder a Cocina'); return; }
     if (nombre === 'config' && !Auth.esAdmin()) { showToast('error', 'Solo administradores pueden acceder a Configuración'); return; }
@@ -151,26 +246,33 @@ const App = {
     }
     if (btn) btn.classList.add('active');
 
+    // ── Ciclo de vida: activar nueva vista ────────────
+    if (modulosVista[nombre] && typeof modulosVista[nombre].activar === 'function') {
+      modulosVista[nombre].activar();
+    }
+
+    _vistaActual = nombre;
+
     EventBus.emit('vista:cambiada', nombre);
 
     if (Auth.esMasterReal && Auth.esMasterReal()) {
       Auth.aplicarRestriccionesUI();
     }
 
-    // Renderizado de vistas (sin cambios)...
-    if (nombre === 'mesas' && window.Mesas) Mesas.render();
-    if (nombre === 'cocina' && window.KDS) KDS.refresh();
-    if (nombre === 'caja' && window.Caja) Caja.render();
-    if (nombre === 'config' && window.Config) Config.renderProductos();
-    if (nombre === 'despensa' && window.Despensa) Despensa.render();
-    if (nombre === 'recetas' && window.Recetas) Recetas.render();
-    if (nombre === 'reparto' && window.Reparto) Reparto.render();
-    if (nombre === 'menu' && window.Menu) Menu.render();
-    if (nombre === 'eventos' && window.Eventos) Eventos.render();
-    if (nombre === 'perfil' && window.Perfil) Perfil.render();
+    // ── Renderizados explícitos (a revisar en futuras iteraciones) ─
+    if (nombre === 'mesas' && typeof Mesas !== 'undefined') Mesas.render();
+    if (nombre === 'cocina' && typeof KDS !== 'undefined') KDS.refresh();
+    if (nombre === 'caja' && typeof Caja !== 'undefined') Caja.render();
+    if (nombre === 'config' && typeof Config !== 'undefined') Config.renderProductos();
+    if (nombre === 'despensa' && typeof Despensa !== 'undefined') Despensa.render();
+    if (nombre === 'recetas' && typeof Recetas !== 'undefined') Recetas.render();
+    if (nombre === 'reparto' && typeof Reparto !== 'undefined') Reparto.render();
+    if (nombre === 'menu' && typeof Menu !== 'undefined') Menu.render();
+    if (nombre === 'eventos' && typeof Eventos !== 'undefined') Eventos.render();
+    if (nombre === 'eventos-en-vivo' && typeof EventosEnVivo !== 'undefined') EventosEnVivo.render();
+    if (nombre === 'perfil' && typeof Perfil !== 'undefined') Perfil.render();
   },
 
-  /** Monitorea la conexión a internet */
   _iniciarMonitoreoConexion() {
     window.addEventListener('online', () => {
       showToast('success', '<i class="fas fa-wifi"></i> Conexión restablecida. Sincronizando...');
@@ -185,29 +287,28 @@ const App = {
 
   _suscribirEventos() {
     EventBus.on('sincronizacion:completada', () => {
-      if (window.Mesas) Mesas.render();
-      if (window.Carta) Carta.render();
-      if (window.Recetas) Recetas.render();
-      if (window.Reparto) Reparto.render();
-      if (window.Menu) Menu.render();
-      if (window.Eventos) Eventos.render();
-      if (window.Perfil) Perfil.render();
+      if (typeof Mesas !== 'undefined') Mesas.render();
+      if (typeof Carta !== 'undefined') Carta.render();
+      if (typeof Recetas !== 'undefined') Recetas.render();
+      if (typeof Reparto !== 'undefined') Reparto.render();
+      if (typeof Menu !== 'undefined') Menu.render();
+      if (typeof Eventos !== 'undefined') Eventos.render();
+      if (typeof Perfil !== 'undefined') Perfil.render();
     });
-    EventBus.on('mesas:guardadas', () => { if (window.Mesas) Mesas.render(); });
-    EventBus.on('comandas:guardadas', () => { if (window.KDS) KDS.refresh(); });
-    EventBus.on('pedido:cerrado', () => { if (window.Caja) Caja.render(); });
-    EventBus.on('mesa:seleccionada', (num) => { if (window.Pedido) Pedido.abrirMesa(num); });
+    EventBus.on('mesas:guardadas', () => { if (typeof Mesas !== 'undefined') Mesas.render(); });
+    EventBus.on('comandas:guardadas', () => { if (typeof KDS !== 'undefined') KDS.refresh(); });
+    EventBus.on('pedido:cerrado', () => { if (typeof Caja !== 'undefined') Caja.render(); });
+    EventBus.on('mesa:seleccionada', (num) => { if (typeof Pedido !== 'undefined') Pedido.abrirMesa(num); });
     EventBus.on('inventario:stock_bajo', (data) => {
       showToast('warning', `⚠️ Stock bajo: ${data.ingrediente} (${data.stock} ${data.unidad})`);
     });
     EventBus.on('productos:cargados', () => {
-      if (window.Recetas) Recetas.render();
-      if (window.Menu) Menu.render();
+      if (typeof Recetas !== 'undefined') Recetas.render();
+      if (typeof Menu !== 'undefined') Menu.render();
     });
-    EventBus.on('recetas:actualizadas', () => { if (window.Recetas) Recetas.render(); });
-    EventBus.on('pedidosDelivery:guardados', () => { if (window.Reparto) Reparto.render(); });
+    EventBus.on('recetas:actualizadas', () => { if (typeof Recetas !== 'undefined') Recetas.render(); });
+    EventBus.on('pedidosDelivery:guardados', () => { if (typeof Reparto !== 'undefined') Reparto.render(); });
 
-    // ── Badge de sincronización ──────────────────────────
     EventBus.on('sync:colaActualizada', (pendientes) => {
       const badge = document.getElementById('syncPendingBadge');
       const countSpan = document.getElementById('syncPendingCount');
@@ -220,7 +321,6 @@ const App = {
       }
     });
 
-    // Indicador de última sincronización exitosa
     EventBus.on('sync:completada', (timestamp) => {
       const indicator = document.getElementById('syncStatusIndicator');
       if (indicator) {
@@ -232,11 +332,11 @@ const App = {
 
     EventBus.on('turno:iniciado', (turno) => {
       Logger.info(`[App] Turno iniciado: ${turno?.id}`);
-      if (window.Caja) Caja.render();
+      if (typeof Caja !== 'undefined') Caja.render();
     });
     EventBus.on('turno:cerrado', () => {
       showToast('success', 'Turno cerrado correctamente.');
-      if (window.Caja) Caja.render();
+      if (typeof Caja !== 'undefined') Caja.render();
     });
     EventBus.on('audit:actualizado', (info) => {
       Logger.info(`[App] Bitácora actualizada: ${info.total} registros.`);
@@ -256,14 +356,48 @@ const App = {
     const resultado = await TurnoManager.cerrarTurno();
     if (resultado.exito) {
       showToast('success', resultado.mensaje);
-      if (window.Mesas) Mesas.render();
-      if (window.KDS) KDS.refresh();
-      if (window.Caja) Caja.render();
-      if (window.Reparto) Reparto.render();
+      if (typeof Mesas !== 'undefined') Mesas.render();
+      if (typeof KDS !== 'undefined') KDS.refresh();
+      if (typeof Caja !== 'undefined') Caja.render();
+      if (typeof Reparto !== 'undefined') Reparto.render();
     } else {
       showToast('error', resultado.mensaje);
     }
   }
 };
 
-window.App = App;
+// ═══════════════════════════════════════════════════════════
+// Listener para cambios de vista desde Auth
+// ═══════════════════════════════════════════════════════════
+EventBus.on('app:cambiarVista', function(vista) {
+  App.showView(vista);
+});
+
+// ═══════════════════════════════════════════════════════════
+// Vinculación de eventos del header (compatible con módulos)
+// ═══════════════════════════════════════════════════════════
+function _vincularHeader() {
+  document.querySelectorAll('.nav-btn[data-view]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var view = this.getAttribute('data-view');
+      if (view) {
+        App.showView(view);
+      }
+    });
+  });
+
+  var logoutBtn = document.getElementById('btnLogout');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', function() {
+      Auth.logout();
+    });
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(_vincularHeader, 100);
+  });
+} else {
+  setTimeout(_vincularHeader, 100);
+}

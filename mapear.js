@@ -2,10 +2,12 @@ const fs = require('fs');
 const path = require('path');
 
 const EXTENSIONES = ['.js', '.html'];
-const CARPETAS_IGNORAR = ['node_modules', '.git', '.vscode'];
+const CARPETAS_IGNORAR = ['node_modules', '.git', '.vscode', 'tests', 'Vendor'];
+const ARCHIVOS_IGNORAR = ['mapear.js', 'mapear_servicios.js', 'mapeartodo.js'];
 const ARCHIVO_SALIDA = 'mapa_proyecto.txt';
 
 let resultado = "=== MAPA DE ARQUITECTURA DEL PROYECTO ===\n\n";
+let totalLineas = 0;
 
 function recorrerDirectorio(dir, nivel = 0) {
     const archivos = fs.readdirSync(dir);
@@ -21,9 +23,17 @@ function recorrerDirectorio(dir, nivel = 0) {
             recorrerDirectorio(rutaCompleta, nivel + 1);
         } else {
             const ext = path.extname(archivo);
-            if (!EXTENSIONES.includes(ext) || archivo === 'mapear.js') return;
+            // Excluir por extensión, nombre exacto, prefijo test- en cualquier nivel,
+            // y archivos Prueba- solo si están en la raíz (nivel 0)
+            if (!EXTENSIONES.includes(ext) || 
+                ARCHIVOS_IGNORAR.includes(archivo) || 
+                archivo.startsWith('test-') ||
+                (nivel === 0 && archivo.startsWith('Prueba-'))) {
+                return;
+            }
 
             resultado += `${sangria}    📄 ${archivo}\n`;
+            let lineasArchivo = 0;
 
             try {
                 const contenido = fs.readFileSync(rutaCompleta, 'utf-8');
@@ -31,17 +41,18 @@ function recorrerDirectorio(dir, nivel = 0) {
 
                 lineas.forEach(linea => {
                     const l = linea.trim();
-                    // Filtros específicos para JS Vanilla y manipulación del DOM
+                    // Filtros para arquitectura modular (sin manipulación del DOM)
                     if (l.startsWith('function ') || 
                         l.startsWith('export function') ||
-                        l.includes('=>') && (l.startsWith('const ') || l.startsWith('let ')) ||
-                        l.startsWith('class ') ||
-                        l.includes('document.getElementById') ||
-                        l.includes('addEventListener')) {
+                        l.startsWith('export const ') ||
+                        l.startsWith('export class ') ||
+                        (l.startsWith('const ') && l.includes('=>')) ||
+                        l.startsWith('class ')) {
                         
-                        // Limitar el largo de la línea para mantener el mapa limpio
                         if (l.length < 100) {
                             resultado += `${sangria}        🔹 ${l}\n`;
+                            lineasArchivo++;
+                            totalLineas++;
                         }
                     }
                 });
@@ -52,9 +63,14 @@ function recorrerDirectorio(dir, nivel = 0) {
     });
 }
 
-// Ejecutar el script desde la carpeta actual
+console.log('Generando mapa de arquitectura...');
 recorrerDirectorio('.');
 
-// Guardar el resultado
+// Mensaje final en el archivo de salida
+resultado += `\n\n=== MAPEO COMPLETADO ===\n`;
+resultado += `Total de funciones/declaraciones capturadas: ${totalLineas}\n`;
+resultado += `Fecha de generación: ${new Date().toLocaleString()}\n`;
+
 fs.writeFileSync(ARCHIVO_SALIDA, resultado, 'utf-8');
 console.log(`¡Mapa generado con éxito en ${ARCHIVO_SALIDA}!`);
+console.log(`Total de funciones/declaraciones capturadas: ${totalLineas}`);

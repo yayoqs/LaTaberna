@@ -1,12 +1,17 @@
 /* ================================================================
-   LaTaberna - PubPOS — UI JS
+   LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/caja.js
-   Versión: 1.0.0
-   Propósito: Vista de caja: resumen de turno, estadísticas y tabla de pedidos.
-   Dependencias: js/lib/store.js, js/lib/eventBus.js, js/utils.js,
-                 js/app.js (App.cerrarTurnoApp)
+   Versión: 1.1.0
+   Propósito: Vista de caja: resumen de turno, estadísticas, tabla de pedidos
+              y sección de cobros pendientes (split bill).
    ================================================================ */
-const Caja = (() => {
+
+import { Store } from '../lib/store.js';
+import { EventBus } from '../lib/eventBus.js';
+import { fmtMoney, fmtHoraCorta, $id, showToast } from '../utils.js';
+import { Cobro } from './cobro.js';
+
+export const Caja = (() => {
 
   function _asegurarVista() {
     if ($id('view-caja')) return;
@@ -18,12 +23,19 @@ const Caja = (() => {
       <div class="view-toolbar">
         <h2><i class="fas fa-cash-register"></i> Caja — Resumen del Turno</h2>
         <div class="toolbar-actions">
-          <button class="btn-primary" onclick="App.cerrarTurnoApp()">
+          <button class="btn-secondary" id="btnVentaBarra">
+            <i class="fas fa-beer"></i> Venta Barra
+          </button>
+          <button class="btn-primary" id="btnCerrarTurno">
             <i class="fas fa-file-alt"></i> Cierre de Caja
           </button>
         </div>
       </div>
       <div class="caja-stats" id="cajaStats"></div>
+      <div class="caja-pendientes" id="cajaPendientes" style="padding: 0 24px; display: none;">
+        <h3 style="color: var(--color-warning);"><i class="fas fa-clock"></i> Cobros pendientes</h3>
+        <div id="pendientesLista"></div>
+      </div>
       <div class="caja-table-wrap">
         <table class="caja-table">
           <thead>
@@ -35,18 +47,33 @@ const Caja = (() => {
     `;
     const referencia = $id('toastContainer') || document.body.lastChild;
     document.body.insertBefore(main, referencia);
+
+    document.getElementById('btnCerrarTurno').addEventListener('click', () => {
+      if (typeof App !== 'undefined' && App.cerrarTurnoApp) {
+        App.cerrarTurnoApp();
+      }
+    });
+
+    document.getElementById('btnVentaBarra').addEventListener('click', () => {
+      const mesas = Store.getState().mesas || [];
+      let mesaBarra = mesas.find(m => m.numero === 'barra');
+      if (!mesaBarra) {
+        showToast('warning', 'No se encontró la mesa "barra". Debe configurarse desde administración.');
+        return;
+      }
+      Cobro.abrirModalCierre(mesaBarra);
+    });
   }
 
-  /**
-   * Renderiza el resumen de caja con los datos del Store.
-   */
   function render() {
     _asegurarVista();
     const statsEl = $id('cajaStats');
     const bodyEl = $id('cajaBody');
+    const pendientesContainer = $id('cajaPendientes');
+    const pendientesLista = $id('pendientesLista');
     if (!statsEl || !bodyEl) return;
 
-    const pedidos = Store.getState().pedidos;
+    const pedidos = Store.getState().pedidos || [];
     const cerrados = pedidos.filter(p => p.estado === 'cerrada');
     const abiertos = pedidos.filter(p => p.estado !== 'cerrada' && p.estado !== 'cancelada');
 
@@ -57,6 +84,43 @@ const Caja = (() => {
     bodyEl.innerHTML = pedidos.length
       ? pedidos.map(_htmlFila).join('')
       : `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--color-text-muted)">No hay registros en este turno</td></tr>`;
+
+    const pedidosPendientes = pedidos.filter(p => {
+      if (p.estado === 'cerrada') return false;
+      const total = p.total || 0;
+      const transacciones = Array.isArray(p.transacciones) ? p.transacciones : [];
+      const cubierto = transacciones.reduce((s, t) => s + (t.monto || 0), 0);
+      return cubierto > 0 && cubierto < total;
+    });
+
+    if (pendientesContainer && pendientesLista) {
+      if (pedidosPendientes.length > 0) {
+        pendientesContainer.style.display = 'block';
+        pendientesLista.innerHTML = pedidosPendientes.map(p => {
+          const total = p.total || 0;
+          const cubierto = (p.transacciones || []).reduce((s, t) => s + (t.monto || 0), 0);
+          return `<div style="display:flex; align-items:center; gap:12px; padding:8px 0; border-bottom:1px solid var(--color-border);">
+            <strong>Mesa ${p.mesa}</strong>
+            <span>Cubierto: ${fmtMoney(cubierto)} de ${fmtMoney(total)}</span>
+            <button class="btn-secondary btn-cobrar-pendiente" data-mesa="${p.mesa}" style="margin-left:auto; font-size:12px;">Cobrar pendiente</button>
+          </div>`;
+        }).join('');
+
+        pendientesLista.querySelectorAll('.btn-cobrar-pendiente').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const numeroMesa = btn.dataset.mesa;
+            const mesa = (Store.getState().mesas || []).find(m => m.numero == numeroMesa);
+            if (mesa) {
+              Cobro.abrirModalCierre(mesa);
+            } else {
+              Cobro.abrirModalCierre({ numero: numeroMesa });
+            }
+          });
+        });
+      } else {
+        pendientesContainer.style.display = 'none';
+      }
+    }
   }
 
   function _htmlStats(totalVentas, cerradas, promedio, abiertas) {
@@ -108,5 +172,3 @@ const Caja = (() => {
 
   return { render };
 })();
-
-window.Caja = Caja;

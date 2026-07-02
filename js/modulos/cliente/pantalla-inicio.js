@@ -1,24 +1,14 @@
 /* ================================================================
-   LaTaberna - PubPOS — Módulo
+   LaTaberna - PubPOS — Módulo (ES6)
    Archivo: js/modulos/cliente/pantalla-inicio.js
-   Versión: 1.0.2
-   Propósito: Pantalla de inicio híbrida con triángulo de acceso,
-             vitrinas y registro vía modal del sistema.
-   Dependencias: Auth, EventBus
+   Versión: 1.0.4
+   Propósito: Pantalla de inicio híbrida con triángulo de acceso.
+              Sin onclick en HTML. Usa addEventListener.
    ================================================================ */
 
-/**
- * Pantalla de Inicio Híbrida (v1.0.2)
- * Vista pública que no requiere autenticación.
- *
- * @module PantallaInicio
- * @version 1.0.2
- *
- * Rediseño con triángulo de acceso neón, cabecera izquierda
- * y vitrinas deslizables decorativas con eslogan dinámico.
- * Ahora también escucha el evento 'auth:mostrarRegistro' para
- * abrir el modal de registro desde el modal de login del sistema.
- */
+import { EventBus } from '../../lib/eventBus.js';
+import { Auth } from '../../auth.js';
+
 const PantallaInicio = (() => {
   let _vista = null;
   let _intervaloEslogan = null;
@@ -47,13 +37,11 @@ const PantallaInicio = (() => {
           <a href="#" class="login-subtitle" id="btnRegistroCorner">Registrarse</a>
         </div>
       </div>
-
       <div class="header-left">
         <i class="fa-solid fa-beer-mug-empty icono"></i>
         <div class="nombre">La Taberna</div>
         <div class="eslogan" id="eslogan-dinamico">"${FRASES_ESLOGAN[0]}"</div>
       </div>
-
       <div class="main-wrapper">
         <div class="vitrina-contenedor">
           <div class="vitrina-scroll vitrina-cocktails">
@@ -62,7 +50,6 @@ const PantallaInicio = (() => {
             <div class="vitrina-card"><i class="fa-solid fa-martini-glass vitrina-icon"></i><div class="vitrina-titulo">Margarita</div><div class="vitrina-desc">Cítrica, con borde de sal</div></div>
           </div>
         </div>
-
         <div class="vitrina-contenedor">
           <div class="vitrina-scroll vitrina-burgers">
             <div class="vitrina-card"><i class="fa-solid fa-hamburger vitrina-icon"></i><div class="vitrina-titulo">Clásica</div><div class="vitrina-desc">Queso cheddar, cebolla caramelizada</div></div>
@@ -70,7 +57,6 @@ const PantallaInicio = (() => {
             <div class="vitrina-card"><i class="fa-solid fa-seedling vitrina-icon"></i><div class="vitrina-titulo">Veggie</div><div class="vitrina-desc">Garbanzos, palta, brotes frescos</div></div>
           </div>
         </div>
-
         <div class="vitrina-contenedor">
           <div class="vitrina-scroll vitrina-karaoke">
             <div class="vitrina-card"><i class="fa-solid fa-microphone-lines vitrina-icon"></i><div class="vitrina-titulo">Rock</div><div class="vitrina-desc">Viernes de clásicos en vivo</div></div>
@@ -90,24 +76,16 @@ const PantallaInicio = (() => {
       _mostrarRegistro();
     });
 
-    // Escuchar el evento del modal de login del sistema
-    if (typeof window.EventBus !== 'undefined') {
-      window.EventBus.on('auth:mostrarRegistro', () => {
-        _mostrarRegistro();
-      });
-    }
+    EventBus.on('auth:mostrarRegistro', () => _mostrarRegistro());
 
     _iniciarEsloganDinamico();
-
     return _vista;
   }
 
   function _iniciarEsloganDinamico() {
     const esloganEl = document.getElementById('eslogan-dinamico');
     if (!esloganEl) return;
-
     let indice = Math.floor(Math.random() * FRASES_ESLOGAN.length);
-
     _intervaloEslogan = setInterval(() => {
       esloganEl.style.opacity = '0';
       setTimeout(() => {
@@ -119,19 +97,13 @@ const PantallaInicio = (() => {
   }
 
   function _mostrarLogin() {
-    if (typeof window.Auth !== 'undefined' && typeof window.Auth.mostrarLogin === 'function') {
-      window.Auth.mostrarLogin();
-    } else {
-      alert('Sistema de autenticación no disponible.');
-    }
+    if (typeof Auth.mostrarLogin === 'function') Auth.mostrarLogin();
   }
 
   function _mostrarRegistro() {
-    if (typeof window.Auth !== 'undefined' && typeof window.Auth.registrarCliente === 'function') {
-      // Redirigir al flujo de registro del sistema
-      window.Auth.mostrarLogin?.();
-    } else {
-      alert('Registro no disponible en este momento.');
+    if (typeof Auth.registrarCliente === 'function') {
+      // Abre el modal de login del sistema, que ahora incluye el botón de registro
+      Auth.mostrarLogin();
     }
   }
 
@@ -143,13 +115,8 @@ const PantallaInicio = (() => {
   }
 
   function ocultar() {
-    if (_vista) {
-      _vista.classList.remove('active');
-    }
-    if (_intervaloEslogan) {
-      clearInterval(_intervaloEslogan);
-      _intervaloEslogan = null;
-    }
+    if (_vista) _vista.classList.remove('active');
+    if (_intervaloEslogan) { clearInterval(_intervaloEslogan); _intervaloEslogan = null; }
   }
 
   return { render, mostrar, ocultar };

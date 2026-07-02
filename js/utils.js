@@ -1,33 +1,20 @@
 /* ================================================================
-   LaTaberna - PubPOS — MÓDULO JS
+   LaTaberna - PubPOS — UTILIDADES COMPARTIDAS (ES6)
    Archivo: js/utils.js
-   Versión: 1.0.0
-   Propósito: Utilidades compartidas: formato monetario, fechas, toast, DOM.
+   Versión: 1.1.0
+   Propósito: Utilidades compartidas entre todas las células.
+              Incluye obtenerColorDesdeNombre (unificada).
    ================================================================ */
 
-/* ── FORMATO MONETARIO ───────────────────────────────────────── */
-
-/**
- * Devuelve un número formateado como moneda argentina.
- * Ejemplos: fmtMoney(1500) → "$1.500"
- *           fmtMoney(0)    → "$0"
- */
-function fmtMoney(n) {
+export function fmtMoney(n) {
   return '$' + (n || 0).toLocaleString('es-AR', { minimumFractionDigits: 0 });
 }
 
-/**
- * Versión compacta para tickets de impresión (sin separador de miles).
- */
-function fmtMoneyTicket(n) {
+export function fmtMoneyTicket(n) {
   return '$' + (n || 0).toLocaleString('es-AR', { minimumFractionDigits: 0 });
 }
 
-
-/* ── FORMATO FECHA / HORA ────────────────────────────────────── */
-
-/** Devuelve la fecha actual en formato "Lunes 18 de abril de 2026" */
-function fmtFechaLarga() {
+export function fmtFechaLarga() {
   const now = new Date();
   const s = now.toLocaleDateString('es-AR', {
     weekday: 'long', day: '2-digit', month: 'long', year: 'numeric'
@@ -35,34 +22,24 @@ function fmtFechaLarga() {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-/** Devuelve la hora actual "HH:MM:SS" */
-function fmtHoraCompleta() {
+export function fmtHoraCompleta() {
   return new Date().toLocaleTimeString('es-AR', {
     hour: '2-digit', minute: '2-digit', second: '2-digit'
   });
 }
 
-/** Devuelve hora corta "HH:MM" de un timestamp o Date */
-function fmtHoraCorta(ts) {
+export function fmtHoraCorta(ts) {
   if (!ts) return '—';
   return new Date(ts).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
 }
 
-/** Devuelve fecha corta "DD/MM/AAAA" */
-function fmtFechaCorta() {
+export function fmtFechaCorta() {
   return new Date().toLocaleDateString('es-AR', {
     day: '2-digit', month: '2-digit', year: 'numeric'
   });
 }
 
-
-/* ── TIEMPO TRANSCURRIDO ─────────────────────────────────────── */
-
-/**
- * Devuelve "X min" o "Xh Ym" desde un timestamp pasado.
- * @param {number|string} ts  timestamp de apertura
- */
-function tiempoDesde(ts) {
+export function tiempoDesde(ts) {
   const ms  = Date.now() - (typeof ts === 'number' ? ts : new Date(ts).getTime());
   const min = Math.floor(ms / 60000);
   if (min < 60) return `${min} min`;
@@ -71,27 +48,11 @@ function tiempoDesde(ts) {
   return `${h}h ${m}m`;
 }
 
-
-/* ── CÁLCULO DE TOTALES ──────────────────────────────────────── */
-
-/**
- * Suma precio×qty de todos los ítems de una comanda.
- * @param {Array} items  array de ítems { precio, qty }
- */
-function calcularTotal(items) {
+export function calcularTotal(items) {
   return (items || []).reduce((sum, it) => sum + it.precio * it.qty, 0);
 }
 
-
-/* ── TOAST NOTIFICATIONS ─────────────────────────────────────── */
-
-/**
- * Muestra una notificación flotante.
- * @param {'success'|'error'|'info'|'warning'} tipo
- * @param {string} htmlMsg  HTML del mensaje (puede contener <i> de FontAwesome)
- * @param {number} ms       duración en milisegundos (default 3500)
- */
-function showToast(tipo, htmlMsg, ms = 3500) {
+export function showToast(tipo, htmlMsg, ms = 3500) {
   const cont  = document.getElementById('toastContainer');
   if (!cont) return;
   const toast = document.createElement('div');
@@ -104,11 +65,22 @@ function showToast(tipo, htmlMsg, ms = 3500) {
   }, ms);
 }
 
+export function $id(id) { return document.getElementById(id); }
 
-/* ── DOM HELPERS ─────────────────────────────────────────────── */
+export function $val(id) { return ($id(id)?.value || '').trim(); }
 
-/** Shortcut para document.getElementById */
-function $id(id) { return document.getElementById(id); }
-
-/** Valor limpio de un input por id */
-function $val(id) { return ($id(id)?.value || '').trim(); }
+/**
+ * Genera un color HSL consistente a partir de un nombre.
+ * Útil para fondos de tarjetas de producto, recetas, etc.
+ * @param {string} nombre - El nombre desde el cual generar el color.
+ * @returns {string} Color en formato HSL (ej: "hsl(210, 55%, 45%)").
+ */
+export function obtenerColorDesdeNombre(nombre) {
+  let hash = 0;
+  for (let i = 0; i < nombre.length; i++) {
+    hash = nombre.charCodeAt(i) + ((hash << 5) - hash);
+    hash = hash & hash;
+  }
+  const h = Math.abs(hash) % 360;
+  return `hsl(${h}, 55%, 45%)`;
+}

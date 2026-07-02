@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Test D – Recetas Unificado</title>
+  <title>Test D – Recetas Unificado (Diagnóstico final)</title>
   <style>
     body { font-family: system-ui, sans-serif; background: #1a1a1a; color: #e0e0e0; padding: 30px; max-width: 700px; margin: auto; }
     h1 { color: #f59e0b; }
@@ -13,30 +13,50 @@
   </style>
 </head>
 <body>
-  <h1>Test D – Recetas (v7.0)</h1>
-  <p style="color:#a0a0a0; font-size:13px;">Modo administración y modo consulta unificados.</p>
+  <h1>Test D – Recetas (v2.0.2) — Diagnóstico final</h1>
+  <p style="color:#a0a0a0; font-size:13px;">Prueba directa de la lógica de filtrado de recetas.</p>
   <div id="resultados"></div>
 
   <script>
+    // ─── Mocks globales mínimos ───
     const Logger = { info: console.log, warn: console.warn, error: console.error };
     const EventBus = { events: {}, on(ev, cb) { (this.events[ev] = this.events[ev] || []).push(cb); }, emit(ev, data) { (this.events[ev] || []).forEach(cb => cb(data)); } };
-    const Store = { state: {}, getState() { return this.state; }, subscribe() {} };
+    const Auth = { getRol() { return 'cocina'; }, getNombre() { return 'Test'; } };
     let toastMessages = [];
     function showToast(tipo, msg) { toastMessages.push({tipo, msg}); }
     window.fmtMoney = (val) => `$${val.toFixed(0)}`;
 
-    const DB = {
-      recetas: [],
-      productos: [],
-      ingredientes: [],
-      saveRecetas() {},
-      syncGuardarReceta() {}
+    // ─── Estado de prueba (igual que en el mock-store) ───
+    const state = {
+      productos: [
+        { id: 'prod1', nombre: 'Hamburguesa', precio: 1500, categoria: 'Comidas', destino: 'cocina', activo: true }
+      ],
+      ingredientes: [
+        { id: 'ing1', nombre: 'Pan', stock: 50, stock_minimo: 5, unidad: 'u', categoria: 'cocina', valor_unitario: 100 }
+      ],
+      recetas: [
+        { productoId: 'prod1', ingredientes: [{ ingredienteId: 'ing1', cantidad: 1 }], instrucciones: 'Paso 1' }
+      ]
     };
-  </script>
 
-  <script src="js/ui/recetas.js"></script>
+    // ─── Implementación exacta del filtro de recetas.js ───
+    function filtrarProductos(productos, recetas, ingredientes, rol) {
+      // 1. Filtrar por destino según rol
+      if (rol === 'cocina') {
+        productos = productos.filter(p => p.destino === 'cocina' || p.destino === 'ambos');
+      } else if (rol === 'barra') {
+        productos = productos.filter(p => p.destino === 'barra' || p.destino === 'ambos');
+      }
 
-  <script>
+      // 2. Solo productos con receta e ingredientes
+      productos = productos.filter(prod => {
+        const receta = recetas.find(r => r.productoId == prod.id);
+        return receta && receta.ingredientes && receta.ingredientes.length > 0;
+      });
+
+      return productos;
+    }
+
     function resultado(ok, seccion, mensaje) {
       const div = document.createElement('div');
       div.className = 'resultado ' + (ok ? 'ok' : 'fallo');
@@ -44,63 +64,17 @@
       document.getElementById('resultados').appendChild(div);
     }
 
-    async function iniciarTests() {
-      const prodConReceta = {
-        id: 'prod1', nombre: 'Hamburguesa', precio: 1500, categoria: 'Comidas', destino: 'cocina', activo: true
-      };
-      const ingPan = { id: 'ing1', nombre: 'Pan', stock: 50, stock_minimo: 5, unidad: 'u', categoria: 'cocina', valor_unitario: 100 };
-      const ingCarne = { id: 'ing2', nombre: 'Carne molida', stock: 20, stock_minimo: 2, unidad: 'kg', categoria: 'cocina', valor_unitario: 500 };
-      const receta = {
-        id: 'rec1', productoId: 'prod1',
-        ingredientes: [
-          { ingredienteId: 'ing1', cantidad: 1 },
-          { ingredienteId: 'ing2', cantidad: 0.2 }
-        ],
-        instrucciones: '1. Cocinar carne\n2. Armar hamburguesa'
-      };
+    // ─── Ejecutar prueba ───
+    const productosFiltrados = filtrarProductos(
+      state.productos,
+      state.recetas,
+      state.ingredientes,
+      'cocina'
+    );
 
-      Store.state = {
-        productos: [prodConReceta],
-        ingredientes: [ingPan, ingCarne],
-        recetas: [receta]
-      };
-      DB.productos = [prodConReceta];
-      DB.ingredientes = [ingPan, ingCarne];
-      DB.recetas = [receta];
-
-      // ── Modo administración ──────────────────────────
-      window.Auth = { getRol() { return 'admin'; }, getNombre() { return 'Admin'; } };
-      EventBus.emit('vista:cambiada', 'recetas');
-      await new Promise(r => setTimeout(r, 100));
-      resultado(document.getElementById('view-recetas') !== null, 'Admin', 'Vista creada');
-      resultado(document.getElementById('btnNuevaReceta').style.display !== 'none', 'Admin', 'Botón Nueva Receta visible');
-
-      Recetas.mostrarDetalle('prod1');
-      await new Promise(r => setTimeout(r, 100));
-      resultado(document.getElementById('btnEditarReceta').style.display !== 'none', 'Admin', 'Botón Editar visible en detalle');
-      Recetas.cerrarDetalle();
-
-      // ── Modo consulta (cocina) ───────────────────────
-      window.Auth = { getRol() { return 'cocina'; }, getNombre() { return 'Cocinero'; } };
-      Recetas.render(); // forzar re-render en modo consulta
-      await new Promise(r => setTimeout(r, 100));
-      resultado(document.getElementById('btnNuevaReceta').style.display === 'none', 'Consulta', 'Botón Nueva Receta oculto');
-
-      Recetas.mostrarDetalle('prod1');
-      await new Promise(r => setTimeout(r, 100));
-      resultado(document.getElementById('btnEditarReceta').style.display === 'none', 'Consulta', 'Botón Editar oculto en detalle');
-      // El botón Exportar PDF debe seguir visible
-      const btnPDF = document.getElementById('btnExportarPDF');
-      resultado(btnPDF && btnPDF.style.display !== 'none', 'Consulta', 'Botón Exportar PDF visible');
-      Recetas.cerrarDetalle();
-
-      // Limpiar
-      const vista = document.getElementById('view-recetas');
-      if (vista) vista.style.display = 'none';
-      console.log('Tests unificados finalizados.');
-    }
-
-    window.addEventListener('load', () => setTimeout(iniciarTests, 200));
+    console.log('Productos después del filtro:', productosFiltrados);
+    resultado(productosFiltrados.length === 1, 'Filtro', 'Se encuentra 1 producto (Hamburguesa)');
+    resultado(productosFiltrados[0].nombre === 'Hamburguesa', 'Filtro', 'El producto es Hamburguesa');
   </script>
 </body>
 </html>

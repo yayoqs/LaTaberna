@@ -1,10 +1,17 @@
 /* ================================================================
-   LaTaberna - PubPOS — Módulo
+   LaTaberna - PubPOS — Módulo (ES6)
    Archivo: js/modulos/cliente/menu-digital.js
-   Versión: 1.1.1
-   Propósito: Menú digital interactivo con botón de retorno a la bienvenida.
-   Dependencias: Store, EventBus, App, ClienteModulo (Orden, PantallaBienvenida)
+   Versión: 1.1.6
+   Propósito: Menú digital interactivo. Usa Store para permiso y mesa.
+              Usa obtenerColorDesdeNombre desde utils.js.
    ================================================================ */
+
+import { Store } from '../../lib/store.js';
+import { EventBus } from '../../lib/eventBus.js';
+import { Auth } from '../../auth.js';
+import { DBAppwrite } from '../../db-appwrite.js';
+import { showToast, fmtMoney, obtenerColorDesdeNombre } from '../../utils.js';
+import { Orden } from './orden.js';
 
 const MenuDigital = (() => {
   let _vista = null;
@@ -62,16 +69,13 @@ const MenuDigital = (() => {
 
     document.getElementById('btnToggleOrden').addEventListener('click', _togglePanelOrden);
     document.getElementById('btnVolverMenu').addEventListener('click', () => {
-      if (typeof window.App !== 'undefined' && typeof window.App.showView === 'function') {
-        window.App.showView('bienvenida');
-      }
+      EventBus.emit('app:cambiarVista', 'bienvenida');
     });
 
     _initRealtime();
     return _vista;
   }
 
-  /* ── Panel de la orden ────────────────────────────────── */
   function _crearPanelOrden() {
     _panelOrden = document.createElement('aside');
     _panelOrden.id = 'panelOrden';
@@ -104,20 +108,15 @@ const MenuDigital = (() => {
   function _renderizarItemsOrden() {
     const container = document.getElementById('ordenItems');
     const totalEl = document.getElementById('ordenTotal');
-    const items = window.ClienteModulo?.Orden?.obtenerItems() || [];
-    const total = window.ClienteModulo?.Orden?.obtenerTotal() || 0;
+    const items = Orden.obtenerItems();
+    const total = Orden.obtenerTotal();
 
-    if (totalEl) totalEl.textContent = window.fmtMoney?.(total) || '$' + total;
+    if (totalEl) totalEl.textContent = fmtMoney(total);
 
     if (!container) return;
 
     if (!items.length) {
-      container.innerHTML = `
-        <div class="orden-vacia">
-          <i class="fas fa-inbox"></i>
-          <p>Tu orden está vacía</p>
-        </div>
-      `;
+      container.innerHTML = `<div class="orden-vacia"><i class="fas fa-inbox"></i><p>Tu orden está vacía</p></div>`;
       return;
     }
 
@@ -125,7 +124,7 @@ const MenuDigital = (() => {
       <div class="orden-item">
         <div class="orden-item-info">
           <div class="orden-item-nombre">${item.nombre}</div>
-          <div class="orden-item-precio">${window.fmtMoney?.(item.precio) || '$' + item.precio} c/u</div>
+          <div class="orden-item-precio">${fmtMoney(item.precio)} c/u</div>
           <div class="orden-item-cantidad">
             <button data-id="${item.prodId}" data-accion="restar">−</button>
             <span>${item.qty}</span>
@@ -147,21 +146,19 @@ const MenuDigital = (() => {
         const item = items.find(i => i.prodId === id);
         if (!item) return;
         const nuevaCantidad = btn.dataset.accion === 'sumar' ? item.qty + 1 : item.qty - 1;
-        window.ClienteModulo?.Orden?.modificarCantidad(id, nuevaCantidad);
+        Orden.modificarCantidad(id, nuevaCantidad);
         _renderizarItemsOrden();
         _actualizarContador();
       });
     });
 
     container.querySelectorAll('.orden-item-obs input').forEach(input => {
-      input.addEventListener('input', () => {
-        window.ClienteModulo?.Orden?.modificarObservacion(input.dataset.id, input.value);
-      });
+      input.addEventListener('input', () => Orden.modificarObservacion(input.dataset.id, input.value));
     });
 
     container.querySelectorAll('.btn-quitar-item').forEach(btn => {
       btn.addEventListener('click', () => {
-        window.ClienteModulo?.Orden?.quitarItem(btn.dataset.id);
+        Orden.quitarItem(btn.dataset.id);
         _renderizarItemsOrden();
         _actualizarContador();
       });
@@ -169,100 +166,67 @@ const MenuDigital = (() => {
   }
 
   function _actualizarContador() {
-    const items = window.ClienteModulo?.Orden?.obtenerItems() || [];
+    const items = Orden.obtenerItems();
     const totalCantidad = items.reduce((sum, i) => sum + i.qty, 0);
     const contador = document.getElementById('contadorOrden');
     if (contador) contador.textContent = totalCantidad;
   }
 
-  /* ── Confirmación de la orden ─────────────────────────── */
   async function _confirmarOrden() {
-    const permite = window.ClienteModulo?.PantallaBienvenida?.permitePrepedidos?.() || false;
+    const state = Store.getState();
+    const permite = state.cliente?.permitePrepedidos || false;
     if (!permite) {
-      _mostrarToast('error', 'Tu mesa ya no admite pedidos. Contactá al garzón.');
+      showToast('error', 'Tu mesa ya no admite pedidos. Contactá al garzón.');
       return;
     }
 
-    const items = window.ClienteModulo?.Orden?.obtenerItems() || [];
+    const items = Orden.obtenerItems();
     if (!items.length) {
-      _mostrarToast('error', 'Agregá productos a tu orden antes de confirmar.');
+      showToast('error', 'Agregá productos a tu orden antes de confirmar.');
       return;
     }
 
     let idUsuario;
-    try {
-      idUsuario = await window.Auth?.getAppwriteUserId?.();
-    } catch (e) {
-      idUsuario = null;
-    }
+    try { idUsuario = await Auth.getAppwriteUserId(); } catch (e) { idUsuario = null; }
     if (!idUsuario) {
-      _mostrarToast('error', 'No se pudo obtener tu sesión. Intentá de nuevo.');
+      showToast('error', 'No se pudo obtener tu sesión. Intentá de nuevo.');
       return;
     }
 
-    const mesa = window.ClienteModulo?.PantallaBienvenida?.obtenerMesa?.() || 0;
+    const mesa = state.cliente?.mesa || 0;
     if (!mesa) {
-      _mostrarToast('error', 'No se pudo obtener el número de mesa.');
+      showToast('error', 'No se pudo obtener el número de mesa.');
       return;
     }
 
-    const nombreComensal = window.Auth?.getNombre?.() || 'comensal';
-
+    const nombreComensal = Auth.getNombre() || 'comensal';
     const payload = {
-      mesa: mesa,
-      items: items,
-      clienteId: nombreComensal,
-      id_usuario: idUsuario,
-      nombre_comensal: nombreComensal,
-      observaciones: '',
-      timestamp: Date.now()
+      mesa, items, clienteId: nombreComensal,
+      id_usuario: idUsuario, nombre_comensal: nombreComensal,
+      observaciones: '', timestamp: Date.now()
     };
 
     try {
-      const resultado = await window.DBAppwrite?.crear?.('precargas_cliente', 'unique()', {
-        id_mesa: mesa,
-        id_usuario: idUsuario,
-        nombre_comensal: nombreComensal,
-        productos: JSON.stringify(items),
-        estado: 'por_confirmar',
-        timestamp: payload.timestamp
+      const resultado = await DBAppwrite.crear('precargas_cliente', 'unique()', {
+        id_mesa: mesa, id_usuario: idUsuario, nombre_comensal: nombreComensal,
+        productos: JSON.stringify(items), estado: 'por_confirmar', timestamp: payload.timestamp
       });
-
-      if (!resultado) {
-        _mostrarToast('error', 'Error al enviar tu orden. Intentá de nuevo.');
-        return;
-      }
-
+      if (!resultado) { showToast('error', 'Error al enviar tu orden. Intentá de nuevo.'); return; }
       payload.id = resultado.id || 'pre_' + Date.now();
-
-      if (typeof window.EventBus !== 'undefined') {
-        window.EventBus.emit('cliente:precarga_enviada', payload);
-      }
-
-      window.ClienteModulo?.Orden?.vaciar();
+      EventBus.emit('cliente:precarga_enviada', payload);
+      Orden.vaciar();
       _actualizarContador();
       _panelOrden.classList.add('oculto');
-      _mostrarToast('success', '✅ ¡Orden enviada! El garzón la revisará pronto.');
+      showToast('success', '✅ ¡Orden enviada! El garzón la revisará pronto.');
     } catch (e) {
       console.error('[MenuDigital] Error al confirmar orden:', e);
-      _mostrarToast('error', 'Error de conexión. Revisá tu internet.');
+      showToast('error', 'Error de conexión. Revisá tu internet.');
     }
-  }
-
-  function _mostrarToast(tipo, mensaje) {
-    const contenedor = document.getElementById('toastContainer');
-    if (!contenedor) return;
-    const toast = document.createElement('div');
-    toast.className = `toast ${tipo}`;
-    toast.innerHTML = `<i class="fas fa-${tipo === 'success' ? 'check-circle' : 'info-circle'}"></i> ${mensaje}`;
-    contenedor.appendChild(toast);
-    setTimeout(() => toast.remove(), 2500);
   }
 
   function mostrar() {
     const viewMenu = document.getElementById('view-menu');
     if (viewMenu) viewMenu.classList.remove('active');
-
     if (_vista) {
       _vista.classList.add('active');
       _actualizarEstado();
@@ -279,34 +243,29 @@ const MenuDigital = (() => {
   }
 
   function _actualizarEstado() {
-    const nombre = window.Auth?.getNombre?.() || 'comensal';
-    const mesa = window.ClienteModulo?.PantallaBienvenida?.obtenerMesa?.() || '?';
+    const nombre = Auth.getNombre() || 'comensal';
+    const state = Store.getState();
+    const mesa = state.cliente?.mesa || '?';
     document.getElementById('menuEstadoCliente').textContent = `👤 ${nombre}`;
     document.getElementById('menuEstadoMesa').textContent = `🪑 Mesa ${mesa}`;
   }
 
   function _verificarPermiso() {
-    const permite = window.ClienteModulo?.PantallaBienvenida?.permitePrepedidos?.() || false;
+    const state = Store.getState();
+    const permite = state.cliente?.permitePrepedidos || false;
     const banner = document.getElementById('menuBannerEspera');
-    if (banner) {
-      banner.style.display = permite ? 'none' : 'flex';
-    }
+    if (banner) banner.style.display = permite ? 'none' : 'flex';
     _renderProductos();
   }
 
   function _renderCategorias() {
     const container = document.getElementById('menuDigitalCategorias');
     if (!container) return;
-
-    const productos = window.Store?.getState?.().productos || [];
-    const categorias = ['Todas', ...new Set(
-      productos.filter(p => p.activo !== false).map(p => p.categoria)
-    )].filter(Boolean);
-
+    const productos = Store.getState().productos || [];
+    const categorias = ['Todas', ...new Set(productos.filter(p => p.activo !== false).map(p => p.categoria))].filter(Boolean);
     container.innerHTML = categorias.map(cat => `
       <button class="menu-cat-btn ${cat === _categoriaActiva ? 'active' : ''}" data-categoria="${cat}">${cat}</button>
     `).join('');
-
     container.querySelectorAll('.menu-cat-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         _categoriaActiva = btn.dataset.categoria;
@@ -319,104 +278,52 @@ const MenuDigital = (() => {
   function _renderProductos() {
     const grid = document.getElementById('menuDigitalGrid');
     if (!grid) return;
-
-    const permite = window.ClienteModulo?.PantallaBienvenida?.permitePrepedidos?.() || false;
-    let productos = (window.Store?.getState?.().productos || []).filter(p => p.activo !== false);
-
-    if (_categoriaActiva !== 'Todas') {
-      productos = productos.filter(p => p.categoria === _categoriaActiva);
-    }
+    const state = Store.getState();
+    const permite = state.cliente?.permitePrepedidos || false;
+    let productos = (Store.getState().productos || []).filter(p => p.activo !== false);
+    if (_categoriaActiva !== 'Todas') productos = productos.filter(p => p.categoria === _categoriaActiva);
     if (_terminoBusqueda) {
       const term = _terminoBusqueda.toLowerCase();
-      productos = productos.filter(p =>
-        p.nombre.toLowerCase().includes(term) ||
-        (p.descripcion || '').toLowerCase().includes(term)
-      );
+      productos = productos.filter(p => p.nombre.toLowerCase().includes(term) || (p.descripcion || '').toLowerCase().includes(term));
     }
-
     if (!productos.length) {
       grid.innerHTML = '<div class="menu-empty"><i class="fas fa-search"></i><p>No se encontraron productos</p></div>';
       return;
     }
-
     productos.sort((a, b) => a.nombre.localeCompare(b.nombre));
-
     grid.innerHTML = productos.map(prod => {
       const disponible = prod.disponible !== false;
       const puedeAgregar = permite && disponible;
       const desc = prod.descripcion || 'Consulta a nuestro personal.';
-      const tieneImagen = prod.imagen && prod.imagen.trim() !== '';
-      const estiloImagen = tieneImagen
-        ? `background-image: url('${prod.imagen}');`
-        : `background-color: ${_getColorFromName(prod.nombre)};`;
-      const contenidoImagen = tieneImagen
-        ? ''
-        : `<span class="menu-card-inicial">${prod.nombre.charAt(0).toUpperCase()}</span>`;
-
       return `
         <div class="menu-card ${!disponible ? 'menu-card-atenuado' : ''}">
-          <div class="menu-card-img" style="${estiloImagen}">
-            ${contenidoImagen}
-            <span class="menu-card-precio">${window.fmtMoney?.(prod.precio) || '$' + prod.precio}</span>
+          <div class="menu-card-img" style="background-color: ${obtenerColorDesdeNombre(prod.nombre)};">
+            <span class="menu-card-inicial">${prod.nombre.charAt(0).toUpperCase()}</span>
+            <span class="menu-card-precio">${fmtMoney(prod.precio)}</span>
           </div>
           <div class="menu-card-body">
             <h3>${prod.nombre}</h3>
             <p>${desc.length > 60 ? desc.substring(0, 60) + '...' : desc}</p>
-            <button class="btn-agregar-orden ${!puedeAgregar ? 'btn-deshabilitado' : ''}"
-                    ${!puedeAgregar ? 'disabled' : ''}
-                    data-id="${prod.id}"
-                    data-nombre="${prod.nombre}"
-                    data-precio="${prod.precio}"
-                    data-categoria="${prod.categoria}"
-                    data-destino="${prod.destino || prod.categoria || 'general'}">
+            <button class="btn-agregar-orden ${!puedeAgregar ? 'btn-deshabilitado' : ''}" ${!puedeAgregar ? 'disabled' : ''} data-id="${prod.id}" data-nombre="${prod.nombre}" data-precio="${prod.precio}" data-categoria="${prod.categoria}" data-destino="${prod.destino || prod.categoria || 'general'}">
               🛒 Agregar a mi orden
             </button>
           </div>
         </div>
       `;
     }).join('');
-
     grid.querySelectorAll('.btn-agregar-orden:not(.btn-deshabilitado)').forEach(btn => {
       btn.addEventListener('click', () => {
-        const producto = {
-          id: btn.dataset.id,
-          nombre: btn.dataset.nombre,
-          precio: parseInt(btn.dataset.precio, 10),
-          categoria: btn.dataset.categoria,
-          destino: btn.dataset.destino
-        };
-        window.ClienteModulo?.Orden?.agregarItem(producto);
-        _mostrarToast('success', `${producto.nombre} agregado a tu orden`);
+        Orden.agregarItem({ id: btn.dataset.id, nombre: btn.dataset.nombre, precio: parseInt(btn.dataset.precio, 10), categoria: btn.dataset.categoria, destino: btn.dataset.destino });
+        showToast('success', `${btn.dataset.nombre} agregado a tu orden`);
         _actualizarContador();
         _renderizarItemsOrden();
       });
     });
   }
 
-  function _getColorFromName(nombre) {
-    let hash = 0;
-    for (let i = 0; i < nombre.length; i++) {
-      hash = nombre.charCodeAt(i) + ((hash << 5) - hash);
-      hash = hash & hash;
-    }
-    const h = Math.abs(hash) % 360;
-    return `hsl(${h}, 55%, 45%)`;
-  }
-
   function _initRealtime() {
-    if (typeof window.EventBus !== 'undefined') {
-      window.EventBus.on('productos:actualizada', () => {
-        if (_vista?.classList.contains('active')) {
-          _renderCategorias();
-          _renderProductos();
-        }
-      });
-      window.EventBus.on('mesas:actualizada', () => {
-        if (_vista?.classList.contains('active')) {
-          _verificarPermiso();
-        }
-      });
-    }
+    EventBus.on('productos:actualizada', () => { if (_vista?.classList.contains('active')) { _renderCategorias(); _renderProductos(); } });
+    EventBus.on('mesas:actualizada', () => { if (_vista?.classList.contains('active')) _verificarPermiso(); });
   }
 
   return { render, mostrar, ocultar };

@@ -1,0 +1,60 @@
+/* ================================================================
+   LaTaberna - PubPOS — CSS MODULAR
+   Archivo: css/extra.css
+   Versión: 1.0.0
+   Propósito: Estilos adicionales previamente inline en index.html
+   ================================================================ */
+
+.app-header {
+  display: none;
+}
+
+.item-persona-badge {
+  font-size: 10px;
+  background: var(--color-primary);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 99px;
+  margin-left: 6px;
+}
+
+.cierre-persona-group {
+  margin-bottom: 12px;
+  border-bottom: 1px dashed var(--color-border);
+}
+
+.cierre-persona-header {
+  font-weight: bold;
+  display: flex;
+  justify-content: space-between;
+}
+
+.pago-persona-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+}
+
+#syncStatusIndicator {
+  margin-right: 8px;
+  font-size: 14px;
+}
+
+#espacioSelectorContainer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 12px;
+  font-size: 13px;
+  color: var(--color-text-sec);
+}
+
+#espacioSelectorContainer select {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+}

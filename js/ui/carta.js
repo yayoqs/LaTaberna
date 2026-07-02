@@ -1,17 +1,19 @@
 /* ================================================================
-   LaTaberna - PubPOS — UI JS
+   LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/carta.js
-   Versión: 1.0.0
+   Versión: 2.0.3
    Propósito: Carta de productos: categorías, búsqueda y selección.
-   Dependencias: js/lib/store.js, js/lib/eventBus.js, js/utils.js
+              Sin onclick. Usa delegación de eventos.
    ================================================================ */
+
+import { Store } from '../lib/store.js';
+import { EventBus } from '../lib/eventBus.js';
+import { fmtMoney, $id } from '../utils.js';
+
 const Carta = (() => {
   let _categoriaActiva = 'Todos';
   let _terminoBusqueda = '';
 
-  /**
-   * Renderiza las pestañas de categorías y la grilla de productos.
-   */
   function render() {
     _renderCategorias();
     _renderProductos();
@@ -27,22 +29,20 @@ const Carta = (() => {
     )].filter(Boolean);
 
     container.innerHTML = categorias
-      .map(cat => `
-        <button class="cat-tab${cat === _categoriaActiva ? ' active' : ''}"
-                onclick="Carta.setCategoria('${cat}')">${cat}</button>
-      `).join('');
+      .map(cat => `<button class="cat-tab${cat === _categoriaActiva ? ' active' : ''}" data-categoria="${cat}">${cat}</button>`)
+      .join('');
+
+    // Delegación de eventos
+    container.querySelectorAll('.cat-tab').forEach(btn => {
+      btn.addEventListener('click', () => setCategoria(btn.dataset.categoria));
+    });
   }
 
-  /**
-   * Establece la categoría activa para filtrar productos.
-   * @param {string} cat
-   */
   function setCategoria(cat) {
     _categoriaActiva = cat;
     render();
   }
 
-  /** Filtra productos según el término de búsqueda */
   function filtrar() {
     _terminoBusqueda = ($id('searchProducto')?.value || '').toLowerCase();
     _renderProductos();
@@ -74,12 +74,17 @@ const Carta = (() => {
     }
 
     cont.innerHTML = productosFiltrados.map(_htmlProducto).join('');
+
+    // Delegación de eventos para selección de producto
+    cont.querySelectorAll('.prod-card').forEach(card => {
+      card.addEventListener('click', () => seleccionarProducto(card.dataset.prodId));
+    });
   }
 
   function _htmlProducto(p) {
     const destinoIcon = { barra: 'fa-wine-glass', cocina: 'fa-fire-burner', ambos: 'fa-arrows-split-up-and-left' }[p.destino] || 'fa-fire-burner';
     return `
-      <article class="prod-card" onclick="Carta.seleccionarProducto('${p.id}')" role="button" tabindex="0">
+      <article class="prod-card" data-prod-id="${p.id}" role="button" tabindex="0">
         <div class="prod-nombre">${p.nombre}</div>
         ${p.descripcion ? `<div class="prod-desc">${p.descripcion}</div>` : ''}
         <div class="prod-footer">
@@ -91,10 +96,6 @@ const Carta = (() => {
       </article>`;
   }
 
-  /**
-   * Emite un evento cuando se selecciona un producto.
-   * @param {string} prodId
-   */
   function seleccionarProducto(prodId) {
     const producto = (Store.getState().productos || []).find(p => p.id === prodId);
     if (producto) {
@@ -102,7 +103,6 @@ const Carta = (() => {
     }
   }
 
-  /* ── SUSCRIPCIÓN AL STORE ──────────────────────────────── */
   function _initListeners() {
     Store.subscribe((state, action) => {
       if (action.type.startsWith('PRODUCTO')) {
@@ -125,4 +125,4 @@ const Carta = (() => {
   };
 })();
 
-window.Carta = Carta;
+export { Carta };

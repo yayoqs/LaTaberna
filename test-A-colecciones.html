@@ -15,24 +15,25 @@
 </head>
 <body>
   <h1>🧪 Test Rápido – SDK TablesDB</h1>
-  <p class="info">Verifica que la nueva API listRows devuelve los mismos datos. Esperá unos segundos...</p>
+  <p class="info">Verifica que la nueva API listRows devuelve los mismos datos.</p>
   <div id="resultado">
     <p>⏳ Iniciando Appwrite...</p>
   </div>
 
-  <!-- Dependencias mínimas para DBAppwrite -->
+  <!-- Scripts globales -->
   <script src="/js/utils.js"></script>
-  <script src="/js/lib/logger.js"></script>
   <script src="/js/appwrite.min.js"></script>
-  <script src="/js/db-appwrite.js"></script>
 
-  <script>
+  <!-- Módulo de prueba -->
+  <script type="module">
+    import { Logger } from './js/lib/logger.js';
+    import { DBAppwrite } from './js/db-appwrite.js';
+
     (async function() {
       var resultado = document.getElementById('resultado');
-      Logger.setLevel('ERROR'); // Silenciar logs durante el test
+      Logger.setLevel('ERROR');
 
       try {
-        // Inicializar (sesión anónima)
         var ok = await DBAppwrite.iniciar();
         if (!ok) {
           resultado.innerHTML = '<p class="fail">❌ No se pudo iniciar DBAppwrite. Revisá la conexión.</p>';

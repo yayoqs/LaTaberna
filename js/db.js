@@ -1,22 +1,38 @@
 /* ================================================================
-   LaTaberna - PubPOS — MÓDULO JS
+   LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db.js
-   Versión: 1.0.2
+   Versión: 1.0.10
    Propósito: Orquestador de base de datos (Appwrite + localStorage).
               Sincronización y reseteo de mesas por configuración de zonas.
+              Incluye imports de Logger, EventBus, Store y Auth.
+              Fallback local robusto si Appwrite no responde.
+              mesaVacia disponible como parte del combined.
+              Timestamp unificado a actualizadoEn en PEDIDO_CERRADO.
    ================================================================ */
-var DB = (function() {
+
+import { Logger } from './lib/logger.js';
+import { EventBus } from './lib/eventBus.js';
+import { Store } from './lib/store.js';
+import { DBCore, mesaVacia } from './db-core.js';
+import { DBInventario } from './db-inventario.js';
+import { DBFusion } from './db-fusion.js';
+import { DBAppwrite } from './db-appwrite.js';
+import { DBShim } from './db-shim.js';
+import { inicializarAuth } from './auth.js';
+
+export const DB = (function() {
   const core = DBCore;
   const inventario = DBInventario;
   const fusion = DBFusion;
-  var appwrite = window.DBAppwrite;
-  var shim = window.DBShim;
+  var appwrite = DBAppwrite;
+  var shim = DBShim;
 
   const combined = {
     ...core,
     ...inventario,
     ...fusion,
-    ...shim
+    ...shim,
+    mesaVacia
   };
 
   combined.init = async function() {
@@ -34,6 +50,7 @@ var DB = (function() {
         return false;
       }
 
+      await inicializarAuth();
       await this._cargarConfiguracion();
       this._cargarMozosLocal();
 
@@ -123,12 +140,6 @@ var DB = (function() {
     }
   };
 
-  /**
-   * Sincroniza la grilla de mesas con la configuración de zonas.
-   * - Crea las mesas que falten para alcanzar el total deseado.
-   * - Elimina mesas libres sobrantes si hay más de las necesarias.
-   * - Respeta las mesas ocupadas, incluso si exceden el total.
-   */
   combined.sincronizarMesasConConfig = async function() {
     if (!appwrite || !appwrite.habilitado) return;
 
@@ -216,28 +227,19 @@ var DB = (function() {
     Logger.info('[DB] Sincronización de mesas completada. Total: ' + this.mesas.length);
   };
 
-  /**
-   * Resetea completamente la grilla de mesas:
-   * elimina todas las mesas libres de Appwrite y las recrea desde cero
-   * según la configuración de zonas, comenzando desde el número 1.
-   * Las mesas ocupadas se conservan y se reubican al final de la numeración.
-   */
   combined.resetearMesas = async function() {
     if (!appwrite || !appwrite.habilitado) return;
 
     var zonas = this.config.zonas || [{ nombre: 'salon', cantidad: 12 }];
 
-    // Separar mesas virtuales
     var virtuales = this.mesas.filter(function(m) { return m.esVirtual; });
     var reales = this.mesas.filter(function(m) { return !m.esVirtual; });
 
-    // Separar ocupadas y libres
     var ocupadas = reales.filter(function(m) { return m.estado !== 'libre'; });
     var libres = reales.filter(function(m) { return m.estado === 'libre'; });
 
     Logger.info('[DB] Reseteando mesas. Ocupadas: ' + ocupadas.length + ', Libres: ' + libres.length);
 
-    // 1. Eliminar TODAS las mesas libres de Appwrite
     for (var i = 0; i < libres.length; i++) {
       var mesa = libres[i];
       try {
@@ -248,7 +250,6 @@ var DB = (function() {
       }
     }
 
-    // 2. Crear la grilla nueva desde 1 según las zonas
     var totalDeseado = 0;
     for (var i = 0; i < zonas.length; i++) {
       totalDeseado += zonas[i].cantidad;
@@ -265,7 +266,6 @@ var DB = (function() {
       }
     }
 
-    // 3. Reubicar mesas ocupadas al final
     var siguienteNumero = totalDeseado + 1;
     for (var i = 0; i < ocupadas.length; i++) {
       var ocupada = ocupadas[i];
@@ -274,7 +274,6 @@ var DB = (function() {
       nuevasMesas.push(ocupada);
     }
 
-    // 4. Crear las mesas nuevas en Appwrite
     for (var i = 0; i < nuevasMesas.length; i++) {
       var mesa = nuevasMesas[i];
       try {
@@ -298,7 +297,6 @@ var DB = (function() {
       }
     }
 
-    // 5. Actualizar array local
     this.mesas = nuevasMesas.concat(virtuales);
     this.mesas.sort(function(a, b) { return a.numero - b.numero; });
 
@@ -321,10 +319,26 @@ var DB = (function() {
           return;
         }
       } catch (e) {
-        Logger.warn('[DB] No se pudo cargar configuración desde Appwrite, usando local.');
+        Logger.warn('[DB] No se pudo cargar configuración desde Appwrite, usando local. Error:', e.message);
       }
     }
-    this._cargarConfigLocal();
+
+    if (typeof DBCore._cargarConfigLocal === 'function') {
+      DBCore._cargarConfigLocal.call(this);
+    } else {
+      Logger.error('[DB] Método _cargarConfigLocal no disponible. Usando configuración por defecto.');
+      this.config = {
+        nombreLocal: 'La Taberna',
+        direccion: 'Av. Corrientes 1234',
+        cuit: '30-12345678-9',
+        pieTicket: '¡Gracias por visitarnos!',
+        zonas: [
+          { nombre: 'salon',   cantidad: 12 },
+          { nombre: 'terraza', cantidad: 0 }
+        ]
+      };
+    }
+
     if (!this.config.zonas) {
       this.config.zonas = [{ nombre: 'salon', cantidad: 12 }];
     }
@@ -358,13 +372,8 @@ var DB = (function() {
     pedido.estado = 'cerrada';
     pedido.total = total;
     pedido.actualizadoEn = new Date().toISOString();
-    if (typeof Store !== 'undefined') {
-      Store.dispatch({ type: 'PEDIDO_CERRADO', payload: { id, total, updated_at: pedido.actualizadoEn } });
-    }
     return pedido;
   };
 
   return combined;
 })();
-
-window.DB = DB;

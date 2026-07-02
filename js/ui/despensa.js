@@ -1,20 +1,25 @@
 /* ================================================================
-   LaTaberna - PubPOS — UI JS
+   LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/despensa.js
-   Versión: 1.0.0
+   Versión: 1.0.2
    Propósito: Vista de inventario: ingredientes, movimientos, filtros, exportación.
-   Dependencias: js/lib/store.js, js/lib/eventBus.js, js/auth.js,
-                 js/utils.js, js/db.js, js/servicios/inventario-service.js
+              Sin onclick. Usa addEventListener y delegación de eventos.
    ================================================================ */
+
+import { Store } from '../lib/store.js';
+import { EventBus } from '../lib/eventBus.js';
+import { Auth } from '../auth.js';
+import { fmtMoney, showToast } from '../utils.js';
+import { DB } from '../db.js';
+import { InventarioService } from '../servicios/inventario-service.js';
 
 const Despensa = (() => {
 
-  let _ordenColumnas = [];       // array de {columna, direccion}
+  let _ordenColumnas = [];
   let _categoriaFiltro = 'todas';
-  let _paginaMovimientos = 0;    // control de paginación
+  let _paginaMovimientos = 0;
   const _MOVS_POR_PAGINA = 10;
 
-  /* ── CREACIÓN DINÁMICA DE LA VISTA ───────────────────────── */
   function _asegurarVista() {
     if (document.getElementById('view-despensa')) return;
 
@@ -26,30 +31,28 @@ const Despensa = (() => {
         <h2><i class="fas fa-boxes"></i> Despensa — Inventario</h2>
         <div class="toolbar-actions">
           <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-            <select id="despensaCatFilter" onchange="Despensa.filtrarPorCategoria(this.value)">
+            <select id="despensaCatFilter">
               <option value="todas">Todas las categorías</option>
               <option value="cocina">Cocina</option>
               <option value="barra">Barra</option>
               <option value="general">General</option>
             </select>
-            <input type="text" id="ingredienteSearch" placeholder="Buscar ingrediente..." 
-                   oninput="Despensa._buscar()">
+            <input type="text" id="ingredienteSearch" placeholder="Buscar ingrediente...">
             <label style="display:flex; align-items:center; gap:4px; font-size:12px; color:var(--color-text-muted);">
-              <input type="checkbox" id="filtroBajoMinimo" onchange="Despensa._aplicarFiltros()"> Bajo mínimo
+              <input type="checkbox" id="filtroBajoMinimo"> Bajo mínimo
             </label>
             <label style="display:flex; align-items:center; gap:4px; font-size:12px; color:var(--color-text-muted);">
-              <input type="checkbox" id="filtroConValor" onchange="Despensa._aplicarFiltros()"> Con valor > 0
+              <input type="checkbox" id="filtroConValor"> Con valor > 0
             </label>
-            <input type="text" id="filtroUbicacion" placeholder="Filtrar ubicación..." 
-                   oninput="Despensa._aplicarFiltros()" style="width:140px;">
+            <input type="text" id="filtroUbicacion" placeholder="Filtrar ubicación..." style="width:140px;">
           </div>
-          <button class="btn-primary" onclick="Despensa.mostrarModalIngrediente()">
+          <button class="btn-primary" id="btnNuevoIngrediente">
             <i class="fas fa-plus"></i> Nuevo Ingrediente
           </button>
-          <button class="btn-secondary" onclick="Despensa.exportarIngredientes()">
+          <button class="btn-secondary" id="btnExportarCSV">
             <i class="fas fa-download"></i> Exportar CSV
           </button>
-          <button class="btn-secondary" onclick="Despensa.exportarPDF()">
+          <button class="btn-secondary" id="btnExportarPDF">
             <i class="fas fa-print"></i> Exportar PDF
           </button>
         </div>
@@ -59,14 +62,14 @@ const Despensa = (() => {
         <div class="despensa-main">
           <table class="ingredientes-table" id="ingredientesTable">
             <thead>
-              <tr>
-                <th onclick="Despensa.ordenarTabla('nombre', event)">Ingrediente <i class="fas fa-sort"></i></th>
-                <th onclick="Despensa.ordenarTabla('categoria', event)">Cat. <i class="fas fa-sort"></i></th>
-                <th onclick="Despensa.ordenarTabla('stock', event)">Stock <i class="fas fa-sort"></i></th>
-                <th onclick="Despensa.ordenarTabla('unidad', event)">Uni. <i class="fas fa-sort"></i></th>
-                <th onclick="Despensa.ordenarTabla('stock_minimo', event)">Mín. <i class="fas fa-sort"></i></th>
-                <th onclick="Despensa.ordenarTabla('ubicacion', event)">Ubicación <i class="fas fa-sort"></i></th>
-                <th onclick="Despensa.ordenarTabla('valor_unitario', event)">Valor Un. <i class="fas fa-sort"></i></th>
+              <tr id="ingredientesTableHead">
+                <th data-columna="nombre">Ingrediente <i class="fas fa-sort"></i></th>
+                <th data-columna="categoria">Cat. <i class="fas fa-sort"></i></th>
+                <th data-columna="stock">Stock <i class="fas fa-sort"></i></th>
+                <th data-columna="unidad">Uni. <i class="fas fa-sort"></i></th>
+                <th data-columna="stock_minimo">Mín. <i class="fas fa-sort"></i></th>
+                <th data-columna="ubicacion">Ubicación <i class="fas fa-sort"></i></th>
+                <th data-columna="valor_unitario">Valor Un. <i class="fas fa-sort"></i></th>
                 <th>Valor Total</th>
                 <th>Acciones</th>
               </tr>
@@ -80,7 +83,7 @@ const Despensa = (() => {
           <div id="movimientosPaginador" style="margin-top:8px;"></div>
           <h4><i class="fas fa-exclamation-triangle" style="color:var(--color-warning);"></i> Alertas Stock Bajo</h4>
           <div id="alertasStockList"></div>
-          <button class="btn-secondary" onclick="Despensa.ajusteRapido()" style="width:100%;">
+          <button class="btn-secondary" id="btnAjusteRapidoSidebar" style="width:100%;">
             <i class="fas fa-pen"></i> Ajuste Rápido
           </button>
         </div>
@@ -88,9 +91,59 @@ const Despensa = (() => {
     `;
     const referencia = document.getElementById('toastContainer') || document.body.lastChild;
     document.body.insertBefore(main, referencia);
+
+    _vincularEventos();
   }
 
-  /** Renderiza toda la vista de inventario */
+  function _vincularEventos() {
+    // Toolbar
+    document.getElementById('despensaCatFilter').addEventListener('change', function() {
+      _categoriaFiltro = this.value;
+      _aplicarFiltros();
+    });
+    document.getElementById('ingredienteSearch').addEventListener('input', function() {
+      _ordenColumnas = [];
+      _aplicarFiltros();
+    });
+    document.getElementById('filtroBajoMinimo').addEventListener('change', _aplicarFiltros);
+    document.getElementById('filtroConValor').addEventListener('change', _aplicarFiltros);
+    document.getElementById('filtroUbicacion').addEventListener('input', _aplicarFiltros);
+    document.getElementById('btnNuevoIngrediente').addEventListener('click', () => mostrarModalIngrediente());
+    document.getElementById('btnExportarCSV').addEventListener('click', exportarIngredientes);
+    document.getElementById('btnExportarPDF').addEventListener('click', exportarPDF);
+
+    // Encabezados de tabla (delegación)
+    document.getElementById('ingredientesTableHead').addEventListener('click', function(e) {
+      const th = e.target.closest('th[data-columna]');
+      if (th) {
+        ordenarTabla(th.dataset.columna, e);
+      }
+    });
+
+    // Filas de ingredientes (delegación)
+    document.getElementById('ingredientesBody').addEventListener('click', function(e) {
+      const editBtn = e.target.closest('.btn-ajuste[data-accion="editar"]');
+      const ajusteBtn = e.target.closest('.btn-ajuste[data-accion="ajuste"]');
+      if (editBtn) {
+        editarIngrediente(editBtn.dataset.id);
+      }
+      if (ajusteBtn) {
+        ajusteRapido(ajusteBtn.dataset.id);
+      }
+    });
+
+    // Paginador de movimientos
+    document.getElementById('movimientosPaginador').addEventListener('click', function(e) {
+      const btn = e.target.closest('#btnVerMasMovimientos');
+      if (btn) {
+        _mostrarMasMovimientos();
+      }
+    });
+
+    // Botón Ajuste Rápido de la barra lateral
+    document.getElementById('btnAjusteRapidoSidebar').addEventListener('click', () => ajusteRapido());
+  }
+
   function render() {
     _asegurarVista();
     _renderResumen();
@@ -117,7 +170,6 @@ const Despensa = (() => {
     `;
   }
 
-  /** @param {string} cat */
   function filtrarPorCategoria(cat) {
     _categoriaFiltro = cat;
     _aplicarFiltros();
@@ -159,7 +211,6 @@ const Despensa = (() => {
       );
     }
 
-    // Filtros avanzados (checkboxes + ubicación)
     const filtroBajo = document.getElementById('filtroBajoMinimo')?.checked;
     const filtroValor = document.getElementById('filtroConValor')?.checked;
     const filtroUbicacion = (document.getElementById('filtroUbicacion')?.value || '').trim().toLowerCase();
@@ -174,7 +225,6 @@ const Despensa = (() => {
       ingredientes = ingredientes.filter(i => (i.ubicacion || '').toLowerCase().includes(filtroUbicacion));
     }
 
-    // Ordenamiento múltiple
     if (_ordenColumnas.length > 0) {
       ingredientes.sort((a, b) => {
         for (const ord of _ordenColumnas) {
@@ -188,7 +238,6 @@ const Despensa = (() => {
         return 0;
       });
     } else {
-      // Orden por defecto: críticos primero
       ingredientes.sort((a, b) => {
         const critA = a.stock <= a.stock_minimo ? 1 : 0;
         const critB = b.stock <= b.stock_minimo ? 1 : 0;
@@ -227,20 +276,17 @@ const Despensa = (() => {
           <td>${valorUnitario ? fmtMoney(valorUnitario) : '—'}</td>
           <td><strong>${valorTotal ? fmtMoney(valorTotal) : '—'}</strong></td>
           <td>
-            <button class="btn-ajuste" onclick="Despensa.editarIngrediente('${ing.id}')"><i class="fas fa-edit"></i></button>
-            <button class="btn-ajuste" onclick="Despensa.ajusteRapido('${ing.id}')"><i class="fas fa-pen"></i></button>
+            <button class="btn-ajuste" data-accion="editar" data-id="${ing.id}"><i class="fas fa-edit"></i></button>
+            <button class="btn-ajuste" data-accion="ajuste" data-id="${ing.id}"><i class="fas fa-pen"></i></button>
           </td>
         </tr>`;
     }).join('');
   }
 
-  /** Ordena la tabla por la columna indicada, con soporte Shift+clic */
   function ordenarTabla(columna, event) {
     if (event && event.shiftKey) {
-      // Agregar/quitar orden secundario
       const existente = _ordenColumnas.findIndex(o => o.columna === columna);
       if (existente >= 0) {
-        // Invertir dirección o eliminar
         if (_ordenColumnas[existente].direccion === 1) {
           _ordenColumnas[existente].direccion = -1;
         } else {
@@ -250,7 +296,6 @@ const Despensa = (() => {
         _ordenColumnas.push({ columna, direccion: 1 });
       }
     } else {
-      // Orden simple o reemplazar
       if (_ordenColumnas.length === 1 && _ordenColumnas[0].columna === columna) {
         _ordenColumnas[0].direccion *= -1;
       } else {
@@ -268,7 +313,6 @@ const Despensa = (() => {
     const movs = Store.getState().movimientos || DB.movimientos || [];
     const recientes = [...movs].reverse();
     
-    // Paginación
     const totalMovs = recientes.length;
     const inicio = 0;
     const fin = (_paginaMovimientos + 1) * _MOVS_POR_PAGINA;
@@ -295,9 +339,8 @@ const Despensa = (() => {
         </div>`;
     }).join('');
 
-    // Paginador
     if (paginador && totalMovs > fin) {
-      paginador.innerHTML = `<button class="btn-ajuste" onclick="Despensa._mostrarMasMovimientos()" style="width:100%;">Ver más (${totalMovs - fin} restantes)</button>`;
+      paginador.innerHTML = `<button class="btn-ajuste" id="btnVerMasMovimientos" style="width:100%;">Ver más (${totalMovs - fin} restantes)</button>`;
     } else if (paginador) {
       paginador.innerHTML = '';
     }
@@ -325,7 +368,6 @@ const Despensa = (() => {
       </div>`).join('');
   }
 
-  /* ── MODAL INGREDIENTE ──────────────────────────────────── */
   function mostrarModalIngrediente(ingrediente = null) {
     const esEdicion = !!ingrediente;
     const titulo = esEdicion ? 'Editar Ingrediente' : 'Nuevo Ingrediente';
@@ -337,7 +379,7 @@ const Despensa = (() => {
       modal.style.display = 'none';
       modal.innerHTML = `
         <div class="modal-small">
-          <div class="modal-header"><h3 id="ingTitulo">${titulo}</h3><button class="modal-close" onclick="Despensa.cerrarModalIngrediente()"><i class="fas fa-times"></i></button></div>
+          <div class="modal-header"><h3 id="ingTitulo">${titulo}</h3><button class="modal-close" id="btnCerrarModalIng"><i class="fas fa-times"></i></button></div>
           <div class="modal-small-body">
             <input type="hidden" id="ingId">
             <label>Nombre</label><input type="text" id="ingNombre" placeholder="Ej: Harina 000">
@@ -347,10 +389,14 @@ const Despensa = (() => {
             <label>Stock mínimo</label><input type="number" id="ingStockMin" step="0.01" value="5">
             <label>Ubicación</label><input type="text" id="ingUbicacion" placeholder="Ej: Estante 3">
             <label>Valor unitario ($)</label><input type="number" id="ingValorUnitario" step="0.01" value="0" placeholder="0.00">
-            <div class="modal-small-footer"><button class="btn-secondary" onclick="Despensa.cerrarModalIngrediente()">Cancelar</button><button class="btn-primary" onclick="Despensa.guardarIngrediente()">Guardar</button></div>
+            <div class="modal-small-footer"><button class="btn-secondary" id="btnCancelarModalIng">Cancelar</button><button class="btn-primary" id="btnGuardarModalIng">Guardar</button></div>
           </div>
         </div>`;
       document.body.appendChild(modal);
+
+      document.getElementById('btnCerrarModalIng').addEventListener('click', cerrarModalIngrediente);
+      document.getElementById('btnCancelarModalIng').addEventListener('click', cerrarModalIngrediente);
+      document.getElementById('btnGuardarModalIng').addEventListener('click', guardarIngrediente);
     }
     document.getElementById('ingId').value = ingrediente?.id || '';
     document.getElementById('ingNombre').value = ingrediente?.nombre || '';
@@ -365,10 +411,10 @@ const Despensa = (() => {
   }
 
   function cerrarModalIngrediente() {
-    document.getElementById('modalIngrediente').style.display = 'none';
+    const modal = document.getElementById('modalIngrediente');
+    if (modal) modal.style.display = 'none';
   }
 
-  /** Guarda el ingrediente (usa InventarioService si está disponible) */
   async function guardarIngrediente() {
     const id = document.getElementById('ingId').value;
     const nombre = document.getElementById('ingNombre').value.trim();
@@ -410,7 +456,6 @@ const Despensa = (() => {
     if (ing) mostrarModalIngrediente(ing);
   }
 
-  /** Realiza un ajuste rápido de stock */
   async function ajusteRapido(ingredienteId = null) {
     if (!ingredienteId) {
       const nombre = prompt('Ingrediente a ajustar (nombre exacto):');
@@ -442,7 +487,6 @@ const Despensa = (() => {
     showToast('success', `Stock de ${ing.nombre} actualizado`);
   }
 
-  /** Exporta los ingredientes a CSV */
   function exportarIngredientes() {
     const ing = DB.ingredientes || [];
     let csv = 'Nombre,Categoría,Stock,Unidad,Stock Mínimo,Ubicación,Valor Unitario,Valor Total\n';
@@ -458,11 +502,9 @@ const Despensa = (() => {
     URL.revokeObjectURL(url);
   }
 
-  /** Exporta los ingredientes a PDF usando window.print() */
   function exportarPDF() {
     const ingredientes = Store.getState().ingredientes || DB.ingredientes || [];
     
-    // Construir HTML para impresión
     const html = `
       <html>
       <head><title>Inventario</title>
@@ -515,7 +557,7 @@ const Despensa = (() => {
     });
     EventBus.on('vista:cambiada', (vista) => {
       if (vista === 'despensa') {
-        _paginaMovimientos = 0; // resetear paginación al entrar
+        _paginaMovimientos = 0;
         render();
       }
     });
@@ -540,4 +582,4 @@ const Despensa = (() => {
   };
 })();
 
-window.Despensa = Despensa;
+export { Despensa };

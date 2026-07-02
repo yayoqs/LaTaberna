@@ -1,11 +1,16 @@
 /* ================================================================
-   LaTaberna - PubPOS — MÓDULO JS
+   LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-inventario.js
-   Versión: 1.0.0
+   Versión: 1.0.4
    Propósito: Gestión de ingredientes, recetas, stock y movimientos.
+              Incluye imports de Logger y EventBus.
    ================================================================ */
 
-const DBInventario = (function() {
+import { Logger } from './lib/logger.js';
+import { EventBus } from './lib/eventBus.js';
+import { DBAppwrite } from './db-appwrite.js';
+
+export const DBInventario = (function() {
   const module = {};
 
   module.ingredientes = [];
@@ -105,11 +110,6 @@ const DBInventario = (function() {
     localStorage.setItem('pubpos_movimientos', JSON.stringify(this.movimientos));
   };
 
-  /**
-   * Retorna los ingredientes necesarios para un producto.
-   * @param {string} productoId
-   * @returns {Array}
-   */
   module.getIngredientesDeProducto = function(productoId) {
     const receta = this.recetas.find(r => r.productoId === productoId);
     if (!receta) return [];
@@ -122,13 +122,6 @@ const DBInventario = (function() {
     }).filter(i => i !== undefined);
   };
 
-  /**
-   * Descuenta del stock los ingredientes necesarios para producir un producto.
-   * @param {string} productoId
-   * @param {number} cantidad
-   * @param {string} motivo
-   * @returns {Promise<boolean>}
-   */
   module.consumirIngredientesDeProducto = async function(productoId, cantidad, motivo = 'Consumo') {
     const receta = this.recetas.find(r => r.productoId === productoId);
     if (!receta) return false;
@@ -138,7 +131,26 @@ const DBInventario = (function() {
       if (!ingrediente) continue;
 
       const cantidadADescontar = ingReceta.cantidad * cantidad;
-      ingrediente.stock = Math.max(0, ingrediente.stock - cantidadADescontar);
+
+      if (typeof DBAppwrite !== 'undefined' && DBAppwrite.habilitado) {
+        try {
+          const resultado = await DBAppwrite.decrementarCampo(
+            'ingredientes',
+            ingrediente.id,
+            'stock',
+            cantidadADescontar,
+            0
+          );
+          if (resultado && typeof resultado.stock === 'number') {
+            ingrediente.stock = resultado.stock;
+          }
+        } catch (e) {
+          Logger.error('[DBInventario] Error al decrementar stock en Appwrite:', e);
+          ingrediente.stock = Math.max(0, ingrediente.stock - cantidadADescontar);
+        }
+      } else {
+        ingrediente.stock = Math.max(0, ingrediente.stock - cantidadADescontar);
+      }
 
       this.movimientos.push(this._normalizarMovimiento({
         id: `mov_${Date.now()}_${Math.random().toString(36).substr(2,4)}`,
@@ -165,13 +177,6 @@ const DBInventario = (function() {
     return true;
   };
 
-  /**
-   * Ajusta manualmente el stock de un ingrediente.
-   * @param {string} ingredienteId
-   * @param {number} cantidadDelta
-   * @param {string} motivo
-   * @returns {boolean}
-   */
   module.ajustarStock = function(ingredienteId, cantidadDelta, motivo = 'Ajuste manual') {
     const ingrediente = this.ingredientes.find(i => i.id === ingredienteId);
     if (!ingrediente) return false;
@@ -202,11 +207,6 @@ const DBInventario = (function() {
     return true;
   };
 
-  /**
-   * Verifica si hay stock suficiente para preparar un conjunto de ítems.
-   * @param {Array} items - [{ prodId, nombre, qty }]
-   * @returns {{ ok: boolean, faltantes: Array }}
-   */
   module.validarStockParaItems = function(items) {
     const faltantes = [];
     const totalNecesario = new Map();

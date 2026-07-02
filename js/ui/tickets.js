@@ -1,10 +1,16 @@
 /* ================================================================
-   LaTaberna - PubPOS — UI JS
+   LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/tickets.js
-   Versión: 1.0.0
+   Versión: 1.0.1
    Propósito: Generación y visualización de tickets de comanda, cuenta y cierre.
-   Dependencias: js/utils.js (fmtMoney, fmtHoraCorta, fmtFechaCorta, calcularTotal), js/db.js (DB.config)
+              Sin asignaciones window.
+   Dependencias: js/utils.js, js/db.js, js/lib/logger.js
    ================================================================ */
+
+import { fmtMoney, fmtMoneyTicket, fmtHoraCorta, fmtFechaCorta, calcularTotal, showToast } from '../utils.js';
+import { DB } from '../db.js';
+import { Logger } from '../lib/logger.js';
+
 const Tickets = (() => {
 
   const Renderer = {
@@ -224,13 +230,11 @@ const Tickets = (() => {
       if (typeof opciones.editarCallback === 'function') {
         html += `<button class="btn-secondary" id="${prefix}-editar"><i class="fas fa-pen"></i> ${opciones.textoEditar || 'Editar'}</button>`;
       }
-      // Botón extra (ej. "Pagado")
       if (typeof opciones.onExtra === 'function') {
         html += `<button class="btn-primary" id="${prefix}-extra" style="background:var(--color-success); border:none; color:#000;">
                   <i class="fas fa-check-circle"></i> ${opciones.textoExtra || 'Acción'}
                 </button>`;
       }
-      // Botón imprimir
       const textoImprimir = opciones.textoImprimir || 'Imprimir';
       const claseImprimir = opciones.claseImprimir || 'btn-print';
       html += `<button class="${claseImprimir}" id="${prefix}-imprimir"><i class="fas fa-print"></i> ${textoImprimir}</button>`;
@@ -328,4 +332,4 @@ const Tickets = (() => {
   };
 })();
 
-window.Tickets = Tickets;
+export { Tickets };

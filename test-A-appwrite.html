@@ -22,19 +22,18 @@
   <div id="results"></div>
   <button onclick="location.reload()">🔄 Ejecutar de nuevo</button>
 
+  <!-- Scripts globales (deben cargarse antes que los módulos) -->
   <script src="/js/utils.js"></script>
-  <script src="/js/lib/logger.js"></script>
-  <script src="/js/lib/eventBus.js"></script>
-  <script src="/js/lib/store.js"></script>
   <script src="/js/appwrite.min.js"></script>
-  <script src="/js/db-appwrite.js"></script>
-  <script src="/js/db-core.js"></script>
-  <script src="/js/db-inventario.js"></script>
-  <script src="/js/db-fusion.js"></script>
-  <script src="/js/db-shim.js"></script>
-  <script src="/js/db.js"></script>
 
-  <script>
+  <!-- Módulo de prueba -->
+  <script type="module">
+    import { Logger } from './js/lib/logger.js';
+    import { EventBus } from './js/lib/eventBus.js';
+    import { Store } from './js/lib/store.js';
+    import { DBAppwrite } from './js/db-appwrite.js';
+    import { DB } from './js/db.js';
+
     (function() {
       var resultsEl = document.getElementById('results');
       var passed = 0, failed = 0;
@@ -53,7 +52,6 @@
         resultsEl.innerHTML = '';
         Logger.setLevel('ERROR');
 
-        // ── Suite 1: Iniciar DBAppwrite ──────────────────
         resultsEl.innerHTML += '<h2>1. Iniciar DBAppwrite (TablesDB)</h2>';
         var appwriteOk = await DBAppwrite.iniciar();
         assert(appwriteOk === true, 'DBAppwrite.iniciar() exitoso');
@@ -63,7 +61,6 @@
           return;
         }
 
-        // ── Suite 2: Listar colecciones EN PARALELO ───────
         resultsEl.innerHTML += '<h2>2. Listar colecciones (paralelo)</h2>';
         var colecciones = ['productos','pedidos','mesas','comandas','ingredientes','recetas','pedidos_delivery','usuarios','configuracion','precargas_cliente','eventos_en_vivo'];
 
@@ -86,7 +83,6 @@
           }
         }
 
-        // ── Suite 3: CRUD básico ─────────────────────────
         resultsEl.innerHTML += '<h2>3. CRUD básico en pedidos</h2>';
         try {
           var doc = {
@@ -103,7 +99,6 @@
           assert(false, 'Error CRUD: ' + e.message);
         }
 
-        // ── Suite 4: Integración con Store ───────────────
         resultsEl.innerHTML += '<h2>4. Integración Appwrite → Store</h2>';
         window.Auth = window.Auth || { getEspacioActivo: function() { return { id: 'esp_taberna' }; } };
         window.PedidoManager = window.PedidoManager || { getTurnoActual: function() { return { id: 'test', estado: 'abierto' }; }, registrar: function() {} };
@@ -136,7 +131,6 @@
           resultsEl.innerHTML += '<div class="info">⚠️ Todas las colecciones están vacías. ¿Ejecutaste la migración inicial?</div>';
         }
 
-        // ── Resumen ──────────────────────────────────────
         resultsEl.innerHTML += '<h2>Resultado</h2>';
         resultsEl.innerHTML += '<p>' + passed + ' pasaron, ' + failed + ' fallaron.</p>';
         if (failed === 0) {

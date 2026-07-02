@@ -1,14 +1,16 @@
 /* ================================================================
-   LaTaberna - PubPOS — MÓDULO JS
+   LaTaberna - PubPOS — MÓDULO INTERNO (ES6)
    Archivo: js/modulos/interno/guia-mesero.js
-   Versión: 1.0.2
-   Propósito: Guía interactiva para el mesero nuevo. Se activa al
-              entrar al mapa de mesas. Modo prueba: siempre visible.
-   Dependencias: window.EventBus, window.Logger
+   Versión: 2.0.1
+   Propósito: Guía interactiva para el mesero nuevo.
+              Sin asignaciones window.
+   Dependencias: js/lib/eventBus.js, js/lib/logger.js
    ================================================================ */
 
+import { EventBus } from '../../lib/eventBus.js';
+import { Logger } from '../../lib/logger.js';
+
 const GuiaMesero = (() => {
-  const Logger = window.Logger;
   const PASOS = [
     {
       titulo: 'Bienvenido al mapa de mesas',
@@ -33,7 +35,6 @@ const GuiaMesero = (() => {
 
   function _iniciar() {
     if (_activa) return;
-
     _activa = true;
     _pasoActual = 0;
     _crearContenedor();
@@ -128,16 +129,15 @@ const GuiaMesero = (() => {
     Logger.info('[GuiaMesero] Guía completada.');
   }
 
-  // Solo se activa al entrar a la vista de mesas
   EventBus.on('vista:cambiada', (vista) => {
     if (vista === 'mesas') {
       setTimeout(_iniciar, 300);
     }
   });
 
-  Logger.info('[GuiaMesero] Módulo inicializado (modo prueba: siempre visible).');
+  Logger.info('[GuiaMesero] Módulo inicializado (ES6 v2.0.1).');
 
   return {};
 })();
 
-window.GuiaMesero = GuiaMesero;
+export { GuiaMesero };

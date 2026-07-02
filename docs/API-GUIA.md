@@ -1,14 +1,24 @@
-# 🧩 API de Integración – La Taberna (v2.2)
+┌────────────────────────────────────────────────────────┐
+│ REMITENTE: Coordinador de Integración                  │
+│ FECHA:     2026-07-02 00:05 UTC                        │
+│ TIPO:      DOCUMENTO OFICIAL                           │
+│ REFERENCIA: API de Integración v3.0                    │
+└────────────────────────────────────────────────────────┘
+
+# 🧩 API de Integración – La Taberna (v3.0)
+
+**Última actualización:** 2026-07-02
 
 ---
 
 ## 1. Principios Fundamentales
 
 1. Ningún módulo accede directamente a la base de datos sin pasar por DBAppwrite.
-2. Comunicación entre módulos solo por EventBus, nunca por llamadas directas a funciones de otro módulo.
-3. Estado centralizado en Store, de solo lectura para las vistas.
+2. Comunicación entre módulos solo por EventBus o CommandBus, nunca por llamadas directas a funciones de otro módulo.
+3. Estado centralizado en Store, de solo lectura para las vistas. Las escrituras se hacen despachando acciones.
 4. Toda escritura en Appwrite usa DBAppwrite, nunca fetch directo.
 5. El Realtime es automático para todas las colecciones definidas en DBAppwrite.COLECCIONES. No necesitas crear canales manualmente.
+6. Las operaciones que modifican datos y tienen lógica de negocio deben usar CommandBus, no llamadas directas a DBAppwrite desde las vistas.
 
 ---
 
@@ -66,6 +76,8 @@ Importante: Si tu módulo necesita una colección nueva, debes solicitar a la C�
 
 Convención de nombres: coleccion:accion (ej: mesa:actualizada, comanda:enviada). Las colecciones nuevas heredan automáticamente el evento coleccion:actualizada vía Realtime.
 
+Consulta el catálogo completo en `docs/EVENTOS.md`.
+
 ---
 
 ### 2.4 Leer el estado actual (Store)
@@ -74,7 +86,7 @@ Convención de nombres: coleccion:accion (ej: mesa:actualizada, comanda:enviada)
     const recetas = state.recetas;      // array actualizado en tiempo real
     const productos = state.productos;
     const mesas = state.mesas;
-    // ... etc.
+    const cliente = state.cliente;      // { permitePrepedidos: boolean, mesa: number|null }
 
     // Suscribirse a cambios del Store
     Store.subscribe((state, action) => {
@@ -83,6 +95,8 @@ Convención de nombres: coleccion:accion (ej: mesa:actualizada, comanda:enviada)
       }
     });
 
+El slice `cliente` es mantenido por la Célula C. Cualquier módulo puede leerlo para conocer el estado del cliente activo.
+
 ---
 
 ### 2.5 Emitir eventos personalizados
@@ -90,9 +104,44 @@ Convención de nombres: coleccion:accion (ej: mesa:actualizada, comanda:enviada)
     EventBus.emit('receta:creada', { id: 'rec_123', productoId: 'prod_1' });
     EventBus.emit('receta:eliminada', { id: 'rec_123' });
 
+    // Suscripción con limpieza
+    const unsubscribe = EventBus.on('receta:creada', (data) => {
+      console.log('Nueva receta:', data);
+    });
+    // Para dejar de escuchar: unsubscribe();
+
 ---
 
-### 2.6 Registro de clientes
+### 2.6 Ejecutar comandos (CommandBus)
+
+Para operaciones que modifican datos y tienen lógica de negocio, usa CommandBus en lugar de llamar directamente a DBAppwrite:
+
+    const resultado = await CommandBus.ejecutar({
+      type: 'producto:marcar_agotado',
+      datos: { prodId: 'prod_123' }
+    });
+
+    if (resultado.exito) {
+      console.log('Producto marcado como agotado');
+    } else {
+      console.error('Error:', resultado.error);
+    }
+
+Comandos disponibles:
+
+| Comando | Propósito | Célula dueña |
+|---------|-----------|--------------|
+| `crearPedidoMesa` | Abrir una mesa y crear su pedido | A (Core) |
+| `enviarComanda` | Enviar ítems a cocina/barra | A (Core) |
+| `agregarMesa` | Agregar una nueva mesa al salón | A (Core) |
+| `liberarMesa` | Liberar una mesa después del pago | A (Core) |
+| `completarSubcomanda` | Marcar una subcomanda como completada | A (Core) |
+| `producto:marcar_agotado` | Marcar un producto como no disponible (botón de pánico) | A (Core) |
+| `precarga:revisar` | Marcar una precarga como revisada por el garzón | B1 (Mesero) |
+
+---
+
+### 2.7 Registro de clientes
 
     const resultado = await Auth.registrarCliente('nombreUsuario', 'contraseña');
     // Retorna: { exito: true, nombre: 'nombreUsuario' }
@@ -100,7 +149,7 @@ Convención de nombres: coleccion:accion (ej: mesa:actualizada, comanda:enviada)
 
 ---
 
-### 2.7 Obtener ID de Appwrite del usuario autenticado
+### 2.8 Obtener ID de Appwrite del usuario autenticado
 
     const userId = await Auth.getAppwriteUserId();
     // Devuelve el $id de la sesión anónima de Appwrite, o null si no está disponible.
@@ -130,14 +179,14 @@ Convención de nombres: coleccion:accion (ej: mesa:actualizada, comanda:enviada)
 | descripcion | string | Descripción breve (opcional) |
 | activo | boolean | Si está disponible en la carta |
 | imagen | string | URL de imagen (opcional) |
-| disponible | boolean | Nuevo: control de disponibilidad (botón de pánico). Default: true |
+| disponible | boolean | Control de disponibilidad (botón de pánico). Default: true |
 
 ### 4.2 Mesas
 
 | Atributo | Tipo | Descripción |
 |----------|------|-------------|
 | numero | integer | Número de mesa |
-| estado | string | 'libre', 'ocupada', etc. |
+| estado | string | 'libre', 'ocupada', 'esperando', 'cuenta', 'pagada', 'fusionada' |
 | pedidoId | string | ID del pedido activo |
 | items | string | JSON de items |
 | mozo | string | Nombre del mozo asignado |
@@ -174,11 +223,32 @@ Convención de nombres: coleccion:accion (ej: mesa:actualizada, comanda:enviada)
 | creadoPor | string | Nombre del animador |
 | updatedAt | number | Última modificación (timestamp) |
 
+### 4.5 Pedidos
+
+| Atributo | Tipo | Descripción |
+|----------|------|-------------|
+| id | string | Identificador único |
+| mesa | integer | Número de mesa asociada |
+| mozo | string | Mozo asignado |
+| comensales | integer | Cantidad de comensales |
+| items | string | JSON de ítems del pedido |
+| total | number | Total del pedido |
+| estado | string | 'abierta', 'en_proceso', 'cerrada' |
+| creadoEn | string | ISO 8601 de creación |
+| actualizadoEn | string | ISO 8601 de última actualización |
+| transacciones | string | JSON de transacciones (split bill) |
+| observaciones | string | Notas del pedido |
+| descuento | number | Porcentaje de descuento aplicado |
+
 ---
 
 ## 5. Plantilla de Módulo
 
     // js/modulos/mi-modulo/mi-modulo-service.js
+    import { DBAppwrite } from '../db-appwrite.js';
+    import { Store } from '../lib/store.js';
+    import { EventBus } from '../lib/eventBus.js';
+
     const MiModuloService = (() => {
 
       async function cargarDatos() {
@@ -227,6 +297,8 @@ Convención de nombres: coleccion:accion (ej: mesa:actualizada, comanda:enviada)
       return { cargarDatos, guardar, eliminar };
     })();
 
+    export { MiModuloService };
+
 ---
 
 ## 6. Lo que NO debe hacer un módulo
@@ -238,16 +310,17 @@ Convención de nombres: coleccion:accion (ej: mesa:actualizada, comanda:enviada)
 - Emitir eventos con nombres que no siguen la convención modulo:accion.
 - Modificar db-appwrite.js sin coordinación con la Célula A.
 - Implementar lógica de autenticación propia (usar Auth.registrarCliente).
+- Llamar directamente a métodos de otro módulo sin pasar por EventBus o CommandBus.
 
 ---
 
-## 7. Realtime Dinámico (v2.10+)
+## 7. Realtime Dinámico
 
-A partir de la versión 2.10 de db-appwrite.js, el sistema se suscribe automáticamente a todas las colecciones definidas en DBAppwrite.COLECCIONES. Cuando un documento cambia en cualquiera de ellas, se emite un evento coleccion:actualizada con el documento modificado como payload.
+El sistema se suscribe automáticamente a todas las colecciones definidas en DBAppwrite.COLECCIONES. Cuando un documento cambia en cualquiera de ellas, se emite un evento coleccion:actualizada con el documento modificado como payload.
 
 Para añadir una nueva colección al Realtime:
 
-1. Agrega la entrada en DBAppwrite.COLECCIONES en js/core/db-appwrite.js.
+1. Agrega la entrada en DBAppwrite.COLECCIONES en js/db-appwrite.js.
 2. Asegúrate de que la colección exista en Appwrite con los atributos correctos.
 3. A partir de ese momento, los cambios en esa colección se propagarán automáticamente a todos los dispositivos conectados.
 
@@ -257,4 +330,9 @@ Para añadir una nueva colección al Realtime:
 
 - Célula A (Core): Responsable de la base de datos, sincronización y contratos.
 - Coordinador de Integración: Revisa PRs, mantiene la documentación, veta si algo rompe la arquitectura.
-- Documentación actualizada: docs/API-GUIA.md, docs/EVENTOS.md
+- Documentación actualizada: docs/API-GUIA.md, docs/EVENTOS.md, docs/INTEGRACION.md, docs/PROPIEDAD.md
+
+---
+
+*Documento mantenido por el Coordinador de Integración.*
+*Versión 3.0 — 2026-07-02*

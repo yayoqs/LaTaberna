@@ -1,250 +1,313 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>La Taberna — Eventos en Vivo (Prototipo v2)</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        :root {
-            --color-bg: #0f0f14;
-            --color-accent: #f59e0b;
-            --color-primary: #6366f1;
-            --color-card: #1a1a24;
-            --color-border: #2e2e42;
-            --color-text: #f1f5f9;
-            --color-text-sec: #94a3b8;
-            --color-text-muted: #64748b;
-            --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            --radius: 16px;
-            --radius-sm: 10px;
-            --t: all 0.25s ease;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>La Taberna — Centro de Operaciones (Prototipo Unificado)</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --color-bg: #0f0f14;
+      --color-accent: #f59e0b;
+      --color-primary: #6366f1;
+      --color-card: #1a1a24;
+      --color-panel: #21212e;
+      --color-border: #2e2e42;
+      --color-text: #f1f5f9;
+      --color-text-sec: #94a3b8;
+      --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --radius: 16px;
+      --radius-sm: 10px;
+      --t: all 0.2s ease;
+    }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
-        body {
-            font-family: var(--font-ui);
-            background: var(--color-bg);
-            color: var(--color-text);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-        }
+    body {
+      font-family: var(--font-ui);
+      background: var(--color-bg);
+      color: var(--color-text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background-image:
+        radial-gradient(circle at 50% 0%, rgba(245,158,11,0.08) 0%, transparent 50%),
+        linear-gradient(rgba(255,255,255,0.01) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.01) 1px, transparent 1px);
+      background-size: 100% 100%, 40px 40px, 40px 40px;
+    }
 
-        .vista-eventos {
-            width: 100%;
-            max-width: 480px;
-            min-height: 650px;
-            background: var(--color-bg);
-            border-radius: var(--radius);
-            position: relative;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            box-shadow: 0 0 40px rgba(0,0,0,.5);
-        }
+    .simulador { text-align: center; }
+    .simulador button {
+      background: var(--color-card);
+      border: 1px solid var(--color-border);
+      color: var(--color-text);
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 14px;
+      margin: 4px;
+      transition: var(--t);
+    }
+    .simulador button:hover { border-color: var(--color-accent); color: var(--color-accent); }
+    .info { color: var(--color-text-sec); font-size: 13px; margin-top: 12px; }
 
-        /* Fondo animado */
-        .eventos-fondo {
-            position: absolute;
-            inset: 0;
-            background:
-                radial-gradient(circle at 30% 40%, rgba(99,102,241,.12) 0%, transparent 55%),
-                radial-gradient(circle at 70% 60%, rgba(245,158,11,.1) 0%, transparent 55%),
-                radial-gradient(circle at 50% 80%, rgba(239,68,68,.08) 0%, transparent 55%);
-            animation: eventos-mesh 12s ease-in-out infinite alternate;
-            pointer-events: none;
-            z-index: 0;
-        }
-        @keyframes eventos-mesh {
-            0%   { transform: scale(1); }
-            100% { transform: scale(1.08); }
-        }
+    /* Overlay del modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+    .modal-overlay.visible { opacity: 1; pointer-events: auto; }
 
-        .eventos-contenido {
-            position: relative;
-            z-index: 1;
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            padding: 28px 20px 24px;
-            gap: 20px;
-        }
+    /* Tarjeta centrada */
+    .centro-card {
+      width: 100%;
+      max-width: 460px;
+      min-height: 580px;
+      background: var(--color-bg);
+      border-radius: var(--radius);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 0 40px rgba(0,0,0,.5), 0 0 0 1px var(--color-border);
+      transform: translateY(20px);
+      transition: transform 0.25s ease;
+    }
+    .modal-overlay.visible .centro-card { transform: translateY(0); }
 
-        /* Header */
-        .eventos-header {
-            text-align: center;
-            flex-shrink: 0;
-        }
-        .eventos-header h1 {
-            font-size: 26px;
-            font-weight: 800;
-            background: linear-gradient(to right, var(--color-accent), var(--color-primary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 6px;
-        }
-        .eventos-sub {
-            font-size: 14px;
-            color: var(--color-text-sec);
-            font-style: italic;
-            margin-bottom: 12px;
-        }
+    .centro-fondo {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 30% 30%, rgba(245,158,11,.12) 0%, transparent 55%),
+        radial-gradient(circle at 70% 70%, rgba(99,102,241,.08) 0%, transparent 55%);
+      pointer-events: none;
+      z-index: 0;
+    }
 
-        /* Badge En vivo con pulso mejorado */
-        .eventos-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            background: rgba(239,68,68,0.12);
-            border: 1px solid rgba(239,68,68,0.25);
-            border-radius: 99px;
-            padding: 6px 16px;
-            font-size: 12px;
-            font-weight: 700;
-            color: #ef4444;
-            transition: var(--t);
-        }
-        .eventos-punto {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #ef4444;
-            animation: punto-vivo 1s ease-in-out infinite;
-        }
-        @keyframes punto-vivo {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50%      { opacity: .3; transform: scale(1.3); }
-        }
+    .centro-contenido {
+      position: relative;
+      z-index: 1;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      gap: 14px;
+      overflow-y: auto;
+    }
 
-        /* Tarjeta principal con borde degradado */
-        .eventos-card {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            background: var(--color-card);
-            border-radius: var(--radius);
-            padding: 28px 20px;
-            text-align: center;
-            align-items: center;
-            justify-content: center;
-            gap: 14px;
-            background-image: linear-gradient(rgba(26,26,36,.95), rgba(26,26,36,.95)),
-                              linear-gradient(135deg, var(--color-accent), var(--color-primary));
-            background-origin: border-box;
-            background-clip: padding-box, border-box;
-            border: 2px solid transparent;
-            transition: opacity 0.4s ease;
-        }
-        .eventos-icono { font-size: 56px; }
-        .eventos-card h2 { font-size: 22px; }
-        .eventos-descripcion { font-size: 14px; color: var(--color-text-sec); max-width: 400px; }
+    /* Barra superior del modal */
+    .centro-top {
+      display: flex; justify-content: space-between; align-items: flex-start; flex-shrink: 0;
+    }
+    .centro-mesa-info h2 {
+      font-size: 1.4rem; font-weight: 800;
+      background: linear-gradient(to right, var(--color-accent), var(--color-primary));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .centro-mesa-info .badge-estado {
+      font-size: 0.7rem; font-weight: 700; padding: 3px 10px; border-radius: 99px;
+      text-transform: uppercase; display: inline-block; margin-top: 4px;
+    }
+    .badge-estado.libre { background: rgba(34,197,94,.2); color: #22c55e; }
+    .badge-estado.ocupada { background: rgba(59,130,246,.2); color: #3b82f6; }
+    .badge-estado.esperando { background: rgba(245,158,11,.2); color: #f59e0b; }
+    .btn-cerrar-modal {
+      background: transparent; border: none; color: var(--color-text-sec);
+      font-size: 1.2rem; cursor: pointer; padding: 4px;
+    }
+    .btn-cerrar-modal:hover { color: #fff; }
 
-        /* Ecualizador con colores de paleta */
-        .ecualizador {
-            display: flex;
-            align-items: flex-end;
-            gap: 5px;
-            height: 36px;
-            margin-top: 8px;
-        }
-        .ecualizador span {
-            width: 7px;
-            border-radius: 3px;
-            animation: eco 0.8s ease-in-out infinite alternate;
-        }
-        .ecualizador span:nth-child(odd)  { background: var(--color-accent); }
-        .ecualizador span:nth-child(even) { background: var(--color-primary); }
-        .ecualizador span:nth-child(1) { height: 50%; animation-delay: 0s; }
-        .ecualizador span:nth-child(2) { height: 75%; animation-delay: .1s; }
-        .ecualizador span:nth-child(3) { height: 40%; animation-delay: .2s; }
-        .ecualizador span:nth-child(4) { height: 90%; animation-delay: .3s; }
-        .ecualizador span:nth-child(5) { height: 60%; animation-delay: .4s; }
-        @keyframes eco {
-            0%   { transform: scaleY(0.5); }
-            100% { transform: scaleY(1); }
-        }
+    /* Datos de la mesa */
+    .centro-datos {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex-shrink: 0;
+    }
+    .dato-item {
+      background: var(--color-card); border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm); padding: 10px 12px;
+    }
+    .dato-item .dato-label { font-size: 0.65rem; color: var(--color-text-sec); text-transform: uppercase; letter-spacing: 0.5px; }
+    .dato-item .dato-valor { font-size: 0.9rem; font-weight: 700; margin-top: 2px; }
 
-        /* Estado vacío mejorado */
-        .eventos-vacio {
-            text-align: center;
-        }
-        .eventos-vacio i {
-            font-size: 48px;
-            opacity: 0.2;
-            display: block;
-            margin-bottom: 16px;
-            color: var(--color-text-muted);
-        }
-        .eventos-vacio h2 { margin-bottom: 8px; }
-        .eventos-vacio p  { font-size: 14px; color: var(--color-text-muted); margin-bottom: 20px; }
-        .ecualizador.inactivo span { animation: none; opacity: .25; background: var(--color-text-muted); }
+    /* Sección de atención (cliente esperando / precarga) */
+    .seccion-atencion {
+      background: rgba(99,102,241,.1); border: 1px solid rgba(99,102,241,.25);
+      border-radius: var(--radius-sm); padding: 12px 14px; flex-shrink: 0;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .seccion-atencion.precarga {
+      background: rgba(245,158,11,.1); border-color: rgba(245,158,11,.25);
+    }
+    .seccion-atencion .atencion-avatar {
+      width: 42px; height: 42px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
+      display: flex; align-items: center; justify-content: center;
+      font-weight: bold; font-size: 0.8rem; color: #fff; flex-shrink: 0;
+    }
+    .seccion-atencion.precarga .atencion-avatar {
+      background: linear-gradient(135deg, var(--color-accent), #d97706);
+    }
+    .seccion-atencion .atencion-texto { flex: 1; font-size: 0.8rem; }
+    .seccion-atencion .atencion-texto strong { color: #a5b4fc; }
+    .seccion-atencion.precarga .atencion-texto strong { color: #fbbf24; }
+    .btn-atender {
+      background: var(--color-primary); color: #fff; border: none;
+      padding: 8px 14px; border-radius: 20px; font-weight: 700; font-size: 0.75rem;
+      cursor: pointer; transition: var(--t); flex-shrink: 0;
+    }
+    .btn-atender:hover { background: #818cf8; }
+    .btn-atender.precarga {
+      background: var(--color-accent); color: #000;
+    }
+    .btn-atender.precarga:hover { background: #d97706; }
 
-        /* Votación */
-        .eventos-votacion {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            width: 100%;
-            max-width: 300px;
-        }
-        .votacion-opcion {
-            background: var(--color-panel, #21212e);
-            border: 1px solid var(--color-border);
-            border-radius: var(--radius-sm);
-            color: var(--color-text);
-            padding: 12px 20px;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: var(--t);
-            text-align: center;
-        }
-        .votacion-opcion:hover {
-            border-color: var(--color-accent);
-            background: var(--color-hover, #2a2a3a);
-            color: var(--color-accent);
-        }
-    </style>
+    /* Tarjetas de acción */
+    .acciones-lista {
+      display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;
+    }
+    .action-card {
+      background: var(--color-card); border: 1px solid var(--color-border);
+      border-radius: var(--radius); padding: 14px 16px;
+      display: flex; align-items: center; gap: 12px;
+      cursor: pointer; text-align: left; position: relative;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+    .action-card::after {
+      content: '\f105'; font-family: 'Font Awesome 6 Free'; font-weight: 900;
+      position: absolute; right: 16px; color: var(--color-text-muted, #64748b);
+      font-size: 1rem; transition: transform 0.2s;
+    }
+    .action-card:hover { border-color: var(--color-accent); transform: translateY(-2px); }
+    .action-card:hover::after { transform: translateX(3px); color: #fff; }
+    .action-card.primaria { border-color: rgba(245,158,11,.3); background: rgba(245,158,11,.05); }
+    .action-card.primaria .action-icon { color: var(--color-accent); }
+    .action-card.verde .action-icon { color: #22c55e; }
+    .action-card.roja .action-icon { color: #ef4444; }
+    .action-icon { font-size: 1.4rem; width: 32px; display: flex; justify-content: center; }
+    .action-details h4 { font-size: 0.9rem; font-weight: 700; margin-bottom: 2px; }
+    .action-details p  { font-size: 0.7rem; color: var(--color-text-sec); }
+  </style>
 </head>
 <body>
-    <div class="vista-eventos">
-        <div class="eventos-fondo"></div>
-        <div class="eventos-contenido">
-            <div class="eventos-header">
-                <h1>🎉 Eventos en Vivo</h1>
-                <p class="eventos-sub">Conectate a la energía de La Taberna</p>
-                <div class="eventos-badge">
-                    <span class="eventos-punto"></span> En vivo
-                </div>
-            </div>
+  <div class="simulador">
+    <h2 style="margin-bottom:12px;">🧪 Centro de Operaciones — Prototipo</h2>
+    <button onclick="abrirCentro('libre', 'esperando')">Mesa 5 — Libre (cliente esperando)</button>
+    <button onclick="abrirCentro('libre', 'precarga')">Mesa 5 — Libre (precarga enviada)</button>
+    <button onclick="abrirCentro('ocupada', null)">Mesa 8 — Ocupada</button>
+    <button onclick="abrirCentro('esperando', null)">Mesa 3 — Lista</button>
+    <p class="info">Clic en un botón para simular la apertura del centro de operaciones.</p>
+  </div>
 
-            <!-- Ejemplo: tarjeta de karaoke activo -->
-            <div class="eventos-card">
-                <div class="eventos-icono">🎤</div>
-                <h2>Karaoke en vivo</h2>
-                <p class="eventos-descripcion">Subí al escenario y brillá como una estrella</p>
-                <div class="ecualizador">
-                    <span></span><span></span><span></span><span></span><span></span>
-                </div>
-            </div>
-
-            <!-- Para probar estado vacío, comentar la tarjeta de arriba y descomentar esto:
-            <div class="eventos-card">
-                <div class="eventos-vacio">
-                    <i class="fa-solid fa-calendar-alt"></i>
-                    <h2>No hay eventos activos ahora</h2>
-                    <p>Volvé más tarde o consultá el cronograma en la barra.</p>
-                    <div class="ecualizador inactivo">
-                        <span></span><span></span><span></span><span></span><span></span>
-                    </div>
-                </div>
-            </div>
-            -->
+  <!-- Modal del Centro de Operaciones -->
+  <div class="modal-overlay" id="modalCentro">
+    <div class="centro-card">
+      <div class="centro-fondo"></div>
+      <div class="centro-contenido">
+        <!-- Cabecera -->
+        <div class="centro-top">
+          <div class="centro-mesa-info">
+            <h2 id="centroTitulo">Mesa 5</h2>
+            <span class="badge-estado libre" id="centroBadge">LIBRE</span>
+          </div>
+          <button class="btn-cerrar-modal" onclick="cerrarCentro()">
+            <i class="fas fa-times"></i>
+          </button>
         </div>
+
+        <!-- Datos -->
+        <div class="centro-datos">
+          <div class="dato-item"><div class="dato-label">Mozo</div><div class="dato-valor" id="centroMozo">Sin asignar</div></div>
+          <div class="dato-item"><div class="dato-label">Comensales</div><div class="dato-valor" id="centroComensales">—</div></div>
+          <div class="dato-item"><div class="dato-label">Zona</div><div class="dato-valor">Salón</div></div>
+          <div class="dato-item"><div class="dato-label">Abierta hace</div><div class="dato-valor" id="centroTiempo">—</div></div>
+        </div>
+
+        <!-- Sección de atención (cliente esperando) -->
+        <div class="seccion-atencion" id="seccionEspera" style="display:none;">
+          <div class="atencion-avatar">TQ</div>
+          <div class="atencion-texto">
+            <strong>Trinidad Quilodrán</strong><br>quiere unirse a la <span>Mesa 5</span>
+          </div>
+          <button class="btn-atender" onclick="alert('Vinculación aceptada (simulación)')">
+            Aceptar
+          </button>
+        </div>
+
+        <!-- Sección de atención (precarga) -->
+        <div class="seccion-atencion precarga" id="seccionPrecarga" style="display:none;">
+          <div class="atencion-avatar">JP</div>
+          <div class="atencion-texto">
+            <strong>Juan Pérez</strong><br>quiere añadir un pedido a la <span>Mesa 5</span>
+          </div>
+          <button class="btn-atender precarga" onclick="alert('Precarga cargada (simulación)')">
+            Cargar Pedido
+          </button>
+        </div>
+
+        <!-- Acciones -->
+        <div class="acciones-lista">
+          <div class="action-card primaria" id="cardAbrir" onclick="alert('Abrir mesa (simulación)')">
+            <div class="action-icon"><i class="fas fa-door-open"></i></div>
+            <div class="action-details"><h4>Abrir Mesa</h4><p>Asignar mozo y comensales</p></div>
+          </div>
+          <div class="action-card primaria" id="cardPedido" onclick="alert('Tomar pedido (simulación)')" style="display:none;">
+            <div class="action-icon"><i class="fas fa-utensils"></i></div>
+            <div class="action-details"><h4>Tomar Pedido</h4><p>Agregar ítems a la comanda</p></div>
+          </div>
+          <div class="action-card verde" onclick="alert('Pedir cuenta (simulación)')">
+            <div class="action-icon"><i class="fas fa-file-invoice-dollar"></i></div>
+            <div class="action-details"><h4>Pedir Cuenta</h4><p>Generar pre-cuenta para la mesa</p></div>
+          </div>
+          <div class="action-card roja" onclick="alert('Cerrar mesa (simulación)')">
+            <div class="action-icon"><i class="fas fa-check-circle"></i></div>
+            <div class="action-details"><h4>Cerrar Mesa</h4><p>Procesar pago y liberar</p></div>
+          </div>
+        </div>
+      </div>
     </div>
+  </div>
+
+  <script>
+    function abrirCentro(estado, atencion) {
+      const overlay = document.getElementById('modalCentro');
+      document.getElementById('centroTitulo').textContent = estado === 'libre' ? 'Mesa 5' : (estado === 'ocupada' ? 'Mesa 8' : 'Mesa 3');
+      const badge = document.getElementById('centroBadge');
+      badge.textContent = estado === 'libre' ? 'LIBRE' : (estado === 'ocupada' ? 'OCUPADA' : 'LISTA');
+      badge.className = 'badge-estado ' + (estado === 'libre' ? 'libre' : (estado === 'ocupada' ? 'ocupada' : 'esperando'));
+      document.getElementById('centroMozo').textContent = estado === 'libre' ? 'Sin asignar' : (estado === 'ocupada' ? 'Carlos' : 'Ana');
+      document.getElementById('centroComensales').textContent = estado === 'libre' ? '—' : (estado === 'ocupada' ? '4' : '2');
+      document.getElementById('centroTiempo').textContent = estado === 'libre' ? '—' : (estado === 'ocupada' ? '12 min' : '25 min');
+
+      document.getElementById('cardAbrir').style.display = estado === 'libre' ? 'flex' : 'none';
+      document.getElementById('cardPedido').style.display = estado !== 'libre' ? 'flex' : 'none';
+
+      // Secciones de atención
+      document.getElementById('seccionEspera').style.display = atencion === 'esperando' ? 'flex' : 'none';
+      document.getElementById('seccionPrecarga').style.display = atencion === 'precarga' ? 'flex' : 'none';
+
+      overlay.classList.add('visible');
+    }
+
+    function cerrarCentro() {
+      document.getElementById('modalCentro').classList.remove('visible');
+    }
+
+    document.getElementById('modalCentro').addEventListener('click', function(e) {
+      if (e.target === this) cerrarCentro();
+    });
+  </script>
 </body>
 </html>
