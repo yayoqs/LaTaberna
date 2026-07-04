@@ -92,7 +92,11 @@
     </div>
 
     <div class="header-right">
+      <span id="syncPendingBadge" style="display:none; margin-right:6px;">
+        <i class="fas fa-sync-alt"></i> <span id="syncPendingCount">0</span>
+      </span>
       <span id="syncStatusIndicator" title="Sin sincronizar"><i class="fas fa-sync-alt"></i></span>
+      <span id="espacioSelectorContainer"></span>
       <span id="usuarioActualDisplay"></span>
       <button class="btn-secondary" id="btnLogout" title="Cerrar sesión" style="padding:6px 10px;">
         <i class="fas fa-sign-out-alt"></i>
@@ -100,6 +104,27 @@
     </div>
   </header>
 
+  <!-- Contenedores de vista vacíos (los módulos los llenan al activarse) -->
+  <main id="view-mesas" class="view"></main>
+  <main id="view-cocina" class="view"></main>
+  <main id="view-caja" class="view"></main>
+  <main id="view-config" class="view"></main>
+  <main id="view-despensa" class="view"></main>
+  <main id="view-recetas" class="view"></main>
+  <main id="view-reparto" class="view"></main>
+  <main id="view-menu" class="view"></main>
+  <main id="view-eventos" class="view"></main>
+  <main id="view-eventos-en-vivo" class="view"></main>
+  <main id="view-perfil" class="view"></main>
+  <main id="view-inicio" class="view"></main>
+  <main id="view-bienvenida" class="view"></main>
+  <main id="view-menu-digital" class="view"></main>
+  <main id="view-eventos-cliente" class="view"></main>
+
+  <!-- Popover global (usado por mesas) -->
+  <div id="popoverContainer" style="display:none; position:fixed; z-index:9999;"></div>
+
+  <!-- Toast container global -->
   <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
   <!-- ========== PUNTO DE ENTRADA MODULAR ÚNICO ========== -->

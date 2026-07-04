@@ -24,7 +24,6 @@ function analizarArchivo(rutaCompleta, archivo) {
             if (l.startsWith('function ')) {
                 nombreFuncion = l.split('function ')[1].split('(')[0].trim();
             } else if ((l.startsWith('const ') || l.startsWith('let ')) && l.includes('=')) {
-                // Detectar funciones flecha básicas: const miFunc = () =>
                 const partes = l.split('=');
                 if (partes[1] && partes[1].includes('=>')) {
                     nombreFuncion = partes[0].replace('const', '').replace('let', '').trim();
@@ -66,7 +65,8 @@ function recorrerYAnalizar(dir) {
             recorrerYAnalizar(rutaCompleta);
         } else {
             const ext = path.extname(archivo);
-            if (EXTENSIONES.includes(ext) && archivo !== 'analizar_fallas.js' && archivo !== 'mapear.js') {
+            // Excluir archivos específicos y cualquier archivo que empiece por "Prueba-"
+            if (EXTENSIONES.includes(ext) && archivo !== 'analizar_fallas.js' && archivo !== 'mapear.js' && !archivo.startsWith('Prueba-','test-')) {
                 analizarArchivo(rutaCompleta, archivo);
             }
         }

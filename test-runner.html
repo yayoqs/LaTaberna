@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test Runner – La Taberna</title>
+  <style>
+    :root {
+      --bg: #1a1a24;
+      --card: #1e1e2e;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --pass: #22c55e;
+      --fail: #ef4444;
+      --warn: #f59e0b;
+      --border: #2e2e42;
+      --radius: 8px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, monospace;
+      background: var(--bg);
+      color: var(--text);
+      padding: 24px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    h1 { color: var(--warn); margin-bottom: 4px; }
+    .subtitle { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    button {
+      padding: 10px 20px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--card);
+      color: var(--text);
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 14px;
+      transition: all .2s;
+    }
+    button:hover { background: #2a2a3e; }
+    button.run-all { background: var(--warn); color: #000; border-color: var(--warn); }
+    button.run-all:hover { opacity: .9; }
+
+    .summary-bar {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 24px;
+      font-size: 14px;
+    }
+    .summary-item {
+      padding: 8px 16px;
+      border-radius: var(--radius);
+      font-weight: 700;
+    }
+    .summary-item.pass { background: rgba(34,197,94,.15); color: var(--pass); }
+    .summary-item.fail { background: rgba(239,68,68,.15); color: var(--fail); }
+    .summary-item.pending { background: rgba(148,163,184,.1); color: var(--muted); }
+
+    .suite {
+      margin-bottom: 20px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+    .suite-header {
+      background: var(--card);
+      padding: 14px 20px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      user-select: none;
+    }
+    .suite-header:hover { background: #252535; }
+    .suite-name { font-weight: 700; }
+    .suite-status { font-size: 12px; }
+    .suite-body { display: none; padding: 0 20px 16px; }
+    .suite-body.open { display: block; }
+
+    .test { margin: 6px 0; padding: 6px 10px; border-radius: 4px; font-size: 13px; }
+    .test.pass { background: rgba(34,197,94,.08); }
+    .test.fail { background: rgba(239,68,68,.08); }
+
+    .progress {
+      margin-top: 12px;
+      height: 6px;
+      background: var(--border);
+      border-radius: 3px;
+      overflow: hidden;
+      display: none;
+    }
+    .progress-bar {
+      height: 100%;
+      width: 0;
+      background: var(--warn);
+      transition: width .3s;
+    }
+
+    #logPanel {
+      margin-top: 24px;
+      background: var(--card);
+      border-radius: var(--radius);
+      padding: 16px;
+      font-size: 12px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+    #logPanel h3 { margin-bottom: 8px; }
+    .log-entry { margin: 2px 0; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test Runner – La Taberna</h1>
+  <p class="subtitle">Ejecución centralizada de todas las suites de prueba</p>
+
+  <div class="toolbar">
+    <button class="run-all" onclick="testRunner.ejecutarTodas()">▶ Ejecutar todas</button>
+    <button onclick="testRunner.ejecutarPendientes()">▶ Ejecutar pendientes</button>
+    <button onclick="location.reload()">↻ Reiniciar</button>
+  </div>
+
+  <div class="summary-bar" id="summaryBar">
+    <span class="summary-item pass" id="totalPass">✔ 0</span>
+    <span class="summary-item fail" id="totalFail">✘ 0</span>
+    <span class="summary-item pending" id="totalPending">○ 0</span>
+  </div>
+
+  <div id="suitesContainer"></div>
+  <div class="progress" id="progressBar"><div class="progress-bar" id="progressFill"></div></div>
+
+  <div id="logPanel">
+    <h3>📋 Log de ejecución</h3>
+    <div id="logContent"></div>
+  </div>
+
+  <script type="module">
+    import { Logger } from './js/lib/logger.js';
+    Logger.setLevel('ERROR');
+
+    // ── DEFINICIÓN DE SUITES ─────────────────────────────
+    // Cada suite tiene:
+    //   id       → identificador único
+    //   nombre   → etiqueta visible
+    //   archivos → array de rutas a importar (módulos ES6)
+    //   ejecutar → función async que recibe un objeto `assert` y ejecuta los tests
+    //   mock     → (opcional) función para configurar mocks antes de la ejecución
+    //   cleanup  → (opcional) función para limpiar después de la ejecución
+    const suitesDisponibles = [
+      {
+        id: 'db-core',
+        nombre: 'Núcleo de base de datos (db-core)',
+        archivos: ['./js/db-core.js'],
+        async ejecutar(assert) {
+          const { DBCore } = await import('./js/db-core.js');
+          
+          // Normalización de producto
+          const prod = DBCore._normalizarProducto({ nombre: 'Test', precio: 100 });
+          assert(prod.disponible === true, 'Producto sin disponible → true por defecto');
+          assert(prod.nombre === 'Test', 'Nombre normalizado correctamente');
+          assert(prod.precio === 100, 'Precio normalizado correctamente');
+
+          const prod2 = DBCore._normalizarProducto({ nombre: 'X', precio: 0, disponible: false });
+          assert(prod2.disponible === false, 'Producto con disponible=false se respeta');
+
+          // Normalización de mesa
+          const mesa = DBCore._normalizarMesa({ numero: 5, estado: 'libre', permite_prepedidos: true });
+          assert(mesa.permite_prepedidos === false, 'Mesa libre fuerza permite_prepedidos=false');
+          assert(mesa.estado === 'libre', 'Estado libre normalizado');
+
+          const mesaOcupada = DBCore._normalizarMesa({ numero: 3, estado: 'ocupada', permite_prepedidos: true });
+          assert(mesaOcupada.permite_prepedidos === true, 'Mesa ocupada conserva permite_prepedidos=true');
+
+          // fábrica mesaVacia
+          const { mesaVacia } = await import('./js/db-core.js');
+          const vacia = mesaVacia(10, 'patio');
+          assert(vacia.numero === 10, 'mesaVacia asigna número');
+          assert(vacia.zona === 'patio', 'mesaVacia asigna zona');
+          assert(vacia.estado === 'libre', 'mesaVacia estado inicial libre');
+          assert(vacia.permite_prepedidos === false, 'mesaVacia permite_prepedidos=false');
+        }
+      },
+      {
+        id: 'dominio-cantidad',
+        nombre: 'Dominio: Cantidad',
+        archivos: ['./js/dominio/cantidad.js'],
+        async ejecutar(assert) {
+          const { Cantidad, crearCantidad } = await import('./js/dominio/cantidad.js');
+          
+          const c = crearCantidad(5);
+          assert(c !== null, 'crearCantidad(5) retorna instancia');
+          assert(c.valor === 5, 'valor es 5');
+          assert(crearCantidad(0) === null, 'crearCantidad(0) falla');
+          assert(crearCantidad(-3) === null, 'crearCantidad(-3) falla');
+
+          const suma = c.sumar(new Cantidad(3));
+          assert(suma.valor === 8, '5 + 3 = 8 (inmutable)');
+          assert(c.valor === 5, 'original sigue siendo 5');
+        }
+      }
+      // ── AGREGAR NUEVAS SUITES AQUÍ ───────────────────
+      // {
+      //   id: 'auth',
+      //   nombre: 'Autenticación (auth)',
+      //   archivos: ['./js/auth.js', './js/roles.js'],
+      //   async ejecutar(assert) { ... }
+      // }
+    ];
+
+    // ═══════════════════════════════════════════════════════
+    // TEST RUNNER ENGINE
+    // ═══════════════════════════════════════════════════════
+    const runner = {
+      suites: [],
+      resultados: {},
+
+      async inicializar() {
+        this.suites = suitesDisponibles.map(s => ({
+          ...s,
+          estado: 'pending',
+          tests: [],
+          error: null
+        }));
+        this.resultados = {};
+        this._render();
+      },
+
+      _actualizarResumen() {
+        let totalPass = 0, totalFail = 0, totalPending = 0;
+        this.suites.forEach(s => {
+          if (s.estado === 'pending') totalPending++;
+          else {
+            s.tests.forEach(t => {
+              if (t.pass) totalPass++;
+              else totalFail++;
+            });
+          }
+        });
+        document.getElementById('totalPass').textContent = `✔ ${totalPass}`;
+        document.getElementById('totalFail').textContent = `✘ ${totalFail}`;
+        document.getElementById('totalPending').textContent = `○ ${totalPending}`;
+      },
+
+      async ejecutarTodas() {
+        for (const suite of this.suites) {
+          await this._ejecutarSuite(suite);
+        }
+        this._log('✔ Todas las suites ejecutadas.');
+      },
+
+      async ejecutarPendientes() {
+        for (const suite of this.suites) {
+          if (suite.estado === 'pending') {
+            await this._ejecutarSuite(suite);
+          }
+        }
+        this._log('✔ Suites pendientes ejecutadas.');
+      },
+
+      async ejecutarSuite(id) {
+        const suite = this.suites.find(s => s.id === id);
+        if (suite) await this._ejecutarSuite(suite);
+      },
+
+      async _ejecutarSuite(suite) {
+        suite.estado = 'running';
+        suite.tests = [];
+        suite.error = null;
+        this._render();
+        this._log(`⏳ Ejecutando: ${suite.nombre}`);
+
+        // Mostrar barra de progreso
+        const progress = document.getElementById('progressBar');
+        const fill = document.getElementById('progressFill');
+        progress.style.display = 'block';
+        fill.style.width = '0%';
+
+        try {
+          // Configurar mocks si la suite lo requiere
+          if (typeof suite.mock === 'function') {
+            await suite.mock();
+          }
+
+          // Esperar carga de archivos
+          fill.style.width = '20%';
+
+          // Ejecutar tests
+          const assert = (condition, msg) => {
+            suite.tests.push({ msg, pass: condition });
+          };
+
+          await suite.ejecutar(assert);
+          fill.style.width = '90%';
+
+          // Limpiar mocks si existen
+          if (typeof suite.cleanup === 'function') {
+            await suite.cleanup();
+          }
+
+          suite.estado = 'done';
+          fill.style.width = '100%';
+          this._log(`✅ ${suite.nombre}: ${suite.tests.filter(t=>t.pass).length}/${suite.tests.length} pasaron`);
+        } catch (e) {
+          suite.estado = 'done';
+          suite.error = e.message;
+          this._log(`❌ ${suite.nombre}: Error - ${e.message}`);
+        }
+
+        setTimeout(() => { progress.style.display = 'none'; }, 500);
+        this._render();
+        this._actualizarResumen();
+      },
+
+      _render() {
+        const container = document.getElementById('suitesContainer');
+        container.innerHTML = this.suites.map(s => {
+          const passed = s.tests.filter(t => t.pass).length;
+          const failed = s.tests.filter(t => !t.pass).length;
+          const statusIcon = s.estado === 'pending' ? '○' : s.error ? '❌' : '✅';
+          const statusText = s.estado === 'pending' ? 'Pendiente' : s.error ? 'Error' : `${passed}/${s.tests.length} OK`;
+
+          return `
+            <div class="suite">
+              <div class="suite-header" onclick="document.getElementById('body-${s.id}').classList.toggle('open')">
+                <span class="suite-name">${statusIcon} ${s.nombre}</span>
+                <span class="suite-status">${statusText}</span>
+              </div>
+              <div class="suite-body" id="body-${s.id}">
+                ${s.error ? `<div class="test fail">⚠ ${s.error}</div>` : ''}
+                ${s.tests.map(t => `<div class="test ${t.pass ? 'pass' : 'fail'}">${t.pass ? '✔' : '✘'} ${t.msg}</div>`).join('')}
+                <button onclick="testRunner.ejecutarSuite('${s.id}')" style="margin-top:8px;font-size:12px;">▶ Re-ejecutar</button>
+              </div>
+            </div>`;
+        }).join('');
+      },
+
+      _log(msg) {
+        const log = document.getElementById('logContent');
+        const time = new Date().toLocaleTimeString();
+        log.innerHTML += `<div class="log-entry">[${time}] ${msg}</div>`;
+        log.scrollTop = log.scrollHeight;
+      }
+    };
+
+    // Exponer al scope global para los botones onclick
+    window.testRunner = runner;
+
+    // Inicializar al cargar
+    await runner.inicializar();
+    runner._log('🏁 Test Runner listo.');
+  </script>
+</body>
+</html>

@@ -1,10 +1,12 @@
 /* ================================================================
    LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/comanda.js
-   Versión: 2.0.3
+   Versión: 2.0.4
    Propósito: Gestión de la comanda actual (ítems, cantidades,
               observaciones, split bill). Sin onclick. Usa delegación.
               Incluye listener para precarga:items_listos.
+              Corrección: guarda de igualdad para evitar escrituras
+              innecesarias en DB (hallazgo #1).
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -17,13 +19,34 @@ import { DB } from '../db.js';
 const Comanda = (() => {
   let _mesaActiva = null;
 
+  function _mesasIguales(a, b) {
+    if (!a || !b) return a === b;
+    const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+    for (const key of keys) {
+      if (key === 'personaActiva') continue;
+      const va = a[key];
+      const vb = b[key];
+      if (va !== vb) {
+        if (typeof va === 'object' && typeof vb === 'object') {
+          if (JSON.stringify(va) !== JSON.stringify(vb)) return false;
+        } else {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
   function _syncMesaStoreADB(mesaActualizada) {
     if (!mesaActualizada) return;
     const idx = DB.mesas.findIndex(m => m.numero == mesaActualizada.numero);
     if (idx >= 0) {
-      DB.mesas[idx] = mesaActualizada;
-      if (typeof DB.saveMesas === 'function') {
-        DB.saveMesas();
+      if (!_mesasIguales(DB.mesas[idx], mesaActualizada)) {
+        DB.mesas[idx] = mesaActualizada;
+        if (typeof DB.saveMesas === 'function') {
+          DB.saveMesas();
+        }
+        Logger.debug('[Comanda] Mesa sincronizada a DB:', mesaActualizada.numero);
       }
     }
   }
@@ -277,7 +300,6 @@ const Comanda = (() => {
     EventBus.on('producto:seleccionado', agregarItem);
     EventBus.on('mesa:abierta', setMesaActiva);
 
-    // Listener para cargar ítems desde precarga
     EventBus.on('precarga:items_listos', (payload) => {
       const mesaActiva = Comanda.getMesaActiva();
       if (!mesaActiva || mesaActiva.numero !== payload.mesa) {
@@ -296,7 +318,6 @@ const Comanda = (() => {
           Comanda.agregarItem(producto);
         }
       });
-      // Limpiar el badge después de cargar
       EventBus.emit('mesas:limpiar_badge', { mesa: payload.mesa });
     });
   }

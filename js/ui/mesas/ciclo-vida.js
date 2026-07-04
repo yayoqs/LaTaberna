@@ -1,10 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — MESAS SUBMÓDULO (ES6)
    Archivo: js/ui/mesas/ciclo-vida.js
-   Versión: 1.0.5
+   Versión: 1.0.6
    Propósito: Ciclo de vida (activar/limpiar) con AbortController
               y desuscripción funcional del EventBus.
               Incluye listener para mesas:limpiar_badge.
+              Corrección: console.log migrados a Logger.debug (hallazgo #2).
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -54,14 +55,13 @@ export function activar() {
   _desuscripciones.push(EventBus.on('cliente:mesa_ingresada', (data) => {
     if (data && data.mesa) {
       addNotificacion(data.mesa, 'esperando', {});
-// Verificar el estado de la mesa justo antes de renderizar
-const mesas = Store.getState().mesas;
-const mesaObjetivo = mesas.find(m => m.numero == data.mesa);
-console.log('[DEBUG] Mesa ' + data.mesa + ' - estado:', mesaObjetivo?.estado, 'permite_prepedidos:', mesaObjetivo?.permite_prepedidos);
-renderGrid();
+      Logger.debug('[Mesas] Cliente esperando en mesa ' + data.mesa + ' - estado: ' + 
+        (Store.getState().mesas.find(m => m.numero == data.mesa)?.estado || '?') + 
+        ', permite_prepedidos: ' + (Store.getState().mesas.find(m => m.numero == data.mesa)?.permite_prepedidos || false));
+      renderGrid();
       Logger.info(`[Mesas] Cliente esperando en mesa ${data.mesa}`);
     }
-    console.log('[DEBUG] cliente:mesa_ingresada recibido:', data);
+    Logger.debug('[Mesas] cliente:mesa_ingresada recibido:', data);
   }));
   _desuscripciones.push(EventBus.on('precarga:nueva', (data) => {
     import('../mesas.js').then(m => m.Mesas.setBadge(data.mesa, data.cantidad, data.precargaId));

@@ -1,17 +1,16 @@
 /* ================================================================
    LaTaberna - PubPOS — COMANDO JS (ES6)
    Archivo: js/comandos/agregar-mesa.js
-   Versión: 1.0.4
+   Versión: 1.0.5
    Propósito: Comando para agregar una nueva mesa.
-              Con imports explícitos. mesaVacia importado desde db-core.
-              PedidoManager importado correctamente.
+              Sin validación de turno (operación administrativa).
+              Con imports explícitos.
    ================================================================ */
 
 import { CommandBus } from '../lib/command-bus.js';
 import { Deps } from '../lib/deps.js';
 import { EventBus } from '../lib/eventBus.js';
 import { mesaVacia } from '../db-core.js';
-import { PedidoManager } from '../managers/pedido-manager.js';
 
 export function crearComandoAgregarMesa(datos) {
   return {
@@ -25,14 +24,6 @@ export function crearComandoAgregarMesa(datos) {
 
 async function handleAgregarMesa(comando) {
   const { numero, zona } = comando.datos;
-
-  if (!PedidoManager || !PedidoManager.getTurnoActual) {
-    throw new Error('Sistema de turnos no disponible');
-  }
-  const turno = PedidoManager.getTurnoActual();
-  if (!turno || turno.estado !== 'abierto') {
-    throw new Error('No hay turno abierto para agregar mesas');
-  }
 
   let repo;
   try {
@@ -55,10 +46,6 @@ async function handleAgregarMesa(comando) {
     await repo.agregarMesa(nuevaMesa);
   } catch (e) {
     throw new Error('Error al agregar la mesa: ' + e.message);
-  }
-
-  if (typeof PedidoManager.registrar === 'function') {
-    PedidoManager.registrar('mesa:agregada', { numero, zona });
   }
 
   EventBus.emit('mesa:agregada', nuevaMesa);

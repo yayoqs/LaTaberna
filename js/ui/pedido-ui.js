@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/pedido-ui.js
-   Versión: 2.1.0
+   Versión: 2.1.1
    Propósito: Modal de pedido, revisar comandas, validación de stock.
               Sin onclick. Apertura de mesa delegada a MesaDetalles.
+              Corrección: eliminada función _agregarItem sin uso (hallazgo #3).
    Dependencias: CommandBus, EventBus, Logger, DB, Store, Mesas, Comanda,
                  Carta, Cuenta, Cobro, Tickets, Auth, mesaVacia, showToast, $id
    ================================================================ */

@@ -1,7 +1,7 @@
 /* ================================================================
-   La Taberna — MÓDULO: eventos-en-vivo.js (v1.2.0 – historial bingo)
+   La Taberna — MÓDULO: eventos-en-vivo.js (v1.2.1 – fix Appwrite)
    Propósito: Panel del animador para eventos en vivo (bingo, karaoke, votaciones).
-              Sin asignaciones window.
+              Sin asignaciones window. Eliminado updatedAt manual.
    ================================================================ */
 
 import { EventBus } from '../../lib/eventBus.js';
@@ -130,13 +130,11 @@ const EventosEnVivo = (() => {
     }
   }
 
-  /* ── BINGO (con historial) ────────────────────────────── */
   function _renderInterfazBingo(datos, estado) {
     const zona = document.getElementById('zonaInteraccion');
     const bolas = (datos && datos.bolas) || [];
     const ultima = bolas.length > 0 ? bolas[bolas.length - 1] : null;
 
-    // Historial de bolas cantadas
     let historialHTML = '';
     if (bolas.length > 0) {
       historialHTML = `
@@ -158,7 +156,6 @@ const EventosEnVivo = (() => {
     `;
   }
 
-  /* ── KARAOKE ─────────────────────────────────────────── */
   function _renderInterfazKaraoke(datos, estado) {
     const zona = document.getElementById('zonaInteraccion');
     const letra = (datos && datos.letra) || '';
@@ -177,7 +174,6 @@ const EventosEnVivo = (() => {
     `;
   }
 
-  /* ── VOTACIÓN ─────────────────────────────────────────── */
   function _renderInterfazVotacion(datos, estado) {
     const zona = document.getElementById('zonaInteraccion');
     const opciones = (datos && datos.opciones) || [];
@@ -204,10 +200,14 @@ const EventosEnVivo = (() => {
     `;
   }
 
+  /* ── ACCIONES (sin updatedAt manual) ──────────────────── */
   async function crearEvento() {
     const tipo = document.getElementById('selTipoEvento').value;
     if (!tipo) { showToast('error', 'Selecciona un tipo de evento'); return; }
-    const datosIniciales = { tipo, estado: 'configuracion', datos: {}, creadoPor: Auth.getNombre(), updatedAt: Date.now() };
+    const datosIniciales = {
+      tipo, estado: 'configuracion', datos: {},
+      creadoPor: Auth.getNombre()
+    };
     try {
       const doc = await DBAppwrite.crear('eventos_en_vivo', 'unique()', datosIniciales);
       showToast('success', `Evento de ${tipo} creado`);
@@ -219,9 +219,8 @@ const EventosEnVivo = (() => {
   async function cambiarEstado(nuevoEstado) {
     if (!_estadoActual || !_estadoActual.id) return;
     try {
-      await DBAppwrite.actualizar('eventos_en_vivo', _estadoActual.id, { estado: nuevoEstado, updatedAt: Date.now() });
+      await DBAppwrite.actualizar('eventos_en_vivo', _estadoActual.id, { estado: nuevoEstado });
       _estadoActual.estado = nuevoEstado;
-      _estadoActual.updatedAt = Date.now();
       _actualizarUI();
     } catch (e) { Logger.error('[EventosEnVivo] Error al cambiar estado:', e); showToast('error', 'No se pudo cambiar el estado'); }
   }
@@ -229,8 +228,8 @@ const EventosEnVivo = (() => {
   async function reiniciarEvento() {
     if (!_estadoActual || !_estadoActual.id) return;
     try {
-      await DBAppwrite.actualizar('eventos_en_vivo', _estadoActual.id, { estado: 'configuracion', datos: {}, updatedAt: Date.now() });
-      _estadoActual.estado = 'configuracion'; _estadoActual.datos = {}; _estadoActual.updatedAt = Date.now();
+      await DBAppwrite.actualizar('eventos_en_vivo', _estadoActual.id, { estado: 'configuracion', datos: {} });
+      _estadoActual.estado = 'configuracion'; _estadoActual.datos = {};
       _actualizarUI();
     } catch (e) { Logger.error('[EventosEnVivo] Error al reiniciar evento:', e); showToast('error', 'No se pudo reiniciar el evento'); }
   }
@@ -242,8 +241,8 @@ const EventosEnVivo = (() => {
     let nuevaBola; do { nuevaBola = Math.floor(Math.random() * 90) + 1; } while (bolas.includes(nuevaBola));
     const nuevosDatos = { ..._estadoActual.datos, bolas: [...bolas, nuevaBola] };
     try {
-      await DBAppwrite.actualizar('eventos_en_vivo', _estadoActual.id, { datos: nuevosDatos, updatedAt: Date.now() });
-      _estadoActual.datos = nuevosDatos; _estadoActual.updatedAt = Date.now();
+      await DBAppwrite.actualizar('eventos_en_vivo', _estadoActual.id, { datos: nuevosDatos });
+      _estadoActual.datos = nuevosDatos;
       _actualizarUI();
     } catch (e) { Logger.error('[EventosEnVivo] Error al cantar bola:', e); showToast('error', 'No se pudo cantar la bola'); }
   }
@@ -253,8 +252,8 @@ const EventosEnVivo = (() => {
     const letra = document.getElementById('letraKaraoke')?.value || '';
     const nuevosDatos = { ..._estadoActual.datos, letra };
     try {
-      await DBAppwrite.actualizar('eventos_en_vivo', _estadoActual.id, { datos: nuevosDatos, updatedAt: Date.now() });
-      _estadoActual.datos = nuevosDatos; _estadoActual.updatedAt = Date.now();
+      await DBAppwrite.actualizar('eventos_en_vivo', _estadoActual.id, { datos: nuevosDatos });
+      _estadoActual.datos = nuevosDatos;
       _actualizarUI();
     } catch (e) { Logger.error('[EventosEnVivo] Error al actualizar letra:', e); showToast('error', 'No se pudo actualizar la letra'); }
   }
@@ -263,8 +262,8 @@ const EventosEnVivo = (() => {
     if (!_estadoActual || _estadoActual.tipo !== 'karaoke' || _estadoActual.estado !== 'activo') return;
     const nuevosDatos = { ..._estadoActual.datos, letra: '' };
     try {
-      await DBAppwrite.actualizar('eventos_en_vivo', _estadoActual.id, { datos: nuevosDatos, updatedAt: Date.now() });
-      _estadoActual.datos = nuevosDatos; _estadoActual.updatedAt = Date.now();
+      await DBAppwrite.actualizar('eventos_en_vivo', _estadoActual.id, { datos: nuevosDatos });
+      _estadoActual.datos = nuevosDatos;
       _actualizarUI();
       const ta = document.getElementById('letraKaraoke'); if (ta) ta.value = '';
     } catch (e) { Logger.error('[EventosEnVivo] Error al limpiar letra:', e); showToast('error', 'No se pudo limpiar la letra'); }
@@ -278,8 +277,8 @@ const EventosEnVivo = (() => {
     if (opciones.includes(opcion)) { showToast('warning', 'Esa opción ya existe'); return; }
     const nuevosDatos = { ..._estadoActual.datos, opciones: [...opciones, opcion] };
     try {
-      await DBAppwrite.actualizar('eventos_en_vivo', _estadoActual.id, { datos: nuevosDatos, updatedAt: Date.now() });
-      _estadoActual.datos = nuevosDatos; _estadoActual.updatedAt = Date.now();
+      await DBAppwrite.actualizar('eventos_en_vivo', _estadoActual.id, { datos: nuevosDatos });
+      _estadoActual.datos = nuevosDatos;
       _actualizarUI(); if (input) input.value = '';
     } catch (e) { Logger.error('[EventosEnVivo] Error al agregar opción:', e); showToast('error', 'No se pudo agregar la opción'); }
   }
@@ -291,8 +290,8 @@ const EventosEnVivo = (() => {
     const nuevasOpciones = opciones.slice(0, -1);
     const nuevosDatos = { ..._estadoActual.datos, opciones: nuevasOpciones };
     try {
-      await DBAppwrite.actualizar('eventos_en_vivo', _estadoActual.id, { datos: nuevosDatos, updatedAt: Date.now() });
-      _estadoActual.datos = nuevosDatos; _estadoActual.updatedAt = Date.now();
+      await DBAppwrite.actualizar('eventos_en_vivo', _estadoActual.id, { datos: nuevosDatos });
+      _estadoActual.datos = nuevosDatos;
       _actualizarUI();
     } catch (e) { Logger.error('[EventosEnVivo] Error al eliminar opción:', e); showToast('error', 'No se pudo eliminar la opción'); }
   }
