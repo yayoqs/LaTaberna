@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/pedido-ui.js
-   Versión: 2.0.3
+   Versión: 2.1.0
    Propósito: Modal de pedido, revisar comandas, validación de stock.
-              Sin onclick. Con bandera de panel de detalle.
+              Sin onclick. Apertura de mesa delegada a MesaDetalles.
    Dependencias: CommandBus, EventBus, Logger, DB, Store, Mesas, Comanda,
                  Carta, Cuenta, Cobro, Tickets, Auth, mesaVacia, showToast, $id
    ================================================================ */
@@ -25,7 +25,6 @@ import { showToast, $id } from '../utils.js';
 
 const Pedido = (() => {
 
-  let _mesaAbriendo = null;
   let _comandasEnviadas = {};
   let _panelDetalleAbierto = false;
 
@@ -124,98 +123,6 @@ const Pedido = (() => {
     });
   }
 
-  function _mostrarModalApertura(mesa) {
-    let oldModal = $id('modalAperturaMesa');
-    if (oldModal) oldModal.remove();
-
-    const modal = document.createElement('div');
-    modal.id = 'modalAperturaMesa';
-    modal.className = 'modal-overlay';
-    modal.style.display = 'flex';
-    modal.setAttribute('role', 'dialog');
-    modal.setAttribute('aria-modal', 'true');
-
-    const numMesa = mesa.numero;
-    modal.innerHTML = `
-      <div class="modal-small" style="max-width:400px;">
-        <div class="modal-header">
-          <h3><i class="fas fa-chair"></i> Abrir Mesa ${numMesa}</h3>
-          <button class="modal-close" id="btnCancelarApertura"><i class="fas fa-times"></i></button>
-        </div>
-        <div class="modal-small-body">
-          <label for="aperturaComensales">Comensales</label>
-          <input type="number" id="aperturaComensales" value="2" min="1" max="20" step="1">
-          <label for="aperturaPersonas">
-            Nombres o apodos (opcional)
-            <span style="font-weight:normal;font-size:11px;color:var(--color-text-muted);">Separados por coma o uno por línea</span>
-          </label>
-          <textarea id="aperturaPersonas" rows="3" placeholder="Ej: Juan, María, Pedro"></textarea>
-          <div class="modal-small-footer">
-            <button class="btn-secondary" id="btnCancelarApertura2">Cancelar</button>
-            <button class="btn-primary" id="btnConfirmarApertura">
-              <i class="fas fa-check-circle"></i> Abrir Mesa
-            </button>
-          </div>
-        </div>
-      </div>`;
-    document.body.appendChild(modal);
-
-    $id('btnCancelarApertura').addEventListener('click', _cancelarApertura);
-    $id('btnCancelarApertura2').addEventListener('click', _cancelarApertura);
-    $id('btnConfirmarApertura').addEventListener('click', () => _confirmarApertura(numMesa));
-
-    setTimeout(() => {
-      const input = $id('aperturaComensales');
-      if (input) input.focus();
-    }, 100);
-  }
-
-  function _cancelarApertura() {
-    const modal = $id('modalAperturaMesa');
-    if (modal) modal.remove();
-    _mesaAbriendo = null;
-  }
-
-  async function _confirmarApertura(num) {
-    const comensales = parseInt($id('aperturaComensales')?.value) || 2;
-    const personasRaw = $id('aperturaPersonas')?.value || '';
-    const personas = personasRaw.split(/[,\n]/).map(s => s.trim()).filter(s => s.length > 0);
-    _cancelarApertura();
-
-    const mesa = DB.mesas.find(m => m.numero == num);
-    if (!mesa) { showToast('error', 'Mesa no encontrada'); return; }
-
-    const mozo = $id('mozoActivo')?.value || (DB.mozos[0]?.nombre || 'Mozo');
-
-    const resultado = await CommandBus.ejecutar({
-      type: 'crearPedidoMesa',
-      datos: {
-        numeroMesa: num,
-        mozo: mozo,
-        comensales: comensales
-      }
-    });
-
-    if (!resultado || !resultado.exito) {
-      const errorMsg = (resultado && resultado.error) ? resultado.error : 'Error desconocido';
-      Logger.error('[Pedido] El comando crearPedidoMesa falló:', errorMsg);
-      showToast('error', 'No se pudo abrir la mesa. ' + errorMsg);
-      return;
-    }
-
-    const pedido = resultado.data || resultado;
-    if (pedido) {
-      mesa.pedidoId = pedido.id;
-      mesa.estado = 'ocupada';
-      mesa.mozo = mozo;
-      mesa.comensales = comensales;
-      mesa.personas = personas;
-      mesa.personaActiva = personas.length > 0 ? personas[0] : 'General';
-    }
-
-    _abrirModalPedido(mesa);
-  }
-
   function _abrirModalPedido(mesa) {
     _asegurarModalPedido();
 
@@ -233,23 +140,13 @@ const Pedido = (() => {
     if (modal) modal.style.display = 'flex';
   }
 
-  async function abrirMesa(num) {
+  function abrirMesa(num) {
     if (_panelDetalleAbierto) return;
-    if (_mesaAbriendo === num) return;
-    _mesaAbriendo = num;
 
-    try {
-      const mesa = DB.mesas.find(m => m.numero == num);
-      if (!mesa) { Logger.error('[Pedido] Mesa ' + num + ' no encontrada.'); return; }
+    const mesa = DB.mesas.find(m => m.numero == num);
+    if (!mesa) { Logger.error('[Pedido] Mesa ' + num + ' no encontrada.'); return; }
 
-      if (mesa.estado === 'libre') {
-        _mostrarModalApertura(mesa);
-      } else {
-        _abrirModalPedido(mesa);
-      }
-    } finally {
-      _mesaAbriendo = null;
-    }
+    _abrirModalPedido(mesa);
   }
 
   function cerrar() {
@@ -526,12 +423,10 @@ const Pedido = (() => {
   function _setCat(cat) { Carta.setCategoria(cat); }
   function filtrarProductos() { Carta.filtrar(); }
   function actualizarObsGeneral(valor) { Comanda.setObservacionGeneral(valor); }
-  function _agregarItem(prodId) { const producto = DB.productos.find(p => p.id === prodId); if (producto) Comanda.agregarItem(producto); }
 
   // Listeners de desacoplamiento
   EventBus.on('mesa-detalle:abierto', () => { _panelDetalleAbierto = true; });
   EventBus.on('mesa-detalle:cerrado', () => { _panelDetalleAbierto = false; });
-  EventBus.on('mesa:abrir_desde_detalle', (data) => { abrirMesa(data.mesa); });
   EventBus.on('mesa:tomar_pedido', (data) => { abrirMesa(data.mesa); });
   EventBus.on('pago:confirmado', () => { cerrar(); });
 
@@ -545,10 +440,7 @@ const Pedido = (() => {
     cerrarMesa,
     _setCat,
     filtrarProductos,
-    actualizarObsGeneral,
-    _agregarItem,
-    _confirmarApertura,
-    _cancelarApertura
+    actualizarObsGeneral
   };
 })();
 

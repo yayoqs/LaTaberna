@@ -1,8 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-core.js
-   Versión: 1.0.6
+   Versión: 1.0.7
    Propósito: Núcleo de datos: mesas, pedidos, productos, persistencia local.
+              Normalización defensiva: mesa libre fuerza permite_prepedidos=false.
               Incluye imports de Logger, EventBus.
    ================================================================ */
 
@@ -36,9 +37,10 @@ export const DBCore = (function() {
   };
 
   module._normalizarMesa = function(m) {
+    const estado = this._validarEstadoMesa(m.estado);
     return {
       numero: this._validarNumero(m.numero, 0),
-      estado: this._validarEstadoMesa(m.estado),
+      estado: estado,
       pedidoId: m.pedidoId || null,
       items: Array.isArray(m.items) ? m.items : [],
       mozo: this._validarString(m.mozo, ''),
@@ -48,7 +50,8 @@ export const DBCore = (function() {
       mesasFusionadas: m.mesasFusionadas || null,
       esVirtual: m.esVirtual || false,
       zona: this._validarString(m.zona, (this.config.zonas && this.config.zonas[0]?.nombre) || 'salon'),
-      permite_prepedidos: this._validarBooleano(m.permite_prepedidos, false)
+      // ── Normalización defensiva: mesa libre nunca permite prepedidos ──
+      permite_prepedidos: (estado === 'libre') ? false : this._validarBooleano(m.permite_prepedidos, false)
     };
   };
 

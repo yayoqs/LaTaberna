@@ -1,8 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — Módulo (ES6)
    Archivo: js/modulos/cliente/pantalla-bienvenida.js
-   Versión: 2.1.6
-   Propósito: Sincroniza estado de permiso y mesa con el Store.
+   Versión: 2.1.7
+   Propósito: Panel de control post-validación.
+              Corrige flujo de vinculación: listener mesa:actualizada
+              y verificación en mostrar().
    ================================================================ */
 
 import { EventBus } from '../../lib/eventBus.js';
@@ -268,6 +270,7 @@ const PantallaBienvenida = (() => {
 
   function mostrar() {
     if (_vista) {
+      _verificarPermisoMesa();  // ← nuevo: verifica estado real al activarse
       const viewMenu = document.getElementById('view-menu');
       if (viewMenu) viewMenu.classList.remove('active');
       _vista.classList.add('active');
@@ -284,9 +287,26 @@ const PantallaBienvenida = (() => {
   function ocultar() { if (_vista) _vista.classList.remove('active'); }
 
   function _initRealtime() {
+    // Listener para mesas:actualizada (plural)
     EventBus.on('mesas:actualizada', (datos) => {
-      if (_mesa && datos) { const coincide = _mesa === 'barra' ? (datos.numero === 0 || datos.nombre === 'barra') : (datos.numero === _mesa); if (coincide) _verificarPermisoMesa(); }
+      if (_mesa && datos) {
+        const coincide = _mesa === 'barra'
+          ? (datos.numero === 0 || datos.nombre === 'barra')
+          : (datos.numero === _mesa);
+        if (coincide) _verificarPermisoMesa();
+      }
     });
+
+    // Listener para mesa:actualizada (singular) ← restaurado
+    EventBus.on('mesa:actualizada', (datos) => {
+      if (_mesa && datos) {
+        const coincide = _mesa === 'barra'
+          ? (datos.numero === 0 || datos.nombre === 'barra')
+          : (datos.numero === _mesa);
+        if (coincide) _verificarPermisoMesa();
+      }
+    });
+
     EventBus.on('eventos_en_vivo:actualizada', () => {
       const state = Store.getState();
       const eventos = state.eventos_en_vivo || [];

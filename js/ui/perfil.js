@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/perfil.js
-   Versión: 1.0.2
+   Versión: 1.0.3
    Propósito: Vista de perfil de usuario: avatar, datos y documentos.
-              Sin onclick. Usa addEventListener.
+              v1.0.3: evita toast "no hay sesión activa" al iniciar.
    ================================================================ */
 
 import { Auth } from '../auth.js';
@@ -62,7 +62,7 @@ const Perfil = (() => {
 
     const usuario = Auth.getUsuarioActual();
     if (!usuario) {
-      showToast('error', 'No hay sesión activa');
+      // No mostrar toast para evitar mensaje molesto al inicio sin sesión
       return;
     }
 
@@ -201,7 +201,12 @@ const Perfil = (() => {
     }
   }
 
-  EventBus.on('db:inicializada', render);
+  // Listener corregido: solo renderiza si hay sesión activa
+  EventBus.on('db:inicializada', () => {
+    if (Auth.getUsuarioActual()) {
+      render();
+    }
+  });
 
   return { render, mostrarModalEditar, cerrarModalEditar, guardarPerfil };
 })();

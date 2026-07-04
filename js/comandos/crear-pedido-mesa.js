@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — COMANDO JS (ES6)
    Archivo: js/comandos/crear-pedido-mesa.js
-   Versión: 1.0.2
+   Versión: 1.0.3
    Propósito: Comando para crear un pedido asociado a una mesa.
-              Con imports explícitos.
+              Con imports explícitos. PedidoManager importado correctamente.
    ================================================================ */
 
 import { CommandBus } from '../lib/command-bus.js';
@@ -12,6 +12,7 @@ import { EventBus } from '../lib/eventBus.js';
 import { Logger } from '../lib/logger.js';
 import { DBAppwrite } from '../db-appwrite.js';
 import { DB } from '../db.js';
+import { PedidoManager } from '../managers/pedido-manager.js';
 
 export function crearComandoPedidoMesa(datos) {
   return {
@@ -27,7 +28,7 @@ export function crearComandoPedidoMesa(datos) {
 async function handleCrearPedidoMesa(comando) {
   const { numeroMesa, mozo, comensales } = comando.datos;
 
-  if (typeof PedidoManager === 'undefined' || !PedidoManager.getTurnoActual) {
+  if (!PedidoManager || !PedidoManager.getTurnoActual) {
     throw new Error('Sistema de turnos no disponible');
   }
   const turno = PedidoManager.getTurnoActual();

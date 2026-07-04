@@ -1,11 +1,12 @@
 /* ================================================================
    LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/mesa-detalles.js
-   Versión: 2.0.6
-   Propósito: Panel de detalle de la mesa. Centro de operaciones.
-              Sin onclick. Comunicación vía EventBus.
-              Desacoplado de Pedido y PrecargaControl.
-   Dependencias: Store, EventBus, Logger, Mesas, Cuenta, Cobro
+   Versión: 3.0.3
+   Propósito: Centro de operaciones de mesa. Panel unificado con
+              columna colapsable (swipe), apertura inline, precargas,
+              resumen de comanda. Sin onclick, sin window.
+              Vinculación cliente-mesa corregida: actualiza Store,
+              emite evento correcto y mantiene panel abierto.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -14,11 +15,44 @@ import { Logger } from '../lib/logger.js';
 import { Mesas } from './mesas.js';
 import { Cuenta } from './cuenta.js';
 import { Cobro } from './cobro.js';
+import { CommandBus } from '../lib/command-bus.js';
+import { Auth } from '../auth.js';
+import { DB } from '../db.js';
+import { showToast } from '../utils.js';
 
 const MesaDetalles = (() => {
 
   let _panelVisible = false;
+  let _mesaActual = null;
+  let _columnaColapsada = false;
+  let _comensalesApertura = 2;
+  let _modoApertura = false;
 
+  // ── Swipe ─────────────────────────────────────────────────
+  let _touchStartX = 0;
+  let _touchStartY = 0;
+
+  function _onTouchStart(e) {
+    _touchStartX = e.touches[0].clientX;
+    _touchStartY = e.touches[0].clientY;
+  }
+
+  function _onTouchEnd(e) {
+    const columna = document.getElementById('columnaIzquierda');
+    if (!columna) return;
+    const deltaX = e.changedTouches[0].clientX - _touchStartX;
+    const deltaY = e.changedTouches[0].clientY - _touchStartY;
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
+      if (deltaX > 0) {
+        _columnaColapsada = false;
+      } else {
+        _columnaColapsada = true;
+      }
+      columna.classList.toggle('colapsada', _columnaColapsada);
+    }
+  }
+
+  // ── Construcción del modal ─────────────────────────────────
   function _asegurarModal() {
     if (document.getElementById('modalMesaDetalles')) return;
 
@@ -30,134 +64,376 @@ const MesaDetalles = (() => {
     overlay.setAttribute('aria-modal', 'true');
 
     overlay.innerHTML = `
-      <div class="mesa-detalles-card">
-        <div class="md-fondo"></div>
-        <div class="md-contenido">
-          <div class="md-header">
-            <div class="md-mesa-info">
-              <h2 id="mdTitulo">Mesa</h2>
-              <span class="badge-estado libre" id="mdEstado">LIBRE</span>
-            </div>
-            <button class="md-cerrar" id="btnCerrarMesaDetalles">
-              <i class="fas fa-times"></i>
-            </button>
+      <div class="centro-card">
+        <div class="centro-fondo"></div>
+        <div class="centro-top">
+          <div class="centro-mesa-info">
+            <h2 id="mdTitulo">Mesa</h2>
+            <span class="badge-estado libre" id="mdEstado">LIBRE</span>
           </div>
-          <div class="md-datos" id="mdDatos"></div>
-          <div class="md-atencion" id="mdAtencion" style="display:none;"></div>
-          <div class="md-acciones" id="mdAcciones"></div>
+          <button class="btn-cerrar-modal" id="btnCerrarMesaDetalles">
+            <i class="fas fa-times"></i>
+          </button>
+        </div>
+        <div class="centro-body" id="centroBody">
+          <!-- Columna izquierda (solo mesa ocupada) -->
+          <div class="columna-izquierda" id="columnaIzquierda">
+            <div class="dato-item-sm"><div class="dato-icon"><i class="fas fa-user-tag"></i></div><div class="dato-cuerpo"><div class="dato-label">Mozo</div><div class="dato-valor" id="mdMozo">—</div></div></div>
+            <div class="dato-item-sm"><div class="dato-icon"><i class="fas fa-clock"></i></div><div class="dato-cuerpo"><div class="dato-label">Tiempo</div><div class="dato-valor" id="mdTiempo">—</div></div></div>
+            <div class="comensales-seccion">
+              <div class="comensales-titulo">Comensales (<span id="mdComensales">0</span>)</div>
+              <div class="comensales-lista" id="comensalesGrid"></div>
+            </div>
+          </div>
+          <!-- Columna derecha (contenido principal) -->
+          <div class="columna-derecha" id="columnaDerecha">
+            <!-- Datos básicos (visible en libre/pagada) -->
+            <div class="centro-datos" id="centroDatos"></div>
+            <!-- Mensaje pagada -->
+            <div class="pagada-mensaje" id="pagadaMensaje" style="display:none;"></div>
+            <!-- Sección atención (cliente esperando) -->
+            <div class="seccion-atencion" id="seccionEspera" style="display:none;"></div>
+            <!-- Resumen comanda (mesa ocupada) -->
+            <div class="comanda-resumen" id="comandaResumen" style="display:none;"></div>
+            <!-- Precargas -->
+            <div id="precargasContainer"></div>
+            <!-- Formulario apertura inline -->
+            <div class="apertura-form" id="aperturaForm" style="display:none;"></div>
+            <!-- Acciones -->
+            <div class="acciones-lista" id="accionesContainer"></div>
+          </div>
         </div>
       </div>
     `;
 
     document.body.appendChild(overlay);
 
+    // Listeners
     document.getElementById('btnCerrarMesaDetalles').addEventListener('click', cerrar);
-
     overlay.addEventListener('click', function(e) {
       if (e.target === overlay) cerrar();
     });
 
-    document.getElementById('mdAcciones').addEventListener('click', function(e) {
+    // Swipe en columna izquierda
+    const columna = document.getElementById('columnaIzquierda');
+    columna.addEventListener('touchstart', _onTouchStart, { passive: true });
+    columna.addEventListener('touchend', _onTouchEnd, { passive: true });
+
+    // Delegación en columna derecha (acciones, apertura, precarga)
+    document.getElementById('columnaDerecha').addEventListener('click', function(e) {
       const actionCard = e.target.closest('.action-card');
-      if (!actionCard) return;
-
-      if (actionCard.classList.contains('primaria')) {
-        const mesa = MesaDetalles._mesaActual;
-        if (mesa && mesa.estado === 'libre') {
-          cerrar();
-          EventBus.emit('mesa:abrir_desde_detalle', { mesa: mesa.numero });
-        } else {
-          cerrar();
-          EventBus.emit('mesa:tomar_pedido', { mesa: mesa.numero });
+      if (actionCard) {
+        if (actionCard.classList.contains('primaria')) {
+          if (_mesaActual && _mesaActual.estado === 'libre') {
+            activarModoApertura();
+          } else {
+            cerrar();
+            EventBus.emit('mesa:tomar_pedido', { mesa: _mesaActual.numero });
+          }
+        } else if (actionCard.classList.contains('verde')) {
+          pedirCuenta();
+        } else if (actionCard.classList.contains('roja')) {
+          cerrarMesa();
         }
-      } else if (actionCard.classList.contains('verde')) {
-        pedirCuenta();
-      } else if (actionCard.classList.contains('roja')) {
-        cerrarMesa();
+        return;
       }
-    });
 
-    document.getElementById('mdAtencion').addEventListener('click', function(e) {
       const btnAtender = e.target.closest('.btn-atender');
-      if (!btnAtender) return;
+      if (btnAtender) {
+        if (btnAtender.classList.contains('precarga')) {
+          const precargaId = btnAtender.dataset.precargaId;
+          if (precargaId) cargarPrecarga(precargaId);
+        } else {
+          const numMesa = btnAtender.dataset.numMesa;
+          if (numMesa) aceptarVinculacion(numMesa);
+        }
+        return;
+      }
 
-      if (btnAtender.classList.contains('precarga')) {
-        const precargaId = btnAtender.dataset.precargaId;
-        if (precargaId) cargarPrecarga(precargaId);
-      } else {
-        const numMesa = btnAtender.dataset.numMesa;
-        if (numMesa) aceptarVinculacion(numMesa);
+      const btnApertura = e.target.closest('#btnConfirmarApertura');
+      if (btnApertura) {
+        confirmarApertura();
+        return;
+      }
+
+      const btnCancelarApertura = e.target.closest('#btnCancelarApertura');
+      if (btnCancelarApertura) {
+        cancelarApertura();
+        return;
+      }
+
+      const btnMenos = e.target.closest('#btnMenosComensales');
+      if (btnMenos) {
+        cambiarComensales(-1);
+        return;
+      }
+
+      const btnMas = e.target.closest('#btnMasComensales');
+      if (btnMas) {
+        cambiarComensales(1);
+        return;
       }
     });
   }
 
-  function _htmlDatos(mesa) {
+  // ── Renderizado por estado ─────────────────────────────────
+  function _renderizarEstado(mesa) {
+    _mesaActual = mesa;
+    const estado = mesa.estado;
+
+    // Título y badge
+    document.getElementById('mdTitulo').textContent = mesa.esVirtual ? `Mesas ${mesa.mesasFusionadas.join(' + ')}` : `Mesa ${mesa.numero}`;
+    const badge = document.getElementById('mdEstado');
+    badge.textContent = Mesas.labelEstado(estado);
+    badge.className = `badge-estado ${estado}`;
+
+    const centroBody = document.getElementById('centroBody');
+    const columnaIzquierda = document.getElementById('columnaIzquierda');
+    const datosContainer = document.getElementById('centroDatos');
+    const comandaResumen = document.getElementById('comandaResumen');
+    const pagadaMensaje = document.getElementById('pagadaMensaje');
+    const seccionEspera = document.getElementById('seccionEspera');
+    const aperturaForm = document.getElementById('aperturaForm');
+
+    // Limpiar clases de layout
+    centroBody.classList.remove('layout-simple');
+
+    if (estado === 'ocupada' || estado === 'esperando' || estado === 'cuenta') {
+      // Layout con columna izquierda
+      centroBody.classList.remove('layout-simple');
+      columnaIzquierda.style.display = 'flex';
+      datosContainer.style.display = 'none';
+      comandaResumen.style.display = 'block';
+      pagadaMensaje.style.display = 'none';
+      aperturaForm.style.display = 'none';
+
+      document.getElementById('mdMozo').textContent = mesa.mozo || '—';
+      document.getElementById('mdTiempo').textContent = mesa.abiertaEn ? _tiempoDesde(mesa.abiertaEn) : '—';
+      document.getElementById('mdComensales').textContent = mesa.comensales || 0;
+      _renderizarComensales(mesa.personas || []);
+      _renderizarComanda(mesa);
+    } else {
+      // Layout simple (libre / pagada)
+      centroBody.classList.add('layout-simple');
+      columnaIzquierda.style.display = 'none';
+      datosContainer.style.display = 'grid';
+      comandaResumen.style.display = 'none';
+      aperturaForm.style.display = 'none';
+
+      // Mostrar datos básicos
+      datosContainer.innerHTML = _htmlDatosBasicos(mesa);
+
+      // Pagada
+      if (estado === 'pagada') {
+        pagadaMensaje.style.display = 'block';
+        pagadaMensaje.innerHTML = `
+          <i class="fas fa-check-circle"></i>
+          <p class="pagada-titulo">Mesa pagada</p>
+          <p class="pagada-sub">Esperando liberación por el cajero</p>
+        `;
+      } else {
+        pagadaMensaje.style.display = 'none';
+      }
+    }
+
+    // Sección atención (espera/precarga)
+    const infoAtencion = Mesas.getBadgeAtencion(mesa.numero);
+    if (infoAtencion && infoAtencion.tipo === 'esperando' && estado === 'libre') {
+      seccionEspera.style.display = 'flex';
+      seccionEspera.className = 'seccion-atencion';
+      seccionEspera.innerHTML = `
+        <div class="atencion-avatar">${infoAtencion.iniciales || '?'}</div>
+        <div class="atencion-texto">
+          <strong>${infoAtencion.nombre || 'Cliente'}</strong><br>quiere unirse a la Mesa ${mesa.numero}
+        </div>
+        <button class="btn-atender" data-num-mesa="${mesa.numero}">Aceptar</button>
+      `;
+    } else if (infoAtencion && infoAtencion.tipo === 'precarga') {
+      seccionEspera.style.display = 'flex';
+      seccionEspera.className = 'seccion-atencion precarga';
+      seccionEspera.innerHTML = `
+        <div class="atencion-avatar">${infoAtencion.iniciales || '?'}</div>
+        <div class="atencion-texto">
+          <strong>${infoAtencion.nombre || 'Cliente'}</strong><br>quiere añadir un pedido
+        </div>
+        <button class="btn-atender precarga" data-precarga-id="${infoAtencion.precargaId}">Cargar</button>
+      `;
+    } else {
+      seccionEspera.style.display = 'none';
+    }
+
+    // Acciones
+    _renderizarAcciones(estado);
+
+    // Resetear modo apertura
+    _modoApertura = false;
+    _comensalesApertura = 2;
+  }
+
+  function _htmlDatosBasicos(mesa) {
     const mozo = mesa.mozo || 'Sin asignar';
     const comensales = mesa.comensales || '—';
     const zona = mesa.zona || 'Salón';
     let tiempo = '—';
-    if (mesa.abiertaEn) {
-      const min = Math.floor((Date.now() - mesa.abiertaEn) / 60000);
-      tiempo = min === 0 ? 'Ahora' : `Hace ${min} min`;
-    }
+    if (mesa.abiertaEn) tiempo = _tiempoDesde(mesa.abiertaEn);
     return `
-      <div class="md-dato"><span class="md-dato-label">Mozo</span><span class="md-dato-valor">${mozo}</span></div>
-      <div class="md-dato"><span class="md-dato-label">Comensales</span><span class="md-dato-valor">${comensales}</span></div>
-      <div class="md-dato"><span class="md-dato-label">Zona</span><span class="md-dato-valor">${zona}</span></div>
-      <div class="md-dato"><span class="md-dato-label">Abierta hace</span><span class="md-dato-valor">${tiempo}</span></div>`;
+      <div class="dato-item"><div class="dato-icon"><i class="fas fa-user-tag"></i></div><div class="dato-cuerpo"><div class="dato-label">Mozo</div><div class="dato-valor">${mozo}</div></div></div>
+      <div class="dato-item"><div class="dato-icon"><i class="fas fa-users"></i></div><div class="dato-cuerpo"><div class="dato-label">Comensales</div><div class="dato-valor">${comensales}</div></div></div>
+      <div class="dato-item"><div class="dato-icon"><i class="fas fa-map-marker-alt"></i></div><div class="dato-cuerpo"><div class="dato-label">Zona</div><div class="dato-valor">${zona}</div></div></div>
+      <div class="dato-item"><div class="dato-icon"><i class="fas fa-clock"></i></div><div class="dato-cuerpo"><div class="dato-label">Abierta hace</div><div class="dato-valor">${tiempo}</div></div></div>
+    `;
   }
 
-  function _htmlAcciones(mesa) {
-    if (mesa.estado === 'pagada') {
-      return `<div style="text-align:center; padding:16px; color:var(--color-text-sec);">
-        <i class="fas fa-check-circle" style="font-size:24px; color:#10b981; display:block; margin-bottom:8px;"></i>
-        <p style="font-size:14px; font-weight:600; color:#10b981;">Mesa pagada</p>
-        <p style="font-size:12px; color:var(--color-text-muted);">Esperando liberación por el cajero</p></div>`;
-    }
-    if (mesa.estado === 'cuenta') {
-      return `<div class="action-card roja"><div class="action-icon"><i class="fas fa-check-circle"></i></div><div class="action-details"><h4>Cerrar Mesa</h4><p>Procesar pago y liberar</p></div></div>`;
-    }
-    const libre = mesa.estado === 'libre';
-    let html = '';
-    if (libre) {
-      html += `<div class="action-card primaria"><div class="action-icon"><i class="fas fa-door-open"></i></div><div class="action-details"><h4>Abrir Mesa</h4><p>Asignar mozo y comensales</p></div></div>`;
-    } else {
-      html += `<div class="action-card primaria"><div class="action-icon"><i class="fas fa-utensils"></i></div><div class="action-details"><h4>Tomar Pedido</h4><p>Agregar ítems a la comanda</p></div></div>`;
-    }
-    html += `<div class="action-card verde"><div class="action-icon"><i class="fas fa-file-invoice-dollar"></i></div><div class="action-details"><h4>Pedir Cuenta</h4><p>Generar pre-cuenta para la mesa</p></div></div>`;
-    html += `<div class="action-card roja"><div class="action-icon"><i class="fas fa-check-circle"></i></div><div class="action-details"><h4>Cerrar Mesa</h4><p>Procesar pago y liberar</p></div></div>`;
-    return html;
+  function _renderizarComensales(personas) {
+    const grid = document.getElementById('comensalesGrid');
+    if (!grid) return;
+    const lista = personas && personas.length > 0 ? personas : ['General'];
+    grid.innerHTML = lista.map(nombre => {
+      const iniciales = nombre.split(' ').map(n => n.charAt(0).toUpperCase()).slice(0, 2).join('');
+      return `<div class="comensal-fila"><div class="comensal-avatar">${iniciales}</div><div class="comensal-nombre">${nombre}</div></div>`;
+    }).join('');
   }
 
+  function _renderizarComanda(mesa) {
+    const container = document.getElementById('comandaResumen');
+    if (!container) return;
+    const items = mesa.items || [];
+    const total = items.reduce((sum, i) => sum + (i.precio || 0) * (i.qty || 1), 0);
+    container.innerHTML = `
+      <div class="resumen-titulo">Comanda activa</div>
+      <div class="resumen-items">
+        ${items.map(i => `<div class="resumen-item"><span>${i.nombre} x${i.qty}</span><span>$${(i.precio * i.qty).toLocaleString()}</span></div>`).join('')}
+      </div>
+      <div class="resumen-total"><span>Total</span><span>$${total.toLocaleString()}</span></div>
+    `;
+    setTimeout(() => {
+      container.scrollTop = container.scrollHeight - container.clientHeight;
+    }, 0);
+  }
+
+  function _renderizarAcciones(estado) {
+    const container = document.getElementById('accionesContainer');
+    if (!container) return;
+
+    if (estado === 'pagada') {
+      container.innerHTML = `
+        <div class="action-card roja">
+          <div class="action-icon"><i class="fas fa-door-open"></i></div>
+          <div class="action-details"><h4>Forzar Apertura</h4><p>La mesa está pagada pero no liberada. Abrir de todos modos.</p></div>
+          <div class="action-arrow"><i class="fas fa-angle-right"></i></div>
+        </div>`;
+    } else if (estado === 'libre') {
+      if (_modoApertura) {
+        container.innerHTML = '';
+      } else {
+        container.innerHTML = `
+          <div class="action-card primaria">
+            <div class="action-icon"><i class="fas fa-door-open"></i></div>
+            <div class="action-details"><h4>Abrir Mesa</h4><p>Asignar mozo y comensales</p></div>
+            <div class="action-arrow"><i class="fas fa-angle-right"></i></div>
+          </div>`;
+      }
+    } else { // ocupada, esperando, cuenta
+      container.innerHTML = `
+        <div class="action-card primaria">
+          <div class="action-icon"><i class="fas fa-utensils"></i></div>
+          <div class="action-details"><h4>Tomar Pedido</h4><p>Agregar ítems a la comanda</p></div>
+          <div class="action-arrow"><i class="fas fa-angle-right"></i></div>
+        </div>
+        <div class="action-card verde">
+          <div class="action-icon"><i class="fas fa-file-invoice-dollar"></i></div>
+          <div class="action-details"><h4>Pedir Cuenta</h4><p>Generar pre-cuenta</p></div>
+          <div class="action-arrow"><i class="fas fa-angle-right"></i></div>
+        </div>
+        <div class="action-card roja">
+          <div class="action-icon"><i class="fas fa-check-circle"></i></div>
+          <div class="action-details"><h4>Cerrar Mesa</h4><p>Procesar pago y liberar</p></div>
+          <div class="action-arrow"><i class="fas fa-angle-right"></i></div>
+        </div>`;
+    }
+  }
+
+  // ── Apertura inline ───────────────────────────────────────
+  function activarModoApertura() {
+    _modoApertura = true;
+    _comensalesApertura = 2;
+    const form = document.getElementById('aperturaForm');
+    form.style.display = 'flex';
+    form.innerHTML = `
+      <label>Cantidad de Comensales</label>
+      <div class="selector-comensales">
+        <button id="btnMenosComensales"><i class="fas fa-minus"></i></button>
+        <span class="cantidad" id="cantidadComensales">2</span>
+        <button id="btnMasComensales"><i class="fas fa-plus"></i></button>
+      </div>
+      <div class="apertura-botones">
+        <button class="btn-cancelar" id="btnCancelarApertura">Cancelar</button>
+        <button class="btn-confirmar" id="btnConfirmarApertura"><i class="fas fa-check-circle"></i> Confirmar y Abrir</button>
+      </div>
+    `;
+    _renderizarAcciones('libre');
+  }
+
+  function cambiarComensales(delta) {
+    _comensalesApertura = Math.max(1, Math.min(20, _comensalesApertura + delta));
+    document.getElementById('cantidadComensales').textContent = _comensalesApertura;
+  }
+
+  function cancelarApertura() {
+    _modoApertura = false;
+    document.getElementById('aperturaForm').style.display = 'none';
+    _renderizarAcciones('libre');
+  }
+
+  async function confirmarApertura() {
+    if (!_mesaActual) return;
+    const num = _mesaActual.numero;
+    const comensales = _comensalesApertura;
+    const mozo = document.getElementById('mozoActivo')?.value || 'Mozo';
+    cancelarApertura();
+
+    try {
+      const resultado = await CommandBus.ejecutar({
+        type: 'crearPedidoMesa',
+        datos: {
+          numeroMesa: num,
+          mozo: mozo,
+          comensales: comensales
+        }
+      });
+      if (resultado.exito) {
+        showToast('success', `Mesa ${num} abierta`);
+        const mesas = Store.getState().mesas;
+        const mesaActualizada = mesas.find(m => m.numero == num);
+        if (mesaActualizada) {
+          _renderizarEstado(mesaActualizada);
+        }
+        EventBus.emit('mesa:tomar_pedido', { mesa: num });
+      } else {
+        showToast('error', resultado.error || 'Error al abrir mesa');
+      }
+    } catch (e) {
+      Logger.error('[MesaDetalles] Error al abrir mesa:', e);
+      showToast('error', 'Error inesperado al abrir mesa');
+    }
+  }
+
+  function _tiempoDesde(ts) {
+    const min = Math.floor((Date.now() - ts) / 60000);
+    return min === 0 ? 'Ahora' : `Hace ${min} min`;
+  }
+
+  // ── API pública ──────────────────────────────────────────
   function abrir(numMesa) {
     _asegurarModal();
     const mesas = Store.getState().mesas || [];
     const mesa = mesas.find(m => m.numero == numMesa);
     if (!mesa) { Logger.warn('[MesaDetalles] Mesa no encontrada:', numMesa); return; }
 
-    document.getElementById('mdTitulo').textContent = mesa.esVirtual ? `Mesas ${mesa.mesasFusionadas.join(' + ')}` : `Mesa ${mesa.numero}`;
-    const badge = document.getElementById('mdEstado');
-    badge.textContent = Mesas.labelEstado(mesa.estado);
-    badge.className = `badge-estado ${mesa.estado}`;
+    _columnaColapsada = false;
+    _modoApertura = false;
+    _renderizarEstado(mesa);
 
-    document.getElementById('mdDatos').innerHTML = _htmlDatos(mesa);
-
-    const seccionAtencion = document.getElementById('mdAtencion');
-    const infoAtencion = Mesas.getBadgeAtencion(numMesa);
-    if (infoAtencion) {
-      if (infoAtencion.tipo === 'esperando') {
-        seccionAtencion.style.display = 'block';
-        seccionAtencion.className = 'md-atencion';
-        seccionAtencion.innerHTML = `<div class="atencion-avatar">${infoAtencion.iniciales || '?'}</div><div class="atencion-texto"><strong>${infoAtencion.nombre || 'Cliente'}</strong><br>quiere unirse a la Mesa ${numMesa}</div><button class="btn-atender" data-num-mesa="${numMesa}">Aceptar</button>`;
-      } else if (infoAtencion.tipo === 'precarga') {
-        seccionAtencion.style.display = 'block';
-        seccionAtencion.className = 'md-atencion precarga';
-        seccionAtencion.innerHTML = `<div class="atencion-avatar">${infoAtencion.iniciales || '?'}</div><div class="atencion-texto"><strong>${infoAtencion.nombre || 'Cliente'}</strong><br>quiere añadir un pedido a la Mesa ${numMesa}</div><button class="btn-atender precarga" data-precarga-id="${infoAtencion.precargaId}">Cargar Pedido</button>`;
-      } else { seccionAtencion.style.display = 'none'; }
-    } else { seccionAtencion.style.display = 'none'; }
-
-    document.getElementById('mdAcciones').innerHTML = _htmlAcciones(mesa);
-    MesaDetalles._mesaActual = mesa;
     document.getElementById('modalMesaDetalles').style.display = 'flex';
     _panelVisible = true;
     EventBus.emit('mesa-detalle:abierto');
@@ -174,28 +450,64 @@ const MesaDetalles = (() => {
   function cerrarMesa() { cerrar(); if (Cobro && Cobro.abrirModalCierre) Cobro.abrirModalCierre(); }
 
   function aceptarVinculacion(numMesa) {
-    cerrar();
-    EventBus.emit('mesa:abrir_desde_detalle', { mesa: numMesa });
+    // 1. Actualizar DB
+    const mesa = DB.mesas.find(m => m.numero == numMesa);
+    if (mesa) {
+      mesa.estado = 'ocupada';
+      mesa.permite_prepedidos = true;
+      DB.saveMesas();
+    }
+
+    // 2. Actualizar Store
+    Store.dispatch({
+      type: 'MESA_ACTUALIZAR',
+      payload: {
+        numero: numMesa,
+        cambios: { estado: 'ocupada', permite_prepedidos: true }
+      }
+    });
+
+    // 3. Emitir evento en el formato que el cliente escucha
+    EventBus.emit('mesas:actualizada', {
+      numero: numMesa,
+      estado: 'ocupada',
+      permite_prepedidos: true
+    });
+
+    // 4. Limpiar badge de atención
     Mesas.clearBadgeAtencion(numMesa);
+
+    // 5. Refrescar panel para mostrar vista de ocupada sin cerrar
+    _mesaActual = DB.mesas.find(m => m.numero == numMesa) || _mesaActual;
+    if (_mesaActual) {
+      _renderizarEstado(_mesaActual);
+    }
   }
 
   function cargarPrecarga(precargaId) {
     EventBus.emit('precarga:cargar_en_comanda', {
       precargaId,
-      mesa: MesaDetalles._mesaActual ? MesaDetalles._mesaActual.numero : null
+      mesa: _mesaActual ? _mesaActual.numero : null
     });
     cerrar();
   }
 
-  // Suscribirse al evento que activa el panel
   EventBus.on('mesa:seleccionada', (numMesa) => {
     if (_panelVisible) return;
     abrir(numMesa);
   });
 
-  Logger.info('[MesaDetalles] Módulo inicializado (ES6 v2.0.6).');
+  Logger.info('[MesaDetalles] Módulo inicializado (ES6 v3.0.3).');
 
-  return { abrir, cerrar, pedirCuenta, cerrarMesa, aceptarVinculacion, cargarPrecarga, _mesaActual: null };
+  return {
+    abrir,
+    cerrar,
+    pedirCuenta,
+    cerrarMesa,
+    aceptarVinculacion,
+    cargarPrecarga,
+    _mesaActual: null
+  };
 })();
 
 export { MesaDetalles };

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>La Taberna — Centro de Operaciones (Prototipo Unificado)</title>
+  <title>La Taberna — Mesa Detalles (Prototipo Ajustado)</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     :root {
@@ -104,52 +104,58 @@
       flex: 1;
       display: flex;
       flex-direction: column;
-      padding: 20px;
-      gap: 14px;
+      padding: 24px;
+      gap: 16px;
       overflow-y: auto;
     }
 
     /* Barra superior del modal */
     .centro-top {
-      display: flex; justify-content: space-between; align-items: flex-start; flex-shrink: 0;
+      display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
     }
     .centro-mesa-info h2 {
-      font-size: 1.4rem; font-weight: 800;
+      font-size: 1.6rem; font-weight: 800;
       background: linear-gradient(to right, var(--color-accent), var(--color-primary));
       -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      display: flex; align-items: center; gap: 8px;
     }
     .centro-mesa-info .badge-estado {
       font-size: 0.7rem; font-weight: 700; padding: 3px 10px; border-radius: 99px;
-      text-transform: uppercase; display: inline-block; margin-top: 4px;
+      text-transform: uppercase; display: inline-block; margin-top: 4px; letter-spacing: 0.5px;
     }
     .badge-estado.libre { background: rgba(34,197,94,.2); color: #22c55e; }
     .badge-estado.ocupada { background: rgba(59,130,246,.2); color: #3b82f6; }
     .badge-estado.esperando { background: rgba(245,158,11,.2); color: #f59e0b; }
+    .badge-estado.pagada { background: rgba(16,185,129,.2); color: #10b981; }
+    
+    /* Botón cerrar optimizado para dedos (Touch Target) */
     .btn-cerrar-modal {
-      background: transparent; border: none; color: var(--color-text-sec);
-      font-size: 1.2rem; cursor: pointer; padding: 4px;
+      background: rgba(255, 255, 255, 0.03); border: 1px solid var(--color-border); color: var(--color-text-sec);
+      font-size: 1rem; cursor: pointer; width: 40px; height: 40px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; transition: var(--t);
     }
-    .btn-cerrar-modal:hover { color: #fff; }
+    .btn-cerrar-modal:hover { color: #fff; border-color: var(--color-text-sec); background: rgba(255, 255, 255, 0.08); }
 
-    /* Datos de la mesa */
+    /* Datos de la mesa con iconos integrados */
     .centro-datos {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 8px; flex-shrink: 0;
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px; flex-shrink: 0;
     }
     .dato-item {
       background: var(--color-card); border: 1px solid var(--color-border);
-      border-radius: var(--radius-sm); padding: 10px 12px;
+      border-radius: var(--radius-sm); padding: 12px; display: flex; align-items: center; gap: 10px;
     }
+    .dato-icon {
+      font-size: 1.1rem; color: var(--color-text-sec); width: 24px; text-align: center;
+    }
+    .dato-cuerpo { flex: 1; min-width: 0; }
     .dato-item .dato-label { font-size: 0.65rem; color: var(--color-text-sec); text-transform: uppercase; letter-spacing: 0.5px; }
-    .dato-item .dato-valor { font-size: 0.9rem; font-weight: 700; margin-top: 2px; }
+    .dato-item .dato-valor { font-size: 0.95rem; font-weight: 700; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-    /* Sección de atención (cliente esperando / precarga) */
+    /* Sección de atención (cliente esperando) */
     .seccion-atencion {
       background: rgba(99,102,241,.1); border: 1px solid rgba(99,102,241,.25);
       border-radius: var(--radius-sm); padding: 12px 14px; flex-shrink: 0;
-      display: flex; align-items: center; gap: 10px;
-    }
-    .seccion-atencion.precarga {
-      background: rgba(245,158,11,.1); border-color: rgba(245,158,11,.25);
+      display: flex; align-items: center; gap: 12px;
     }
     .seccion-atencion .atencion-avatar {
       width: 42px; height: 42px; border-radius: 50%;
@@ -157,58 +163,117 @@
       display: flex; align-items: center; justify-content: center;
       font-weight: bold; font-size: 0.8rem; color: #fff; flex-shrink: 0;
     }
-    .seccion-atencion.precarga .atencion-avatar {
-      background: linear-gradient(135deg, var(--color-accent), #d97706);
-    }
-    .seccion-atencion .atencion-texto { flex: 1; font-size: 0.8rem; }
+    .seccion-atencion .atencion-texto { flex: 1; font-size: 0.8rem; line-height: 1.3; }
     .seccion-atencion .atencion-texto strong { color: #a5b4fc; }
-    .seccion-atencion.precarga .atencion-texto strong { color: #fbbf24; }
     .btn-atender {
       background: var(--color-primary); color: #fff; border: none;
-      padding: 8px 14px; border-radius: 20px; font-weight: 700; font-size: 0.75rem;
+      padding: 10px 16px; border-radius: 8px; font-weight: 700; font-size: 0.8rem;
       cursor: pointer; transition: var(--t); flex-shrink: 0;
     }
     .btn-atender:hover { background: #818cf8; }
-    .btn-atender.precarga {
-      background: var(--color-accent); color: #000;
-    }
-    .btn-atender.precarga:hover { background: #d97706; }
 
-    /* Tarjetas de acción */
+    /* Mensaje de estado pagada */
+    .pagada-mensaje {
+      text-align: center; padding: 16px; color: var(--color-text-sec); flex-shrink: 0;
+      background: rgba(16,185,129,0.05); border: 1px solid rgba(16,185,129,0.15); border-radius: var(--radius-sm);
+    }
+    .pagada-mensaje i { font-size: 26px; color: #10b981; display: block; margin-bottom: 8px; }
+    .pagada-mensaje .pagada-titulo { font-size: 14px; font-weight: 700; color: #10b981; }
+    .pagada-mensaje .pagada-sub { font-size: 12px; color: var(--color-text-sec); margin-top: 2px; }
+
+    /* Tarjetas de acción limpias sin CSS absoluto forzado */
     .acciones-lista {
-      display: flex; flex-direction: column; gap: 8px; flex-shrink: 0;
+      display: flex; flex-direction: column; gap: 10px; flex-shrink: 0;
     }
     .action-card {
       background: var(--color-card); border: 1px solid var(--color-border);
-      border-radius: var(--radius); padding: 14px 16px;
-      display: flex; align-items: center; gap: 12px;
+      border-radius: var(--radius); padding: 16px;
+      display: flex; align-items: center; gap: 14px;
       cursor: pointer; text-align: left; position: relative;
       transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
     }
-    .action-card::after {
-      content: '\f105'; font-family: 'Font Awesome 6 Free'; font-weight: 900;
-      position: absolute; right: 16px; color: var(--color-text-muted, #64748b);
-      font-size: 1rem; transition: transform 0.2s;
-    }
-    .action-card:hover { border-color: var(--color-accent); transform: translateY(-2px); }
-    .action-card:hover::after { transform: translateX(3px); color: #fff; }
-    .action-card.primaria { border-color: rgba(245,158,11,.3); background: rgba(245,158,11,.05); }
+    .action-card:hover { border-color: var(--color-accent); transform: translateY(-2px); background: rgba(255,255,255,0.02); }
+    
+    .action-card.primaria { border-color: rgba(245,158,11,.25); background: rgba(245,158,11,.03); }
     .action-card.primaria .action-icon { color: var(--color-accent); }
+    .action-card.verde { border-color: rgba(34,197,94,0.15); }
     .action-card.verde .action-icon { color: #22c55e; }
+    .action-card.roja { border-color: rgba(239,68,68,0.15); }
     .action-card.roja .action-icon { color: #ef4444; }
-    .action-icon { font-size: 1.4rem; width: 32px; display: flex; justify-content: center; }
-    .action-details h4 { font-size: 0.9rem; font-weight: 700; margin-bottom: 2px; }
-    .action-details p  { font-size: 0.7rem; color: var(--color-text-sec); }
+    
+    .action-icon { font-size: 1.3rem; width: 36px; height: 36px; border-radius: 8px; background: rgba(255,255,255,0.03); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .action-details { flex: 1; min-width: 0; }
+    .action-details h4 { font-size: 0.95rem; font-weight: 700; color: var(--color-text); }
+    .action-details p  { font-size: 0.75rem; color: var(--color-text-sec); margin-top: 1px; }
+    
+    /* Flecha controlada por flexbox en vez de absoluta */
+    .action-arrow {
+      color: #475569; font-size: 0.9rem; transition: transform 0.2s, color 0.2s; margin-left: auto; padding-left: 8px;
+    }
+    .action-card:hover .action-arrow { transform: translateX(3px); color: #fff; }
+
+    /* Resumen de comanda */
+    .comanda-resumen {
+      background: var(--color-card); border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm); padding: 14px; flex-shrink: 0;
+    }
+    .comanda-resumen .resumen-titulo {
+      font-size: 0.65rem; color: var(--color-text-sec); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; font-weight: 600;
+    }
+    .comanda-resumen .resumen-items {
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .resumen-item {
+      display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--color-text-sec);
+    }
+    .resumen-item span:first-child { color: var(--color-text); font-weight: 500; }
+    .resumen-total {
+      border-top: 1px solid var(--color-border); margin-top: 10px; padding-top: 10px;
+      display: flex; justify-content: space-between; font-weight: 700; font-size: 1rem;
+    }
+    .resumen-total span:last-child { color: var(--color-accent); }
+
+    /* Formulario de apertura */
+    .apertura-form {
+      background: var(--color-card); border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm); padding: 16px; flex-shrink: 0;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .apertura-form label {
+      font-size: 0.65rem; color: var(--color-text-sec); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600;
+    }
+    .selector-comensales {
+      display: flex; align-items: center; justify-content: center; gap: 24px; margin: 6px 0;
+    }
+    .selector-comensales button {
+      width: 46px; height: 46px; border-radius: 50%; background: var(--color-panel);
+      border: 2px solid var(--color-border); color: var(--color-text); font-size: 1.2rem;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: var(--t);
+    }
+    .selector-comensales button:hover { border-color: var(--color-accent); color: var(--color-accent); }
+    .selector-comensales .cantidad {
+      font-size: 2.2rem; font-weight: 800; min-width: 50px; text-align: center;
+    }
+    .apertura-botones {
+      display: flex; gap: 8px;
+    }
+    .apertura-botones button {
+      flex: 1; padding: 12px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; border: none; transition: var(--t);
+    }
+    .btn-cancelar { background: var(--color-panel); color: var(--color-text-sec); border: 1px solid var(--color-border); }
+    .btn-cancelar:hover { background: var(--color-border); color: #fff; }
+    .btn-confirmar { background: var(--color-accent); color: #000; }
+    .btn-confirmar:hover { background: #fbbf24; }
   </style>
 </head>
 <body>
   <div class="simulador">
-    <h2 style="margin-bottom:12px;">🧪 Centro de Operaciones — Prototipo</h2>
+    <h2 style="margin-bottom:12px;">🧪 Mesa Detalles — Prototipo Ajustado</h2>
     <button onclick="abrirCentro('libre', 'esperando')">Mesa 5 — Libre (cliente esperando)</button>
-    <button onclick="abrirCentro('libre', 'precarga')">Mesa 5 — Libre (precarga enviada)</button>
     <button onclick="abrirCentro('ocupada', null)">Mesa 8 — Ocupada</button>
-    <button onclick="abrirCentro('esperando', null)">Mesa 3 — Lista</button>
-    <p class="info">Clic en un botón para simular la apertura del centro de operaciones.</p>
+    <button onclick="abrirCentro('pagada', null)">Mesa 3 — Pagada</button>
+    <p class="info">Clic en un botón para simular el panel de detalle.</p>
   </div>
 
   <!-- Modal del Centro de Operaciones -->
@@ -219,7 +284,7 @@
         <!-- Cabecera -->
         <div class="centro-top">
           <div class="centro-mesa-info">
-            <h2 id="centroTitulo">Mesa 5</h2>
+            <h2 id="centroTitulo"><i class="fas fa-wine-glass-alt" style="color: var(--color-accent); font-size: 1.3rem;"></i> Mesa 5</h2>
             <span class="badge-estado libre" id="centroBadge">LIBRE</span>
           </div>
           <button class="btn-cerrar-modal" onclick="cerrarCentro()">
@@ -227,77 +292,167 @@
           </button>
         </div>
 
-        <!-- Datos -->
+        <!-- Datos con Iconografía Operativa -->
         <div class="centro-datos">
-          <div class="dato-item"><div class="dato-label">Mozo</div><div class="dato-valor" id="centroMozo">Sin asignar</div></div>
-          <div class="dato-item"><div class="dato-label">Comensales</div><div class="dato-valor" id="centroComensales">—</div></div>
-          <div class="dato-item"><div class="dato-label">Zona</div><div class="dato-valor">Salón</div></div>
-          <div class="dato-item"><div class="dato-label">Abierta hace</div><div class="dato-valor" id="centroTiempo">—</div></div>
+          <div class="dato-item">
+            <div class="dato-icon"><i class="fas fa-user-tag"></i></div>
+            <div class="dato-cuerpo">
+              <div class="dato-label">Mozo</div>
+              <div class="dato-valor" id="centroMozo">Sin asignar</div>
+            </div>
+          </div>
+          <div class="dato-item">
+            <div class="dato-icon"><i class="fas fa-users"></i></div>
+            <div class="dato-cuerpo">
+              <div class="dato-label">Comensales</div>
+              <div class="dato-valor" id="centroComensales">—</div>
+            </div>
+          </div>
+          <div class="dato-item">
+            <div class="dato-icon"><i class="fas fa-map-marker-alt"></i></div>
+            <div class="dato-cuerpo">
+              <div class="dato-label">Zona</div>
+              <div class="dato-valor">Salón</div>
+            </div>
+          </div>
+          <div class="dato-item">
+            <div class="dato-icon"><i class="fas fa-clock"></i></div>
+            <div class="dato-cuerpo">
+              <div class="dato-label">Abierta hace</div>
+              <div class="dato-valor" id="centroTiempo">—</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mensaje de estado pagada -->
+        <div class="pagada-mensaje" id="pagadaMensaje" style="display:none;">
+          <i class="fas fa-check-circle"></i>
+          <p class="pagada-titulo">Mesa pagada</p>
+          <p class="pagada-sub">Esperando liberación por el cajero</p>
         </div>
 
         <!-- Sección de atención (cliente esperando) -->
         <div class="seccion-atencion" id="seccionEspera" style="display:none;">
           <div class="atencion-avatar">TQ</div>
           <div class="atencion-texto">
-            <strong>Trinidad Quilodrán</strong><br>quiere unirse a la <span>Mesa 5</span>
+            <strong>Trinidad Quilodrán</strong><br>quieres unirse a la <span>Mesa 5</span>
           </div>
           <button class="btn-atender" onclick="alert('Vinculación aceptada (simulación)')">
             Aceptar
           </button>
         </div>
 
-        <!-- Sección de atención (precarga) -->
-        <div class="seccion-atencion precarga" id="seccionPrecarga" style="display:none;">
-          <div class="atencion-avatar">JP</div>
-          <div class="atencion-texto">
-            <strong>Juan Pérez</strong><br>quiere añadir un pedido a la <span>Mesa 5</span>
+        <!-- Resumen de comanda (mesa ocupada) -->
+        <div class="comanda-resumen" id="comandaResumen" style="display:none;">
+          <div class="resumen-titulo">Comanda activa</div>
+          <div class="resumen-items">
+            <div class="resumen-item"><span>Hamburguesa x2</span><span>$3000</span></div>
+            <div class="resumen-item"><span>Cerveza x1</span><span>$800</span></div>
           </div>
-          <button class="btn-atender precarga" onclick="alert('Precarga cargada (simulación)')">
-            Cargar Pedido
-          </button>
+          <div class="resumen-total"><span>Total</span><span>$3800</span></div>
+        </div>
+
+        <!-- Formulario de apertura (solo libre, oculto al inicio) -->
+        <div class="apertura-form" id="aperturaForm" style="display:none;">
+          <label>Cantidad de Comensales</label>
+          <div class="selector-comensales">
+            <button onclick="cambiarComensales(-1)"><i class="fas fa-minus"></i></button>
+            <span class="cantidad" id="cantidadComensales">2</span>
+            <button onclick="cambiarComensales(1)"><i class="fas fa-plus"></i></button>
+          </div>
+          <div class="apertura-botones">
+            <button class="btn-cancelar" onclick="cancelarApertura()">Cancelar</button>
+            <button class="btn-confirmar" onclick="alert('Mesa abierta con ' + document.getElementById('cantidadComensales').textContent + ' comensales (simulación)')"><i class="fas fa-check-circle"></i> Confirmar y Abrir</button>
+          </div>
         </div>
 
         <!-- Acciones -->
-        <div class="acciones-lista">
-          <div class="action-card primaria" id="cardAbrir" onclick="alert('Abrir mesa (simulación)')">
-            <div class="action-icon"><i class="fas fa-door-open"></i></div>
-            <div class="action-details"><h4>Abrir Mesa</h4><p>Asignar mozo y comensales</p></div>
-          </div>
-          <div class="action-card primaria" id="cardPedido" onclick="alert('Tomar pedido (simulación)')" style="display:none;">
-            <div class="action-icon"><i class="fas fa-utensils"></i></div>
-            <div class="action-details"><h4>Tomar Pedido</h4><p>Agregar ítems a la comanda</p></div>
-          </div>
-          <div class="action-card verde" onclick="alert('Pedir cuenta (simulación)')">
-            <div class="action-icon"><i class="fas fa-file-invoice-dollar"></i></div>
-            <div class="action-details"><h4>Pedir Cuenta</h4><p>Generar pre-cuenta para la mesa</p></div>
-          </div>
-          <div class="action-card roja" onclick="alert('Cerrar mesa (simulación)')">
-            <div class="action-icon"><i class="fas fa-check-circle"></i></div>
-            <div class="action-details"><h4>Cerrar Mesa</h4><p>Procesar pago y liberar</p></div>
-          </div>
+        <div class="acciones-lista" id="accionesContainer">
+          <!-- Se llena dinámicamente -->
         </div>
       </div>
     </div>
   </div>
 
   <script>
+    let _comensales = 2;
+    let _modoApertura = false;
+
+    function cambiarComensales(delta) {
+      _comensales = Math.max(1, Math.min(20, _comensales + delta));
+      document.getElementById('cantidadComensales').textContent = _comensales;
+    }
+
+    function cancelarApertura() {
+      _modoApertura = false;
+      document.getElementById('aperturaForm').style.display = 'none';
+      renderizarAcciones('libre');
+    }
+
+    function activarModoApertura() {
+      _modoApertura = true;
+      document.getElementById('aperturaForm').style.display = 'flex';
+      renderizarAcciones('libre');
+    }
+
+    function renderizarAcciones(estado) {
+      const container = document.getElementById('accionesContainer');
+      if (estado === 'pagada') {
+        container.innerHTML = `
+          <div class="action-card roja" onclick="alert('Forzar apertura de mesa pagada (simulación)')">
+            <div class="action-icon"><i class="fas fa-door-open"></i></div>
+            <div class="action-details"><h4>Forzar Apertura</h4><p>La mesa está pagada pero no liberada. Abrir de todos modos.</p></div>
+            <div class="action-arrow"><i class="fas fa-angle-right"></i></div>
+          </div>`;
+      } else if (estado === 'libre') {
+        if (_modoApertura) {
+          container.innerHTML = '';
+        } else {
+          container.innerHTML = `
+            <div class="action-card primaria" onclick="activarModoApertura()">
+              <div class="action-icon"><i class="fas fa-door-open"></i></div>
+              <div class="action-details"><h4>Abrir Mesa</h4><p>Asignar mozo y comensales</p></div>
+              <div class="action-arrow"><i class="fas fa-angle-right"></i></div>
+            </div>`;
+        }
+      } else if (estado === 'ocupada') {
+        container.innerHTML = `
+          <div class="action-card primaria" onclick="alert('Tomar pedido (simulación)')">
+            <div class="action-icon"><i class="fas fa-utensils"></i></div>
+            <div class="action-details"><h4>Tomar Pedido</h4><p>Agregar ítems a la comanda</p></div>
+            <div class="action-arrow"><i class="fas fa-angle-right"></i></div>
+          </div>
+          <div class="action-card verde" onclick="alert('Pedir cuenta (simulación)')">
+            <div class="action-icon"><i class="fas fa-file-invoice-dollar"></i></div>
+            <div class="action-details"><h4>Pedir Cuenta</h4><p>Generar pre-cuenta para la mesa</p></div>
+            <div class="action-arrow"><i class="fas fa-angle-right"></i></div>
+          </div>
+          <div class="action-card roja" onclick="alert('Cerrar mesa (simulación)')">
+            <div class="action-icon"><i class="fas fa-check-circle"></i></div>
+            <div class="action-details"><h4>Cerrar Mesa</h4><p>Procesar pago y liberar</p></div>
+            <div class="action-arrow"><i class="fas fa-angle-right"></i></div>
+          </div>`;
+      }
+    }
+
     function abrirCentro(estado, atencion) {
+      _modoApertura = false;
+      document.getElementById('aperturaForm').style.display = 'none';
+
       const overlay = document.getElementById('modalCentro');
-      document.getElementById('centroTitulo').textContent = estado === 'libre' ? 'Mesa 5' : (estado === 'ocupada' ? 'Mesa 8' : 'Mesa 3');
+      document.getElementById('centroTitulo').innerHTML = `<i class="fas fa-wine-glass-alt" style="color: var(--color-accent); font-size: 1.3rem;"></i> ` + (estado === 'libre' ? 'Mesa 5' : (estado === 'ocupada' ? 'Mesa 8' : 'Mesa 3'));
       const badge = document.getElementById('centroBadge');
-      badge.textContent = estado === 'libre' ? 'LIBRE' : (estado === 'ocupada' ? 'OCUPADA' : 'LISTA');
-      badge.className = 'badge-estado ' + (estado === 'libre' ? 'libre' : (estado === 'ocupada' ? 'ocupada' : 'esperando'));
+      badge.textContent = estado === 'libre' ? 'LIBRE' : (estado === 'ocupada' ? 'OCUPADA' : 'PAGADA');
+      badge.className = 'badge-estado ' + estado;
       document.getElementById('centroMozo').textContent = estado === 'libre' ? 'Sin asignar' : (estado === 'ocupada' ? 'Carlos' : 'Ana');
-      document.getElementById('centroComensales').textContent = estado === 'libre' ? '—' : (estado === 'ocupada' ? '4' : '2');
-      document.getElementById('centroTiempo').textContent = estado === 'libre' ? '—' : (estado === 'ocupada' ? '12 min' : '25 min');
+      document.getElementById('centroComensales').textContent = estado === 'libre' ? '—' : (estado === 'ocupada' ? '4 Pax' : '2 Pax');
+      document.getElementById('centroTiempo').textContent = estado === 'libre' ? '—' : (estado === 'ocupada' ? '12 min' : '—');
 
-      document.getElementById('cardAbrir').style.display = estado === 'libre' ? 'flex' : 'none';
-      document.getElementById('cardPedido').style.display = estado !== 'libre' ? 'flex' : 'none';
-
-      // Secciones de atención
       document.getElementById('seccionEspera').style.display = atencion === 'esperando' ? 'flex' : 'none';
-      document.getElementById('seccionPrecarga').style.display = atencion === 'precarga' ? 'flex' : 'none';
+      document.getElementById('pagadaMensaje').style.display = estado === 'pagada' ? 'block' : 'none';
+      document.getElementById('comandaResumen').style.display = estado === 'ocupada' ? 'block' : 'none';
 
+      renderizarAcciones(estado);
       overlay.classList.add('visible');
     }
 

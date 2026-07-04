@@ -54,9 +54,14 @@ export function activar() {
   _desuscripciones.push(EventBus.on('cliente:mesa_ingresada', (data) => {
     if (data && data.mesa) {
       addNotificacion(data.mesa, 'esperando', {});
-      renderGrid();
+// Verificar el estado de la mesa justo antes de renderizar
+const mesas = Store.getState().mesas;
+const mesaObjetivo = mesas.find(m => m.numero == data.mesa);
+console.log('[DEBUG] Mesa ' + data.mesa + ' - estado:', mesaObjetivo?.estado, 'permite_prepedidos:', mesaObjetivo?.permite_prepedidos);
+renderGrid();
       Logger.info(`[Mesas] Cliente esperando en mesa ${data.mesa}`);
     }
+    console.log('[DEBUG] cliente:mesa_ingresada recibido:', data);
   }));
   _desuscripciones.push(EventBus.on('precarga:nueva', (data) => {
     import('../mesas.js').then(m => m.Mesas.setBadge(data.mesa, data.cantidad, data.precargaId));

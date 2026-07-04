@@ -251,7 +251,6 @@
                 🔹 function _cargarAuditLog() {
                 🔹 function _guardarAuditLog() {
                 🔹 function _registrarAuditoria(tipo, datos) {
-                🔹 function agregarItemAPedido(pedidoId, item) {
                 🔹 function crearPedidoDelivery(datos) {
                 🔹 function enviarPedidoDeliveryACocina(deliveryId) {
                 🔹 const pedido = DB.pedidosDelivery.find(p => p.id === deliveryId);
@@ -292,7 +291,6 @@
                     🔹 function _verificarPermiso() {
                     🔹 function _renderCategorias() {
                     🔹 function _renderProductos() {
-                    🔹 function _getColorFromName(nombre) {
                     🔹 function _initRealtime() {
                 📄 orden.js
                     🔹 const Orden = (() => {
@@ -556,7 +554,6 @@
                 🔹 function setCategoria(cat) {
                 🔹 function filtrar() {
                 🔹 function _renderProductos() {
-                🔹 function _getColorFromName(nombre) {
                 🔹 function mostrarDetalle(prodId) {
                 🔹 const producto = (state.productos || []).find(p => p.id == prodId);
                 🔹 const receta = (state.recetas || []).find(r => r.productoId == prodId);
@@ -580,6 +577,7 @@
                 📄 ciclo-vida.js
                     🔹 export function activar() {
                     🔹 const unsubscribeStore = Store.subscribe((state, action) => {
+                    🔹 const mesaObjetivo = mesas.find(m => m.numero == data.mesa);
                     🔹 export function limpiar() {
                 📄 constantes.js
                     🔹 export const ICONOS = {
@@ -686,7 +684,6 @@
                 🔹 const receta = recetas.find(r => r.productoId == prod.id);
                 🔹 export function filtrar() {
                 🔹 export function filtrarPorIngrediente() {
-                🔹 function _getColorFromName(nombre) {
                 🔹 function _iconoPorCategoria(categoria) {
                 🔹 export function mostrarDetalle(prodId) {
                 🔹 const producto = (state.productos || []).find(p => p.id == prodId);
@@ -783,8 +780,9 @@
             🔹 export function showToast(tipo, htmlMsg, ms = 3500) {
             🔹 export function $id(id) { return document.getElementById(id); }
             🔹 export function $val(id) { return ($id(id)?.value || '').trim(); }
+            🔹 export function obtenerColorDesdeNombre(nombre) {
 
 
 === MAPEO COMPLETADO ===
-Total de funciones/declaraciones capturadas: 689
-Fecha de generación: 7/1/2026, 9:45:33 PM
+Total de funciones/declaraciones capturadas: 687
+Fecha de generación: 7/2/2026, 9:17:51 PM

@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/lib/store.js
-   Versión: 2.0.2
+   Versión: 2.0.3
    Propósito: Estado centralizado con slice 'cliente' para la Célula C.
-              Incluye reducers para COMANDA_ITEM_* (restaurados).
+              Incluye reducers para COMANDA_ITEM_* y MESA_ACTUALIZAR.
               Timestamps unificados en español (creadoEn, actualizadoEn).
    ================================================================ */
 
@@ -98,6 +98,10 @@ const Store = (() => {
       }
       case 'MESA_AGREGAR': return [...mesas, action.payload];
       case 'MESA_ELIMINAR': return mesas.filter(m => m.numero !== action.payload);
+      case 'MESA_ACTUALIZAR': {
+        const { numero, cambios } = action.payload;
+        return mesas.map(m => m.numero === numero ? { ...m, ...cambios } : m);
+      }
       case 'COMANDA_ITEM_AGREGAR': {
         const { numeroMesa, item } = action.payload;
         return mesas.map(m => {

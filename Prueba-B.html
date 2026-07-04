@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>La Taberna — Mesa Detalles (Comanda con último pedido visible)</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --color-bg: #0f0f14;
+      --color-accent: #f59e0b;
+      --color-primary: #6366f1;
+      --color-card: #1a1a24;
+      --color-panel: #21212e;
+      --color-border: #2e2e42;
+      --color-text: #f1f5f9;
+      --color-text-sec: #94a3b8;
+      --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --radius: 16px;
+      --radius-sm: 10px;
+      --t: all 0.25s ease;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-ui);
+      background: var(--color-bg);
+      color: var(--color-text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background-image:
+        radial-gradient(circle at 50% 0%, rgba(245,158,11,0.08) 0%, transparent 50%),
+        linear-gradient(rgba(255,255,255,0.01) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.01) 1px, transparent 1px);
+      background-size: 100% 100%, 40px 40px, 40px 40px;
+    }
+
+    .simulador { text-align: center; }
+    .simulador button {
+      background: var(--color-card);
+      border: 1px solid var(--color-border);
+      color: var(--color-text);
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 14px;
+      margin: 4px;
+      transition: var(--t);
+    }
+    .simulador button:hover { border-color: var(--color-accent); color: var(--color-accent); }
+    .info { color: var(--color-text-sec); font-size: 13px; margin-top: 12px; }
+
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+    .modal-overlay.visible { opacity: 1; pointer-events: auto; }
+
+    .centro-card {
+      width: 100%;
+      max-width: 580px;
+      max-height: 90vh;
+      background: var(--color-bg);
+      border-radius: var(--radius);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 0 40px rgba(0,0,0,.5), 0 0 0 1px var(--color-border);
+      transform: translateY(20px);
+      transition: transform 0.25s ease;
+    }
+    .modal-overlay.visible .centro-card { transform: translateY(0); }
+
+    .centro-fondo {
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(circle at 30% 30%, rgba(245,158,11,.12) 0%, transparent 55%),
+        radial-gradient(circle at 70% 70%, rgba(99,102,241,.08) 0%, transparent 55%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .centro-top {
+      display: flex; justify-content: space-between; align-items: center; flex-shrink: 0;
+      padding: 20px 20px 0 20px; position: relative; z-index: 1;
+    }
+    .centro-mesa-info h2 {
+      font-size: 1.6rem; font-weight: 800;
+      background: linear-gradient(to right, var(--color-accent), var(--color-primary));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .centro-mesa-info .badge-estado {
+      font-size: 0.7rem; font-weight: 700; padding: 3px 10px; border-radius: 99px;
+      text-transform: uppercase; display: inline-block; margin-top: 4px; letter-spacing: 0.5px;
+    }
+    .badge-estado.libre { background: rgba(34,197,94,.2); color: #22c55e; }
+    .badge-estado.ocupada { background: rgba(59,130,246,.2); color: #3b82f6; }
+    .badge-estado.pagada { background: rgba(16,185,129,.2); color: #10b981; }
+    .btn-cerrar-modal {
+      background: rgba(255, 255, 255, 0.03); border: 1px solid var(--color-border); color: var(--color-text-sec);
+      font-size: 1rem; cursor: pointer; width: 40px; height: 40px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center; transition: var(--t);
+    }
+    .btn-cerrar-modal:hover { color: #fff; border-color: var(--color-text-sec); background: rgba(255, 255, 255, 0.08); }
+
+    .centro-body {
+      position: relative; z-index: 1; flex: 1; display: flex; gap: 0; padding: 16px 0 20px 0; overflow: hidden; min-height: 0;
+    }
+
+    .columna-izquierda {
+      width: 160px; flex-shrink: 0; display: flex; flex-direction: column; gap: 12px; padding: 0 12px;
+      transition: width 0.3s ease, padding 0.3s ease, opacity 0.2s ease; overflow: hidden;
+    }
+    .columna-izquierda.colapsada {
+      width: 48px; padding: 0 6px;
+    }
+    .columna-izquierda.colapsada .dato-cuerpo,
+    .columna-izquierda.colapsada .comensal-nombre,
+    .columna-izquierda.colapsada .comensales-titulo { display: none; }
+    .columna-izquierda.colapsada .dato-item-sm { justify-content: center; }
+    .columna-izquierda.colapsada .comensales-lista { align-items: center; }
+
+    .toggle-columna {
+      position: absolute; top: 50%; right: -12px; transform: translateY(-50%);
+      width: 24px; height: 48px; background: var(--color-panel); border: 1px solid var(--color-border);
+      border-radius: 0 8px 8px 0; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      color: var(--color-text-sec); font-size: 0.8rem; z-index: 2; transition: var(--t);
+    }
+    .toggle-columna:hover { color: var(--color-accent); border-color: var(--color-accent); }
+
+    .columna-derecha {
+      flex: 1; display: flex; flex-direction: column; gap: 14px; overflow-y: auto; padding: 0 20px 0 8px; min-height: 0;
+    }
+
+    .dato-item-sm {
+      background: var(--color-card); border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm); padding: 10px; display: flex; align-items: center; gap: 8px;
+    }
+    .dato-icon { font-size: 0.9rem; color: var(--color-text-sec); width: 20px; text-align: center; }
+    .dato-cuerpo { flex: 1; min-width: 0; }
+    .dato-item-sm .dato-label { font-size: 0.6rem; color: var(--color-text-sec); text-transform: uppercase; letter-spacing: 0.5px; }
+    .dato-item-sm .dato-valor { font-size: 0.8rem; font-weight: 700; }
+
+    .comensales-seccion {
+      background: var(--color-card); border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm); flex: 1; display: flex; flex-direction: column; overflow: hidden;
+    }
+    .comensales-titulo { font-size: 0.6rem; color: var(--color-text-sec); text-transform: uppercase; letter-spacing: 0.5px; padding: 10px 10px 6px 10px; font-weight: 600; flex-shrink: 0; }
+    .comensales-lista {
+      flex: 1; overflow-y: auto; padding: 0 10px 10px 10px; display: flex; flex-direction: column; gap: 6px;
+    }
+    .comensal-fila { display: flex; align-items: center; gap: 8px; }
+    .comensal-avatar {
+      width: 30px; height: 30px; border-radius: 50%; background: var(--color-panel);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.7rem; font-weight: 700; color: var(--color-text); flex-shrink: 0;
+    }
+    .comensal-nombre { font-size: 0.75rem; color: var(--color-text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    .comanda-resumen {
+      background: var(--color-card); border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm); padding: 14px; flex-shrink: 0; max-height: 200px; overflow-y: auto;
+    }
+    .comanda-resumen .resumen-titulo { font-size: 0.65rem; color: var(--color-text-sec); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; font-weight: 600; }
+    .comanda-resumen .resumen-items { display: flex; flex-direction: column; gap: 8px; }
+    .resumen-item { display: flex; justify-content: space-between; font-size: 0.85rem; color: var(--color-text-sec); }
+    .resumen-item span:first-child { color: var(--color-text); font-weight: 500; }
+    .resumen-total { border-top: 1px solid var(--color-border); margin-top: 10px; padding-top: 10px; display: flex; justify-content: space-between; font-weight: 700; font-size: 1rem; position: sticky; bottom: 0; background: var(--color-card); }
+    .resumen-total span:last-child { color: var(--color-accent); }
+
+    .precarga-item {
+      background: rgba(245,158,11,.1); border: 1px solid rgba(245,158,11,.25);
+      border-radius: var(--radius-sm); padding: 12px 14px; flex-shrink: 0;
+      display: flex; align-items: center; gap: 12px; cursor: pointer; transition: var(--t);
+    }
+    .precarga-item:hover { border-color: var(--color-accent); background: rgba(245,158,11,.2); }
+    .precarga-avatar {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--color-accent), #d97706);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: bold; font-size: 0.7rem; color: #fff; flex-shrink: 0;
+    }
+    .precarga-texto { flex: 1; font-size: 0.8rem; }
+    .precarga-texto strong { color: #fbbf24; }
+
+    .acciones-lista { display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; }
+    .action-card {
+      background: var(--color-card); border: 1px solid var(--color-border);
+      border-radius: var(--radius); padding: 16px;
+      display: flex; align-items: center; gap: 14px;
+      cursor: pointer; text-align: left; position: relative;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+    .action-card:hover { border-color: var(--color-accent); transform: translateY(-2px); background: rgba(255,255,255,0.02); }
+    .action-card.primaria { border-color: rgba(245,158,11,.25); background: rgba(245,158,11,.03); }
+    .action-card.primaria .action-icon { color: var(--color-accent); }
+    .action-card.verde { border-color: rgba(34,197,94,0.15); }
+    .action-card.verde .action-icon { color: #22c55e; }
+    .action-card.roja { border-color: rgba(239,68,68,0.15); }
+    .action-card.roja .action-icon { color: #ef4444; }
+    .action-icon { font-size: 1.3rem; width: 36px; height: 36px; border-radius: 8px; background: rgba(255,255,255,0.03); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .action-details { flex: 1; min-width: 0; }
+    .action-details h4 { font-size: 0.95rem; font-weight: 700; color: var(--color-text); }
+    .action-details p  { font-size: 0.75rem; color: var(--color-text-sec); margin-top: 1px; }
+    .action-arrow { color: #475569; font-size: 0.9rem; transition: transform 0.2s, color 0.2s; margin-left: auto; padding-left: 8px; }
+    .action-card:hover .action-arrow { transform: translateX(3px); color: #fff; }
+
+    .sim-botones {
+      display: flex; gap: 8px; flex-shrink: 0; margin-top: 8px;
+    }
+    .sim-botones button {
+      flex: 1; padding: 12px; border-radius: 8px; font-weight: 700; font-size: 0.8rem; cursor: pointer; border: 1px dashed var(--color-border);
+      background: transparent; color: var(--color-text-sec); transition: var(--t);
+    }
+    .sim-botones button:hover { border-color: var(--color-accent); color: var(--color-accent); }
+
+    .modal-revision {
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+      z-index: 1100; display: flex; align-items: center; justify-content: center;
+    }
+    .modal-revision-content {
+      background: var(--color-bg); border: 1px solid var(--color-border);
+      border-radius: var(--radius); padding: 24px; max-width: 380px; width: 90%;
+    }
+    .modal-revision-content h3 { margin-bottom: 12px; }
+    .modal-revision-content ul { list-style: none; margin-bottom: 16px; }
+    .modal-revision-content ul li { padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.9rem; }
+    .modal-revision-botones { display: flex; gap: 8px; }
+    .modal-revision-botones button { flex: 1; padding: 10px; border-radius: 8px; font-weight: 700; cursor: pointer; border: none; }
+    .btn-cancelar-revision { background: var(--color-panel); color: var(--color-text-sec); }
+    .btn-confirmar-revision { background: var(--color-accent); color: #000; }
+  </style>
+</head>
+<body>
+  <div class="simulador">
+    <h2 style="margin-bottom:12px;">🧪 Mesa Detalles — Comanda con último pedido visible</h2>
+    <button onclick="abrirCentro('ocupada')">Mesa 8 — Ocupada (4 Pax)</button>
+    <p class="info">El último pedido agregado aparece justo arriba del total. Los anteriores se desplazan hacia arriba.</p>
+  </div>
+
+  <div class="modal-overlay visible" id="modalCentro">
+    <div class="centro-card">
+      <div class="centro-fondo"></div>
+      <div class="centro-top">
+        <div class="centro-mesa-info">
+          <h2 id="centroTitulo"><i class="fas fa-wine-glass-alt" style="color: var(--color-accent); font-size: 1.3rem;"></i> Mesa 8</h2>
+          <span class="badge-estado ocupada" id="centroBadge">OCUPADA</span>
+        </div>
+        <button class="btn-cerrar-modal" onclick="cerrarCentro()">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+      <div class="centro-body">
+        <div class="columna-izquierda" id="columnaIzquierda">
+          <div class="dato-item-sm"><div class="dato-icon"><i class="fas fa-user-tag"></i></div><div class="dato-cuerpo"><div class="dato-label">Mozo</div><div class="dato-valor" id="centroMozo">Carlos</div></div></div>
+          <div class="dato-item-sm"><div class="dato-icon"><i class="fas fa-clock"></i></div><div class="dato-cuerpo"><div class="dato-label">Tiempo</div><div class="dato-valor" id="centroTiempo">12 min</div></div></div>
+          <div class="comensales-seccion">
+            <div class="comensales-titulo">Comensales (<span id="centroComensales">4</span>)</div>
+            <div class="comensales-lista" id="comensalesGrid">
+              <div class="comensal-fila"><div class="comensal-avatar">TQ</div><div class="comensal-nombre">Trinidad</div></div>
+              <div class="comensal-fila"><div class="comensal-avatar">JP</div><div class="comensal-nombre">Juan Pérez</div></div>
+              <div class="comensal-fila"><div class="comensal-avatar">ML</div><div class="comensal-nombre">María López</div></div>
+              <div class="comensal-fila"><div class="comensal-avatar">AR</div><div class="comensal-nombre">Andrés R.</div></div>
+            </div>
+          </div>
+          <div class="toggle-columna" id="toggleColumna" onclick="toggleColumna()"><i class="fas fa-angle-left"></i></div>
+        </div>
+        <div class="columna-derecha">
+          <div class="comanda-resumen" id="comandaResumen">
+            <div class="resumen-titulo">Comanda activa</div>
+            <div class="resumen-items" id="comandaItems">
+            </div>
+            <div class="resumen-total"><span>Total</span><span id="comandaTotal">$0</span></div>
+          </div>
+          <div id="precargasContainer"></div>
+          <div class="acciones-lista">
+            <div class="action-card primaria" onclick="alert('Tomar pedido')"><div class="action-icon"><i class="fas fa-utensils"></i></div><div class="action-details"><h4>Tomar Pedido</h4><p>Agregar ítems a la comanda</p></div><div class="action-arrow"><i class="fas fa-angle-right"></i></div></div>
+            <div class="action-card verde" onclick="alert('Pedir cuenta')"><div class="action-icon"><i class="fas fa-file-invoice-dollar"></i></div><div class="action-details"><h4>Pedir Cuenta</h4><p>Generar pre-cuenta</p></div><div class="action-arrow"><i class="fas fa-angle-right"></i></div></div>
+            <div class="action-card roja" onclick="alert('Cerrar mesa')"><div class="action-icon"><i class="fas fa-check-circle"></i></div><div class="action-details"><h4>Cerrar Mesa</h4><p>Procesar pago y liberar</p></div><div class="action-arrow"><i class="fas fa-angle-right"></i></div></div>
+          </div>
+          <div class="sim-botones">
+            <button onclick="anadirComensal()"><i class="fas fa-user-plus"></i> Añadir Comensal</button>
+            <button onclick="simularPrecarga()"><i class="fas fa-bell"></i> Simular Precarga</button>
+            <button onclick="agregarComanda()"><i class="fas fa-plus-circle"></i> Agregar a Comanda</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let _comensales = ['Trinidad', 'Juan Pérez', 'María López', 'Andrés R.'];
+    let _precargas = [];
+    let _precargaId = 1;
+    let _comandaItems = [];
+    const NOMBRES_DISPONIBLES = ['Diego', 'Carla', 'Felipe', 'Sofía', 'Mateo', 'Valentina', 'Lucas', 'Emma', 'Benjamín', 'Isabella', 'Pedro', 'Lucía', 'Martín', 'Camila', 'Joaquín', 'Antonia'];
+    const PLATILLOS = ['Pizza Margarita', 'Tacos al Pastor', 'Ceviche', 'Lomo Saltado', 'Sushi Roll', 'Papas Bravas', 'Ramen', 'Pad Thai'];
+
+    function renderizarComensales() {
+      const grid = document.getElementById('comensalesGrid');
+      grid.innerHTML = _comensales.map(nombre => {
+        const iniciales = nombre.split(' ').map(n => n.charAt(0).toUpperCase()).slice(0, 2).join('');
+        return `<div class="comensal-fila"><div class="comensal-avatar">${iniciales}</div><div class="comensal-nombre">${nombre}</div></div>`;
+      }).join('');
+      document.getElementById('centroComensales').textContent = _comensales.length;
+    }
+
+    function anadirComensal() {
+      const nombre = NOMBRES_DISPONIBLES[Math.floor(Math.random() * NOMBRES_DISPONIBLES.length)];
+      _comensales.push(nombre);
+      renderizarComensales();
+    }
+
+    function renderizarPrecargas() {
+      const container = document.getElementById('precargasContainer');
+      container.innerHTML = _precargas.map(p => `
+        <div class="precarga-item" onclick="revisarPrecarga('${p.id}')">
+          <div class="precarga-avatar">${p.iniciales}</div>
+          <div class="precarga-texto">
+            <strong>${p.nombre}</strong><br>quiere añadir un pedido (${p.items.length} ítems)
+          </div>
+          <i class="fas fa-angle-right" style="color: var(--color-text-sec);"></i>
+        </div>
+      `).join('');
+    }
+
+    function simularPrecarga() {
+      const nombre = NOMBRES_DISPONIBLES[Math.floor(Math.random() * NOMBRES_DISPONIBLES.length)];
+      const iniciales = nombre.split(' ').map(n => n.charAt(0).toUpperCase()).slice(0, 2).join('');
+      const items = [PLATILLOS[Math.floor(Math.random() * PLATILLOS.length)], PLATILLOS[Math.floor(Math.random() * PLATILLOS.length)]];
+      _precargas.push({ id: String(_precargaId++), nombre, iniciales, items });
+      renderizarPrecargas();
+    }
+
+    function revisarPrecarga(precargaId) {
+      const precarga = _precargas.find(p => p.id === precargaId);
+      if (!precarga) return;
+
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-revision';
+      overlay.innerHTML = `
+        <div class="modal-revision-content">
+          <h3>Revisar Pedido de ${precarga.nombre}</h3>
+          <ul>${precarga.items.map(i => `<li>🍽️ ${i}</li>`).join('')}</ul>
+          <div class="modal-revision-botones">
+            <button class="btn-cancelar-revision" id="btnCancelarRevision">Cancelar</button>
+            <button class="btn-confirmar-revision" id="btnConfirmarRevision">Confirmar y Cargar</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+
+      document.getElementById('btnCancelarRevision').onclick = () => overlay.remove();
+      document.getElementById('btnConfirmarRevision').onclick = () => {
+        _comandaItems.push(...precarga.items);
+        _precargas = _precargas.filter(p => p.id !== precargaId);
+        renderizarPrecargas();
+        renderizarComanda();
+        overlay.remove();
+      };
+    }
+
+    function renderizarComanda() {
+      const container = document.getElementById('comandaItems');
+      const total = _comandaItems.length * 1500;
+      container.innerHTML = _comandaItems.map(item => `<div class="resumen-item"><span>${item}</span><span>$${1500}</span></div>`).join('');
+      document.getElementById('comandaTotal').textContent = `$${total}`;
+
+      // Forzar scroll al final del contenedor de comanda
+      const resumen = document.getElementById('comandaResumen');
+      if (resumen) {
+        setTimeout(() => {
+          resumen.scrollTop = resumen.scrollHeight - resumen.clientHeight;
+        }, 0);
+      }
+    }
+
+    function agregarComanda() {
+      const platillo = PLATILLOS[Math.floor(Math.random() * PLATILLOS.length)];
+      _comandaItems.push(platillo);
+      renderizarComanda();
+    }
+
+    function toggleColumna() {
+      const columna = document.getElementById('columnaIzquierda');
+      const icono = document.getElementById('toggleColumna').querySelector('i');
+      columna.classList.toggle('colapsada');
+      if (columna.classList.contains('colapsada')) {
+        icono.className = 'fas fa-angle-right';
+      } else {
+        icono.className = 'fas fa-angle-left';
+      }
+    }
+
+    function abrirCentro() {
+      renderizarComensales();
+      renderizarPrecargas();
+      renderizarComanda();
+    }
+
+    function cerrarCentro() { document.getElementById('modalCentro').classList.remove('visible'); }
+
+    abrirCentro('ocupada');
+  </script>
+</body>
+</html>
