@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/config.js
-   Versión: 1.0.5
+   Versión: 1.0.7
    Propósito: Vista de configuración: productos, zonas, impresoras, mozos.
-              v1.0.5: reemplaza Mesas.render() por evento config:actualizada.
+              v1.0.7: _asegurarVista corregida según estándar B1.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -16,11 +16,17 @@ import { DBAppwrite } from '../db-appwrite.js';
 
 const Config = (() => {
   function _asegurarVista() {
-    if (document.getElementById('view-config')) return;
+    let main = document.getElementById('view-config');
+    if (main && main.querySelector('.view-toolbar')) return;
+    
+    if (!main) {
+      main = document.createElement('main');
+      main.id = 'view-config';
+      main.className = 'view';
+      const referencia = document.getElementById('toastContainer') || document.body.lastChild;
+      document.body.insertBefore(main, referencia);
+    }
 
-    const main = document.createElement('main');
-    main.id = 'view-config';
-    main.className = 'view';
     main.innerHTML = `
       <div class="view-toolbar">
         <h2><i class="fas fa-sliders"></i> Configuración</h2>
@@ -89,8 +95,6 @@ const Config = (() => {
         </section>
       </div>
     `;
-    const referencia = document.getElementById('toastContainer') || document.body.lastChild;
-    document.body.insertBefore(main, referencia);
 
     _vincularEventos();
   }
@@ -102,7 +106,6 @@ const Config = (() => {
     document.getElementById('btnGuardarConfig')?.addEventListener('click', guardar);
     document.getElementById('btnAgregarMozo')?.addEventListener('click', agregarMozo);
 
-    // Delegación de eventos en listas dinámicas
     document.getElementById('productosLista')?.addEventListener('click', (e) => {
       const editBtn = e.target.closest('.btn-icon-sm.edit');
       const delBtn = e.target.closest('.btn-icon-sm.del');
@@ -322,7 +325,6 @@ const Config = (() => {
       await DB.sincronizarMesasConConfig();
     }
 
-    // Notificar a Mesas que la configuración cambió (reemplaza Mesas.render())
     EventBus.emit('config:actualizada');
 
     showToast('success', '<i class="fas fa-check-circle"></i> Configuración guardada');
@@ -522,7 +524,6 @@ const Config = (() => {
     if (!confirm('¿Resetear todas las mesas? Se eliminarán las mesas libres y se recrearán según las zonas configuradas. Las mesas ocupadas se conservarán al final.')) return;
     if (typeof DB.resetearMesas === 'function') {
       await DB.resetearMesas();
-      // Notificar a Mesas que la configuración cambió (reemplaza Mesas.render())
       EventBus.emit('config:actualizada');
       showToast('success', 'Mesas reseteadas correctamente');
     } else {

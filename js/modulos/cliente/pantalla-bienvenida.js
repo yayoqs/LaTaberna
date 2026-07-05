@@ -1,10 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — Módulo (ES6)
    Archivo: js/modulos/cliente/pantalla-bienvenida.js
-   Versión: 2.1.7
+   Versión: 2.2.1
    Propósito: Panel de control post-validación.
-              Corrige flujo de vinculación: listener mesa:actualizada
-              y verificación en mostrar().
+              _asegurarVista reutiliza contenedor estático de index.html.
    ================================================================ */
 
 import { EventBus } from '../../lib/eventBus.js';
@@ -16,13 +15,27 @@ const PantallaBienvenida = (() => {
   let _mesa = null;
   let _permitePrepedidos = false;
   let _interfazActivada = false;
+  let _activada = false;
 
-  function render() {
-    if (_vista) return _vista;
+  let _cbMesasActualizada, _cbMesaActualizada, _cbEventosActualizada, _cbPrecargasActualizada;
+  let _cbBtnGuardar, _cbBtnBarra, _cbLogout, _cbGastroInicial, _cbEventosInicial;
 
-    _vista = document.createElement('main');
-    _vista.id = 'view-bienvenida';
-    _vista.className = 'view';
+  function _asegurarVista() {
+    if (_vista) return;
+
+    let main = document.getElementById('view-bienvenida');
+    if (!main) {
+      main = document.createElement('main');
+      main.id = 'view-bienvenida';
+      main.className = 'view';
+      document.body.appendChild(main);
+    }
+
+    _vista = main;
+
+    // Si ya tiene contenido, no reconstruir
+    if (_vista.querySelector('.top-bar')) return;
+
     _vista.innerHTML = `
       <div class="top-bar" id="bienvenidaTopBar">
         <div class="user-profile">
@@ -32,11 +45,8 @@ const PantallaBienvenida = (() => {
             <p><i class="fa-solid fa-circle-check"></i> Cliente Registrado</p>
           </div>
         </div>
-        <button class="logout-btn" id="btnLogout">
-          <i class="fa-solid fa-right-from-bracket"></i> Salir
-        </button>
+        <button class="logout-btn" id="btnLogout"><i class="fa-solid fa-right-from-bracket"></i> Salir</button>
       </div>
-
       <div class="welcome-container" id="welcomeContainer">
         <div class="status-card" id="cardIngresoMesa">
           <h2><i class="fa-solid fa-chair" style="color:var(--color-accent)"></i> ¿Dónde te ubicas?</h2>
@@ -52,54 +62,63 @@ const PantallaBienvenida = (() => {
             </button>
           </div>
         </div>
-
         <div class="status-card" id="cardEspera" style="display:none;"></div>
-
         <div class="menu-grid" id="menuGridInicial">
           <div class="action-card order-mode" id="cardGastronomicaInicial">
             <div class="action-icon"><i class="fa-solid fa-scroll"></i></div>
-            <div class="action-details">
-              <h4>Armar mi Pedido</h4>
-              <p id="mensajeGastroInicial">Vincula tu mesa para comenzar.</p>
-            </div>
+            <div class="action-details"><h4>Armar mi Pedido</h4><p id="mensajeGastroInicial">Vincula tu mesa para comenzar.</p></div>
           </div>
           <div class="action-card events-mode" id="cardEntretenimientoInicial">
             <div class="action-icon"><i class="fa-solid fa-cake-candles"></i></div>
-            <div class="action-details">
-              <h4>Eventos en Vivo & Karaoke</h4>
-              <p id="mensajeEventoInicial">Próximo evento a las 22:00 hrs</p>
-            </div>
+            <div class="action-details"><h4>Eventos en Vivo & Karaoke</h4><p id="mensajeEventoInicial">Próximo evento a las 22:00 hrs</p></div>
           </div>
         </div>
       </div>
     `;
-
-    document.body.appendChild(_vista);
-    _configurarEventos();
-    _actualizarPerfil();
-    _initRealtime();
-    return _vista;
   }
 
-  function _configurarEventos() {
-    document.getElementById('btnGuardarMesa').addEventListener('click', _guardarMesa);
-    document.getElementById('btnBarra').addEventListener('click', _vincularBarra);
-    document.getElementById('btnLogout').addEventListener('click', () => { if (typeof Auth.logout === 'function') Auth.logout(); });
-    document.getElementById('cardEntretenimientoInicial').addEventListener('click', _irAEventos);
-    document.getElementById('cardGastronomicaInicial').addEventListener('click', () => {
-      if (!_permitePrepedidos) {
-        document.getElementById('mensajeGastroInicial').textContent = 'Espera la activación del garzón.';
-        return;
-      }
+  function activar() {
+    if (_activada) return;
+    _activada = true;
+
+    _cbBtnGuardar = _guardarMesa;
+    _cbBtnBarra = _vincularBarra;
+    _cbLogout = () => { if (typeof Auth.logout === 'function') Auth.logout(); };
+    _cbGastroInicial = () => {
+      if (!_permitePrepedidos) { document.getElementById('mensajeGastroInicial').textContent = 'Espera la activación del garzón.'; return; }
       _irAlMenu();
-    });
+    };
+    _cbEventosInicial = _irAEventos;
+
+    document.getElementById('btnGuardarMesa').addEventListener('click', _cbBtnGuardar);
+    document.getElementById('btnBarra').addEventListener('click', _cbBtnBarra);
+    document.getElementById('btnLogout').addEventListener('click', _cbLogout);
+    document.getElementById('cardEntretenimientoInicial').addEventListener('click', _cbEventosInicial);
+    document.getElementById('cardGastronomicaInicial').addEventListener('click', _cbGastroInicial);
+
+    _initRealtime();
+    _actualizarPerfil();
+  }
+
+  function limpiar() {
+    if (!_activada) return;
+    _activada = false;
+
+    if (EventBus.off) {
+      if (_cbMesasActualizada) EventBus.off('mesas:actualizada', _cbMesasActualizada);
+      if (_cbMesaActualizada) EventBus.off('mesa:actualizada', _cbMesaActualizada);
+      if (_cbEventosActualizada) EventBus.off('eventos_en_vivo:actualizada', _cbEventosActualizada);
+      if (_cbPrecargasActualizada) EventBus.off('precargas_cliente:actualizada', _cbPrecargasActualizada);
+    }
   }
 
   function _actualizarPerfil() {
     const nombre = Auth.getNombre() || 'Comensal';
     const iniciales = nombre.split(' ').map(n => n.charAt(0).toUpperCase()).slice(0, 2).join('');
-    document.getElementById('bienvenidaNombre').textContent = nombre;
-    document.getElementById('bienvenidaAvatar').textContent = iniciales;
+    const nombreEl = document.getElementById('bienvenidaNombre');
+    const avatarEl = document.getElementById('bienvenidaAvatar');
+    if (nombreEl) nombreEl.textContent = nombre;
+    if (avatarEl) avatarEl.textContent = iniciales;
   }
 
   function _guardarMesa() {
@@ -118,23 +137,27 @@ const PantallaBienvenida = (() => {
 
   function _vincular(mesaId, estadoEl) {
     _mesa = mesaId;
-    estadoEl.textContent = `Vinculado a ${_mesa === 'barra' ? 'Barra' : 'Mesa ' + _mesa}.`;
+    if (estadoEl) estadoEl.textContent = `Vinculado a ${_mesa === 'barra' ? 'Barra' : 'Mesa ' + _mesa}.`;
     EventBus.emit('cliente:mesa_ingresada', { mesa: _mesa });
-    document.getElementById('cardIngresoMesa').style.display = 'none';
+    const cardIngreso = document.getElementById('cardIngresoMesa');
+    if (cardIngreso) cardIngreso.style.display = 'none';
 
     Store.dispatch({ type: 'CLIENTE_MESA_ASIGNADA', payload: _mesa });
 
     const cardEspera = document.getElementById('cardEspera');
-    cardEspera.style.display = 'block';
-    cardEspera.innerHTML = `
-      <h2>Mesa asignada: <span style="color:var(--color-accent)">${_mesa === 'barra' ? 'Barra' : 'Mesa ' + _mesa}</span></h2>
-      <div class="waiting-status" id="waitingBlock">
-        <div class="spinner"></div>
-        <p style="font-size:0.9rem;font-weight:600;">Esperando validación del garzón...</p>
-        <p style="color:var(--color-text-sec);font-size:0.8rem;">Estamos confirmando tu presencia en el mesón.</p>
-      </div>
-    `;
-    document.getElementById('mensajeGastroInicial').textContent = 'Espera la activación del garzón.';
+    if (cardEspera) {
+      cardEspera.style.display = 'block';
+      cardEspera.innerHTML = `
+        <h2>Mesa asignada: <span style="color:var(--color-accent)">${_mesa === 'barra' ? 'Barra' : 'Mesa ' + _mesa}</span></h2>
+        <div class="waiting-status" id="waitingBlock">
+          <div class="spinner"></div>
+          <p style="font-size:0.9rem;font-weight:600;">Esperando validación del garzón...</p>
+          <p style="color:var(--color-text-sec);font-size:0.8rem;">Estamos confirmando tu presencia en el mesón.</p>
+        </div>
+      `;
+    }
+    const mensaje = document.getElementById('mensajeGastroInicial');
+    if (mensaje) mensaje.textContent = 'Espera la activación del garzón.';
   }
 
   function _verificarPermisoMesa() {
@@ -161,15 +184,16 @@ const PantallaBienvenida = (() => {
           <div class="waiting-status"><div class="spinner"></div><p style="font-size:0.9rem;font-weight:600;">Esperando validación del garzón...</p><p style="color:var(--color-text-sec);font-size:0.8rem;">Estamos confirmando tu presencia en el mesón.</p></div>
         `;
       }
-      document.getElementById('mensajeGastroInicial').textContent = 'Espera la activación del garzón.';
+      const mensaje = document.getElementById('mensajeGastroInicial');
+      if (mensaje) mensaje.textContent = 'Espera la activación del garzón.';
     }
   }
 
   function _construirPanelControl() {
     const container = document.getElementById('welcomeContainer');
+    if (!container) return;
     const esBarra = _mesa === 'barra';
     const nombreMesa = esBarra ? 'Barra' : `Mesa ${_mesa}`;
-
     container.innerHTML = `
       <div class="hero-row">
         <div class="hero-estado">
@@ -188,9 +212,7 @@ const PantallaBienvenida = (() => {
         </div>
         <div class="sidebar-comensales" id="sidebarComensales">
           <h4><i class="fa-solid fa-users"></i> Comensales</h4>
-          <div class="avatar-list-vertical" id="listaComensales">
-            <div class="avatar-mini activo" id="avatarPrincipal"></div>
-          </div>
+          <div class="avatar-list-vertical" id="listaComensales"><div class="avatar-mini activo" id="avatarPrincipal"></div></div>
           <button class="btn-agregar-comensal" id="btnAgregarComensal">+</button>
         </div>
       </div>
@@ -219,7 +241,8 @@ const PantallaBienvenida = (() => {
     document.getElementById('cardEntretenimiento').addEventListener('click', _irAEventos);
     document.getElementById('btnAgregarComensal').addEventListener('click', _agregarComensal);
 
-    EventBus.on('precargas_cliente:actualizada', _actualizarVistazoPedido);
+    _cbPrecargasActualizada = _actualizarVistazoPedido;
+    EventBus.on('precargas_cliente:actualizada', _cbPrecargasActualizada);
     _actualizarVistazoPedido();
   }
 
@@ -239,10 +262,7 @@ const PantallaBienvenida = (() => {
     const iniciales = nombre.split(' ').map(n => n.charAt(0).toUpperCase()).slice(0, 2).join('');
     const lista = document.getElementById('listaComensales');
     if (lista) {
-      const avatar = document.createElement('div');
-      avatar.className = 'avatar-mini';
-      avatar.textContent = iniciales;
-      avatar.title = nombre;
+      const avatar = document.createElement('div'); avatar.className = 'avatar-mini'; avatar.textContent = iniciales; avatar.title = nombre;
       lista.appendChild(avatar);
     }
     EventBus.emit('cliente:comensal_agregado', { mesa: _mesa, nombre, iniciales });
@@ -264,60 +284,57 @@ const PantallaBienvenida = (() => {
 
   function obtenerMesa() { return _mesa; }
   function permitePrepedidos() { return _permitePrepedidos; }
-
   function _irAlMenu() { if (!_mesa || !_permitePrepedidos) return; EventBus.emit('app:cambiarVista', 'menu'); }
   function _irAEventos() { EventBus.emit('app:cambiarVista', 'eventos'); }
 
   function mostrar() {
-    if (_vista) {
-      _verificarPermisoMesa();  // ← nuevo: verifica estado real al activarse
-      const viewMenu = document.getElementById('view-menu');
-      if (viewMenu) viewMenu.classList.remove('active');
-      _vista.classList.add('active');
-      _actualizarPerfil();
-      if (_mesa) {
-        const cardIngreso = document.getElementById('cardIngresoMesa');
-        const cardEspera = document.getElementById('cardEspera');
-        if (_interfazActivada) { if (cardIngreso) cardIngreso.style.display = 'none'; if (cardEspera) cardEspera.style.display = 'none'; }
-        else { if (cardIngreso) cardIngreso.style.display = 'none'; if (cardEspera) cardEspera.style.display = 'block'; }
-      }
+    _asegurarVista();
+    activar();
+    _verificarPermisoMesa();
+    const viewMenu = document.getElementById('view-menu');
+    if (viewMenu) viewMenu.classList.remove('active');
+    _vista.classList.add('active');
+    _actualizarPerfil();
+    if (_mesa) {
+      const cardIngreso = document.getElementById('cardIngresoMesa');
+      const cardEspera = document.getElementById('cardEspera');
+      if (_interfazActivada) { if (cardIngreso) cardIngreso.style.display = 'none'; if (cardEspera) cardEspera.style.display = 'none'; }
+      else { if (cardIngreso) cardIngreso.style.display = 'none'; if (cardEspera) cardEspera.style.display = 'block'; }
     }
   }
 
-  function ocultar() { if (_vista) _vista.classList.remove('active'); }
+  function ocultar() {
+    if (_vista) _vista.classList.remove('active');
+  }
 
   function _initRealtime() {
-    // Listener para mesas:actualizada (plural)
-    EventBus.on('mesas:actualizada', (datos) => {
+    _cbMesasActualizada = (datos) => {
       if (_mesa && datos) {
-        const coincide = _mesa === 'barra'
-          ? (datos.numero === 0 || datos.nombre === 'barra')
-          : (datos.numero === _mesa);
+        const coincide = _mesa === 'barra' ? (datos.numero === 0 || datos.nombre === 'barra') : (datos.numero === _mesa);
         if (coincide) _verificarPermisoMesa();
       }
-    });
-
-    // Listener para mesa:actualizada (singular) ← restaurado
-    EventBus.on('mesa:actualizada', (datos) => {
+    };
+    _cbMesaActualizada = (datos) => {
       if (_mesa && datos) {
-        const coincide = _mesa === 'barra'
-          ? (datos.numero === 0 || datos.nombre === 'barra')
-          : (datos.numero === _mesa);
+        const coincide = _mesa === 'barra' ? (datos.numero === 0 || datos.nombre === 'barra') : (datos.numero === _mesa);
         if (coincide) _verificarPermisoMesa();
       }
-    });
-
-    EventBus.on('eventos_en_vivo:actualizada', () => {
+    };
+    _cbEventosActualizada = () => {
       const state = Store.getState();
       const eventos = state.eventos_en_vivo || [];
       const activo = eventos.find(e => e.estado === 'activo');
       const mensaje = document.getElementById('mensajeEvento') || document.getElementById('mensajeEventoInicial');
       if (activo && mensaje) mensaje.textContent = `🎤 ${activo.tipo || 'Evento'} en vivo ahora`;
       else if (mensaje) mensaje.textContent = 'Próximo evento a las 22:00 hrs';
-    });
+    };
+
+    EventBus.on('mesas:actualizada', _cbMesasActualizada);
+    EventBus.on('mesa:actualizada', _cbMesaActualizada);
+    EventBus.on('eventos_en_vivo:actualizada', _cbEventosActualizada);
   }
 
-  return { render, mostrar, ocultar, obtenerMesa, permitePrepedidos };
+  return { mostrar, ocultar, obtenerMesa, permitePrepedidos };
 })();
 
 export { PantallaBienvenida };

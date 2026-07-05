@@ -1,12 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/kds.js
-   Versión: 2.0.2
+   Versión: 2.0.3
    Propósito: Monitor de cocina (KDS): tarjetas de comandas, estados y recetario.
-              Imports estandarizados. Uso de CommandBus para botón de pánico.
+              _asegurarVista refactorizada para contenedores estáticos.
    Dependencias: ../lib/store.js, ../lib/eventBus.js, ../lib/command-bus.js,
-                 ../auth.js, ../utils.js, ../lib/logger.js,
-                 ./recetas.js
+                 ../auth.js, ../utils.js, ../lib/logger.js, ./recetas.js
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -21,11 +20,25 @@ const MINUTOS_URGENTE = 15;
 const MINUTOS_OCULTAR_LISTA = 10;
 
 function _asegurarVista() {
-  if ($id('view-cocina')) return;
+  let main = document.getElementById('view-cocina');
 
-  const main = document.createElement('main');
-  main.id = 'view-cocina';
-  main.className = 'view';
+  // Si ya está completo, no hacer nada
+  if (main && main.querySelector('#cocinaKDS')) return;
+
+  // Crear contenedor si no existe (modo dinámico / fallback)
+  if (!main) {
+    main = document.createElement('main');
+    main.id = 'view-cocina';
+    main.className = 'view';
+    const referencia = $id('toastContainer') || document.body.lastChild;
+    document.body.insertBefore(main, referencia);
+  }
+
+  _construirContenidoKDS(main);
+}
+
+function _construirContenidoKDS(main) {
+  // Limpiar cualquier resto y construir estructura interna
   main.innerHTML = `
     <div class="view-toolbar">
       <h2><i class="fas fa-fire-burner"></i> Monitor de Cocina</h2>
@@ -40,9 +53,8 @@ function _asegurarVista() {
     </div>
     <div id="cocinaKDS" class="kds-grid"></div>
   `;
-  const referencia = $id('toastContainer') || document.body.lastChild;
-  document.body.insertBefore(main, referencia);
 
+  // Asignar eventos a los botones (sin duplicar)
   $id('kds-refresh-btn').addEventListener('click', () => refresh());
   $id('kds-recetario-btn').addEventListener('click', () => Recetas.render('consulta'));
 }

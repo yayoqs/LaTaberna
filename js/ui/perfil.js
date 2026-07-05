@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/perfil.js
-   Versión: 1.0.3
+   Versión: 1.0.5
    Propósito: Vista de perfil de usuario: avatar, datos y documentos.
-              v1.0.3: evita toast "no hay sesión activa" al iniciar.
+              v1.0.5: _asegurarVista corregida según estándar B1.
    ================================================================ */
 
 import { Auth } from '../auth.js';
@@ -19,11 +19,17 @@ const Perfil = (() => {
   }
 
   function _asegurarVista() {
-    if (document.getElementById('view-perfil')) return;
+    let main = document.getElementById('view-perfil');
+    if (main && main.querySelector('.view-toolbar')) return;
+    
+    if (!main) {
+      main = document.createElement('main');
+      main.id = 'view-perfil';
+      main.className = 'view';
+      const referencia = document.getElementById('toastContainer') || document.body.lastChild;
+      document.body.insertBefore(main, referencia);
+    }
 
-    const main = document.createElement('main');
-    main.id = 'view-perfil';
-    main.className = 'view';
     main.innerHTML = `
       <div class="view-toolbar">
         <h2><i class="fas fa-id-card"></i> Mi Perfil</h2>
@@ -50,8 +56,6 @@ const Perfil = (() => {
         </section>
       </div>
     `;
-    const referencia = document.getElementById('toastContainer') || document.body.lastChild;
-    document.body.insertBefore(main, referencia);
 
     document.getElementById('btnEditarPerfil').addEventListener('click', mostrarModalEditar);
     document.getElementById('btnActualizarPerfil').addEventListener('click', render);
@@ -62,7 +66,6 @@ const Perfil = (() => {
 
     const usuario = Auth.getUsuarioActual();
     if (!usuario) {
-      // No mostrar toast para evitar mensaje molesto al inicio sin sesión
       return;
     }
 
@@ -201,7 +204,6 @@ const Perfil = (() => {
     }
   }
 
-  // Listener corregido: solo renderiza si hay sesión activa
   EventBus.on('db:inicializada', () => {
     if (Auth.getUsuarioActual()) {
       render();

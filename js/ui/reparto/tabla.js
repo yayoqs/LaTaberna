@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — REPARTO SUBMÓDULO (ES6)
    Archivo: js/ui/reparto/tabla.js
-   Versión: 1.0.1
+   Versión: 1.0.3
    Propósito: Render de la tabla de pedidos delivery y filtro por estado.
-              v1.0.1: listeners movidos a asegurarVista para evitar acumulación.
+              v1.0.3: asegurarVista corregida según estándar B1.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -11,7 +11,6 @@ import { fmtMoney } from '../../utils.js';
 import { ESTADO_BADGE, ESTADO_DEFAULT } from './constantes.js';
 
 let _estadoFiltro = 'todos';
-let _listenersVinculados = false;
 
 export function getEstadoFiltro() {
   return _estadoFiltro;
@@ -22,11 +21,17 @@ export function setEstadoFiltro(estado) {
 }
 
 export function asegurarVista(onNuevoPedido, onEditarItems, onEnviarCocina, onDespachar, onConfirmarEntrega, onEliminarPedido) {
-  if (document.getElementById('view-reparto')) return;
+  let main = document.getElementById('view-reparto');
+  if (main && main.querySelector('.view-toolbar')) return;
+  
+  if (!main) {
+    main = document.createElement('main');
+    main.id = 'view-reparto';
+    main.className = 'view';
+    const referencia = document.getElementById('toastContainer') || document.body.lastChild;
+    document.body.insertBefore(main, referencia);
+  }
 
-  const main = document.createElement('main');
-  main.id = 'view-reparto';
-  main.className = 'view';
   main.innerHTML = `
     <div class="view-toolbar">
       <h2><i class="fas fa-motorcycle"></i> Reparto — Pedidos de Delivery</h2>
@@ -50,15 +55,13 @@ export function asegurarVista(onNuevoPedido, onEditarItems, onEnviarCocina, onDe
       </table>
     </div>
   `;
-  const referencia = document.getElementById('toastContainer') || document.body.lastChild;
-  document.body.insertBefore(main, referencia);
 
-  // ── Vincular eventos UNA SOLA VEZ ──
+  // Vincular eventos UNA SOLA VEZ
   const selectEstado = document.getElementById('repartoEstadoFilter');
   if (selectEstado) {
     selectEstado.addEventListener('change', function () {
       setEstadoFiltro(this.value);
-      if (typeof onNuevoPedido === 'function') onNuevoPedido(); // callback para re-render
+      if (typeof onNuevoPedido === 'function') onNuevoPedido();
     });
   }
 
@@ -88,8 +91,6 @@ export function asegurarVista(onNuevoPedido, onEditarItems, onEnviarCocina, onDe
       }
     });
   }
-
-  _listenersVinculados = true;
 }
 
 export function renderTabla(pedidos) {

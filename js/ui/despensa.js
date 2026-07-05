@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/despensa.js
-   Versión: 1.0.2
+   Versión: 1.0.4
    Propósito: Vista de inventario: ingredientes, movimientos, filtros, exportación.
-              Sin onclick. Usa addEventListener y delegación de eventos.
+              v1.0.4: _asegurarVista corregida según estándar B1.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -21,11 +21,18 @@ const Despensa = (() => {
   const _MOVS_POR_PAGINA = 10;
 
   function _asegurarVista() {
-    if (document.getElementById('view-despensa')) return;
+    let main = document.getElementById('view-despensa');
+    // Si ya tiene contenido, no lo regeneramos
+    if (main && main.querySelector('.view-toolbar')) return;
+    
+    if (!main) {
+      main = document.createElement('main');
+      main.id = 'view-despensa';
+      main.className = 'view';
+      const referencia = document.getElementById('toastContainer') || document.body.lastChild;
+      document.body.insertBefore(main, referencia);
+    }
 
-    const main = document.createElement('main');
-    main.id = 'view-despensa';
-    main.className = 'view';
     main.innerHTML = `
       <div class="view-toolbar">
         <h2><i class="fas fa-boxes"></i> Despensa — Inventario</h2>
@@ -89,14 +96,11 @@ const Despensa = (() => {
         </div>
       </div>
     `;
-    const referencia = document.getElementById('toastContainer') || document.body.lastChild;
-    document.body.insertBefore(main, referencia);
 
     _vincularEventos();
   }
 
   function _vincularEventos() {
-    // Toolbar
     document.getElementById('despensaCatFilter').addEventListener('change', function() {
       _categoriaFiltro = this.value;
       _aplicarFiltros();
@@ -112,7 +116,6 @@ const Despensa = (() => {
     document.getElementById('btnExportarCSV').addEventListener('click', exportarIngredientes);
     document.getElementById('btnExportarPDF').addEventListener('click', exportarPDF);
 
-    // Encabezados de tabla (delegación)
     document.getElementById('ingredientesTableHead').addEventListener('click', function(e) {
       const th = e.target.closest('th[data-columna]');
       if (th) {
@@ -120,7 +123,6 @@ const Despensa = (() => {
       }
     });
 
-    // Filas de ingredientes (delegación)
     document.getElementById('ingredientesBody').addEventListener('click', function(e) {
       const editBtn = e.target.closest('.btn-ajuste[data-accion="editar"]');
       const ajusteBtn = e.target.closest('.btn-ajuste[data-accion="ajuste"]');
@@ -132,7 +134,6 @@ const Despensa = (() => {
       }
     });
 
-    // Paginador de movimientos
     document.getElementById('movimientosPaginador').addEventListener('click', function(e) {
       const btn = e.target.closest('#btnVerMasMovimientos');
       if (btn) {
@@ -140,7 +141,6 @@ const Despensa = (() => {
       }
     });
 
-    // Botón Ajuste Rápido de la barra lateral
     document.getElementById('btnAjusteRapidoSidebar').addEventListener('click', () => ajusteRapido());
   }
 
@@ -312,11 +312,10 @@ const Despensa = (() => {
 
     const movs = Store.getState().movimientos || DB.movimientos || [];
     const recientes = [...movs].reverse();
-    
+
     const totalMovs = recientes.length;
-    const inicio = 0;
     const fin = (_paginaMovimientos + 1) * _MOVS_POR_PAGINA;
-    const movsPaginados = recientes.slice(inicio, Math.min(fin, totalMovs));
+    const movsPaginados = recientes.slice(0, Math.min(fin, totalMovs));
 
     if (!movsPaginados.length) {
       cont.innerHTML = `<p style="color:var(--color-text-muted);">Sin movimientos</p>`;
@@ -504,7 +503,7 @@ const Despensa = (() => {
 
   function exportarPDF() {
     const ingredientes = Store.getState().ingredientes || DB.ingredientes || [];
-    
+
     const html = `
       <html>
       <head><title>Inventario</title>

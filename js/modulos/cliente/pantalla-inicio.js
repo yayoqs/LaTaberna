@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — Módulo (ES6)
    Archivo: js/modulos/cliente/pantalla-inicio.js
-   Versión: 1.0.4
+   Versión: 2.0.1
    Propósito: Pantalla de inicio híbrida con triángulo de acceso.
-              Sin onclick en HTML. Usa addEventListener.
+              _asegurarVista reutiliza contenedor estático de index.html.
    ================================================================ */
 
 import { EventBus } from '../../lib/eventBus.js';
@@ -12,6 +12,7 @@ import { Auth } from '../../auth.js';
 const PantallaInicio = (() => {
   let _vista = null;
   let _intervaloEslogan = null;
+  let _activada = false;
 
   const FRASES_ESLOGAN = [
     "Donde cada trago es una aventura",
@@ -24,12 +25,24 @@ const PantallaInicio = (() => {
     "Sacia tu sed de aventura y diversión en vivo."
   ];
 
-  function render() {
-    if (_vista) return _vista;
+  let _cbLoginCorner, _cbRegistroCorner, _cbAuthRegistro;
 
-    _vista = document.createElement('main');
-    _vista.id = 'view-inicio';
-    _vista.className = 'view';
+  function _asegurarVista() {
+    if (_vista) return;
+
+    let main = document.getElementById('view-inicio');
+    if (!main) {
+      main = document.createElement('main');
+      main.id = 'view-inicio';
+      main.className = 'view';
+      document.body.appendChild(main);
+    }
+
+    _vista = main;
+
+    // Si ya tiene contenido, no reconstruir
+    if (_vista.querySelector('.login-corner')) return;
+
     _vista.innerHTML = `
       <div class="login-corner" id="btnLoginCorner">
         <div class="login-corner-inner">
@@ -66,20 +79,32 @@ const PantallaInicio = (() => {
         </div>
       </div>
     `;
+  }
 
-    document.body.appendChild(_vista);
+  function activar() {
+    if (_activada) return;
+    _activada = true;
 
-    document.getElementById('btnLoginCorner').addEventListener('click', _mostrarLogin);
-    document.getElementById('btnRegistroCorner').addEventListener('click', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      _mostrarRegistro();
-    });
+    _cbLoginCorner = () => _mostrarLogin();
+    _cbRegistroCorner = (e) => { e.preventDefault(); e.stopPropagation(); _mostrarRegistro(); };
+    _cbAuthRegistro = () => _mostrarRegistro();
 
-    EventBus.on('auth:mostrarRegistro', () => _mostrarRegistro());
+    document.getElementById('btnLoginCorner').addEventListener('click', _cbLoginCorner);
+    document.getElementById('btnRegistroCorner').addEventListener('click', _cbRegistroCorner);
+    EventBus.on('auth:mostrarRegistro', _cbAuthRegistro);
 
     _iniciarEsloganDinamico();
-    return _vista;
+  }
+
+  function limpiar() {
+    if (!_activada) return;
+    _activada = false;
+
+    if (_cbLoginCorner) document.getElementById('btnLoginCorner').removeEventListener('click', _cbLoginCorner);
+    if (_cbRegistroCorner) document.getElementById('btnRegistroCorner').removeEventListener('click', _cbRegistroCorner);
+    if (_cbAuthRegistro) EventBus.off('auth:mostrarRegistro', _cbAuthRegistro);
+
+    if (_intervaloEslogan) { clearInterval(_intervaloEslogan); _intervaloEslogan = null; }
   }
 
   function _iniciarEsloganDinamico() {
@@ -102,24 +127,22 @@ const PantallaInicio = (() => {
 
   function _mostrarRegistro() {
     if (typeof Auth.registrarCliente === 'function') {
-      // Abre el modal de login del sistema, que ahora incluye el botón de registro
       Auth.mostrarLogin();
     }
   }
 
   function mostrar() {
-    if (_vista) {
-      _vista.classList.add('active');
-      if (!_intervaloEslogan) _iniciarEsloganDinamico();
-    }
+    _asegurarVista();
+    activar();
+    _vista.classList.add('active');
   }
 
   function ocultar() {
     if (_vista) _vista.classList.remove('active');
-    if (_intervaloEslogan) { clearInterval(_intervaloEslogan); _intervaloEslogan = null; }
+    limpiar();
   }
 
-  return { render, mostrar, ocultar };
+  return { mostrar, ocultar };
 })();
 
 export { PantallaInicio };

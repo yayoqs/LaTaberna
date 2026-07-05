@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MESAS SUBMÓDULO (ES6)
    Archivo: js/ui/mesas/renderer.js
-   Versión: 1.0.4
+   Versión: 1.1.0
    Propósito: Renderizado de la grilla, tarjetas, popover
               y botones de zona. Con callbacks para el toolbar.
+              Refactor: asegurarVista soporta contenedores estáticos.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -18,6 +19,14 @@ let _zonaActiva = 'todas';
 
 let _longPressTimer = null;
 let _longPressMesa = null;
+
+// Funciones de limpieza del popover
+let _popoverCloseListeners = [];
+
+function _limpiarPopoverListeners() {
+  _popoverCloseListeners.forEach(fn => fn());
+  _popoverCloseListeners = [];
+}
 
 export function setModoSeleccion(valor) { _modoSeleccion = valor; }
 export function isModoSeleccion() { return _modoSeleccion; }
@@ -234,6 +243,9 @@ export function mostrarPopover(mesa, card) {
   const cont = document.getElementById('popoverContainer');
   if (!cont) return;
 
+  // Limpiar listeners anteriores
+  _limpiarPopoverListeners();
+
   const rect = card.getBoundingClientRect();
   const estados = getEstadoComandas(mesa.numero);
   const comandas = Store.getState().comandas || [];
@@ -249,7 +261,7 @@ export function mostrarPopover(mesa, card) {
   });
 
   cont.innerHTML = `
-    <div style="background:#1a1a2e;border:1px solid #2e2e42;border-radius:8px;padding:12px;color:#f1f5f9;font-size:12px;min-width:180px;pointer-events:auto;position:absolute;top:${rect.top}px;left:${rect.right + 8}px;z-index:9999;">
+    <div style="background:#1a1a2e;border:1px solid #2e2e42;border-radius:8px;padding:12px;color:#f1f5f9;font-size:12px;min-width:180px;pointer-events:auto;position:absolute;top:${rect.top}px;left:${rect.right + 8}px;z-index:9999;" id="popoverContent">
       <strong>Mesa ${mesa.numero}</strong>
       <div style="margin-top:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${colorEstado(estados.cocina)};margin-right:4px;"></span> Cocina: ${estados.cocina}</div>
       <div><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${colorEstado(estados.barra)};margin-right:4px;"></span> Barra: ${estados.barra}</div>
@@ -257,16 +269,60 @@ export function mostrarPopover(mesa, card) {
       <button style="margin-top:8px;background:#ef4444;color:#fff;border:none;border-radius:4px;padding:4px 8px;font-size:11px;cursor:pointer;float:right;" id="popoverCerrarBtn">Cerrar</button>
     </div>`;
 
-  document.getElementById('popoverCerrarBtn')?.addEventListener('click', () => { cont.innerHTML = ''; });
+  // Cerrar con botón
+  document.getElementById('popoverCerrarBtn')?.addEventListener('click', () => {
+    cont.innerHTML = '';
+    _limpiarPopoverListeners();
+  });
+
+  // Cerrar al hacer clic fuera
+  const clickFuera = (e) => {
+    const popover = document.getElementById('popoverContent');
+    if (popover && !popover.contains(e.target)) {
+      cont.innerHTML = '';
+      _limpiarPopoverListeners();
+    }
+  };
+  setTimeout(() => {
+    document.addEventListener('click', clickFuera);
+    _popoverCloseListeners.push(() => document.removeEventListener('click', clickFuera));
+  }, 0);
+
+  // Cerrar al hacer scroll en la grilla
+  const grid = document.getElementById('mesasGrid');
+  if (grid) {
+    const scrollCierre = () => {
+      cont.innerHTML = '';
+      _limpiarPopoverListeners();
+    };
+    grid.addEventListener('scroll', scrollCierre, { once: true });
+    _popoverCloseListeners.push(() => grid.removeEventListener('scroll', scrollCierre));
+  }
 }
 
 export function asegurarVista(callbacks = {}) {
-  if (document.getElementById('view-mesas')) return;
+  const main = document.getElementById('view-mesas');
+  
+  // Si ya está completo, no hacemos nada
+  if (main && main.querySelector('.mesas-grid')) return;
 
-  const main = document.createElement('main');
-  main.id = 'view-mesas';
-  main.className = 'view active';
-  main.innerHTML = `
+  // Si no existe el contenedor, lo creamos
+  if (!main) {
+    const nuevoMain = document.createElement('main');
+    nuevoMain.id = 'view-mesas';
+    nuevoMain.className = 'view active';
+    const referencia = document.getElementById('toastContainer') || document.body.lastChild;
+    document.body.insertBefore(nuevoMain, referencia);
+    _construirContenido(nuevoMain, callbacks);
+    return;
+  }
+
+  // Si existe pero está vacío (contenedor estático), lo llenamos
+  _construirContenido(main, callbacks);
+}
+
+function _construirContenido(contenedor, callbacks) {
+  contenedor.innerHTML = `
     <div class="view-toolbar">
       <h2><i class="fas fa-grip"></i> Salón — Mapa de Mesas</h2>
       <div class="toolbar-actions">
@@ -291,8 +347,6 @@ export function asegurarVista(callbacks = {}) {
     <div id="mesasGrid" class="mesas-grid"></div>
     <div id="popoverContainer" style="position:fixed;z-index:9999;pointer-events:none;"></div>
   `;
-  const referencia = document.getElementById('toastContainer') || document.body.lastChild;
-  document.body.insertBefore(main, referencia);
 
   // Vincular botones del toolbar mediante callbacks
   document.getElementById('btnAgregarMesa')?.addEventListener('click', () => {

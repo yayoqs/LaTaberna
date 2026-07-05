@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/recetas.js
-   Versión: 2.0.3
+   Versión: 2.0.4
    Propósito: Vista unificada de recetario (modo consulta y administración).
-              Sin dependencia de $id. Usa obtenerColorDesdeNombre de utils.
+              _asegurarVista refactorizada para contenedores estáticos.
    Dependencias: ../lib/store.js, ../lib/eventBus.js, ../auth.js, ../db.js,
                  ../utils.js, ../lib/logger.js
    ================================================================ */
@@ -20,11 +20,24 @@ let _terminoIngrediente = '';
 let _modo = null;
 
 function _asegurarVista() {
-  if (document.getElementById('view-recetas')) return;
+  let main = document.getElementById('view-recetas');
 
-  const main = document.createElement('main');
-  main.id = 'view-recetas';
-  main.className = 'view';
+  // Si ya está completo, no hacer nada
+  if (main && main.querySelector('#recetasGrid')) return;
+
+  // Crear contenedor si no existe (modo dinámico / fallback)
+  if (!main) {
+    main = document.createElement('main');
+    main.id = 'view-recetas';
+    main.className = 'view';
+    const referencia = document.getElementById('toastContainer') || document.body.lastChild;
+    document.body.insertBefore(main, referencia);
+  }
+
+  _construirContenidoRecetas(main);
+}
+
+function _construirContenidoRecetas(main) {
   main.innerHTML = `
     <div class="view-toolbar">
       <h2><i class="fas fa-book"></i> Recetas</h2>
@@ -42,9 +55,8 @@ function _asegurarVista() {
     </div>
     <div id="recetasGrid" class="recetas-grid"></div>
   `;
-  const referencia = document.getElementById('toastContainer') || document.body.lastChild;
-  document.body.insertBefore(main, referencia);
 
+  // Asignar eventos (sin duplicar)
   document.getElementById('recetasSearch').addEventListener('input', () => {
     _terminoBusqueda = document.getElementById('recetasSearch').value.trim();
     render();
@@ -122,7 +134,7 @@ export function render(modo) {
     const receta = recetas.find(r => r.productoId == prod.id);
     const numIng = receta ? receta.ingredientes.length : 0;
     const inicial = prod.nombre.charAt(0).toUpperCase();
-    const color = obtenerColorDesdeNombre(prod.nombre);   // <-- unificada
+    const color = obtenerColorDesdeNombre(prod.nombre);
 
     return `
       <div class="receta-card" data-prod-id="${prod.id}">
@@ -152,8 +164,6 @@ export function filtrarPorIngrediente() {
   _terminoIngrediente = document.getElementById('recetasIngredienteSearch')?.value?.trim() || '';
   render();
 }
-
-// ── Se eliminó la función _getColorFromName local ──────────────
 
 function _iconoPorCategoria(categoria) {
   const mapa = {

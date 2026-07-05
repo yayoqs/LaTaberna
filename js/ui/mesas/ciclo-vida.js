@@ -1,11 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — MESAS SUBMÓDULO (ES6)
    Archivo: js/ui/mesas/ciclo-vida.js
-   Versión: 1.0.6
+   Versión: 1.0.8
    Propósito: Ciclo de vida (activar/limpiar) con AbortController
               y desuscripción funcional del EventBus.
-              Incluye listener para mesas:limpiar_badge.
-              Corrección: console.log migrados a Logger.debug (hallazgo #2).
+              Corrección: se elimina Carta.destroy() de limpiar()
+              (hallazgo post-refactor). Carta es gestionada por el modal.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -14,6 +14,7 @@ import { Logger } from '../../lib/logger.js';
 import { renderGrid, renderZoneButtons, asegurarVista } from './renderer.js';
 import { addNotificacion } from './notificaciones.js';
 import { toggleModoFusion, fusionarMesasSeleccionadas } from './fusion.js';
+import { agregarMesa, setBadge, clearBadge } from './acciones-mesa.js';
 
 let _abortController = null;
 let _desuscripciones = [];
@@ -24,9 +25,7 @@ export function activar() {
   _abortController = new AbortController();
   const { signal } = _abortController;
 
-  document.getElementById('btnAgregarMesa')?.addEventListener('click', () => {
-    import('../mesas.js').then(m => m.Mesas.agregarMesa());
-  }, { signal });
+  document.getElementById('btnAgregarMesa')?.addEventListener('click', agregarMesa, { signal });
   document.getElementById('btnFusionar')?.addEventListener('click', toggleModoFusion, { signal });
   document.getElementById('btnConfirmarFusion')?.addEventListener('click', fusionarMesasSeleccionadas, { signal });
 
@@ -42,7 +41,7 @@ export function activar() {
 
   _desuscripciones.push(EventBus.on('db:inicializada', () => {
     asegurarVista({
-      onAgregarMesa: () => import('../mesas.js').then(m => m.Mesas.agregarMesa()),
+      onAgregarMesa: agregarMesa,
       onToggleFusion: () => toggleModoFusion(),
       onConfirmarFusion: () => fusionarMesasSeleccionadas()
     });
@@ -64,14 +63,14 @@ export function activar() {
     Logger.debug('[Mesas] cliente:mesa_ingresada recibido:', data);
   }));
   _desuscripciones.push(EventBus.on('precarga:nueva', (data) => {
-    import('../mesas.js').then(m => m.Mesas.setBadge(data.mesa, data.cantidad, data.precargaId));
+    setBadge(data.mesa, data.cantidad, data.precargaId);
   }));
   _desuscripciones.push(EventBus.on('config:actualizada', () => {
     renderZoneButtons();
     renderGrid();
   }));
   _desuscripciones.push(EventBus.on('mesas:limpiar_badge', (data) => {
-    import('../mesas.js').then(m => m.Mesas.clearBadge(data.mesa));
+    clearBadge(data.mesa);
   }));
 }
 

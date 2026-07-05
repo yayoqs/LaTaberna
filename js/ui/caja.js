@@ -1,9 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/caja.js
-   Versión: 1.1.0
+   Versión: 1.1.2
    Propósito: Vista de caja: resumen de turno, estadísticas, tabla de pedidos
               y sección de cobros pendientes (split bill).
+              Refactor: _asegurarVista usa contenedor estático (estándar B1/B2).
+              Corrección: botón "Cierre de Caja" usa EventBus.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -14,12 +16,25 @@ import { Cobro } from './cobro.js';
 export const Caja = (() => {
 
   function _asegurarVista() {
-    if ($id('view-caja')) return;
+    const main = document.getElementById('view-caja');
 
-    const main = document.createElement('main');
-    main.id = 'view-caja';
-    main.className = 'view';
-    main.innerHTML = `
+    if (!main) {
+      const nuevoMain = document.createElement('main');
+      nuevoMain.id = 'view-caja';
+      nuevoMain.className = 'view';
+      const referencia = $id('toastContainer') || document.body.lastChild;
+      document.body.insertBefore(nuevoMain, referencia);
+      _construirContenido(nuevoMain);
+      return;
+    }
+
+    if (main.querySelector('.caja-stats')) return;
+
+    _construirContenido(main);
+  }
+
+  function _construirContenido(contenedor) {
+    contenedor.innerHTML = `
       <div class="view-toolbar">
         <h2><i class="fas fa-cash-register"></i> Caja — Resumen del Turno</h2>
         <div class="toolbar-actions">
@@ -45,13 +60,9 @@ export const Caja = (() => {
         </table>
       </div>
     `;
-    const referencia = $id('toastContainer') || document.body.lastChild;
-    document.body.insertBefore(main, referencia);
 
     document.getElementById('btnCerrarTurno').addEventListener('click', () => {
-      if (typeof App !== 'undefined' && App.cerrarTurnoApp) {
-        App.cerrarTurnoApp();
-      }
+      EventBus.emit('turno:solicitar_cierre');
     });
 
     document.getElementById('btnVentaBarra').addEventListener('click', () => {

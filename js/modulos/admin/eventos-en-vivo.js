@@ -1,6 +1,7 @@
 /* ================================================================
-   La Taberna — MÓDULO: eventos-en-vivo.js (v1.2.1 – fix Appwrite)
+   La Taberna — MÓDULO: eventos-en-vivo.js (v1.3.0 – vista estática)
    Propósito: Panel del animador para eventos en vivo (bingo, karaoke, votaciones).
+              Soporta contenedor estático en index.html (estándar B1).
               Sin asignaciones window. Eliminado updatedAt manual.
    ================================================================ */
 
@@ -14,12 +15,30 @@ const EventosEnVivo = (() => {
   let _estadoActual = null;
   let _vistaActiva = false;
 
+  /* ── VISTA (contenedor estático / fallback) ───────────── */
   function _asegurarVista() {
-    if (document.getElementById('view-eventos-en-vivo')) return;
-    const main = document.createElement('main');
-    main.id = 'view-eventos-en-vivo';
-    main.className = 'view';
-    main.innerHTML = `
+    const main = document.getElementById('view-eventos-en-vivo');
+
+    // Si ya tiene contenido, no hacer nada
+    if (main && main.querySelector('.eventos-vivo-panel')) return;
+
+    // Si no existe el contenedor (fallback), crearlo
+    if (!main) {
+      const nuevoMain = document.createElement('main');
+      nuevoMain.id = 'view-eventos-en-vivo';
+      nuevoMain.className = 'view';
+      const referencia = document.getElementById('toastContainer') || document.body.lastChild;
+      document.body.insertBefore(nuevoMain, referencia);
+      _construirContenido(nuevoMain);
+      return;
+    }
+
+    // Si existe pero está vacío (contenedor estático), llenarlo
+    _construirContenido(main);
+  }
+
+  function _construirContenido(contenedor) {
+    contenedor.innerHTML = `
       <div class="view-toolbar">
         <h2><i class="fas fa-broadcast-tower"></i> Eventos en Vivo</h2>
         <div class="toolbar-actions">
@@ -51,15 +70,15 @@ const EventosEnVivo = (() => {
         <div id="zonaInteraccion" class="zona-interaccion"></div>
       </div>
     `;
-    const referencia = document.getElementById('toastContainer') || document.body.lastChild;
-    document.body.insertBefore(main, referencia);
 
+    // Listeners fijos
     document.getElementById('btnCrearEvento').addEventListener('click', crearEvento);
     document.getElementById('btnIniciar').addEventListener('click', () => cambiarEstado('activo'));
     document.getElementById('btnPausar').addEventListener('click', () => cambiarEstado('pausado'));
     document.getElementById('btnFinalizar').addEventListener('click', () => cambiarEstado('finalizado'));
     document.getElementById('btnReiniciar').addEventListener('click', reiniciarEvento);
 
+    // Delegación de eventos dinámicos
     document.getElementById('zonaInteraccion').addEventListener('click', (e) => {
       const target = e.target.closest('[data-action]');
       if (!target) return;
@@ -74,11 +93,13 @@ const EventosEnVivo = (() => {
     });
   }
 
+  /* ── PERMISOS ───────────────────────────────────────────── */
   function _usuarioAutorizado() {
     const rol = Auth.getRol();
     return ['artista', 'eventos', 'admin', 'master'].includes(rol);
   }
 
+  /* ── RENDERIZADO ────────────────────────────────────────── */
   function render() {
     _asegurarVista();
     if (!_usuarioAutorizado()) {
@@ -123,13 +144,21 @@ const EventosEnVivo = (() => {
     btnReiniciar.style.display = (estado === 'finalizado') ? '' : 'none';
 
     switch (tipo) {
-      case 'bingo': _renderInterfazBingo(datos, estado); break;
-      case 'karaoke': _renderInterfazKaraoke(datos, estado); break;
-      case 'votacion': _renderInterfazVotacion(datos, estado); break;
-      default: zona.innerHTML = '';
+      case 'bingo':
+        _renderInterfazBingo(datos, estado);
+        break;
+      case 'karaoke':
+        _renderInterfazKaraoke(datos, estado);
+        break;
+      case 'votacion':
+        _renderInterfazVotacion(datos, estado);
+        break;
+      default:
+        zona.innerHTML = '';
     }
   }
 
+  /* ── INTERFAZ BINGO ────────────────────────────────────── */
   function _renderInterfazBingo(datos, estado) {
     const zona = document.getElementById('zonaInteraccion');
     const bolas = (datos && datos.bolas) || [];
@@ -156,6 +185,7 @@ const EventosEnVivo = (() => {
     `;
   }
 
+  /* ── INTERFAZ KARAOKE ──────────────────────────────────── */
   function _renderInterfazKaraoke(datos, estado) {
     const zona = document.getElementById('zonaInteraccion');
     const letra = (datos && datos.letra) || '';
@@ -174,6 +204,7 @@ const EventosEnVivo = (() => {
     `;
   }
 
+  /* ── INTERFAZ VOTACIÓN ─────────────────────────────────── */
   function _renderInterfazVotacion(datos, estado) {
     const zona = document.getElementById('zonaInteraccion');
     const opciones = (datos && datos.opciones) || [];

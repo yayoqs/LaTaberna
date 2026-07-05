@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/modulos/cliente/principal.js
-   Versión: 1.7.2
+   Versión: 2.0.0
    Propósito: Punto de entrada del frontend del cliente.
-              Exporta ClienteModulo para tests integrales.
+              Ya no llama a render(), confía en _asegurarVista.
    ================================================================ */
 
 import { PantallaInicio } from './pantalla-inicio.js';
@@ -23,11 +23,6 @@ export const ClienteModulo = {
 };
 
 (function iniciar() {
-  PantallaInicio.render();
-  PantallaBienvenida.render();
-  MenuDigital.render();
-  PantallaEventos.render();
-
   EventBus.on('vista:cambiada', (vista) => {
     const esCliente = Auth.esCliente?.() || false;
 

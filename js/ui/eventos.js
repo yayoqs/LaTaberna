@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/eventos.js
-   Versión: 1.0.2
-   Propósito: Vista de gestión de eventos administrativos (carpetas Drive, presupuestos, menús).
-              Sin onclick. Usa addEventListener.
+   Versión: 1.0.4
+   Propósito: Vista de gestión de eventos administrativos.
+              v1.0.4: _asegurarVista corregida según estándar B1.
    ================================================================ */
 
 import { DB } from '../db.js';
@@ -15,11 +15,17 @@ import { showToast } from '../utils.js';
 const Eventos = (() => {
 
   function _asegurarVista() {
-    if (document.getElementById('view-eventos')) return;
+    let main = document.getElementById('view-eventos');
+    if (main && main.querySelector('.view-toolbar')) return;
+    
+    if (!main) {
+      main = document.createElement('main');
+      main.id = 'view-eventos';
+      main.className = 'view';
+      const referencia = document.getElementById('toastContainer') || document.body.lastChild;
+      document.body.insertBefore(main, referencia);
+    }
 
-    const main = document.createElement('main');
-    main.id = 'view-eventos';
-    main.className = 'view';
     main.innerHTML = `
       <div class="view-toolbar">
         <h2><i class="fas fa-calendar-alt"></i> Gestión de Eventos</h2>
@@ -44,10 +50,7 @@ const Eventos = (() => {
         </table>
       </div>
     `;
-    const referencia = document.getElementById('toastContainer') || document.body.lastChild;
-    document.body.insertBefore(main, referencia);
 
-    // Vincular eventos del toolbar
     document.getElementById('btnNuevoEvento').addEventListener('click', mostrarFormulario);
     document.getElementById('btnActualizarEventos').addEventListener('click', render);
   }
@@ -125,7 +128,6 @@ const Eventos = (() => {
       `;
       document.body.appendChild(modal);
 
-      // Vincular eventos del modal
       document.getElementById('btnCerrarFormularioEvento').addEventListener('click', cerrarFormulario);
       document.getElementById('btnCancelarFormularioEvento').addEventListener('click', cerrarFormulario);
       document.getElementById('btnGuardarEvento').addEventListener('click', guardarEvento);

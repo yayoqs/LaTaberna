@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/carta.js
-   Versión: 2.0.3
+   Versión: 2.0.4
    Propósito: Carta de productos: categorías, búsqueda y selección.
               Sin onclick. Usa delegación de eventos.
+              Corrección: suscripciones limpiables (hallazgo #4).
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -13,6 +14,8 @@ import { fmtMoney, $id } from '../utils.js';
 const Carta = (() => {
   let _categoriaActiva = 'Todos';
   let _terminoBusqueda = '';
+  let _unsubscribeStore = null;
+  let _unsubscribeEventBus = null;
 
   function render() {
     _renderCategorias();
@@ -104,15 +107,26 @@ const Carta = (() => {
   }
 
   function _initListeners() {
-    Store.subscribe((state, action) => {
+    _unsubscribeStore = Store.subscribe((state, action) => {
       if (action.type.startsWith('PRODUCTO')) {
         render();
       }
     });
 
-    EventBus.on('vista:cambiada', (vista) => {
+    _unsubscribeEventBus = EventBus.on('vista:cambiada', (vista) => {
       if (vista === 'mesas') render();
     });
+  }
+
+  function destroy() {
+    if (_unsubscribeStore) {
+      _unsubscribeStore();
+      _unsubscribeStore = null;
+    }
+    if (_unsubscribeEventBus) {
+      _unsubscribeEventBus();
+      _unsubscribeEventBus = null;
+    }
   }
 
   _initListeners();
@@ -121,7 +135,8 @@ const Carta = (() => {
     render,
     setCategoria,
     filtrar,
-    seleccionarProducto
+    seleccionarProducto,
+    destroy
   };
 })();
 

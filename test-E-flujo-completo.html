@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Test Integral Rotativo — La Taberna (ES6) v2.2</title>
+    <title>Test Integral Rotativo — La Taberna (ES6) v3.0.0</title>
     <style>
         body { font-family: system-ui, sans-serif; background: #0f0f14; color: #f1f5f9; padding: 20px; }
         h1 { color: #f59e0b; }
@@ -16,7 +16,7 @@
     </style>
 </head>
 <body>
-    <h1>🧪 Test Integral Rotativo — La Taberna (ES6) v2.2</h1>
+    <h1>🧪 Test Integral Rotativo — La Taberna (ES6) v3.0.0</h1>
     <p class="info">Flujo completo: cliente → staff → cocina/barra → administración → dinero.</p>
     <p class="info">Ejecutar localmente con un servidor que soporte módulos ES6.</p>
 
@@ -32,6 +32,7 @@
         import { DBAppwrite } from '../js/db-appwrite.js';
         import { Auth } from '../js/auth.js';
         import { Mesas } from '../js/ui/mesas.js';
+        import { MesaDetalles } from '../js/ui/mesa-detalles.js';
         import { Comanda } from '../js/ui/comanda.js';
         import { Carta } from '../js/ui/carta.js';
         import { Pedido } from '../js/ui/pedido-ui.js';
@@ -99,13 +100,10 @@
                 DBAppwrite._mockActivo = true;
             }
 
-            // Mock de Auth.getAppwriteUserId
             Auth.getAppwriteUserId = async () => 'user_test_123';
-
-            // Mock de window.confirm
             window.confirm = () => true;
 
-            // Mock de CommandBus
+            // Mock de CommandBus actualizado para MesaDetalles
             CommandBus.ejecutar = async (comando) => {
                 if (comando.type === 'crearPedidoMesa') {
                     const mesa = DB.mesas.find(m => m.numero == comando.datos.numeroMesa);
@@ -154,7 +152,7 @@
                 return state;
             };
 
-            // Mock de Store.dispatch para procesar COMANDA_ITEM_AGREGAR sobre DB.mesas
+            // Mock de Store.dispatch para procesar COMANDA_ITEM_AGREGAR y MESA_ACTUALIZAR
             const _originalDispatch = Store.dispatch.bind(Store);
             Store.dispatch = function(action) {
                 if (action.type === 'COMANDA_ITEM_AGREGAR') {
@@ -167,6 +165,10 @@
                         if (existente) existente.qty++;
                         else mesa.items.push({ ...item, qty: 1 });
                     }
+                }
+                if (action.type === 'MESA_ACTUALIZAR') {
+                    const mesa = DB.mesas.find(m => m.numero === action.payload.numero);
+                    if (mesa) Object.assign(mesa, action.payload.cambios);
                 }
                 _originalDispatch(action);
             };
@@ -181,7 +183,7 @@
         }
 
         // ════════════════════════════════════════════════
-        // SUITE 1: CLIENTE
+        // SUITE 1: CLIENTE (CORREGIDA)
         // ════════════════════════════════════════════════
         async function suiteCliente() {
             resultsEl.innerHTML += '<div class="suite"><h2>1. Flujo del Cliente</h2></div>';
@@ -189,17 +191,24 @@
             limpiarDOM();
             Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
 
-            const vistaInicio = PantallaInicio.render();
             PantallaInicio.mostrar();
-            assert(vistaInicio.id === 'view-inicio', 'Pantalla de inicio renderizada');
+            const vistaInicio = document.getElementById('view-inicio');
+            assert(vistaInicio !== null, 'Pantalla de inicio renderizada');
             assert(vistaInicio.querySelector('.login-corner') !== null, 'Triángulo de acceso presente');
 
             PantallaInicio.ocultar();
             await Auth.login('cliente', 'cliente');
             EventBus.emit('app:cambiarVista', 'bienvenida');
+            EventBus.emit('vista:cambiada', 'bienvenida');
+            await esperar(50);
+            
             let vistaBienvenida = document.getElementById('view-bienvenida');
-            if (!vistaBienvenida) { PantallaBienvenida.render(); PantallaBienvenida.mostrar(); vistaBienvenida = document.getElementById('view-bienvenida'); }
-            else PantallaBienvenida.mostrar();
+            if (!vistaBienvenida) {
+                PantallaBienvenida.mostrar();
+                vistaBienvenida = document.getElementById('view-bienvenida');
+            } else {
+                PantallaBienvenida.mostrar();
+            }
             assert(vistaBienvenida.classList.contains('active'), 'Bienvenida activa');
 
             document.getElementById('inputMesa').value = 5;
@@ -215,7 +224,9 @@
             assert(PantallaBienvenida.permitePrepedidos() === true, 'permitePrepedidos true');
 
             document.getElementById('cardGastronomica').click();
-            MenuDigital.render();
+            EventBus.emit('app:cambiarVista', 'menu');
+            EventBus.emit('vista:cambiada', 'menu');
+            await esperar(50);
             MenuDigital.mostrar();
             await esperar(80);
             const vistaMenu = document.getElementById('view-menu-digital');
@@ -236,9 +247,13 @@
             assert(Orden.obtenerTotal() === 0, 'Total en 0');
 
             MenuDigital.ocultar();
+            EventBus.emit('app:cambiarVista', 'bienvenida');
+            EventBus.emit('vista:cambiada', 'bienvenida');
             PantallaBienvenida.mostrar();
+            await esperar(50);
             document.getElementById('cardEntretenimiento').click();
-            PantallaEventos.render();
+            EventBus.emit('app:cambiarVista', 'eventos');
+            EventBus.emit('vista:cambiada', 'eventos');
             PantallaEventos.mostrar();
             await esperar(500);
             assert(document.getElementById('view-eventos-cliente').classList.contains('active'), 'Eventos activa');
@@ -255,6 +270,7 @@
 
             Auth.logout();
             EventBus.emit('app:cambiarVista', 'inicio');
+            EventBus.emit('vista:cambiada', 'inicio');
             PantallaInicio.mostrar();
             assert(document.getElementById('view-inicio').classList.contains('active'), 'Inicio activa al cerrar sesión');
 
@@ -262,7 +278,7 @@
         }
 
         // ════════════════════════════════════════════════
-        // SUITE 2: STAFF (Garzón/Mesero)
+        // SUITE 2: STAFF (Garzón/Mesero) — ACTUALIZADA
         // ════════════════════════════════════════════════
         async function suiteStaff() {
             resultsEl.innerHTML += '<div class="suite"><h2>2. Staff (Garzón/Mesero)</h2></div>';
@@ -284,16 +300,19 @@
             await esperar(80);
             assert(document.querySelectorAll('.esperando-cliente-badge').length === 1, 'Aparece insignia de cliente esperando en mesa 5');
 
-            const mesa5 = DB.mesas[4];
-            await Pedido._confirmarApertura(5);
+            // Abrir mesa mediante MesaDetalles (flujo real)
+            MesaDetalles.abrir(5);
+            await esperar(100);
+            // Simular clic en "Aceptar" de la sección de espera
+            const btnAceptar = document.querySelector('.btn-atender[data-num-mesa="5"]');
+            assert(!!btnAceptar, 'Botón Aceptar visible en panel de detalle');
+            btnAceptar.click();
             await esperar(200);
-            assert(mesa5.estado === 'ocupada' && mesa5.permite_prepedidos === true, 'Mesa en estado ocupada y permite prepedidos');
-            Mesas.render();
-            await esperar(80);
-            assert(document.querySelectorAll('.esperando-cliente-badge').length === 0, 'Insignia de espera desaparece al abrir la mesa');
+            const mesa5 = DB.mesas[4];
+            assert(mesa5.estado === 'ocupada' && mesa5.permite_prepedidos === true, 'Mesa en estado ocupada y permite prepedidos tras vinculación');
+            assert(document.querySelectorAll('.esperando-cliente-badge').length === 0, 'Insignia de espera desaparece');
 
-            const modalPedido = document.getElementById('modalPedido');
-            if (modalPedido) modalPedido.style.display = 'none';
+            // Precarga
             Comanda.setMesaActiva(mesa5);
             EventBus.emit('cliente:precarga_enviada', {
                 id: 'pre_123', mesa: 5,
@@ -307,6 +326,7 @@
             assert(mesa5.items.length > 0, 'Ítems cargados en la comanda desde la precarga');
             assert(!document.querySelector('.precarga-badge'), 'Badge de precarga desaparece después de cargar');
 
+            // Popover long-press
             const tarjetaMesa5 = document.querySelector('.mesa-card');
             tarjetaMesa5.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
             await esperar(500);
