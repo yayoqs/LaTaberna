@@ -1,16 +1,17 @@
 /* ================================================================
    LaTaberna - PubPOS — REPARTO SUBMÓDULO (ES6)
    Archivo: js/ui/reparto/acciones.js
-   Versión: 1.0.0
+   Versión: 1.0.1
    Propósito: Acciones sobre pedidos de delivery: enviar a cocina,
               despachar, confirmar entrega, eliminar.
+              v1.0.1: migra confirm a mostrarConfirmacion.
    ================================================================ */
 
 import { DB } from '../../db.js';
 import { DeliveryService } from '../../servicios/delivery-service.js';
 import { EventBus } from '../../lib/eventBus.js';
 import { Logger } from '../../lib/logger.js';
-import { showToast } from '../../utils.js';
+import { showToast, mostrarConfirmacion } from '../../utils.js';
 
 export async function enviarACocina(deliveryId) {
   if (typeof DB !== 'undefined' && DB.comandas) {
@@ -109,8 +110,13 @@ export async function confirmarEntrega(deliveryId) {
   showToast('success', 'Entregado');
 }
 
-export function eliminarPedido(id) {
-  if (!confirm('¿Eliminar este pedido?')) return;
+export async function eliminarPedido(id) {
+  const confirmado = await mostrarConfirmacion(
+    'Eliminar pedido',
+    '¿Eliminar este pedido?'
+  );
+  if (!confirmado) return;
+
   if (typeof DeliveryService !== 'undefined' && DeliveryService.cancelar) {
     DeliveryService.cancelar(id).then(r => {
       if (r.exito) {

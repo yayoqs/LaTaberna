@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/eventos.js
-   Versión: 1.0.4
+   Versión: 1.0.5
    Propósito: Vista de gestión de eventos administrativos.
-              v1.0.4: _asegurarVista corregida según estándar B1.
+              v1.0.5: implementa ciclo de vida activar/limpiar.
    ================================================================ */
 
 import { DB } from '../db.js';
@@ -13,6 +13,9 @@ import { EventBus } from '../lib/eventBus.js';
 import { showToast } from '../utils.js';
 
 const Eventos = (() => {
+
+  let _abortController = null;
+  let _desuscripciones = [];
 
   function _asegurarVista() {
     let main = document.getElementById('view-eventos');
@@ -51,8 +54,9 @@ const Eventos = (() => {
       </div>
     `;
 
-    document.getElementById('btnNuevoEvento').addEventListener('click', mostrarFormulario);
-    document.getElementById('btnActualizarEventos').addEventListener('click', render);
+    const { signal } = _abortController || {};
+    document.getElementById('btnNuevoEvento').addEventListener('click', mostrarFormulario, { signal });
+    document.getElementById('btnActualizarEventos').addEventListener('click', render, { signal });
   }
 
   async function render() {
@@ -180,12 +184,28 @@ const Eventos = (() => {
     }
   }
 
-  function _initEventListeners() {
-    EventBus.on('db:inicializada', render);
+  function activar() {
+    limpiar();
+    _abortController = new AbortController();
+
+    _desuscripciones.push(EventBus.on('db:inicializada', render));
   }
-  _initEventListeners();
+
+  function limpiar() {
+    if (_abortController) {
+      _abortController.abort();
+      _abortController = null;
+    }
+    _desuscripciones.forEach(fn => fn());
+    _desuscripciones = [];
+  }
+
+  // ── Inicialización ──
+  activar();
 
   return {
+    activar,
+    limpiar,
     render,
     mostrarFormulario,
     cerrarFormulario,

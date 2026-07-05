@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/despensa.js
-   Versión: 1.0.4
+   Versión: 1.0.5
    Propósito: Vista de inventario: ingredientes, movimientos, filtros, exportación.
-              v1.0.4: _asegurarVista corregida según estándar B1.
+              v1.0.5: implementa ciclo de vida activar/limpiar.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -19,10 +19,11 @@ const Despensa = (() => {
   let _categoriaFiltro = 'todas';
   let _paginaMovimientos = 0;
   const _MOVS_POR_PAGINA = 10;
+  let _abortController = null;
+  let _desuscripciones = [];
 
   function _asegurarVista() {
     let main = document.getElementById('view-despensa');
-    // Si ya tiene contenido, no lo regeneramos
     if (main && main.querySelector('.view-toolbar')) return;
     
     if (!main) {
@@ -101,47 +102,71 @@ const Despensa = (() => {
   }
 
   function _vincularEventos() {
+    const { signal } = _abortController || {};
     document.getElementById('despensaCatFilter').addEventListener('change', function() {
       _categoriaFiltro = this.value;
       _aplicarFiltros();
-    });
+    }, { signal });
     document.getElementById('ingredienteSearch').addEventListener('input', function() {
       _ordenColumnas = [];
       _aplicarFiltros();
-    });
-    document.getElementById('filtroBajoMinimo').addEventListener('change', _aplicarFiltros);
-    document.getElementById('filtroConValor').addEventListener('change', _aplicarFiltros);
-    document.getElementById('filtroUbicacion').addEventListener('input', _aplicarFiltros);
-    document.getElementById('btnNuevoIngrediente').addEventListener('click', () => mostrarModalIngrediente());
-    document.getElementById('btnExportarCSV').addEventListener('click', exportarIngredientes);
-    document.getElementById('btnExportarPDF').addEventListener('click', exportarPDF);
+    }, { signal });
+    document.getElementById('filtroBajoMinimo').addEventListener('change', _aplicarFiltros, { signal });
+    document.getElementById('filtroConValor').addEventListener('change', _aplicarFiltros, { signal });
+    document.getElementById('filtroUbicacion').addEventListener('input', _aplicarFiltros, { signal });
+    document.getElementById('btnNuevoIngrediente').addEventListener('click', () => mostrarModalIngrediente(), { signal });
+    document.getElementById('btnExportarCSV').addEventListener('click', exportarIngredientes, { signal });
+    document.getElementById('btnExportarPDF').addEventListener('click', exportarPDF, { signal });
 
     document.getElementById('ingredientesTableHead').addEventListener('click', function(e) {
       const th = e.target.closest('th[data-columna]');
-      if (th) {
-        ordenarTabla(th.dataset.columna, e);
-      }
-    });
+      if (th) ordenarTabla(th.dataset.columna, e);
+    }, { signal });
 
     document.getElementById('ingredientesBody').addEventListener('click', function(e) {
       const editBtn = e.target.closest('.btn-ajuste[data-accion="editar"]');
       const ajusteBtn = e.target.closest('.btn-ajuste[data-accion="ajuste"]');
-      if (editBtn) {
-        editarIngrediente(editBtn.dataset.id);
-      }
-      if (ajusteBtn) {
-        ajusteRapido(ajusteBtn.dataset.id);
-      }
-    });
+      if (editBtn) editarIngrediente(editBtn.dataset.id);
+      if (ajusteBtn) ajusteRapido(ajusteBtn.dataset.id);
+    }, { signal });
 
     document.getElementById('movimientosPaginador').addEventListener('click', function(e) {
       const btn = e.target.closest('#btnVerMasMovimientos');
-      if (btn) {
-        _mostrarMasMovimientos();
+      if (btn) _mostrarMasMovimientos();
+    }, { signal });
+
+    document.getElementById('btnAjusteRapidoSidebar').addEventListener('click', () => ajusteRapido(), { signal });
+  }
+
+  function activar() {
+    limpiar();
+    _abortController = new AbortController();
+
+    const unsubscribeStore = Store.subscribe((state, action) => {
+      if (action.type.startsWith('INGREDIENTE') || action.type.startsWith('MOVIMIENTO')) {
+        render();
       }
     });
+    _desuscripciones.push(unsubscribeStore);
 
-    document.getElementById('btnAjusteRapidoSidebar').addEventListener('click', () => ajusteRapido());
+    _desuscripciones.push(EventBus.on('db:inicializada', () => {
+      setTimeout(render, 100);
+    }));
+    _desuscripciones.push(EventBus.on('vista:cambiada', (vista) => {
+      if (vista === 'despensa') {
+        _paginaMovimientos = 0;
+        render();
+      }
+    }));
+  }
+
+  function limpiar() {
+    if (_abortController) {
+      _abortController.abort();
+      _abortController = null;
+    }
+    _desuscripciones.forEach(fn => fn());
+    _desuscripciones = [];
   }
 
   function render() {
@@ -544,27 +569,12 @@ const Despensa = (() => {
     ventana.close();
   }
 
-  function _initListeners() {
-    Store.subscribe((state, action) => {
-      if (action.type.startsWith('INGREDIENTE') || action.type.startsWith('MOVIMIENTO')) {
-        render();
-      }
-    });
-
-    EventBus.on('db:inicializada', () => {
-      setTimeout(render, 100);
-    });
-    EventBus.on('vista:cambiada', (vista) => {
-      if (vista === 'despensa') {
-        _paginaMovimientos = 0;
-        render();
-      }
-    });
-  }
-
-  _initListeners();
+  // ── Inicialización ──
+  activar();
 
   return {
+    activar,
+    limpiar,
     render,
     filtrarPorCategoria,
     _buscar,

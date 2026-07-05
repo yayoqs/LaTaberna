@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/menu.js
-   Versión: 1.0.4
+   Versión: 1.0.5
    Propósito: Vista de menú digital para garzón/admin.
-              v1.0.4: _asegurarVista corregida según estándar B1.
+              v1.0.5: implementa ciclo de vida activar/limpiar.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -12,6 +12,11 @@ import { Auth } from '../auth.js';
 import { $id, showToast, fmtMoney } from '../utils.js';
 
 const Menu = (() => {
+
+  let _categoriaActiva = 'Todos';
+  let _terminoBusqueda = '';
+  let _abortController = null;
+  let _desuscripciones = [];
 
   function _asegurarVista() {
     let main = document.getElementById('view-menu');
@@ -42,13 +47,13 @@ const Menu = (() => {
       <div id="menuGrid" class="menu-grid"></div>
     `;
 
-    // Registrar eventos
-    document.getElementById('menuSearch').addEventListener('input', () => filtrar());
+    const { signal } = _abortController || {};
+    document.getElementById('menuSearch').addEventListener('input', () => filtrar(), { signal });
     document.getElementById('btnNuevoProductoMenu')?.addEventListener('click', () => {
       if (typeof Config !== 'undefined' && Config.abrirModalProducto) {
         Config.abrirModalProducto();
       }
-    });
+    }, { signal });
     document.getElementById('menuCategorias').addEventListener('click', (e) => {
       const btn = e.target.closest('.menu-cat-btn');
       if (btn) {
@@ -56,11 +61,36 @@ const Menu = (() => {
         btn.classList.add('active');
         filtrar(btn.dataset.categoria);
       }
-    });
+    }, { signal });
   }
 
-  let _categoriaActiva = 'Todos';
-  let _terminoBusqueda = '';
+  function activar() {
+    limpiar();
+    _abortController = new AbortController();
+
+    const unsubscribeStore = Store.subscribe((state, action) => {
+      if (action.type.startsWith('PRODUCTO')) {
+        render();
+      }
+    });
+    _desuscripciones.push(unsubscribeStore);
+
+    _desuscripciones.push(EventBus.on('db:inicializada', () => {
+      setTimeout(render, 100);
+    }));
+    _desuscripciones.push(EventBus.on('vista:cambiada', (vista) => {
+      if (vista === 'menu') render();
+    }));
+  }
+
+  function limpiar() {
+    if (_abortController) {
+      _abortController.abort();
+      _abortController = null;
+    }
+    _desuscripciones.forEach(fn => fn());
+    _desuscripciones = [];
+  }
 
   function render() {
     _asegurarVista();
@@ -127,24 +157,12 @@ const Menu = (() => {
     }).join('');
   }
 
-  function _initListeners() {
-    Store.subscribe((state, action) => {
-      if (action.type.startsWith('PRODUCTO')) {
-        render();
-      }
-    });
-
-    EventBus.on('db:inicializada', () => {
-      setTimeout(render, 100);
-    });
-    EventBus.on('vista:cambiada', (vista) => {
-      if (vista === 'menu') render();
-    });
-  }
-
-  _initListeners();
+  // ── Inicialización ──
+  activar();
 
   return {
+    activar,
+    limpiar,
     render,
     filtrar
   };

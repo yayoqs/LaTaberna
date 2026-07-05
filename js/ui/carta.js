@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/carta.js
-   Versión: 2.0.4
+   Versión: 2.1.0
    Propósito: Carta de productos: categorías, búsqueda y selección.
               Sin onclick. Usa delegación de eventos.
-              Corrección: suscripciones limpiables (hallazgo #4).
+              Ciclo de vida activar/limpiar según estándar de B1.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -14,8 +14,36 @@ import { fmtMoney, $id } from '../utils.js';
 const Carta = (() => {
   let _categoriaActiva = 'Todos';
   let _terminoBusqueda = '';
+  let _activada = false;
   let _unsubscribeStore = null;
   let _unsubscribeEventBus = null;
+
+  function activar() {
+    if (_activada) return;
+    _activada = true;
+
+    _unsubscribeStore = Store.subscribe((state, action) => {
+      if (action.type.startsWith('PRODUCTO')) {
+        render();
+      }
+    });
+
+    _unsubscribeEventBus = EventBus.on('vista:cambiada', (vista) => {
+      if (vista === 'mesas') render();
+    });
+  }
+
+  function limpiar() {
+    if (_unsubscribeStore) {
+      _unsubscribeStore();
+      _unsubscribeStore = null;
+    }
+    if (_unsubscribeEventBus) {
+      _unsubscribeEventBus();
+      _unsubscribeEventBus = null;
+    }
+    _activada = false;
+  }
 
   function render() {
     _renderCategorias();
@@ -35,7 +63,6 @@ const Carta = (() => {
       .map(cat => `<button class="cat-tab${cat === _categoriaActiva ? ' active' : ''}" data-categoria="${cat}">${cat}</button>`)
       .join('');
 
-    // Delegación de eventos
     container.querySelectorAll('.cat-tab').forEach(btn => {
       btn.addEventListener('click', () => setCategoria(btn.dataset.categoria));
     });
@@ -78,7 +105,6 @@ const Carta = (() => {
 
     cont.innerHTML = productosFiltrados.map(_htmlProducto).join('');
 
-    // Delegación de eventos para selección de producto
     cont.querySelectorAll('.prod-card').forEach(card => {
       card.addEventListener('click', () => seleccionarProducto(card.dataset.prodId));
     });
@@ -106,37 +132,16 @@ const Carta = (() => {
     }
   }
 
-  function _initListeners() {
-    _unsubscribeStore = Store.subscribe((state, action) => {
-      if (action.type.startsWith('PRODUCTO')) {
-        render();
-      }
-    });
-
-    _unsubscribeEventBus = EventBus.on('vista:cambiada', (vista) => {
-      if (vista === 'mesas') render();
-    });
-  }
-
-  function destroy() {
-    if (_unsubscribeStore) {
-      _unsubscribeStore();
-      _unsubscribeStore = null;
-    }
-    if (_unsubscribeEventBus) {
-      _unsubscribeEventBus();
-      _unsubscribeEventBus = null;
-    }
-  }
-
-  _initListeners();
+  // Inicializar el ciclo de vida al importar
+  activar();
 
   return {
+    activar,
+    limpiar,
     render,
     setCategoria,
     filtrar,
-    seleccionarProducto,
-    destroy
+    seleccionarProducto
   };
 })();
 

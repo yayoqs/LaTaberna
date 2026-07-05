@@ -1,8 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/modals.css
-   Versión: 1.0.0
-   Propósito: Modales pequeños, modal dual, cierre de mesa, ticket y config.
+   Versión: 1.1.0
+   Propósito: Modales pequeños, modal dual, cierre de mesa, ticket,
+              config y modal de confirmación estilizado.
    ================================================================ */
 
 /* ── MODAL OVERLAY ──────────────────────────────────────────── */
@@ -394,20 +395,72 @@
 #modalLogin .modal-small { max-width: 360px; }
 #modalLogin .btn-primary { width: 100%; }
 
-/* ── RESPONSIVE: MODAL DUAL ──────────────────────────────── */
-@media (max-width: 700px) {
-  .modal-ticket-dual {
-    max-width: 100%;
-    max-height: 95vh;
-  }
-  .ticket-dual-body {
-    flex-direction: column;
-  }
-  .ticket-col {
-    border-right: none;
-    border-bottom: 1px solid var(--color-border);
-  }
-  .ticket-col:last-child {
-    border-bottom: none;
-  }
+/* ── MODAL DE CONFIRMACIÓN (showConfirm) ────────────────────── */
+.modal-confirm-overlay {
+  z-index: 9999;
+}
+
+.modal-confirm-card {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  width: 100%;
+  max-width: 400px;
+  box-shadow: var(--shadow);
+  animation: toast-in .25s ease;
+}
+
+.modal-confirm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 8px;
+}
+
+.modal-confirm-header h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modal-confirm-header h3::before {
+  content: '\f059';
+  font-family: 'Font Awesome 6 Free';
+  font-weight: 900;
+  color: var(--color-accent);
+  font-size: 18px;
+}
+
+.modal-confirm-close {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 20px;
+  cursor: pointer;
+  transition: var(--t);
+  line-height: 1;
+}
+
+.modal-confirm-close:hover {
+  color: var(--color-text);
+}
+
+.modal-confirm-body {
+  padding: 8px 20px 16px;
+}
+
+.modal-confirm-body p {
+  font-size: 13px;
+  color: var(--color-text-sec);
+  line-height: 1.5;
+}
+
+.modal-confirm-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 0 20px 20px;
 }

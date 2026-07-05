@@ -1,20 +1,23 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/config.js
-   Versión: 1.0.7
+   Versión: 1.0.9
    Propósito: Vista de configuración: productos, zonas, impresoras, mozos.
-              v1.0.7: _asegurarVista corregida según estándar B1.
+              v1.0.9: migra confirm a mostrarConfirmacion.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
 import { EventBus } from '../lib/eventBus.js';
 import { Logger } from '../lib/logger.js';
 import { Auth } from '../auth.js';
-import { fmtMoney, showToast } from '../utils.js';
+import { fmtMoney, showToast, mostrarConfirmacion } from '../utils.js';
 import { DB } from '../db.js';
 import { DBAppwrite } from '../db-appwrite.js';
 
 const Config = (() => {
+  let _abortController = null;
+  let _desuscripciones = [];
+
   function _asegurarVista() {
     let main = document.getElementById('view-config');
     if (main && main.querySelector('.view-toolbar')) return;
@@ -100,32 +103,24 @@ const Config = (() => {
   }
 
   function _vincularEventos() {
-    document.getElementById('btnNuevoProducto')?.addEventListener('click', () => abrirModalProducto());
-    document.getElementById('btnAgregarZona')?.addEventListener('click', agregarZona);
-    document.getElementById('btnResetearMesas')?.addEventListener('click', resetearMesas);
-    document.getElementById('btnGuardarConfig')?.addEventListener('click', guardar);
-    document.getElementById('btnAgregarMozo')?.addEventListener('click', agregarMozo);
+    const { signal } = _abortController || {};
+    document.getElementById('btnNuevoProducto')?.addEventListener('click', () => abrirModalProducto(), { signal });
+    document.getElementById('btnAgregarZona')?.addEventListener('click', agregarZona, { signal });
+    document.getElementById('btnResetearMesas')?.addEventListener('click', resetearMesas, { signal });
+    document.getElementById('btnGuardarConfig')?.addEventListener('click', guardar, { signal });
+    document.getElementById('btnAgregarMozo')?.addEventListener('click', agregarMozo, { signal });
 
     document.getElementById('productosLista')?.addEventListener('click', (e) => {
       const editBtn = e.target.closest('.btn-icon-sm.edit');
       const delBtn = e.target.closest('.btn-icon-sm.del');
-      if (editBtn) {
-        const id = editBtn.getAttribute('data-id');
-        if (id) _editarProducto(id);
-      }
-      if (delBtn) {
-        const id = delBtn.getAttribute('data-id');
-        if (id) _eliminarProducto(id);
-      }
-    });
+      if (editBtn) { const id = editBtn.getAttribute('data-id'); if (id) _editarProducto(id); }
+      if (delBtn) { const id = delBtn.getAttribute('data-id'); if (id) _eliminarProducto(id); }
+    }, { signal });
 
     document.getElementById('zonasContainer')?.addEventListener('click', (e) => {
       const delBtn = e.target.closest('.btn-icon-sm.del');
-      if (delBtn) {
-        const idx = parseInt(delBtn.getAttribute('data-idx'));
-        if (!isNaN(idx)) eliminarZona(idx);
-      }
-    });
+      if (delBtn) { const idx = parseInt(delBtn.getAttribute('data-idx')); if (!isNaN(idx)) eliminarZona(idx); }
+    }, { signal });
 
     document.getElementById('zonasContainer')?.addEventListener('change', (e) => {
       if (e.target.matches('input[type="text"]') || e.target.matches('input[type="number"]')) {
@@ -137,19 +132,38 @@ const Config = (() => {
 
     document.getElementById('mozosLista')?.addEventListener('click', (e) => {
       const delBtn = e.target.closest('.btn-icon-sm.del');
-      if (delBtn) {
-        const idx = parseInt(delBtn.getAttribute('data-idx'));
-        if (!isNaN(idx)) eliminarMozo(idx);
-      }
-    });
+      if (delBtn) { const idx = parseInt(delBtn.getAttribute('data-idx')); if (!isNaN(idx)) eliminarMozo(idx); }
+    }, { signal });
 
     document.getElementById('usuariosLista')?.addEventListener('click', (e) => {
       const btn = e.target.closest('.btn-ajuste');
-      if (btn) {
-        const nombre = btn.getAttribute('data-nombre');
-        if (nombre) _mostrarCambiarPassword(nombre);
-      }
+      if (btn) { const nombre = btn.getAttribute('data-nombre'); if (nombre) _mostrarCambiarPassword(nombre); }
+    }, { signal });
+  }
+
+  function activar() {
+    limpiar();
+    _abortController = new AbortController();
+
+    const unsubscribeStore = Store.subscribe((state, action) => {
+      if (action.type.startsWith('PRODUCTO')) renderProductos();
+      if (action.type.startsWith('MOZO')) renderMozos();
+      if (action.type === 'CONFIG_INICIALIZAR') _renderZonas();
     });
+    _desuscripciones.push(unsubscribeStore);
+
+    _desuscripciones.push(EventBus.on('vista:cambiada', (vista) => {
+      if (vista === 'config') cargar();
+    }));
+  }
+
+  function limpiar() {
+    if (_abortController) {
+      _abortController.abort();
+      _abortController = null;
+    }
+    _desuscripciones.forEach(fn => fn());
+    _desuscripciones = [];
   }
 
   function cargar() {
@@ -274,13 +288,17 @@ const Config = (() => {
     _renderZonas();
   }
 
-  function eliminarZona(idx) {
+  async function eliminarZona(idx) {
     const config = Store.getState().config || {};
     if (!config.zonas || config.zonas.length <= 1) {
       showToast('error', 'Debe existir al menos una zona.');
       return;
     }
-    if (!confirm(`¿Eliminar la zona "${config.zonas[idx].nombre}"?`)) return;
+    const confirmado = await mostrarConfirmacion(
+      'Eliminar zona',
+      `¿Eliminar la zona "${config.zonas[idx].nombre}"?`
+    );
+    if (!confirmado) return;
     config.zonas.splice(idx, 1);
     _renderZonas();
   }
@@ -499,7 +517,11 @@ const Config = (() => {
   }
 
   async function _eliminarProducto(id) {
-    if (!confirm('¿Eliminar este producto?')) return;
+    const confirmado = await mostrarConfirmacion(
+      'Eliminar producto',
+      '¿Eliminar este producto?'
+    );
+    if (!confirmado) return;
 
     if (DB.productos) {
       DB.productos = DB.productos.filter(function(p) { return p.id !== id; });
@@ -521,7 +543,12 @@ const Config = (() => {
   }
 
   async function resetearMesas() {
-    if (!confirm('¿Resetear todas las mesas? Se eliminarán las mesas libres y se recrearán según las zonas configuradas. Las mesas ocupadas se conservarán al final.')) return;
+    const confirmado = await mostrarConfirmacion(
+      'Resetear mesas',
+      '¿Resetear todas las mesas? Se eliminarán las mesas libres y se recrearán según las zonas configuradas. Las mesas ocupadas se conservarán al final.'
+    );
+    if (!confirmado) return;
+
     if (typeof DB.resetearMesas === 'function') {
       await DB.resetearMesas();
       EventBus.emit('config:actualizada');
@@ -555,47 +582,43 @@ const Config = (() => {
     showToast('success', 'Mozo añadido');
   }
 
-  function eliminarMozo(idx) {
-    if (!confirm('¿Eliminar mozo?')) return;
+  async function eliminarMozo(idx) {
+    const confirmado = await mostrarConfirmacion(
+      'Eliminar mozo',
+      '¿Eliminar mozo?'
+    );
+    if (!confirmado) return;
+
     DB.mozos.splice(idx, 1);
     DB.saveMozos();
     showToast('warning', 'Mozo eliminado');
   }
 
-  function _initListeners() {
-      Store.subscribe((state, action) => {
-        if (action.type.startsWith('PRODUCTO')) renderProductos();
-        if (action.type.startsWith('MOZO')) renderMozos();
-        if (action.type === 'CONFIG_INICIALIZAR') _renderZonas();
-      });
-  
-      EventBus.on('vista:cambiada', (vista) => {
-        if (vista === 'config') cargar();
-      });
-    }
-  
-    _initListeners();
-  
-    return {
-      cargar,
-      guardar,
-      renderProductos,
-      abrirModalProducto,
-      cerrarModalProducto,
-      guardarProducto,
-      _editarProducto,
-      _eliminarProducto,
-      renderMozos,
-      agregarMozo,
-      eliminarMozo,
-      agregarZona,
-      eliminarZona,
-      resetearMesas,
-      _updateZona,
-      _mostrarCambiarPassword,
-      _autoajustarPrecio,
-      _vistaPreviaImagen
-    };
-  })();
+  // ── Inicialización ──
+  activar();
+
+  return {
+    activar,
+    limpiar,
+    cargar,
+    guardar,
+    renderProductos,
+    abrirModalProducto,
+    cerrarModalProducto,
+    guardarProducto,
+    _editarProducto,
+    _eliminarProducto,
+    renderMozos,
+    agregarMozo,
+    eliminarMozo,
+    agregarZona,
+    eliminarZona,
+    resetearMesas,
+    _updateZona,
+    _mostrarCambiarPassword,
+    _autoajustarPrecio,
+    _vistaPreviaImagen
+  };
+})();
 
 export { Config };

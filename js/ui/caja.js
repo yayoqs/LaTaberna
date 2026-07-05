@@ -1,19 +1,21 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/caja.js
-   Versión: 1.1.2
+   Versión: 1.1.4
    Propósito: Vista de caja: resumen de turno, estadísticas, tabla de pedidos
               y sección de cobros pendientes (split bill).
-              Refactor: _asegurarVista usa contenedor estático (estándar B1/B2).
-              Corrección: botón "Cierre de Caja" usa EventBus.
+              Botón "Cierre de Caja" usa CommandBus ('turno:cerrar').
    ================================================================ */
 
 import { Store } from '../lib/store.js';
 import { EventBus } from '../lib/eventBus.js';
+import { CommandBus } from '../lib/command-bus.js';
 import { fmtMoney, fmtHoraCorta, $id, showToast } from '../utils.js';
 import { Cobro } from './cobro.js';
 
 export const Caja = (() => {
+  let _estaActiva = false;
+  const _cleanups = [];
 
   function _asegurarVista() {
     const main = document.getElementById('view-caja');
@@ -62,7 +64,7 @@ export const Caja = (() => {
     `;
 
     document.getElementById('btnCerrarTurno').addEventListener('click', () => {
-      EventBus.emit('turno:solicitar_cierre');
+      CommandBus.ejecutar({ type: 'turno:cerrar' });
     });
 
     document.getElementById('btnVentaBarra').addEventListener('click', () => {
@@ -74,6 +76,34 @@ export const Caja = (() => {
       }
       Cobro.abrirModalCierre(mesaBarra);
     });
+  }
+
+  function activar() {
+    if (_estaActiva) return;
+    _estaActiva = true;
+
+    _asegurarVista();
+    render();
+
+    const unsubscribeStore = Store.subscribe((state, action) => {
+      if (!_estaActiva) return;
+      if (action.type.startsWith('PEDIDOS') || action.type.startsWith('PEDIDO')) {
+        render();
+      }
+    });
+    _cleanups.push(unsubscribeStore);
+
+    const onDbInicializada = () => { if (_estaActiva) render(); };
+    EventBus.on('db:inicializada', onDbInicializada);
+    _cleanups.push(() => EventBus.off('db:inicializada', onDbInicializada));
+  }
+
+  function limpiar() {
+    if (!_estaActiva) return;
+    _estaActiva = false;
+
+    _cleanups.forEach(fn => fn());
+    _cleanups.length = 0;
   }
 
   function render() {
@@ -167,19 +197,13 @@ export const Caja = (() => {
       </tr>`;
   }
 
-  function _initListeners() {
-    Store.subscribe((state, action) => {
-      if (action.type.startsWith('PEDIDOS') || action.type.startsWith('PEDIDO')) {
-        render();
-      }
-    });
+  EventBus.on('vista:cambiada', (vista) => {
+    if (vista === 'caja') {
+      activar();
+    } else {
+      limpiar();
+    }
+  });
 
-    EventBus.on('db:inicializada', render);
-    EventBus.on('vista:cambiada', (vista) => {
-      if (vista === 'caja') render();
-    });
-  }
-  _initListeners();
-
-  return { render };
+  return { activar, limpiar, render };
 })();

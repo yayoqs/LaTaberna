@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — UTILIDADES COMPARTIDAS (ES6)
    Archivo: js/utils.js
-   Versión: 1.1.0
+   Versión: 1.2.1
    Propósito: Utilidades compartidas entre todas las células.
-              Incluye obtenerColorDesdeNombre (unificada).
+              Incluye mostrarConfirmacion (modal de confirmación
+              estilizado) y obtenerColorDesdeNombre (unificada).
    ================================================================ */
 
 export function fmtMoney(n) {
@@ -83,4 +84,73 @@ export function obtenerColorDesdeNombre(nombre) {
   }
   const h = Math.abs(hash) % 360;
   return `hsl(${h}, 55%, 45%)`;
+}
+
+/**
+ * Muestra un modal de confirmación estilizado con el tema de La Taberna.
+ * Reemplaza window.confirm() de forma no bloqueante.
+ *
+ * @param {string} titulo   - Título del modal.
+ * @param {string} mensaje  - Texto descriptivo.
+ * @param {object} [opciones] - Opciones adicionales.
+ * @param {string} [opciones.textoConfirmar="Confirmar"] - Texto del botón de confirmación.
+ * @param {string} [opciones.textoCancelar="Cancelar"]   - Texto del botón de cancelación.
+ * @param {string} [opciones.claseConfirmar="btn-primary"] - Clase CSS para el botón de confirmación.
+ * @returns {Promise<boolean>} true si el usuario confirma, false si cancela o cierra.
+ */
+export function mostrarConfirmacion(titulo, mensaje, opciones = {}) {
+  const {
+    textoConfirmar = 'Confirmar',
+    textoCancelar = 'Cancelar',
+    claseConfirmar = 'btn-primary'
+  } = opciones;
+
+  return new Promise((resolve) => {
+    // Crear overlay
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay modal-confirm-overlay';
+
+    // Crear tarjeta del modal
+    const card = document.createElement('div');
+    card.className = 'modal-confirm-card';
+
+    card.innerHTML = `
+      <div class="modal-confirm-header">
+        <h3>${titulo}</h3>
+        <button class="modal-confirm-close">&times;</button>
+      </div>
+      <div class="modal-confirm-body">
+        <p>${mensaje}</p>
+      </div>
+      <div class="modal-confirm-footer">
+        <button class="btn-secondary cancelar-btn">${textoCancelar}</button>
+        <button class="${claseConfirmar} confirmar-btn">${textoConfirmar}</button>
+      </div>
+    `;
+
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+
+    // Eventos
+    const cerrar = (confirmado) => {
+      overlay.remove();
+      resolve(confirmado);
+    };
+
+    card.querySelector('.confirmar-btn').addEventListener('click', () => cerrar(true));
+    card.querySelector('.cancelar-btn').addEventListener('click', () => cerrar(false));
+    card.querySelector('.modal-confirm-close').addEventListener('click', () => cerrar(false));
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) cerrar(false);
+    });
+
+    // Cerrar con Escape
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        cerrar(false);
+        document.removeEventListener('keydown', onKeyDown);
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+  });
 }

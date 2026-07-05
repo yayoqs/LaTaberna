@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/recetas.js
-   Versión: 2.0.4
+   Versión: 2.0.5
    Propósito: Vista unificada de recetario (modo consulta y administración).
-              _asegurarVista refactorizada para contenedores estáticos.
+              Ciclo de vida con activar()/limpiar().
    Dependencias: ../lib/store.js, ../lib/eventBus.js, ../auth.js, ../db.js,
                  ../utils.js, ../lib/logger.js
    ================================================================ */
@@ -18,14 +18,14 @@ import { showToast, fmtMoney, obtenerColorDesdeNombre } from '../utils.js';
 let _terminoBusqueda = '';
 let _terminoIngrediente = '';
 let _modo = null;
+let _activada = false;
+let _unsuscribers = [];
 
 function _asegurarVista() {
   let main = document.getElementById('view-recetas');
 
-  // Si ya está completo, no hacer nada
   if (main && main.querySelector('#recetasGrid')) return;
 
-  // Crear contenedor si no existe (modo dinámico / fallback)
   if (!main) {
     main = document.createElement('main');
     main.id = 'view-recetas';
@@ -56,7 +56,6 @@ function _construirContenidoRecetas(main) {
     <div id="recetasGrid" class="recetas-grid"></div>
   `;
 
-  // Asignar eventos (sin duplicar)
   document.getElementById('recetasSearch').addEventListener('input', () => {
     _terminoBusqueda = document.getElementById('recetasSearch').value.trim();
     render();
@@ -500,22 +499,43 @@ export async function _quitarIngrediente(productoId, ingredienteId) {
   }
 }
 
-function _initListeners() {
-  Store.subscribe((state, action) => {
-    if (action.type.startsWith('PRODUCTO') || action.type.startsWith('RECETA') || action.type.startsWith('INGREDIENTE')) {
-      render();
-    }
-  });
+export function activar() {
+  if (_activada) return;
+  _activada = true;
 
-  EventBus.on('db:inicializada', () => {
-    setTimeout(render, 100);
-  });
-  EventBus.on('vista:cambiada', (vista) => {
-    if (vista === 'recetas') render();
-  });
+  _unsuscribers.push(
+    Store.subscribe((state, action) => {
+      if (action.type.startsWith('PRODUCTO') || action.type.startsWith('RECETA') || action.type.startsWith('INGREDIENTE')) {
+        render();
+      }
+    })
+  );
+
+  _unsuscribers.push(
+    EventBus.on('db:inicializada', () => {
+      setTimeout(render, 100);
+    })
+  );
+
+  _unsuscribers.push(
+    EventBus.on('vista:cambiada', (vista) => {
+      if (vista === 'recetas') render();
+    })
+  );
+
+  render();
 }
 
-_initListeners();
+export function limpiar() {
+  if (!_activada) return;
+  _activada = false;
+
+  _unsuscribers.forEach(fn => { if (typeof fn === 'function') fn(); });
+  _unsuscribers = [];
+
+  const main = document.getElementById('view-recetas');
+  if (main) main.innerHTML = '';
+}
 
 export const Recetas = {
   render,
@@ -529,5 +549,7 @@ export const Recetas = {
   cerrarModalReceta,
   guardarReceta,
   _mostrarRecetaActual,
-  _quitarIngrediente
+  _quitarIngrediente,
+  activar,
+  limpiar
 };

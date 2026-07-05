@@ -1,11 +1,10 @@
-
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/app.js
-   Versión: 1.2.3
+   Versión: 1.2.4
    Propósito: Punto de entrada modular. Control de vistas con ciclo
               de vida (limpiar/activar). Vincula header y eventos.
-              Incluye import del comando marcar-agotado.
+              Incluye import del comando cerrar-turno.
    ================================================================ */
 
 // ── Utilidades y librerías ────────────────────────────────
@@ -48,7 +47,8 @@ import './comandos/enviar-comanda.js';
 import './comandos/agregar-mesa.js';
 import './comandos/liberar-mesa.js';
 import './comandos/completar-subcomanda.js';
-import './comandos/marcar-agotado.js';  // ← NUEVO COMANDO D7
+import './comandos/marcar-agotado.js';
+import './comandos/cerrar-turno.js';  // ← NUEVO COMANDO (Célula A)
 
 // ── Repositorios ──────────────────────────────────────────
 import './repositorios/pedido-repository.js';

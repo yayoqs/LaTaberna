@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/kds.js
-   Versión: 2.0.3
+   Versión: 2.0.5
    Propósito: Monitor de cocina (KDS): tarjetas de comandas, estados y recetario.
-              _asegurarVista refactorizada para contenedores estáticos.
+              Ciclo de vida con activar()/limpiar(). Modal de confirmación.
    Dependencias: ../lib/store.js, ../lib/eventBus.js, ../lib/command-bus.js,
                  ../auth.js, ../utils.js, ../lib/logger.js, ./recetas.js
    ================================================================ */
@@ -13,19 +13,21 @@ import { EventBus } from '../lib/eventBus.js';
 import { CommandBus } from '../lib/command-bus.js';
 import { Auth } from '../auth.js';
 import { Logger } from '../lib/logger.js';
-import { $id, showToast, fmtMoney } from '../utils.js';
+import { $id, showToast, fmtMoney, mostrarConfirmacion } from '../utils.js';
 import { Recetas } from './recetas.js';
 
 const MINUTOS_URGENTE = 15;
 const MINUTOS_OCULTAR_LISTA = 10;
 
+let _activada = false;
+let _unsuscribers = [];
+let _delegationHandler = null;
+
 function _asegurarVista() {
   let main = document.getElementById('view-cocina');
 
-  // Si ya está completo, no hacer nada
   if (main && main.querySelector('#cocinaKDS')) return;
 
-  // Crear contenedor si no existe (modo dinámico / fallback)
   if (!main) {
     main = document.createElement('main');
     main.id = 'view-cocina';
@@ -38,7 +40,6 @@ function _asegurarVista() {
 }
 
 function _construirContenidoKDS(main) {
-  // Limpiar cualquier resto y construir estructura interna
   main.innerHTML = `
     <div class="view-toolbar">
       <h2><i class="fas fa-fire-burner"></i> Monitor de Cocina</h2>
@@ -54,7 +55,6 @@ function _construirContenidoKDS(main) {
     <div id="cocinaKDS" class="kds-grid"></div>
   `;
 
-  // Asignar eventos a los botones (sin duplicar)
   $id('kds-refresh-btn').addEventListener('click', () => refresh());
   $id('kds-recetario-btn').addEventListener('click', () => Recetas.render('consulta'));
 }
@@ -175,8 +175,13 @@ function _htmlKdsCard(c) {
     </article>`;
 }
 
-function _panico(prodId) {
-  if (!confirm('¿Marcar este producto como NO disponible?')) return;
+async function _panico(prodId) {
+  const confirmado = await mostrarConfirmacion(
+    'Producto agotado',
+    '¿Marcar este producto como NO disponible?'
+  );
+  if (!confirmado) return;
+
   CommandBus.ejecutar({
     type: 'producto:marcar_agotado',
     datos: { prodId }
@@ -240,7 +245,8 @@ function _setEstado(id, estado) {
 }
 
 function _setupEventDelegation() {
-  document.addEventListener('click', (e) => {
+  if (_delegationHandler) document.removeEventListener('click', _delegationHandler);
+  _delegationHandler = (e) => {
     const panicoBtn = e.target.closest('.kds-panico-btn');
     if (panicoBtn) {
       const prodId = panicoBtn.dataset.prodId;
@@ -255,31 +261,64 @@ function _setupEventDelegation() {
       if (accion && id) _setEstado(id, accion);
       return;
     }
-  });
+  };
+  document.addEventListener('click', _delegationHandler);
 }
 
-function _initListeners() {
-  Store.subscribe((state, action) => {
-    if (action.type.startsWith('COMANDA')) {
-      Logger.debug('[KDS] Cambio detectado en Store, refrescando...');
+function _cleanupDelegation() {
+  if (_delegationHandler) {
+    document.removeEventListener('click', _delegationHandler);
+    _delegationHandler = null;
+  }
+}
+
+export function activar() {
+  if (_activada) return;
+  _activada = true;
+
+  _unsuscribers.push(
+    Store.subscribe((state, action) => {
+      if (action.type.startsWith('COMANDA')) {
+        Logger.debug('[KDS] Cambio detectado en Store, refrescando...');
+        refresh();
+      }
+    })
+  );
+
+  _unsuscribers.push(
+    EventBus.on('comanda:enviada', (comanda) => {
+      Logger.debug(`[KDS] Evento comanda:enviada recibido: ${comanda.id}`);
       refresh();
-    }
-  });
+    })
+  );
 
-  EventBus.on('comanda:enviada', (comanda) => {
-    Logger.debug(`[KDS] Evento comanda:enviada recibido: ${comanda.id}`);
-    refresh();
-  });
+  _unsuscribers.push(
+    EventBus.on('db:inicializada', () => {
+      setTimeout(refresh, 100);
+    })
+  );
 
-  EventBus.on('db:inicializada', () => {
-    setTimeout(refresh, 100);
-  });
-  EventBus.on('vista:cambiada', (vista) => {
-    if (vista === 'cocina') refresh();
-  });
+  _unsuscribers.push(
+    EventBus.on('vista:cambiada', (vista) => {
+      if (vista === 'cocina') refresh();
+    })
+  );
+
+  _setupEventDelegation();
+  refresh();
 }
 
-_setupEventDelegation();
-_initListeners();
+export function limpiar() {
+  if (!_activada) return;
+  _activada = false;
 
-export const KDS = { refresh, _setEstado, _panico };
+  _unsuscribers.forEach(fn => { if (typeof fn === 'function') fn(); });
+  _unsuscribers = [];
+
+  _cleanupDelegation();
+
+  const main = document.getElementById('view-cocina');
+  if (main) main.innerHTML = '';
+}
+
+export const KDS = { refresh, _setEstado, _panico, activar, limpiar };

@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/perfil.js
-   Versión: 1.0.5
+   Versión: 1.0.6
    Propósito: Vista de perfil de usuario: avatar, datos y documentos.
-              v1.0.5: _asegurarVista corregida según estándar B1.
+              v1.0.6: implementa ciclo de vida activar/limpiar.
    ================================================================ */
 
 import { Auth } from '../auth.js';
@@ -13,6 +13,9 @@ import { EventBus } from '../lib/eventBus.js';
 import { showToast } from '../utils.js';
 
 const Perfil = (() => {
+
+  let _abortController = null;
+  let _desuscripciones = [];
 
   function _storageKey(usuario) {
     return `pubpos_perfil_${usuario}`;
@@ -57,8 +60,9 @@ const Perfil = (() => {
       </div>
     `;
 
-    document.getElementById('btnEditarPerfil').addEventListener('click', mostrarModalEditar);
-    document.getElementById('btnActualizarPerfil').addEventListener('click', render);
+    const { signal } = _abortController || {};
+    document.getElementById('btnEditarPerfil').addEventListener('click', mostrarModalEditar, { signal });
+    document.getElementById('btnActualizarPerfil').addEventListener('click', render, { signal });
   }
 
   async function render() {
@@ -204,13 +208,30 @@ const Perfil = (() => {
     }
   }
 
-  EventBus.on('db:inicializada', () => {
-    if (Auth.getUsuarioActual()) {
-      render();
-    }
-  });
+  function activar() {
+    limpiar();
+    _abortController = new AbortController();
 
-  return { render, mostrarModalEditar, cerrarModalEditar, guardarPerfil };
+    _desuscripciones.push(EventBus.on('db:inicializada', () => {
+      if (Auth.getUsuarioActual()) {
+        render();
+      }
+    }));
+  }
+
+  function limpiar() {
+    if (_abortController) {
+      _abortController.abort();
+      _abortController = null;
+    }
+    _desuscripciones.forEach(fn => fn());
+    _desuscripciones = [];
+  }
+
+  // ── Inicialización ──
+  activar();
+
+  return { activar, limpiar, render, mostrarModalEditar, cerrarModalEditar, guardarPerfil };
 })();
 
 export { Perfil };
