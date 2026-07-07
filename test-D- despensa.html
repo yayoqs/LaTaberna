@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test D – Despensa (Modular)</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #0f0f14; color: #f1f5f9; padding: 20px; }
+    h1 { color: #f59e0b; }
+    .resultado { background: #1a1a24; border-radius: 8px; padding: 12px 16px; margin: 8px 0; display: flex; align-items: center; gap: 12px; }
+    .ok { border-left: 4px solid #22c55e; }
+    .fallo { border-left: 4px solid #ef4444; }
+    .seccion { color: #f59e0b; font-size: 13px; min-width: 100px; }
+  </style>
+  <!-- Importmap con stubs como módulos ES6 -->
+  <script type="importmap">
+    {
+      "imports": {
+        "../../lib/store.js": "./stubs/despensa-store.js",
+        "../../lib/eventBus.js": "./stubs/despensa-eventbus.js",
+        "../../lib/logger.js": "./stubs/despensa-logger.js",
+        "../../auth.js": "./stubs/despensa-auth.js",
+        "../../utils.js": "./stubs/despensa-utils.js",
+        "../../db.js": "./stubs/despensa-db.js",
+        "../../servicios/inventario-service.js": "./stubs/despensa-inventario.js",
+        "../../db-appwrite.js": "./stubs/despensa-appwrite.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <h1>Test D – Despensa (v2.0.0 — Modular)</h1>
+  <p style="color:#a0a0a0;">Validación completa con módulos ES6 reales</p>
+  <div id="resultados"></div>
+  <div id="toastContainer"></div>
+
+  <!-- Stubs como archivos separados (simulados con Blob URLs) -->
+  <script>
+    // Estado compartido entre todos los stubs
+    const SHARED = {
+      ingredientes: [],
+      movimientos: [],
+      config: {}
+    };
+    const LISTENERS = [];
+
+    function notify(action) {
+      LISTENERS.forEach(fn => {
+        try { fn(SHARED, action); } catch(e) {}
+      });
+    }
+
+    function createStubBlob(code) {
+      return URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
+    }
+
+    // Mapear rutas del importmap a URLs de Blob
+    const importmapScript = document.querySelector('script[type="importmap"]');
+    const imports = JSON.parse(importmapScript.textContent).imports;
+
+    // 1. Store
+    imports["./stubs/despensa-store.js"] = createStubBlob(`
+      const SHARED = window.SHARED;
+      const LISTENERS = window.LISTENERS;
+      function notify(action) {
+        LISTENERS.forEach(fn => {
+          try { fn(SHARED, action); } catch(e) {}
+        });
+      }
+      export const Store = {
+        getState() { return SHARED; },
+        dispatch(action) {
+          if (!action || !action.type) return;
+          if (action.type === 'INGREDIENTES_INICIALIZAR') {
+            SHARED.ingredientes = action.payload || [];
+            notify(action);
+          } else if (action.type === 'MOVIMIENTOS_INICIALIZAR') {
+            SHARED.movimientos = action.payload || [];
+            notify(action);
+          }
+        },
+        subscribe(fn) {
+          LISTENERS.push(fn);
+          return () => {
+            const i = LISTENERS.indexOf(fn);
+            if (i >= 0) LISTENERS.splice(i, 1);
+          };
+        }
+      };
+    `);
+
+    // 2. EventBus
+    imports["./stubs/despensa-eventbus.js"] = createStubBlob(`
+      const events = {};
+      export const EventBus = {
+        on(ev, cb) {
+          (events[ev] = events[ev] || []).push(cb);
+          return () => {
+            const i = events[ev].indexOf(cb);
+            if (i >= 0) events[ev].splice(i, 1);
+          };
+        },
+        emit(ev, data) {
+          (events[ev] || []).forEach(cb => cb(data));
+        }
+      };
+    `);
+
+    // 3. Logger
+    imports["./stubs/despensa-logger.js"] = createStubBlob(`
+      export const Logger = { info() {}, warn() {}, error() {}, debug() {} };
+    `);
+
+    // 4. Auth
+    imports["./stubs/despensa-auth.js"] = createStubBlob(`
+      export const Auth = { getRol() { return 'admin'; }, getNombre() { return 'Admin Test'; } };
+    `);
+
+    // 5. Utils
+    imports["./stubs/despensa-utils.js"] = createStubBlob(`
+      export function fmtMoney(val) { return '$' + (val || 0).toLocaleString('es-CL'); }
+      export function showToast() {}
+    `);
+
+    // 6. DB (usa SHARED)
+    imports["./stubs/despensa-db.js"] = createStubBlob(`
+      export const DB = {
+        syncGuardarIngrediente: async function(datos) {
+          const st = window.SHARED;
+          const idx = st.ingredientes.findIndex(i => i.id === datos.id);
+          if (idx >= 0) st.ingredientes[idx] = datos;
+          else st.ingredientes.push(datos);
+          return true;
+        },
+        ajustarStock: function(id, cant, motivo) {
+          const st = window.SHARED;
+          const ing = st.ingredientes.find(i => i.id === id);
+          if (ing) ing.stock += cant;
+          st.movimientos.push({ ingredienteId: id, cantidad: cant, motivo, fecha: Date.now() });
+        }
+      };
+    `);
+
+    // 7. InventarioService (importa DB del stub)
+    imports["./stubs/despensa-inventario.js"] = createStubBlob(`
+      import { DB } from './stubs/despensa-db.js';
+      export const InventarioService = {
+        guardarIngrediente: async function(datos) {
+          await DB.syncGuardarIngrediente(datos);
+          return { exito: true };
+        },
+        ajustarStock: async function(id, cant, motivo) {
+          DB.ajustarStock(id, cant, motivo);
+          return { exito: true };
+        }
+      };
+    `);
+
+    // 8. DBAppwrite
+    imports["./stubs/despensa-appwrite.js"] = createStubBlob(`
+      export const DBAppwrite = { habilitado: false };
+    `);
+
+    // Exponer SHARED y LISTENERS para los Blobs
+    window.SHARED = SHARED;
+    window.LISTENERS = LISTENERS;
+
+    // Actualizar el importmap con las URLs reales
+    importmapScript.textContent = JSON.stringify({ imports });
+  </script>
+
+  <!-- Cargar el módulo real -->
+  <script type="module" src="js/ui/despensa.js"></script>
+
+  <script type="module">
+    import { Despensa } from './js/ui/despensa.js';
+
+    function resultado(ok, seccion, mensaje) {
+      const div = document.createElement('div');
+      div.className = 'resultado ' + (ok ? 'ok' : 'fallo');
+      div.innerHTML = `<span>${ok ? '✔' : '✘'}</span><span class="seccion">[${seccion}]</span><span>${mensaje}</span>`;
+      document.getElementById('resultados').appendChild(div);
+    }
+
+    async function iniciarTests() {
+      const st = window.SHARED;
+      // Datos de prueba
+      st.ingredientes = [
+        { id: 'ing1', nombre: 'Pan', stock: 10, stock_minimo: 5, unidad: 'u', categoria: 'cocina', ubicacion: 'Estante 1', valor_unitario: 50 },
+        { id: 'ing2', nombre: 'Carne', stock: 2000, stock_minimo: 500, unidad: 'g', categoria: 'cocina', ubicacion: 'Estante 2', valor_unitario: 0.5 },
+        { id: 'ing3', nombre: 'Queso', stock: 1, stock_minimo: 5, unidad: 'feta', categoria: 'cocina', ubicacion: 'Estante 3', valor_unitario: 10 }
+      ];
+
+      // Render inicial
+      Despensa.render();
+      await new Promise(r => setTimeout(r, 200));
+      resultado(document.getElementById('view-despensa') !== null, 'Render', 'Vista creada');
+      const filas = document.querySelectorAll('#ingredientesBody tr');
+      resultado(filas.length === 3, 'Render', 'Tres ingredientes en tabla');
+
+      // Resumen
+      const resumen = document.getElementById('inventarioResumen').textContent;
+      resultado(resumen.includes('Total ítems: 3'), 'Resumen', 'Total ítems correcto');
+      resultado(resumen.includes('Bajo mínimo: 1'), 'Resumen', 'Contador bajo mínimo = 1');
+
+      // Alertas
+      const alertas = document.getElementById('alertasStockList').textContent;
+      resultado(alertas.includes('Queso'), 'Alertas', 'Alerta de Queso visible');
+      resultado(alertas.includes('Quedan 1'), 'Alertas', 'Stock de Queso = 1');
+
+      // Filtro
+      document.getElementById('filtroBajoMinimo').checked = true;
+      document.getElementById('filtroBajoMinimo').dispatchEvent(new Event('change'));
+      await new Promise(r => setTimeout(r, 100));
+      const filasFiltradas = document.querySelectorAll('#ingredientesBody tr');
+      resultado(filasFiltradas.length === 1, 'Filtro', 'Solo 1 ingrediente bajo mínimo');
+      document.getElementById('filtroBajoMinimo').checked = false;
+      document.getElementById('filtroBajoMinimo').dispatchEvent(new Event('change'));
+      await new Promise(r => setTimeout(r, 100));
+
+      // Modal
+      Despensa.mostrarModalIngrediente();
+      await new Promise(r => setTimeout(r, 100));
+      resultado(document.getElementById('modalIngrediente') !== null, 'Modal', 'Modal abierto');
+      document.getElementById('ingNombre').value = 'Lechuga';
+      document.getElementById('ingStock').value = '5';
+      document.getElementById('ingStockMin').value = '2';
+      document.getElementById('ingUnidad').value = 'u';
+      document.getElementById('btnGuardarModalIng').click();
+      await new Promise(r => setTimeout(r, 200));
+      const lechuga = st.ingredientes.find(i => i.nombre === 'Lechuga');
+      resultado(lechuga !== undefined, 'Modal', 'Lechuga guardada en Store');
+
+      // Ajuste rápido (simulado)
+      st.ingredientes[0].stock = 15;
+      Despensa.render();
+      await new Promise(r => setTimeout(r, 100));
+      resultado(document.querySelector('#ingredientesBody').textContent.includes('15.00'), 'Ajuste', 'Stock de Pan actualizado a 15');
+
+      // Limpiar
+      document.getElementById('view-despensa').style.display = 'none';
+      console.log('Tests de despensa completados.');
+    }
+
+    window.addEventListener('load', () => setTimeout(iniciarTests, 100));
+  </script>
+</body>
+</html>

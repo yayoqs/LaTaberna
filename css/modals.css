@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/modals.css
-   Versión: 1.1.0
+   Versión: 1.2.0
    Propósito: Modales pequeños, modal dual, cierre de mesa, ticket,
-              config y modal de confirmación estilizado.
+              config, modal de confirmación y modal de entrada.
    ================================================================ */
 
 /* ── MODAL OVERLAY ──────────────────────────────────────────── */
@@ -395,7 +395,7 @@
 #modalLogin .modal-small { max-width: 360px; }
 #modalLogin .btn-primary { width: 100%; }
 
-/* ── MODAL DE CONFIRMACIÓN (showConfirm) ────────────────────── */
+/* ── MODAL DE CONFIRMACIÓN (mostrarConfirmacion) ────────────── */
 .modal-confirm-overlay {
   z-index: 9999;
 }
@@ -463,4 +463,22 @@
   justify-content: flex-end;
   gap: 10px;
   padding: 0 20px 20px;
+}
+
+/* ── MODAL DE ENTRADA (mostrarEntrada) ──────────────────────── */
+.modal-input {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  padding: 9px 12px;
+  font-size: 13px;
+  outline: none;
+  transition: var(--t);
+  width: 100%;
+  margin-top: 8px;
+}
+
+.modal-input:focus {
+  border-color: var(--color-accent);
 }

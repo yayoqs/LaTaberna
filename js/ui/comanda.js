@@ -1,18 +1,17 @@
 /* ================================================================
    LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/comanda.js
-   Versión: 2.0.4
+   Versión: 2.0.5
    Propósito: Gestión de la comanda actual (ítems, cantidades,
               observaciones, split bill). Sin onclick. Usa delegación.
               Incluye listener para precarga:items_listos.
-              Corrección: guarda de igualdad para evitar escrituras
-              innecesarias en DB (hallazgo #1).
+              Migración de prompt a mostrarEntrada.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
 import { EventBus } from '../lib/eventBus.js';
 import { Logger } from '../lib/logger.js';
-import { fmtMoney, showToast } from '../utils.js';
+import { fmtMoney, showToast, mostrarEntrada } from '../utils.js';
 import { Auth } from '../auth.js';
 import { DB } from '../db.js';
 
@@ -133,8 +132,12 @@ const Comanda = (() => {
     }
   }
 
-  function agregarPersona() {
-    const nombre = prompt('Nombre de la persona:');
+  async function agregarPersona() {
+    const nombre = await mostrarEntrada(
+      'Agregar persona',
+      'Nombre de la persona:',
+      { placeholder: 'Ej: Juan' }
+    );
     if (!nombre) return;
     if (!_mesaActiva.personas) _mesaActiva.personas = [];
     if (!_mesaActiva.personas.includes(nombre)) {

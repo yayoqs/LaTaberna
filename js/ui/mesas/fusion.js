@@ -1,13 +1,14 @@
 /* ================================================================
    LaTaberna - PubPOS — MESAS SUBMÓDULO (ES6)
    Archivo: js/ui/mesas/fusion.js
-   Versión: 1.0.1
+   Versión: 1.0.2
    Propósito: Modo fusión (toggle, selección, confirmar).
+              Migración de prompt a mostrarEntrada.
    ================================================================ */
 
 import { EventBus } from '../../lib/eventBus.js';
 import { DB } from '../../db.js';
-import { showToast } from '../../utils.js';
+import { showToast, mostrarEntrada } from '../../utils.js';
 import { isModoSeleccion, setModoSeleccion, getMesasSeleccionadas, limpiarSeleccion } from './renderer.js';
 import { renderGrid } from './renderer.js';
 
@@ -40,7 +41,7 @@ export function toggleSeleccionMesa(num, isChecked) {
   }
 }
 
-export function fusionarMesasSeleccionadas() {
+export async function fusionarMesasSeleccionadas() {
   const seleccionadas = getMesasSeleccionadas();
   if (seleccionadas.size < 2) {
     showToast('warning', 'Selecciona al menos dos mesas para fusionar.');
@@ -52,9 +53,15 @@ export function fusionarMesasSeleccionadas() {
     return numA - numB;
   });
   const mozo = document.getElementById('mozoActivo')?.value || 'Mozo';
-  const nombrePersonalizado = prompt('Nombre para la mesa fusionada (opcional):\nEj: DJ, VIP, barra\nDejar vacío para usar formato automático (1+2)');
+  const nombrePersonalizado = await mostrarEntrada(
+    'Fusionar Mesas',
+    'Nombre para la mesa fusionada (opcional):\nFormato automático: 1+2',
+    { placeholder: 'Ej: DJ, VIP' }
+  );
+  // Si el usuario cancela, nombrePersonalizado será null/undefined, se usará '' para el automático
+  const nombreFinal = nombrePersonalizado || '';
 
-  const mesaVirtual = DB.fusionarMesas(numeros, mozo, nombrePersonalizado);
+  const mesaVirtual = DB.fusionarMesas(numeros, mozo, nombreFinal);
   if (mesaVirtual) {
     showToast('success', `Mesas fusionadas: ${mesaVirtual.numero}`);
     toggleModoFusion();

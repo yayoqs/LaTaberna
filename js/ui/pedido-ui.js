@@ -1,10 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/pedido-ui.js
-   Versión: 2.1.1
+   Versión: 2.1.3
    Propósito: Modal de pedido, revisar comandas, validación de stock.
               Sin onclick. Apertura de mesa delegada a MesaDetalles.
-              Corrección: eliminada función _agregarItem sin uso (hallazgo #3).
+              Migración de prompt a mostrarEntrada.
+              Corrección: valorInicial → valorPredefinido.
    Dependencias: CommandBus, EventBus, Logger, DB, Store, Mesas, Comanda,
                  Carta, Cuenta, Cobro, Tickets, Auth, mesaVacia, showToast, $id
    ================================================================ */
@@ -22,7 +23,7 @@ import { Cobro } from './cobro.js';
 import { Tickets } from './tickets.js';
 import { Auth } from '../auth.js';
 import { mesaVacia } from '../db-core.js';
-import { showToast, $id } from '../utils.js';
+import { showToast, $id, mostrarEntrada } from '../utils.js';
 
 const Pedido = (() => {
 
@@ -365,10 +366,14 @@ const Pedido = (() => {
     });
   }
 
-  function _editarComandaCallback(comanda, htmlActual) {
+  async function _editarComandaCallback(comanda, htmlActual) {
     if (!comanda) return htmlActual;
-    const nota = prompt('Agregar comentario a la comanda:', comanda.observaciones || '');
-    if (nota !== null) {
+    const nota = await mostrarEntrada(
+      'Comentario de comanda',
+      'Agregar comentario a la comanda:',
+      { placeholder: 'Ej: Sin sal', valorPredefinido: comanda.observaciones || '' }
+    );
+    if (nota !== null && nota !== undefined) {
       comanda.observaciones = nota;
       return Tickets.generarComanda(comanda, comanda.destino);
     }

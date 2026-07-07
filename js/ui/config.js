@@ -1,16 +1,16 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/config.js
-   Versión: 1.0.9
+   Versión: 1.1.0
    Propósito: Vista de configuración: productos, zonas, impresoras, mozos.
-              v1.0.9: migra confirm a mostrarConfirmacion.
+              v1.1.0: migra window.prompt a mostrarEntrada.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
 import { EventBus } from '../lib/eventBus.js';
 import { Logger } from '../lib/logger.js';
 import { Auth } from '../auth.js';
-import { fmtMoney, showToast, mostrarConfirmacion } from '../utils.js';
+import { fmtMoney, showToast, mostrarConfirmacion, mostrarEntrada } from '../utils.js';
 import { DB } from '../db.js';
 import { DBAppwrite } from '../db-appwrite.js';
 
@@ -235,10 +235,18 @@ const Config = (() => {
       return;
     }
 
-    const nueva = prompt('Nueva contraseña para ' + nombreUsuario + ':');
+    const nueva = await mostrarEntrada(
+      'Cambiar contraseña',
+      'Nueva contraseña para ' + nombreUsuario + ':',
+      { type: 'password' }
+    );
     if (!nueva || nueva.trim().length === 0) return;
 
-    const confirmacion = prompt('Confirma la nueva contraseña:');
+    const confirmacion = await mostrarEntrada(
+      'Cambiar contraseña',
+      'Confirma la nueva contraseña:',
+      { type: 'password' }
+    );
     if (confirmacion !== nueva) {
       showToast('error', 'Las contraseñas no coinciden');
       return;
@@ -277,12 +285,21 @@ const Config = (() => {
     else config.zonas[idx].nombre = valor.trim() || `zona_${idx+1}`;
   }
 
-  function agregarZona() {
+  async function agregarZona() {
     const config = Store.getState().config || {};
     if (!config.zonas) config.zonas = [];
-    const nombre = prompt('Nombre de la nueva zona (ej: Terraza, Patio, VIP):');
+    const nombre = await mostrarEntrada(
+      'Nueva zona',
+      'Nombre de la nueva zona (ej: Terraza, Patio, VIP):',
+      { placeholder: 'Terraza' }
+    );
     if (!nombre) return;
-    const cantidad = parseInt(prompt('Cantidad de mesas inicial:') || '0');
+    const cantidadStr = await mostrarEntrada(
+      'Nueva zona',
+      'Cantidad de mesas inicial:',
+      { type: 'number', placeholder: '0' }
+    );
+    const cantidad = parseInt(cantidadStr || '0');
     if (isNaN(cantidad)) return;
     config.zonas.push({ nombre: nombre.trim(), cantidad });
     _renderZonas();

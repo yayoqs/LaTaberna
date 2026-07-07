@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>La Taberna — Pantalla de Inicio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Monoton&family=Caveat:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --color-bg: #0a0a0f;
+      --color-card: #12121a;
+      --color-border: #222235;
+      --neon-amber: #f59e0b;
+      --neon-indigo: #6366f1;
+      --neon-purple: #a855f7;
+      --neon-orange: #f97316;
+      --color-text: #f1f5f9;
+      --color-text-sec: #94a3b8;
+      --font-display: 'Monoton', cursive;
+      --font-script: 'Caveat', cursive;
+      --font-ui: 'Space Grotesk', sans-serif;
+      --font-body: 'Nunito', system-ui, sans-serif;
+      --radius: 10px;
+      --t: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      --triangulo-ancho: 210px;
+      --triangulo-alto: 210px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--color-bg);
+      font-family: var(--font-body);
+      color: var(--color-text);
+    }
+
+    @keyframes neonPulse {
+      0%, 100% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.2), 0 0 40px rgba(99, 102, 241, 0.1); }
+      50% { box-shadow: 0 0 30px rgba(245, 158, 11, 0.4), 0 0 55px rgba(99, 102, 241, 0.2); }
+    }
+    @keyframes floatIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes emberDrift {
+      0%, 100% { transform: translate(0,0); }
+      50% { transform: translate(4px,-6px); }
+    }
+
+    .view-container {
+      width: 100%;
+      height: 100vh;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      background:
+        radial-gradient(circle at 80% 10%, rgba(245, 158, 11, 0.08) 0%, transparent 40%),
+        radial-gradient(circle at 15% 85%, rgba(99, 102, 241, 0.06) 0%, transparent 45%),
+        linear-gradient(180deg, #0f0f14 0%, #060609 100%);
+      position: relative;
+      box-shadow: inset 0 0 100px rgba(0,0,0,0.8);
+    }
+
+    .view-container::before,
+    .view-container::after {
+      content: '';
+      position: fixed;
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      opacity: 0.4;
+      animation: emberDrift 7s ease-in-out infinite;
+      pointer-events: none;
+    }
+    .view-container::before { top: 30%; left: 10%; background: var(--neon-orange); }
+    .view-container::after { top: 75%; left: 85%; animation-delay: 2.5s; background: var(--neon-indigo); }
+
+    /* === Triángulo === */
+    .login-corner {
+      position: absolute;
+      top: 0; right: 0;
+      width: var(--triangulo-ancho);
+      height: var(--triangulo-alto);
+      cursor: pointer;
+      clip-path: polygon(100% 0, 0 0, 100% 100%);
+      background: linear-gradient(135deg, var(--neon-amber) 0%, var(--neon-indigo) 75%);
+      padding: 1.5px;
+      animation: neonPulse 3.5s ease-in-out infinite;
+      transition: var(--t);
+      z-index: 100;
+    }
+    .login-corner:hover { transform: scale(1.02); }
+    .login-corner-inner {
+      background: rgba(10, 10, 15, 0.96);
+      width: 100%; height: 100%;
+      clip-path: polygon(100% 0, 0 0, 100% 100%);
+      display: flex; flex-direction: column;
+      align-items: flex-end; justify-content: flex-start;
+      padding: 24px 20px 0 0;
+    }
+    .login-title {
+      font-family: var(--font-display);
+      font-size: 0.82rem; letter-spacing: 1px;
+      color: var(--neon-amber);
+      text-shadow: 0 0 8px rgba(245,158,11,0.6);
+      margin-bottom: 6px; white-space: nowrap;
+    }
+    .login-subtitle {
+      font-family: var(--font-ui);
+      font-size: 0.65rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 1px;
+      color: var(--neon-indigo);
+      text-decoration: none; transition: var(--t);
+    }
+    .login-subtitle:hover { color: #fff; text-shadow: 0 0 8px var(--neon-indigo); }
+
+    /* === Cabecera (icono / título / eslogan) === */
+    .header-block {
+      align-self: flex-start;
+      margin-top: 8px;
+      max-width: calc(100% - 140px);
+      animation: floatIn 0.6s ease both;
+    }
+    .icono-marco {
+      width: 60px; height: 60px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #1e1e2e, #12121a 70%);
+      border: 2px solid rgba(245, 158, 11, 0.4);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 8px;
+      box-shadow: 0 0 16px rgba(245, 158, 11, 0.22), inset 0 2px 4px rgba(0,0,0,0.4);
+    }
+    .icono-marco i {
+      font-size: 28px;
+      color: var(--neon-amber);
+      filter: drop-shadow(0 0 4px var(--neon-amber));
+    }
+    .nombre {
+      font-family: var(--font-display);
+      font-size: 1.5rem; letter-spacing: 1px; line-height: 1.2;
+      background: linear-gradient(to right, var(--neon-amber), var(--neon-indigo));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.3));
+      margin-bottom: 4px;
+    }
+    .eslogan {
+      font-family: var(--font-script);
+      font-size: 1.25rem; font-weight: 600;
+      color: var(--neon-amber);
+      text-shadow: 0 0 6px rgba(245,158,11,0.3);
+      transition: opacity 0.4s ease;
+    }
+
+    /* === Envoltura Principal === */
+    .main-wrapper {
+      width: 100%;
+      display: flex; flex-direction: column; gap: 14px;
+      margin-top: 10px; margin-bottom: 10px;
+      flex-grow: 1;
+      justify-content: center;
+    }
+
+    .vitrina-contenedor { width: 100%; animation: floatIn 0.7s ease both; }
+
+    .vitrina-titulo-seccion {
+      font-family: var(--font-ui);
+      font-size: 0.7rem; font-weight: 700;
+      letter-spacing: 1.5px; text-transform: uppercase;
+      margin-bottom: 6px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .vitrina-cocktails .vitrina-titulo-seccion { color: var(--neon-purple); }
+    .vitrina-burgers .vitrina-titulo-seccion { color: var(--neon-orange); }
+    .vitrina-karaoke .vitrina-titulo-seccion { color: var(--neon-indigo); }
+
+    .vitrina-scroll {
+      display: flex; gap: 10px;
+      overflow-x: auto; scroll-snap-type: x mandatory;
+      scrollbar-width: none; width: 100%;
+    }
+    .vitrina-scroll::-webkit-scrollbar { display: none; }
+
+    /* === Tarjetas con Imagen === */
+    .vitrina-card {
+      position: relative;
+      flex: 0 0 76%;
+      scroll-snap-align: center;
+      border-radius: var(--radius);
+      height: 100px;
+      display: flex;
+      align-items: flex-end;
+      padding: 12px;
+      background-size: cover;
+      background-position: center;
+      border: 1px solid var(--color-border);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      transition: var(--t);
+      overflow: hidden; cursor: pointer;
+    }
+    .vitrina-card:hover {
+      border-color: rgba(255,255,255,0.15);
+      transform: translateY(-2px);
+    }
+    .vitrina-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, rgba(10,10,15,0.9) 0%, rgba(10,10,15,0.3) 60%, transparent 100%);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .vitrina-texto { position: relative; z-index: 2; min-width: 0; }
+    .vitrina-titulo {
+      font-family: var(--font-ui);
+      font-size: 0.9rem; font-weight: 700;
+      color: #fff;
+      line-height: 1.2;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+    }
+    .vitrina-desc {
+      font-size: 0.68rem;
+      color: rgba(255,255,255,0.8);
+      text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+      margin-top: 2px;
+    }
+
+    .vitrina-tag {
+      position: absolute;
+      top: 0; right: 0;
+      font-size: 0.52rem; font-weight: 800;
+      letter-spacing: 0.5px; text-transform: uppercase;
+      padding: 3px 8px; border-bottom-left-radius: 6px;
+      color: #000; z-index: 3;
+    }
+    .vitrina-cocktails .vitrina-tag { background: var(--neon-purple); color: #fff; }
+    .vitrina-burgers .vitrina-tag { background: var(--neon-orange); }
+    .vitrina-karaoke .vitrina-tag { background: var(--neon-indigo); color: #fff; }
+
+    /* === Modal de Expansión === */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100vh;
+      background: rgba(5, 5, 8, 0.85);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      z-index: 200;
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.3s ease;
+      padding: 24px;
+    }
+    .modal-overlay.active { opacity: 1; pointer-events: auto; }
+
+    .modal-altar {
+      background: #111116;
+      border: 1px solid rgba(255,255,255,0.08);
+      width: 100%; max-width: 360px;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.7);
+      transform: scale(0.92);
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .modal-overlay.active .modal-altar { transform: scale(1); }
+
+    .modal-img-frame {
+      width: 100%; height: 180px;
+      background-size: cover; background-position: center;
+      position: relative;
+    }
+    .modal-img-frame::before {
+      content: ''; position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: linear-gradient(to top, #111116 0%, transparent 60%);
+    }
+
+    .modal-badge {
+      position: absolute; top: 14px; left: 14px;
+      font-family: var(--font-ui);
+      font-size: 0.58rem; font-weight: 800;
+      text-transform: uppercase; letter-spacing: 1px;
+      padding: 4px 10px; border-radius: 20px;
+    }
+
+    .modal-body { padding: 20px; text-align: left; }
+    .modal-header-line {
+      display: flex; justify-content: space-between; align-items: baseline;
+      margin-bottom: 6px;
+    }
+    .modal-titulo { font-family: var(--font-ui); font-size: 1.4rem; font-weight: 700; color: #fff; }
+    .modal-ingredientes { font-size: 0.72rem; color: var(--neon-amber); font-weight: 600; font-family: var(--font-ui); }
+    .modal-lore { font-size: 0.82rem; color: var(--color-text-sec); line-height: 1.4; margin-bottom: 18px; }
+    
+    .modal-btn-action {
+      width: 100%; background: linear-gradient(90deg, var(--neon-amber), var(--neon-orange));
+      border: none; padding: 12px; border-radius: 8px;
+      font-family: var(--font-ui); font-size: 0.85rem; font-weight: 700;
+      color: #000; text-transform: uppercase; letter-spacing: 0.5px;
+      cursor: pointer; transition: var(--t);
+    }
+    .modal-btn-action:active { transform: scale(0.98); }
+
+    @media (max-width: 400px) {
+      .view-container { padding: 14px; }
+      #view-inicio { --triangulo-ancho: 165px; --triangulo-alto: 165px; }
+      .main-wrapper { gap: 10px; }
+      .vitrina-card { flex: 0 0 82%; height: 90px; }
+      .nombre { font-size: 1.25rem; }
+      .icono-marco { width: 50px; height: 50px; }
+      .icono-marco i { font-size: 24px; }
+      .eslogan { font-size: 1.1rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <main class="view-container" id="view-inicio">
+
+    <!-- Triángulo de Acceso -->
+    <div class="login-corner" id="btnLoginCorner">
+      <div class="login-corner-inner">
+        <div class="login-title">Iniciar Sesión</div>
+        <a href="#" class="login-subtitle" id="btnRegistroCorner">Registrarse</a>
+      </div>
+    </div>
+
+    <!-- Cabecera (icono / título / eslogan) -->
+    <header class="header-block">
+      <div class="icono-marco">
+        <i class="fa-solid fa-beer-mug-empty"></i>
+      </div>
+      <div class="nombre">La Taberna</div>
+      <div class="eslogan" id="eslogan-dinamico">"Bebidas frías, misiones calientes"</div>
+    </header>
+
+    <!-- Vitrinas -->
+    <section class="main-wrapper">
+
+      <!-- Cócteles de la Casa -->
+      <div class="vitrina-contenedor vitrina-cocktails">
+        <div class="vitrina-titulo-seccion">🍸 Cócteles de la casa</div>
+        <div class="vitrina-scroll">
+          
+          <div class="vitrina-card" 
+               style="background-image: url('https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=500&q=80');"
+               data-title="Fuego Valirio" 
+               data-ingredientes="Gin · Jalapeño · Licor verde de la casa"
+               data-tag="2x1 hoy"
+               data-color="var(--neon-purple)"
+               data-img="https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=500&q=80"
+               data-lore="Extraído de los sótanos de la alquimia. Destilado con botánicos seleccionados y un sutil toque punzante de jalapeño que despierta los sentidos.">
+            <span class="vitrina-tag">2x1 hoy</span>
+            <div class="vitrina-texto">
+              <div class="vitrina-titulo">Fuego Valirio</div>
+              <div class="vitrina-desc">Gin, jalapeño y destello verde</div>
+            </div>
+          </div>
+
+          <div class="vitrina-card" 
+               style="background-image: url('https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=500&q=80');"
+               data-title="Abismo Negro" 
+               data-ingredientes="Whisky ahumado · Mora silvestre · Carbón activo"
+               data-tag="Místico"
+               data-color="var(--neon-purple)"
+               data-img="https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=500&q=80"
+               data-lore="Una mezcla densa y oscura como las noches sin luna en el bosque viejo. El humo del whisky escocés colisiona con el dulzor ácido de las moras maceradas.">
+            <div class="vitrina-texto">
+              <div class="vitrina-titulo">Abismo Negro</div>
+              <div class="vitrina-desc">Whisky ahumado y licor de mora</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Los Preferidos (Comida) -->
+      <div class="vitrina-contenedor vitrina-burgers">
+        <div class="vitrina-titulo-seccion">🔥 Los Preferidos del Asador</div>
+        <div class="vitrina-scroll">
+          
+          <div class="vitrina-card" 
+               style="background-image: url('https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500&q=80');"
+               data-title="La Forja" 
+               data-ingredientes="250g Ternera · Cheddar maduro · Pan de carbón"
+               data-tag="Top ventas"
+               data-color="var(--neon-orange)"
+               data-img="https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500&q=80"
+               data-lore="Forjada directamente sobre fuego vivo. Carne seleccionada con costra de sellado perfecta, inundada en queso cheddar fundido que emula el oro líquido de las herrerías.">
+            <span class="vitrina-tag">Top ventas</span>
+            <div class="vitrina-texto">
+              <div class="vitrina-titulo">La Forja</div>
+              <div class="vitrina-desc">Doble carne premium y cheddar fundido</div>
+            </div>
+          </div>
+
+          <div class="vitrina-card" 
+               style="background-image: url('https://images.unsplash.com/photo-1550547660-d9450f859349?w=500&q=80');"
+               data-title="Humo & Acero" 
+               data-ingredientes="Costillar ahumado · BBQ artesanal de bourbon"
+               data-tag="Ahumado"
+               data-color="var(--neon-orange)"
+               data-img="https://images.unsplash.com/photo-1550547660-d9450f859349?w=500&q=80"
+               data-lore="Madera de manzano y doce horas de paciencia en el ahumador. La carne se desprende del hueso con el roce del acero. Bañada en una densa salsa barbacoa reducida con bourbon de barril americano.">
+            <div class="vitrina-texto">
+              <div class="vitrina-titulo">Humo & Acero</div>
+              <div class="vitrina-desc">Tocino crujiente con BBQ artesanal</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Entretención y Eventos -->
+      <div class="vitrina-contenedor vitrina-karaoke">
+        <div class="vitrina-titulo-seccion">🎤 Entretención y Eventos</div>
+        <div class="vitrina-scroll">
+          
+          <div class="vitrina-card" 
+               style="background-image: url('https://images.unsplash.com/photo-1516280440502-861053b92787?w=500&q=80');"
+               data-title="Grito de Guerra" 
+               data-ingredientes="Escenario libre · Micrófono abierto · Sonido valvular"
+               data-tag="Viernes"
+               data-color="var(--neon-indigo)"
+               data-img="https://images.unsplash.com/photo-1516280440502-861053b92787?w=500&q=80"
+               data-lore="La noche donde los clanes se reúnen a medir el poder de sus gargantas. No es solo cantar, es liberar el estrés acumulado de la semana bajo los focos de La Taberna.">
+            <span class="vitrina-tag">Viernes</span>
+            <div class="vitrina-texto">
+              <div class="vitrina-titulo">Grito de Guerra</div>
+              <div class="vitrina-desc">Clásicos del rock pesado en vivo</div>
+            </div>
+          </div>
+
+          <div class="vitrina-card" 
+               style="background-image: url('https://images.unsplash.com/photo-1470229722913-7c092fb1380f?w=500&q=80');"
+               data-title="Torneo de Clanes" 
+               data-ingredientes="Trivia interactiva · Tablero de honor · Rondas gratis"
+               data-tag="Próximamente"
+               data-color="var(--neon-indigo)"
+               data-img="https://images.unsplash.com/photo-1470229722913-7c092fb1380f?w=500&q=80"
+               data-lore="Pon a prueba la agilidad mental de tu equipo. Desafíos estratégicos de cultura popular, ciencia de código y mitología de taberna. El clan dominante de la noche no paga su consumo.">
+            <div class="vitrina-texto">
+              <div class="vitrina-titulo">Torneo de Clanes</div>
+              <div class="vitrina-desc">Trivia estratégica de comunidad</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Modal de Expansión -->
+  <div class="modal-overlay" id="modalPortal">
+    <div class="modal-altar">
+      <div class="modal-img-frame" id="modalImg">
+        <span class="modal-badge" id="modalBadge"></span>
+      </div>
+      <div class="modal-body">
+        <div class="modal-header-line">
+          <h2 class="modal-titulo" id="modalTitulo"></h2>
+          <span class="modal-ingredientes" id="modalIngredientes"></span>
+        </div>
+        <p class="modal-lore" id="modalLore"></p>
+        <button class="modal-btn-action" id="modalActionBtn">Invocar con tu Cuenta</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Slogan rotativo
+    const FRASES_ESLOGAN = [
+      "Bebidas frías, misiones calientes.",
+      "El mejor bar para perder la sed.",
+      "Cócteles que cuentan historias.",
+      "Sacia tu sed de aventura."
+    ];
+    const esloganEl = document.getElementById('eslogan-dinamico');
+    let indice = 0;
+    setInterval(() => {
+      esloganEl.style.opacity = '0';
+      setTimeout(() => {
+        indice = (indice + 1) % FRASES_ESLOGAN.length;
+        esloganEl.textContent = `"${FRASES_ESLOGAN[indice]}"`;
+        esloganEl.style.opacity = '1';
+      }, 400);
+    }, 6000);
+
+    // Modal de expansión
+    const cards = document.querySelectorAll('.vitrina-card');
+    const modal = document.getElementById('modalPortal');
+    const mImg = document.getElementById('modalImg');
+    const mBadge = document.getElementById('modalBadge');
+    const mTitulo = document.getElementById('modalTitulo');
+    const mIngredientes = document.getElementById('modalIngredientes');
+    const mLore = document.getElementById('modalLore');
+    const mActionBtn = document.getElementById('modalActionBtn');
+
+    cards.forEach(card => {
+      card.addEventListener('click', () => {
+        const title = card.getAttribute('data-title');
+        const ingredients = card.getAttribute('data-ingredientes');
+        const lore = card.getAttribute('data-lore');
+        const img = card.getAttribute('data-img');
+        const tag = card.getAttribute('data-tag') || 'Disponible';
+        const color = card.getAttribute('data-color') || 'var(--neon-amber)';
+
+        mTitulo.textContent = title;
+        mIngredientes.textContent = ingredients;
+        mLore.textContent = lore;
+        mImg.style.backgroundImage = `url('${img}')`;
+        mBadge.textContent = tag;
+        mBadge.style.backgroundColor = color;
+        mBadge.style.color = color === 'var(--neon-orange)' ? '#000' : '#fff';
+        
+        if(card.closest('.vitrina-karaoke')) {
+          mActionBtn.textContent = "Reservar Espacio en el Clan";
+        } else {
+          mActionBtn.textContent = "Invocar con tu Cuenta";
+        }
+
+        modal.classList.add('active');
+      });
+    });
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.classList.remove('active');
+    });
+
+    mActionBtn.addEventListener('click', () => {
+      modal.classList.remove('active');
+      const loginCorner = document.getElementById('btnLoginCorner');
+      loginCorner.style.transform = 'scale(1.1)';
+      setTimeout(() => { loginCorner.style.transform = 'scale(1)'; }, 300);
+    });
+  </script>
+</body>
+</html>

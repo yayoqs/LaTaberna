@@ -1,12 +1,12 @@
 /* ================================================================
    LaTaberna - PubPOS — Módulo (ES6)
    Archivo: js/modulos/cliente/pantalla-inicio.js
-   Versión: 2.0.1
-   Propósito: Pantalla de inicio híbrida con triángulo de acceso.
-              _asegurarVista reutiliza contenedor estático de index.html.
+   Versión: 2.1.4
+   Propósito: Pantalla de inicio con triángulo neón, cabecera,
+             vitrinas con imagen, títulos de sección y modal expansivo.
+             Lógica de registro delegada al Core (Auth v1.0.10).
    ================================================================ */
 
-import { EventBus } from '../../lib/eventBus.js';
 import { Auth } from '../../auth.js';
 
 const PantallaInicio = (() => {
@@ -15,17 +15,14 @@ const PantallaInicio = (() => {
   let _activada = false;
 
   const FRASES_ESLOGAN = [
-    "Donde cada trago es una aventura",
-    "Bebidas frías, misiones calientes y fuego vivo.",
-    "El mejor bar para perder la sed y encontrar la noche.",
+    "Bebidas frías, misiones calientes.",
+    "El mejor bar para perder la sed.",
     "Cócteles que cuentan historias.",
-    "Tu segunda casa, pero con mejor barra.",
-    "Si no recuerdas la noche, nosotros tampoco.",
-    "Aparecemos por sorpresa, te divertimos por completo.",
-    "Sacia tu sed de aventura y diversión en vivo."
+    "Sacia tu sed de aventura."
   ];
 
-  let _cbLoginCorner, _cbRegistroCorner, _cbAuthRegistro;
+  let _cbLoginCorner, _cbModalClose, _cbModalAction;
+  let _modalCards = [];
 
   function _asegurarVista() {
     if (_vista) return;
@@ -40,45 +37,160 @@ const PantallaInicio = (() => {
 
     _vista = main;
 
-    // Si ya tiene contenido, no reconstruir
     if (_vista.querySelector('.login-corner')) return;
 
     _vista.innerHTML = `
       <div class="login-corner" id="btnLoginCorner">
         <div class="login-corner-inner">
           <div class="login-title">Iniciar Sesión</div>
-          <a href="#" class="login-subtitle" id="btnRegistroCorner">Registrarse</a>
+          <a href="javascript:void(0)" class="login-subtitle" id="btnRegistroCorner">Registrarse</a>
         </div>
       </div>
-      <div class="header-left">
-        <i class="fa-solid fa-beer-mug-empty icono"></i>
+
+      <header class="header-block">
+        <div class="icono-marco">
+          <i class="fa-solid fa-beer-mug-empty"></i>
+        </div>
         <div class="nombre">La Taberna</div>
         <div class="eslogan" id="eslogan-dinamico">"${FRASES_ESLOGAN[0]}"</div>
-      </div>
-      <div class="main-wrapper">
-        <div class="vitrina-contenedor">
-          <div class="vitrina-scroll vitrina-cocktails">
-            <div class="vitrina-card"><i class="fa-solid fa-glass-martini-alt vitrina-icon"></i><div class="vitrina-titulo">Mojito</div><div class="vitrina-desc">Refrescante, menta y limón</div></div>
-            <div class="vitrina-card"><i class="fa-solid fa-whiskey-glass vitrina-icon"></i><div class="vitrina-titulo">Piña Colada</div><div class="vitrina-desc">Dulce, cremosa y tropical</div></div>
-            <div class="vitrina-card"><i class="fa-solid fa-martini-glass vitrina-icon"></i><div class="vitrina-titulo">Margarita</div><div class="vitrina-desc">Cítrica, con borde de sal</div></div>
+      </header>
+
+      <section class="main-wrapper">
+
+        <div class="vitrina-contenedor vitrina-cocktails">
+          <div class="vitrina-titulo-seccion">🍸 Cócteles de la casa</div>
+          <div class="vitrina-scroll">
+
+            <div class="vitrina-card"
+                 style="background-image: url('https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=500&q=80');"
+                 data-title="Fuego Valirio"
+                 data-ingredientes="Gin · Jalapeño · Licor verde de la casa"
+                 data-tag="2x1 hoy"
+                 data-color="var(--neon-purple)"
+                 data-img="https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=500&q=80"
+                 data-lore="Extraído de los sótanos de la alquimia. Destilado con botánicos seleccionados y un sutil toque punzante de jalapeño que despierta los sentidos.">
+              <span class="vitrina-tag">2x1 hoy</span>
+              <div class="vitrina-texto">
+                <div class="vitrina-titulo">Fuego Valirio</div>
+                <div class="vitrina-desc">Gin, jalapeño y destello verde</div>
+              </div>
+            </div>
+
+            <div class="vitrina-card"
+                 style="background-image: url('https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=500&q=80');"
+                 data-title="Abismo Negro"
+                 data-ingredientes="Whisky ahumado · Mora silvestre · Carbón activo"
+                 data-tag="Místico"
+                 data-color="var(--neon-purple)"
+                 data-img="https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=500&q=80"
+                 data-lore="Una mezcla densa y oscura como las noches sin luna en el bosque viejo. El humo del whisky escocés colisiona con el dulzor ácido de las moras maceradas.">
+              <div class="vitrina-texto">
+                <div class="vitrina-titulo">Abismo Negro</div>
+                <div class="vitrina-desc">Whisky ahumado y licor de mora</div>
+              </div>
+            </div>
+
           </div>
         </div>
-        <div class="vitrina-contenedor">
-          <div class="vitrina-scroll vitrina-burgers">
-            <div class="vitrina-card"><i class="fa-solid fa-hamburger vitrina-icon"></i><div class="vitrina-titulo">Clásica</div><div class="vitrina-desc">Queso cheddar, cebolla caramelizada</div></div>
-            <div class="vitrina-card"><i class="fa-solid fa-burger vitrina-icon"></i><div class="vitrina-titulo">BBQ</div><div class="vitrina-desc">Salsa barbacoa, aros de cebolla</div></div>
-            <div class="vitrina-card"><i class="fa-solid fa-seedling vitrina-icon"></i><div class="vitrina-titulo">Veggie</div><div class="vitrina-desc">Garbanzos, palta, brotes frescos</div></div>
+
+        <div class="vitrina-contenedor vitrina-burgers">
+          <div class="vitrina-titulo-seccion">🔥 Los Preferidos del Asador</div>
+          <div class="vitrina-scroll">
+
+            <div class="vitrina-card"
+                 style="background-image: url('https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500&q=80');"
+                 data-title="La Forja"
+                 data-ingredientes="250g Ternera · Cheddar maduro · Pan de carbón"
+                 data-tag="Top ventas"
+                 data-color="var(--neon-orange)"
+                 data-img="https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500&q=80"
+                 data-lore="Forjada directamente sobre fuego vivo. Carne seleccionada con costra de sellado perfecta, inundada en queso cheddar fundido que emula el oro líquido de las herrerías.">
+              <span class="vitrina-tag">Top ventas</span>
+              <div class="vitrina-texto">
+                <div class="vitrina-titulo">La Forja</div>
+                <div class="vitrina-desc">Doble carne premium y cheddar fundido</div>
+              </div>
+            </div>
+
+            <div class="vitrina-card"
+                 style="background-image: url('https://images.unsplash.com/photo-1550547660-d9450f859349?w=500&q=80');"
+                 data-title="Humo & Acero"
+                 data-ingredientes="Costillar ahumado · BBQ artesanal de bourbon"
+                 data-tag="Ahumado"
+                 data-color="var(--neon-orange)"
+                 data-img="https://images.unsplash.com/photo-1550547660-d9450f859349?w=500&q=80"
+                 data-lore="Madera de manzano y doce horas de paciencia en el ahumador. La carne se desprende del hueso con el roce del acero. Bañada en una densa salsa barbacoa reducida con bourbon de barril americano.">
+              <div class="vitrina-texto">
+                <div class="vitrina-titulo">Humo & Acero</div>
+                <div class="vitrina-desc">Tocino crujiente con BBQ artesanal</div>
+              </div>
+            </div>
+
           </div>
         </div>
-        <div class="vitrina-contenedor">
-          <div class="vitrina-scroll vitrina-karaoke">
-            <div class="vitrina-card"><i class="fa-solid fa-microphone-lines vitrina-icon"></i><div class="vitrina-titulo">Rock</div><div class="vitrina-desc">Viernes de clásicos en vivo</div></div>
-            <div class="vitrina-card"><i class="fa-solid fa-music vitrina-icon"></i><div class="vitrina-titulo">Pop</div><div class="vitrina-desc">Éxitos actuales y coreografías</div></div>
-            <div class="vitrina-card"><i class="fa-solid fa-guitar vitrina-icon"></i><div class="vitrina-titulo">Baladas</div><div class="vitrina-desc">Noches íntimas con voz y piano</div></div>
+
+        <div class="vitrina-contenedor vitrina-karaoke">
+          <div class="vitrina-titulo-seccion">🎤 Entretención y Eventos</div>
+          <div class="vitrina-scroll">
+
+            <div class="vitrina-card"
+                 style="background-image: url('https://images.unsplash.com/photo-1516280440502-861053b92787?w=500&q=80');"
+                 data-title="Grito de Guerra"
+                 data-ingredientes="Escenario libre · Micrófono abierto · Sonido valvular"
+                 data-tag="Viernes"
+                 data-color="var(--neon-indigo)"
+                 data-img="https://images.unsplash.com/photo-1516280440502-861053b92787?w=500&q=80"
+                 data-lore="La noche donde los clanes se reúnen a medir el poder de sus gargantas. No es solo cantar, es liberar el estrés acumulado de la semana bajo los focos de La Taberna.">
+              <span class="vitrina-tag">Viernes</span>
+              <div class="vitrina-texto">
+                <div class="vitrina-titulo">Grito de Guerra</div>
+                <div class="vitrina-desc">Clásicos del rock pesado en vivo</div>
+              </div>
+            </div>
+
+            <div class="vitrina-card"
+                 style="background-image: url('https://images.unsplash.com/photo-1470229722913-7c092fb1380f?w=500&q=80');"
+                 data-title="Torneo de Clanes"
+                 data-ingredientes="Trivia interactiva · Tablero de honor · Rondas gratis"
+                 data-tag="Próximamente"
+                 data-color="var(--neon-indigo)"
+                 data-img="https://images.unsplash.com/photo-1470229722913-7c092fb1380f?w=500&q=80"
+                 data-lore="Pon a prueba la agilidad mental de tu equipo. Desafíos estratégicos de cultura popular, ciencia de código y mitología de taberna. El clan dominante de la noche no paga su consumo.">
+              <div class="vitrina-texto">
+                <div class="vitrina-titulo">Torneo de Clanes</div>
+                <div class="vitrina-desc">Trivia estratégica de comunidad</div>
+              </div>
+            </div>
+
           </div>
+        </div>
+
+      </section>
+    `;
+
+    _crearModalPortal();
+  }
+
+  function _crearModalPortal() {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.id = 'modalPortal';
+    modal.innerHTML = `
+      <div class="modal-altar">
+        <div class="modal-img-frame" id="modalImg">
+          <span class="modal-badge" id="modalBadge"></span>
+        </div>
+        <div class="modal-body">
+          <div class="modal-header-line">
+            <h2 class="modal-titulo" id="modalTitulo"></h2>
+            <span class="modal-ingredientes" id="modalIngredientes"></span>
+          </div>
+          <p class="modal-lore" id="modalLore"></p>
+          <button class="modal-btn-action" id="modalActionBtn">Invocar con tu Cuenta</button>
         </div>
       </div>
     `;
+    document.body.appendChild(modal);
   }
 
   function activar() {
@@ -86,14 +198,12 @@ const PantallaInicio = (() => {
     _activada = true;
 
     _cbLoginCorner = () => _mostrarLogin();
-    _cbRegistroCorner = (e) => { e.preventDefault(); e.stopPropagation(); _mostrarRegistro(); };
-    _cbAuthRegistro = () => _mostrarRegistro();
 
     document.getElementById('btnLoginCorner').addEventListener('click', _cbLoginCorner);
-    document.getElementById('btnRegistroCorner').addEventListener('click', _cbRegistroCorner);
-    EventBus.on('auth:mostrarRegistro', _cbAuthRegistro);
+    // El enlace Registrarse del triángulo no tiene acción
 
     _iniciarEsloganDinamico();
+    _conectarModalPortal();
   }
 
   function limpiar() {
@@ -101,16 +211,83 @@ const PantallaInicio = (() => {
     _activada = false;
 
     if (_cbLoginCorner) document.getElementById('btnLoginCorner').removeEventListener('click', _cbLoginCorner);
-    if (_cbRegistroCorner) document.getElementById('btnRegistroCorner').removeEventListener('click', _cbRegistroCorner);
-    if (_cbAuthRegistro) EventBus.off('auth:mostrarRegistro', _cbAuthRegistro);
 
     if (_intervaloEslogan) { clearInterval(_intervaloEslogan); _intervaloEslogan = null; }
+
+    _desconectarModalPortal();
+  }
+
+  function _conectarModalPortal() {
+    const modal = document.getElementById('modalPortal');
+    const mImg = document.getElementById('modalImg');
+    const mBadge = document.getElementById('modalBadge');
+    const mTitulo = document.getElementById('modalTitulo');
+    const mIngredientes = document.getElementById('modalIngredientes');
+    const mLore = document.getElementById('modalLore');
+    const mActionBtn = document.getElementById('modalActionBtn');
+
+    _modalCards = document.querySelectorAll('.vitrina-card');
+
+    _modalCards.forEach(card => {
+      card.addEventListener('click', () => {
+        const title = card.getAttribute('data-title');
+        const ingredients = card.getAttribute('data-ingredientes');
+        const lore = card.getAttribute('data-lore');
+        const img = card.getAttribute('data-img');
+        const tag = card.getAttribute('data-tag') || 'Disponible';
+        const color = card.getAttribute('data-color') || 'var(--neon-amber)';
+
+        mTitulo.textContent = title;
+        mIngredientes.textContent = ingredients;
+        mLore.textContent = lore;
+        mImg.style.backgroundImage = `url('${img}')`;
+        mBadge.textContent = tag;
+        mBadge.style.backgroundColor = color;
+        mBadge.style.color = color === 'var(--neon-orange)' ? '#000' : '#fff';
+
+        if (card.closest('.vitrina-karaoke')) {
+          mActionBtn.textContent = "Reservar Espacio en el Clan";
+        } else {
+          mActionBtn.textContent = "Invocar con tu Cuenta";
+        }
+
+        modal.classList.add('active');
+      });
+    });
+
+    _cbModalClose = (e) => {
+      if (e.target === modal) modal.classList.remove('active');
+    };
+    modal.addEventListener('click', _cbModalClose);
+
+    _cbModalAction = () => {
+      modal.classList.remove('active');
+      const loginCorner = document.getElementById('btnLoginCorner');
+      if (loginCorner) {
+        loginCorner.style.transform = 'scale(1.1)';
+        setTimeout(() => { loginCorner.style.transform = 'scale(1)'; }, 300);
+      }
+    };
+    mActionBtn.addEventListener('click', _cbModalAction);
+  }
+
+  function _desconectarModalPortal() {
+    const modal = document.getElementById('modalPortal');
+    if (_modalCards.length) {
+      _modalCards.forEach(card => { card.replaceWith(card.cloneNode(true)); });
+      _modalCards = [];
+    }
+    if (modal) {
+      if (_cbModalClose) modal.removeEventListener('click', _cbModalClose);
+      const mActionBtn = document.getElementById('modalActionBtn');
+      if (mActionBtn && _cbModalAction) mActionBtn.removeEventListener('click', _cbModalAction);
+    }
   }
 
   function _iniciarEsloganDinamico() {
     const esloganEl = document.getElementById('eslogan-dinamico');
     if (!esloganEl) return;
-    let indice = Math.floor(Math.random() * FRASES_ESLOGAN.length);
+    let indice = 0;
     _intervaloEslogan = setInterval(() => {
       esloganEl.style.opacity = '0';
       setTimeout(() => {
@@ -123,12 +300,15 @@ const PantallaInicio = (() => {
 
   function _mostrarLogin() {
     if (typeof Auth.mostrarLogin === 'function') Auth.mostrarLogin();
-  }
-
-  function _mostrarRegistro() {
-    if (typeof Auth.registrarCliente === 'function') {
-      Auth.mostrarLogin();
-    }
+    // Restaurar la pantalla de inicio si se cierra el modal de login
+    setTimeout(() => {
+      const btnCerrar = document.getElementById('btnCerrarModalLogin');
+      if (btnCerrar) {
+        btnCerrar.addEventListener('click', function() {
+          setTimeout(() => { PantallaInicio.mostrar(); }, 100);
+        }, { once: true });
+      }
+    }, 100);
   }
 
   function mostrar() {

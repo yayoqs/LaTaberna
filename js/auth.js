@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/auth.js
-   Versión: 1.0.9
+   Versión: 1.0.10
    Propósito: Autenticación, hashing SHA-256, roles, login/logout.
-              Modal con addEventListener en lugar de onclick.
+              Modal con formularios de inicio de sesión y registro.
+              Textos en español neutro.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -106,7 +107,6 @@ export const Auth = (() => {
   async function getAppwriteUserId() {
     if (_appwriteUserId) return _appwriteUserId;
     try {
-      // CORRECCIÓN: usar DBAppwrite.cuenta en lugar de DBAppwrite.account
       if (typeof DBAppwrite !== 'undefined' && DBAppwrite.cuenta) {
         const account = await DBAppwrite.cuenta.get();
         _appwriteUserId = account.$id;
@@ -124,36 +124,65 @@ export const Auth = (() => {
       loginModal.id = 'modalLogin';
       loginModal.className = 'modal-overlay';
       loginModal.style.display = 'flex';
-      loginModal.innerHTML =
-        '<div class="modal-small" style="max-width:360px;">' +
-          '<div class="modal-header">' +
-            '<h3><i class="fas fa-beer"></i> La Taberna</h3>' +
-            '<button class="modal-close" id="btnCerrarModalLogin"><i class="fas fa-times"></i></button>' +
-          '</div>' +
-          '<div class="modal-small-body">' +
-            '<label>Usuario</label>' +
-            '<input type="text" id="loginUsuario" placeholder="Ej: admin, mesero, cocina...">' +
-            '<label>Contraseña</label>' +
-            '<input type="password" id="loginPassword" placeholder="Contraseña">' +
-            '<div class="modal-small-footer" style="display:flex; flex-direction:column; gap:8px;">' +
-              '<button class="btn-primary" id="btnModalIngresar" style="width:100%;">' +
-                '<i class="fas fa-sign-in-alt"></i> Ingresar' +
-              '</button>' +
-              '<button class="btn-secondary" id="btnModalRegistrarse" style="width:100%;">' +
-                '<i class="fas fa-user-plus"></i> ¿Aun sin cuenta? Registrate' +
-              '</button>' +
-            '</div>' +
-          '</div>' +
-        '</div>';
+      loginModal.innerHTML = `
+        <div class="modal-small" style="max-width:360px;">
+          <div class="modal-header">
+            <h3><i class="fas fa-beer"></i> La Taberna</h3>
+            <button class="modal-close" id="btnCerrarModalLogin"><i class="fas fa-times"></i></button>
+          </div>
+          <div class="modal-small-body" id="loginPanel">
+            <label>Usuario</label>
+            <input type="text" id="loginUsuario" placeholder="Ej: admin, mesero, cocina...">
+            <label>Contraseña</label>
+            <input type="password" id="loginPassword" placeholder="Contraseña">
+            <div class="modal-small-footer" style="display:flex; flex-direction:column; gap:8px;">
+              <button class="btn-primary" id="btnModalIngresar" style="width:100%;">
+                <i class="fas fa-sign-in-alt"></i> Ingresar
+              </button>
+              <button class="btn-secondary" id="btnModalRegistrarse" style="width:100%;">
+                <i class="fas fa-user-plus"></i> ¿Aun sin cuenta? Registrate
+              </button>
+            </div>
+          </div>
+          <div class="modal-small-body" id="registroPanel" style="display:none;">
+            <label>Usuario</label>
+            <input type="text" id="regUsuario" placeholder="Elegir un nombre de usuario">
+            <label>Contraseña</label>
+            <input type="password" id="regPassword" placeholder="Mínimo 4 caracteres">
+            <label>Repetir contraseña</label>
+            <input type="password" id="regPasswordConfirm" placeholder="Repetir la contraseña">
+            <div class="modal-small-footer" style="display:flex; flex-direction:column; gap:8px;">
+              <button class="btn-primary" id="btnModalCrearCuenta" style="width:100%;">
+                <i class="fas fa-check"></i> Crear cuenta
+              </button>
+              <button class="btn-secondary" id="btnVolverLogin" style="width:100%;">
+                <i class="fas fa-arrow-left"></i> Volver al inicio de sesión
+              </button>
+            </div>
+          </div>
+        </div>`;
       document.body.appendChild(loginModal);
 
       document.getElementById('btnCerrarModalLogin').addEventListener('click', cerrarModalLogin);
       document.getElementById('btnModalIngresar').addEventListener('click', _loginFromModal);
       document.getElementById('btnModalRegistrarse').addEventListener('click', _mostrarRegistro);
+      document.getElementById('btnVolverLogin').addEventListener('click', _mostrarLoginPanel);
+      document.getElementById('btnModalCrearCuenta').addEventListener('click', _registrarDesdeModal);
     } else {
       loginModal.style.display = 'flex';
+      _mostrarLoginPanel();
     }
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  }
+
+  function _mostrarLoginPanel() {
+    document.getElementById('loginPanel').style.display = '';
+    document.getElementById('registroPanel').style.display = 'none';
+  }
+
+  function _mostrarRegistro() {
+    document.getElementById('loginPanel').style.display = 'none';
+    document.getElementById('registroPanel').style.display = '';
   }
 
   function cerrarModalLogin() { if (loginModal) loginModal.style.display = 'none'; }
@@ -168,7 +197,31 @@ export const Auth = (() => {
     if (passInput) passInput.value = '';
   }
 
-  function _mostrarRegistro() { EventBus.emit('auth:mostrarRegistro'); }
+  async function _registrarDesdeModal() {
+    const nombre = document.getElementById('regUsuario')?.value?.trim() || '';
+    const password = document.getElementById('regPassword')?.value || '';
+    const passwordConfirm = document.getElementById('regPasswordConfirm')?.value || '';
+
+    if (!nombre || !password) {
+      showToast('error', 'Completar todos los campos.');
+      return;
+    }
+    if (password !== passwordConfirm) {
+      showToast('error', 'Las contraseñas no coinciden.');
+      return;
+    }
+
+    const resultado = await registrarCliente(nombre, password);
+    if (resultado.exito) {
+      showToast('success', 'Cuenta creada. Ya puedes iniciar sesión.');
+      _mostrarLoginPanel();
+      document.getElementById('regUsuario').value = '';
+      document.getElementById('regPassword').value = '';
+      document.getElementById('regPasswordConfirm').value = '';
+    } else {
+      showToast('error', resultado.error || 'Error al crear la cuenta.');
+    }
+  }
 
   async function cambiarPassword(nombreUsuario, nuevaPassword) {
     if (!esAdmin() && !esMasterReal()) { showToast('error', 'No tienes permiso para cambiar contraseñas'); return false; }

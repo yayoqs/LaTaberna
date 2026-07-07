@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/layout.css
-   Versión: 1.0.5
+   Versión: 1.0.7
    Propósito: Header, navegación, vistas, toolbar y botones de zona.
-              Fecha y hora centradas con precisión.
+              Fecha y hora alineadas al top. Header responsive corregido.
    ================================================================ */
 
 /* ── APP SHELL ─────────────────────────────────────────────── */
@@ -25,10 +25,10 @@ body { display: flex; flex-direction: column; }
 
 .header-left  { display: flex; align-items: center; gap: 20px; }
 
-/* Fecha y hora centradas */
+/* Fecha y hora centradas horizontalmente, alineadas arriba */
 .header-center {
   display: flex;
-  align-items: center;
+  align-items: flex-start;  /* Alineación superior */
   justify-content: center;
   flex: 1;
   min-width: 0;
@@ -36,6 +36,7 @@ body { display: flex; flex-direction: column; }
   left: 50%;
   transform: translateX(-50%);
   pointer-events: none;
+  margin-top: -42px;
 }
 
 .header-right {
@@ -59,8 +60,6 @@ body { display: flex; flex-direction: column; }
   color: var(--color-accent);
   letter-spacing: -.5px;
   white-space: nowrap;
-  align-self: flex-start;
-  margin-top: -28px;
 }
 .logo i { font-size: 22px; }
 
@@ -71,7 +70,6 @@ body { display: flex; flex-direction: column; }
   font-size: 11px;
   color: var(--color-text-muted);
   line-height: 1.3;
-  margin-top: -42px;
   text-align: center;
 }
 
@@ -231,8 +229,8 @@ body { display: flex; flex-direction: column; }
   }
 
   .header-left {
-    width: 100%;
-    justify-content: space-between;
+    /* Solo ocupa el ancho del logo, no fuerza fila completa */
+    flex: 0;
   }
 
   .header-center {

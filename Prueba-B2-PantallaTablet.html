@@ -1,0 +1,675 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>Jefe de Cocina — La Taberna</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+  <style>
+    :root {
+      --bg: #0f0f0f;
+      --card: #1a1a1a;
+      --panel: #262626;
+      --border: #333;
+      --text: #e0e0e0;
+      --text-sec: #b0b0b0;
+      --text-muted: #888;
+      --accent: #f59e0b;
+      --success: #22c55e;
+      --info: #3b82f6;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --cocina: #f97316;
+      --barra: #8b5cf6;
+      --radius: 12px;
+      --radius-xs: 6px;
+      --radius-sm: 8px;
+      --shadow: 0 2px 8px rgba(0,0,0,.4);
+      --t: .2s ease;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Toolbar ──────────────────────────────── */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 20px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .toolbar h2 {
+      font-size: 18px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--cocina);
+    }
+    .toolbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .btn-icon {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: var(--t);
+    }
+    .btn-icon:hover { background: var(--border); }
+    .btn-icon.activo { background: var(--accent); color: #000; border-color: var(--accent); }
+
+    .reloj {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+      min-width: 60px;
+      text-align: right;
+    }
+
+    /* ── Chips de filtro ──────────────────────── */
+    .filtros {
+      display: flex;
+      gap: 8px;
+      padding: 8px 20px;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .chip {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text-sec);
+      padding: 6px 14px;
+      border-radius: 99px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--t);
+    }
+    .chip.activo { background: var(--accent); color: #000; border-color: var(--accent); }
+
+    /* ── Resumen ──────────────────────────────── */
+    .resumen {
+      display: flex;
+      gap: 12px;
+      padding: 8px 20px;
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .resumen .pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      padding: 5px 12px;
+      border-radius: 99px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-sec);
+    }
+    .pill b { color: var(--text); }
+    .swatch { width: 8px; height: 8px; border-radius: 2px; }
+
+    /* ── Rail (tres columnas) ─────────────────── */
+    .rail {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 0;
+      overflow: hidden;
+      min-height: 0;
+    }
+    .carril {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      border-right: 1px solid var(--border);
+    }
+    .carril:last-child { border-right: none; }
+    .carril-head {
+      padding: 10px 16px 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      border-bottom: 2px solid var(--border);
+    }
+    .carril-head h3 {
+      font-size: 15px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .dot-estado { width: 10px; height: 10px; border-radius: 3px; }
+    .carril-count {
+      font-size: 12px;
+      color: var(--text-muted);
+      background: var(--card);
+      border: 1px solid var(--border);
+      padding: 2px 8px;
+      border-radius: var(--radius-xs);
+    }
+    .carril-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .carril-body::-webkit-scrollbar { width: 5px; }
+    .carril-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    .vacio {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-style: italic;
+      margin-top: 30px;
+      opacity: 0.6;
+    }
+
+    /* ── Ticket ───────────────────────────────── */
+    .ticket {
+      background: var(--card);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      transition: var(--t);
+      animation: llegar .3s ease-out;
+    }
+    @keyframes llegar { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    .ticket.urgente { border-color: var(--danger); }
+    .ticket-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .ticket-num {
+      font-size: 24px;
+      font-weight: 800;
+      line-height: 1;
+      color: var(--text);
+    }
+    .ticket-mesa {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 600;
+      margin-top: 2px;
+    }
+    .badge-tipo {
+      font-size: 9px;
+      font-weight: 800;
+      text-transform: uppercase;
+      padding: 3px 8px;
+      border-radius: 99px;
+      letter-spacing: .4px;
+    }
+    .badge-mesa { background: rgba(59,130,246,.2); color: var(--info); }
+    .badge-reparto { background: rgba(139,92,246,.2); color: var(--barra); }
+    .badge-retiro { background: rgba(34,197,94,.2); color: var(--success); }
+
+    .ticket-timer {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-weight: 700;
+      font-size: 12px;
+      padding: 3px 8px;
+      border-radius: var(--radius-xs);
+      margin-top: 8px;
+    }
+    .t-ok { background: rgba(34,197,94,.15); color: var(--success); }
+    .t-warn { background: rgba(245,158,11,.15); color: var(--warning); }
+    .t-danger { background: rgba(239,68,68,.15); color: var(--danger); }
+
+    .ticket-items {
+      margin-top: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .item-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+    }
+    .item-qty {
+      background: var(--accent);
+      color: #000;
+      font-weight: 800;
+      width: 20px;
+      height: 20px;
+      border-radius: var(--radius-xs);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      flex-shrink: 0;
+    }
+    .item-obs {
+      font-size: 10px;
+      color: var(--warning);
+      font-style: italic;
+    }
+
+    .ticket-flags {
+      margin-top: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+    }
+    .flag {
+      font-size: 9px;
+      font-weight: 800;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border-radius: var(--radius-xs);
+    }
+    .flag-grupo { background: rgba(139,92,246,.15); color: #c4b5fd; }
+    .flag-alerta { background: rgba(239,68,68,.15); color: var(--danger); border: 1px dashed var(--danger); }
+
+    .ticket-actions {
+      margin-top: 10px;
+      display: flex;
+      gap: 6px;
+    }
+    .btn-accion {
+      flex: 1;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 10px;
+      border-radius: var(--radius-xs);
+      font-size: 11px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: var(--t);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    .btn-accion:hover { background: var(--border); }
+    .btn-iniciar { border-color: var(--warning); color: var(--warning); }
+    .btn-iniciar:hover { background: var(--warning); color: #000; }
+    .btn-listo { border-color: var(--success); color: var(--success); }
+    .btn-listo:hover { background: var(--success); color: #000; }
+    .btn-reabrir { border-color: var(--info); color: var(--info); }
+
+    /* ── Modal de detalle ─────────────────────── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+    }
+    .modal-detalle {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      width: 400px;
+      max-width: 90vw;
+    }
+    .modal-detalle h3 { margin-bottom: 12px; }
+    .modal-detalle .item-row { margin: 4px 0; }
+    .modal-close {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 16px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      margin-top: 12px;
+      font-weight: 600;
+    }
+
+    /* ── Panel de simulación ──────────────────── */
+    .sim {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      z-index: 20;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      width: 200px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .sim button {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 10px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .sim button:hover { background: var(--border); }
+    .sim-note { font-size: 9px; color: var(--text-muted); margin-top: 4px; }
+  </style>
+</head>
+<body>
+
+  <div class="toolbar">
+    <h2><i class="fas fa-fire-burner"></i> Jefe de Cocina</h2>
+    <div class="toolbar-actions">
+      <button class="btn-icon" id="btnRecetario"><i class="fas fa-book-open"></i> Recetario</button>
+      <button class="btn-icon" id="btnStock"><i class="fas fa-boxes"></i> Stock</button>
+      <span class="reloj" id="reloj">--:--</span>
+    </div>
+  </div>
+
+  <div class="filtros" id="filtros">
+    <span class="chip activo" data-filtro="todos">Todos</span>
+    <span class="chip" data-filtro="mesa">Mesa</span>
+    <span class="chip" data-filtro="reparto">Reparto</span>
+    <span class="chip" data-filtro="retiro">Retiro</span>
+  </div>
+
+  <div class="resumen" id="resumen"></div>
+
+  <div class="rail">
+    <div class="carril" data-estado="nueva">
+      <div class="carril-head">
+        <h3><span class="dot-estado" style="background:var(--warning)"></span> Nuevas</h3>
+        <span class="carril-count" id="cNueva">0</span>
+      </div>
+      <div class="carril-body" id="colNueva"></div>
+    </div>
+    <div class="carril" data-estado="preparacion">
+      <div class="carril-head">
+        <h3><span class="dot-estado" style="background:var(--cocina)"></span> En preparación</h3>
+        <span class="carril-count" id="cPreparacion">0</span>
+      </div>
+      <div class="carril-body" id="colPreparacion"></div>
+    </div>
+    <div class="carril" data-estado="lista">
+      <div class="carril-head">
+        <h3><span class="dot-estado" style="background:var(--success)"></span> Listas</h3>
+        <span class="carril-count" id="cLista">0</span>
+      </div>
+      <div class="carril-body" id="colLista"></div>
+    </div>
+  </div>
+
+  <div class="sim">
+    <button id="btnNuevaComanda">➕ Nueva comanda</button>
+    <button id="btnAvanzar">➡ Avanzar más antiguo</button>
+    <button id="btnRetirar">✔ Retirar de listas</button>
+    <span class="sim-note">Simulación para pruebas</span>
+  </div>
+
+  <script>
+    // ─── Estado ──────────────────────────────────
+    let pedidos = [];
+    let contador = 1;
+    let filtroActivo = 'todos';
+
+    function idUnico() { return 'c' + (contador++) + '_' + Math.random().toString(36).slice(2,6); }
+
+    const CATALOGO_COCINA = [
+      { nombre: 'Hamburguesa', icono: '🍔' },
+      { nombre: 'Papas fritas', icono: '🍟' },
+      { nombre: 'Pizza muzzarella', icono: '🍕' },
+      { nombre: 'Ensalada mixta', icono: '🥗' },
+      { nombre: 'Milanesa napolitana', icono: '🍖' },
+      { nombre: 'Pasta al pesto', icono: '🍝' },
+      { nombre: 'Sopa del día', icono: '🥣' },
+      { nombre: 'Empanadas', icono: '🥟' }
+    ];
+
+    function crearPedido() {
+      const tipos = ['mesa', 'reparto', 'retiro'];
+      const tipo = tipos[Math.floor(Math.random() * tipos.length)];
+      const numItems = Math.floor(Math.random() * 3) + 1;
+      const items = [];
+      for (let i = 0; i < numItems; i++) {
+        const prod = CATALOGO_COCINA[Math.floor(Math.random() * CATALOGO_COCINA.length)];
+        items.push({ ...prod, qty: Math.floor(Math.random() * 2) + 1, obs: '' });
+      }
+      let etiqueta;
+      if (tipo === 'mesa') etiqueta = 'Mesa ' + (Math.floor(Math.random() * 20) + 1);
+      else if (tipo === 'reparto') etiqueta = 'Reparto #' + (Math.floor(Math.random() * 90) + 10);
+      else etiqueta = 'Retiro #' + (Math.floor(Math.random() * 50) + 1);
+
+      return {
+        id: idUnico(),
+        numero: String(contador - 1).padStart(2, '0'),
+        tipo,
+        etiqueta,
+        items,
+        estado: 'nueva',
+        ts: Date.now(),
+        grupo: Math.random() > 0.75 ? 'Combo' : null,
+        alerta: null,
+        nuevo: true
+      };
+    }
+
+    function clasificarTiempo(ms) {
+      const min = ms / 60000;
+      if (min < 5) return 't-ok';
+      if (min < 12) return 't-warn';
+      return 't-danger';
+    }
+
+    function fmtTiempo(ms) {
+      const s = Math.floor(ms / 1000);
+      const m = Math.floor(s / 60);
+      const r = s % 60;
+      return m + ':' + String(r).padStart(2, '0');
+    }
+
+    function crearTicketHTML(p) {
+      const transcurrido = Date.now() - p.ts;
+      const claseTiempo = clasificarTiempo(transcurrido);
+      const badgeClase = p.tipo === 'mesa' ? 'badge-mesa' : (p.tipo === 'reparto' ? 'badge-reparto' : 'badge-retiro');
+      const urgente = claseTiempo === 't-danger';
+
+      let accionesHTML = '';
+      if (p.estado === 'nueva') {
+        accionesHTML = `<button class="btn-accion btn-iniciar" data-id="${p.id}" data-accion="iniciar"><i class="fas fa-fire"></i> Iniciar</button>`;
+      } else if (p.estado === 'preparacion') {
+        accionesHTML = `<button class="btn-accion btn-listo" data-id="${p.id}" data-accion="listo"><i class="fas fa-check"></i> Listo</button>`;
+      } else if (p.estado === 'lista') {
+        accionesHTML = `<button class="btn-accion btn-reabrir" data-id="${p.id}" data-accion="reabrir"><i class="fas fa-undo"></i> Reabrir</button>`;
+      }
+
+      return `
+        <div class="ticket ${urgente ? 'urgente' : ''} ${p.nuevo ? 'recien' : ''}" data-id="${p.id}">
+          <div class="ticket-top">
+            <div>
+              <div class="ticket-num">#${p.numero}</div>
+              <div class="ticket-mesa">${p.etiqueta}</div>
+            </div>
+            <span class="badge-tipo ${badgeClase}">${p.tipo}</span>
+          </div>
+          <span class="ticket-timer ${claseTiempo}">⏱ ${fmtTiempo(transcurrido)}</span>
+          <div class="ticket-items">
+            ${p.items.map(i => `
+              <div class="item-row">
+                <span class="item-qty">${i.qty}</span>
+                ${i.nombre} ${i.icono}
+              </div>
+              ${i.obs ? `<div class="item-obs">${i.obs}</div>` : ''}
+            `).join('')}
+          </div>
+          ${(p.grupo || p.alerta) ? `
+            <div class="ticket-flags">
+              ${p.grupo ? `<span class="flag flag-grupo">${p.grupo}</span>` : ''}
+              ${p.alerta ? `<span class="flag flag-alerta">${p.alerta}</span>` : ''}
+            </div>
+          ` : ''}
+          <div class="ticket-actions">${accionesHTML}</div>
+        </div>
+      `;
+    }
+
+    function filtrarPedidos(lista) {
+      if (filtroActivo === 'todos') return lista;
+      return lista.filter(p => p.tipo === filtroActivo);
+    }
+
+    function render() {
+      const nuevas = filtrarPedidos(pedidos.filter(p => p.estado === 'nueva'));
+      const preparacion = filtrarPedidos(pedidos.filter(p => p.estado === 'preparacion'));
+      const listas = filtrarPedidos(pedidos.filter(p => p.estado === 'lista'));
+
+      const pintar = (contId, lista, vacioTxt) => {
+        const cont = document.getElementById(contId);
+        cont.innerHTML = lista.length
+          ? lista.map(p => crearTicketHTML(p)).join('')
+          : `<div class="vacio">${vacioTxt}</div>`;
+      };
+
+      pintar('colNueva', nuevas, 'Sin pedidos nuevos');
+      pintar('colPreparacion', preparacion, 'Nada en preparación');
+      pintar('colLista', listas, 'Nada listo por ahora');
+
+      document.getElementById('cNueva').textContent = nuevas.length;
+      document.getElementById('cPreparacion').textContent = preparacion.length;
+      document.getElementById('cLista').textContent = listas.length;
+
+      const urgentes = pedidos.filter(p => p.estado !== 'lista' && clasificarTiempo(Date.now() - p.ts) === 't-danger').length;
+      document.getElementById('resumen').innerHTML = `
+        <div class="pill"><span class="swatch" style="background:var(--warning)"></span> Activos <b>${pedidos.filter(p => p.estado !== 'lista').length}</b></div>
+        <div class="pill"><span class="swatch" style="background:var(--danger)"></span> Demorados <b>${urgentes}</b></div>
+        <div class="pill"><span class="swatch" style="background:var(--success)"></span> Listos <b>${listas.length}</b></div>
+      `;
+
+      pedidos.forEach(p => p.nuevo = false);
+
+      // Eventos en botones de acción
+      document.querySelectorAll('.btn-accion').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const id = btn.dataset.id;
+          const accion = btn.dataset.accion;
+          const pedido = pedidos.find(p => p.id === id);
+          if (!pedido) return;
+          if (accion === 'iniciar') pedido.estado = 'preparacion';
+          else if (accion === 'listo') pedido.estado = 'lista';
+          else if (accion === 'reabrir') pedido.estado = 'preparacion';
+          render();
+        });
+      });
+
+      // Evento para abrir detalle al hacer clic en el ticket
+      document.querySelectorAll('.ticket').forEach(ticketEl => {
+        ticketEl.addEventListener('click', (e) => {
+          if (e.target.closest('.btn-accion')) return; // no abrir si fue clic en botón
+          const id = ticketEl.dataset.id;
+          const p = pedidos.find(p => p.id === id);
+          if (!p) return;
+          abrirDetalle(p);
+        });
+      });
+    }
+
+    function abrirDetalle(p) {
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.innerHTML = `
+        <div class="modal-detalle">
+          <h3>#${p.numero} — ${p.etiqueta}</h3>
+          <p style="color:var(--text-sec);margin-bottom:8px;">Tipo: ${p.tipo} | Hace ${fmtTiempo(Date.now() - p.ts)}</p>
+          ${p.items.map(i => `<div class="item-row"><span class="item-qty">${i.qty}</span> ${i.nombre} ${i.icono}</div>`).join('')}
+          ${p.grupo ? `<p style="margin-top:8px;">Grupo: <span class="flag flag-grupo">${p.grupo}</span></p>` : ''}
+          ${p.alerta ? `<p style="margin-top:8px;">Alerta: <span class="flag flag-alerta">${p.alerta}</span></p>` : ''}
+          <button class="modal-close" id="btnCerrarDetalle">Cerrar</button>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay || e.target.id === 'btnCerrarDetalle') overlay.remove();
+      });
+    }
+
+    // ── Simulación ──────────────────────────────
+    document.getElementById('btnNuevaComanda').addEventListener('click', () => {
+      pedidos.push(crearPedido());
+      render();
+    });
+
+    document.getElementById('btnAvanzar').addEventListener('click', () => {
+      for (const estado of ['nueva', 'preparacion']) {
+        const candidatos = pedidos.filter(p => p.estado === estado).sort((a, b) => a.ts - b.ts);
+        if (candidatos.length) {
+          candidatos[0].estado = estado === 'nueva' ? 'preparacion' : 'lista';
+          render();
+          return;
+        }
+      }
+    });
+
+    document.getElementById('btnRetirar').addEventListener('click', () => {
+      const listas = pedidos.filter(p => p.estado === 'lista').sort((a, b) => a.ts - b.ts);
+      if (listas.length) {
+        pedidos = pedidos.filter(p => p.id !== listas[0].id);
+        render();
+      }
+    });
+
+    // ── Filtros ────────────────────────────────
+    document.getElementById('filtros').addEventListener('click', (e) => {
+      const chip = e.target.closest('.chip');
+      if (!chip) return;
+      document.querySelectorAll('#filtros .chip').forEach(c => c.classList.remove('activo'));
+      chip.classList.add('activo');
+      filtroActivo = chip.dataset.filtro;
+      render();
+    });
+
+    // ── Reloj ──────────────────────────────────
+    function actualizarReloj() {
+      document.getElementById('reloj').textContent = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+    }
+    setInterval(actualizarReloj, 1000);
+    setInterval(render, 1000); // refresca tiempos cada segundo
+
+    // ── Datos iniciales ────────────────────────
+    for (let i = 0; i < 5; i++) pedidos.push(crearPedido());
+    pedidos[0].estado = 'preparacion';
+    pedidos[0].ts -= 8 * 60000;
+    pedidos[1].estado = 'lista';
+    pedidos[1].ts -= 10 * 60000;
+    pedidos[2].ts -= 14 * 60000; // urgente
+    pedidos[2].alerta = 'SIN TACC';
+    pedidos[3].grupo = 'Combo';
+    render();
+    actualizarReloj();
+  </script>
+</body>
+</html>

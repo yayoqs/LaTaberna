@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — UTILIDADES COMPARTIDAS (ES6)
    Archivo: js/utils.js
-   Versión: 1.2.1
+   Versión: 1.3.0
    Propósito: Utilidades compartidas entre todas las células.
-              Incluye mostrarConfirmacion (modal de confirmación
-              estilizado) y obtenerColorDesdeNombre (unificada).
+              Incluye mostrarConfirmacion, mostrarEntrada y
+              obtenerColorDesdeNombre.
    ================================================================ */
 
 export function fmtMoney(n) {
@@ -106,11 +106,9 @@ export function mostrarConfirmacion(titulo, mensaje, opciones = {}) {
   } = opciones;
 
   return new Promise((resolve) => {
-    // Crear overlay
     const overlay = document.createElement('div');
     overlay.className = 'modal-overlay modal-confirm-overlay';
 
-    // Crear tarjeta del modal
     const card = document.createElement('div');
     card.className = 'modal-confirm-card';
 
@@ -131,7 +129,6 @@ export function mostrarConfirmacion(titulo, mensaje, opciones = {}) {
     overlay.appendChild(card);
     document.body.appendChild(overlay);
 
-    // Eventos
     const cerrar = (confirmado) => {
       overlay.remove();
       resolve(confirmado);
@@ -144,10 +141,84 @@ export function mostrarConfirmacion(titulo, mensaje, opciones = {}) {
       if (e.target === overlay) cerrar(false);
     });
 
-    // Cerrar con Escape
     const onKeyDown = (e) => {
       if (e.key === 'Escape') {
         cerrar(false);
+        document.removeEventListener('keydown', onKeyDown);
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+  });
+}
+
+/**
+ * Muestra un modal de entrada de texto estilizado con el tema de La Taberna.
+ * Reemplaza window.prompt() de forma no bloqueante.
+ *
+ * @param {string} titulo   - Título del modal.
+ * @param {string} mensaje  - Texto descriptivo.
+ * @param {object} [opciones] - Opciones adicionales.
+ * @param {string} [opciones.valorPredefinido=""] - Valor inicial del campo.
+ * @param {string} [opciones.placeholder=""]      - Placeholder del input.
+ * @param {string} [opciones.tipo="text"]         - Tipo del input (text, number, password).
+ * @returns {Promise<string|null>} El texto ingresado, o null si cancela o cierra.
+ */
+export function mostrarEntrada(titulo, mensaje, opciones = {}) {
+  const {
+    valorPredefinido = '',
+    placeholder = '',
+    tipo = 'text'
+  } = opciones;
+
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay modal-confirm-overlay';
+
+    const card = document.createElement('div');
+    card.className = 'modal-confirm-card';
+
+    card.innerHTML = `
+      <div class="modal-confirm-header">
+        <h3>${titulo}</h3>
+        <button class="modal-confirm-close">&times;</button>
+      </div>
+      <div class="modal-confirm-body">
+        <p>${mensaje}</p>
+        <input type="${tipo}" class="modal-input" 
+               placeholder="${placeholder}" 
+               value="${valorPredefinido}">
+      </div>
+      <div class="modal-confirm-footer">
+        <button class="btn-secondary cancelar-btn">Cancelar</button>
+        <button class="btn-primary aceptar-btn">Aceptar</button>
+      </div>
+    `;
+
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+
+    const input = card.querySelector('.modal-input');
+    input.focus();
+    input.select();
+
+    const cerrar = (valor) => {
+      overlay.remove();
+      resolve(valor);
+    };
+
+    card.querySelector('.aceptar-btn').addEventListener('click', () => cerrar(input.value));
+    card.querySelector('.cancelar-btn').addEventListener('click', () => cerrar(null));
+    card.querySelector('.modal-confirm-close').addEventListener('click', () => cerrar(null));
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) cerrar(null);
+    });
+
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        cerrar(null);
+        document.removeEventListener('keydown', onKeyDown);
+      } else if (e.key === 'Enter') {
+        cerrar(input.value);
         document.removeEventListener('keydown', onKeyDown);
       }
     };
