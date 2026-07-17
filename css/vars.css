@@ -1,40 +1,35 @@
 /* ==============================================
    LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/vars.css
-   Versión: 1.0.0
+   Versión: 1.0.1
    Propósito: Variables globales de diseño (colores, tipografía, layout).
- ===============================================
-   EDICIÓN POR ETAPAS:
-   • Para cambiar colores del tema → editar las variables --color-*
-   • Para cambiar tipografía      → editar --font-ui y --font-mono
-   • Para cambiar radios/sombras  → editar --radius-* y --shadow-*
-============================================= */
+   ============================================== */
 
 :root {
 
   /* ── PALETA PRINCIPAL ──────────────────────────────────── */
-  --color-bg:          #0f0f14;   /* fondo general */
-  --color-card:        #1a1a24;   /* tarjetas / modales */
-  --color-panel:       #21212e;   /* paneles secundarios */
-  --color-hover:       #2a2a3a;   /* hover de elementos */
-  --color-border:      #2e2e42;   /* bordes */
+  --color-bg:          #0f0f14;
+  --color-card:        #1a1a24;
+  --color-panel:       #21212e;
+  --color-hover:       #2a2a3a;
+  --color-border:      #2e2e42;
 
   /* ── ACENTOS ───────────────────────────────────────────── */
-  --color-accent:      #f59e0b;   /* amarillo dorado principal */
+  --color-accent:      #f59e0b;
   --color-accent-dark: #d97706;
   --color-accent-light:#fcd34d;
 
   /* ── SEMÁNTICOS ────────────────────────────────────────── */
-  --color-primary:     #6366f1;   /* índigo — botones primarios */
+  --color-primary:     #6366f1;
   --color-primary-dark:#4f46e5;
-  --color-success:     #22c55e;   /* verde — libre / cerrado */
-  --color-danger:      #ef4444;   /* rojo — ocupado / error */
-  --color-warning:     #f59e0b;   /* naranja — esperando */
-  --color-info:        #3b82f6;   /* azul — cuenta */
+  --color-success:     #22c55e;
+  --color-danger:      #ef4444;
+  --color-warning:     #f59e0b;
+  --color-info:        #3b82f6;
 
   /* ── DESTINOS ──────────────────────────────────────────── */
-  --color-barra:       #8b5cf6;   /* violeta */
-  --color-cocina:      #f97316;   /* naranja quemado */
+  --color-barra:       #8b5cf6;
+  --color-cocina:      #f97316;
   --color-caja:        #22c55e;
 
   /* ── TEXTO ─────────────────────────────────────────────── */
@@ -43,7 +38,7 @@
   --color-text-muted:  #64748b;
 
   /* ── TIPOGRAFÍA ────────────────────────────────────────── */
-  --font-ui:   system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-ui:   system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --font-mono: "Courier New", Courier, monospace;
 
   /* ── ESPACIADO / FORMA ─────────────────────────────────── */
