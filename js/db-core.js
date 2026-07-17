@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-core.js
-   Versión: 1.0.7
+   Versión: 1.0.8
    Propósito: Núcleo de datos: mesas, pedidos, productos, persistencia local.
-              Normalización defensiva: mesa libre fuerza permite_prepedidos=false.
+              Métodos auxiliares de validación ahora son privados del módulo.
               Incluye imports de Logger, EventBus.
    ================================================================ */
 
@@ -21,87 +21,92 @@ export const DBCore = (function() {
   module.mozos = [];
   module.pedidosDelivery = [];
 
+  // ══ FUNCIONES AUXILIARES PRIVADAS (no expuestas) ══
+
+  function _validarId(val, prefijo) {
+    if (typeof val === 'string' && val.length > 0) return val;
+    return `${prefijo}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+  }
+
+  function _validarString(val, defecto) {
+    return (typeof val === 'string' && val.trim()) ? val.trim() : defecto;
+  }
+
+  function _validarNumero(val, defecto) {
+    const num = Number(val);
+    return isNaN(num) ? defecto : num;
+  }
+
+  function _validarBooleano(val, defecto) {
+    if (typeof val === 'boolean') return val;
+    if (typeof val === 'string') return val.toLowerCase() === 'true' || val === '1';
+    return defecto;
+  }
+
+  function _validarDestino(val) {
+    const destinos = ['cocina', 'barra', 'ambos'];
+    return destinos.includes(val) ? val : 'cocina';
+  }
+
+  function _validarEstadoMesa(val) {
+    const estados = ['libre', 'ocupada', 'esperando', 'cuenta', 'fusionada', 'pagada'];
+    return estados.includes(val) ? val : 'libre';
+  }
+
   /* ── NORMALIZACIONES ─────────────────────────────────────── */
   module._normalizarProducto = function(p) {
     return {
-      id: this._validarId(p.id, 'prod'),
-      nombre: this._validarString(p.nombre, 'Sin nombre'),
-      precio: this._validarNumero(p.precio, 0),
-      categoria: this._validarString(p.categoria, 'General'),
-      destino: this._validarDestino(p.destino),
-      descripcion: this._validarString(p.descripcion, ''),
-      activo: this._validarBooleano(p.activo, true),
-      imagen: this._validarString(p.imagen, ''),
-      disponible: this._validarBooleano(p.disponible, true)
+      id: _validarId(p.id, 'prod'),
+      nombre: _validarString(p.nombre, 'Sin nombre'),
+      precio: _validarNumero(p.precio, 0),
+      categoria: _validarString(p.categoria, 'General'),
+      destino: _validarDestino(p.destino),
+      descripcion: _validarString(p.descripcion, ''),
+      activo: _validarBooleano(p.activo, true),
+      imagen: _validarString(p.imagen, ''),
+      disponible: _validarBooleano(p.disponible, true)
     };
   };
 
   module._normalizarMesa = function(m) {
-    const estado = this._validarEstadoMesa(m.estado);
+    const estado = _validarEstadoMesa(m.estado);
     return {
-      numero: this._validarNumero(m.numero, 0),
+      numero: _validarNumero(m.numero, 0),
       estado: estado,
       pedidoId: m.pedidoId || null,
       items: Array.isArray(m.items) ? m.items : [],
-      mozo: this._validarString(m.mozo, ''),
-      comensales: this._validarNumero(m.comensales, 1),
+      mozo: _validarString(m.mozo, ''),
+      comensales: _validarNumero(m.comensales, 1),
       abiertaEn: m.abiertaEn || null,
-      observaciones: this._validarString(m.observaciones, ''),
+      observaciones: _validarString(m.observaciones, ''),
       mesasFusionadas: m.mesasFusionadas || null,
       esVirtual: m.esVirtual || false,
-      zona: this._validarString(m.zona, (this.config.zonas && this.config.zonas[0]?.nombre) || 'salon'),
-      // ── Normalización defensiva: mesa libre nunca permite prepedidos ──
-      permite_prepedidos: (estado === 'libre') ? false : this._validarBooleano(m.permite_prepedidos, false)
+      zona: _validarString(m.zona, (this.config.zonas && this.config.zonas[0]?.nombre) || 'salon'),
+      permite_prepedidos: (estado === 'libre') ? false : _validarBooleano(m.permite_prepedidos, false)
     };
   };
 
   module._normalizarMozo = function(m) {
     return {
-      id: this._validarId(m.id, 'mozo'),
-      nombre: this._validarString(m.nombre, 'Sin nombre'),
-      activo: this._validarBooleano(m.activo, true)
+      id: _validarId(m.id, 'mozo'),
+      nombre: _validarString(m.nombre, 'Sin nombre'),
+      activo: _validarBooleano(m.activo, true)
     };
   };
 
   module._normalizarPedidoDelivery = function(pd) {
     return {
-      id: this._validarId(pd.id, 'deliv'),
-      direccion: this._validarString(pd.direccion, 'Sin dirección'),
-      telefono: this._validarString(pd.telefono, ''),
+      id: _validarId(pd.id, 'deliv'),
+      direccion: _validarString(pd.direccion, 'Sin dirección'),
+      telefono: _validarString(pd.telefono, ''),
       items: Array.isArray(pd.items) ? pd.items : [],
-      total: this._validarNumero(pd.total, 0),
+      total: _validarNumero(pd.total, 0),
       estado: ['pendiente','en_preparacion','en_camino','entregado'].includes(pd.estado) ? pd.estado : 'pendiente',
-      repartidor: this._validarString(pd.repartidor, ''),
+      repartidor: _validarString(pd.repartidor, ''),
       creadoEn: pd.creadoEn || pd.$createdAt || pd.created_at || new Date().toISOString(),
       actualizadoEn: pd.actualizadoEn || pd.$updatedAt || pd.updated_at || null,
-      observaciones: this._validarString(pd.observaciones, '')
+      observaciones: _validarString(pd.observaciones, '')
     };
-  };
-
-  /* ── VALIDACIONES ────────────────────────────────────────── */
-  module._validarId = function(val, prefijo) {
-    if (typeof val === 'string' && val.length > 0) return val;
-    return `${prefijo}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-  };
-  module._validarString = function(val, defecto) {
-    return (typeof val === 'string' && val.trim()) ? val.trim() : defecto;
-  };
-  module._validarNumero = function(val, defecto) {
-    const num = Number(val);
-    return isNaN(num) ? defecto : num;
-  };
-  module._validarBooleano = function(val, defecto) {
-    if (typeof val === 'boolean') return val;
-    if (typeof val === 'string') return val.toLowerCase() === 'true' || val === '1';
-    return defecto;
-  };
-  module._validarDestino = function(val) {
-    const destinos = ['cocina', 'barra', 'ambos'];
-    return destinos.includes(val) ? val : 'cocina';
-  };
-  module._validarEstadoMesa = function(val) {
-    const estados = ['libre', 'ocupada', 'esperando', 'cuenta', 'fusionada', 'pagada'];
-    return estados.includes(val) ? val : 'libre';
   };
 
   /* ── PERSISTENCIA LOCAL ──────────────────────────────────── */

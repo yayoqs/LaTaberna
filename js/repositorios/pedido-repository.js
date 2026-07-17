@@ -1,12 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — REPOSITORIO JS (ES6)
    Archivo: js/repositorios/pedido-repository.js
-   Versión: 1.0.7
+   Versión: 1.0.8
    Propósito: Implementación local del repositorio de pedidos con
               sincronización directa a Appwrite.
-              Soporte para split bill (transacciones múltiples),
-              cierre automático al completar pago, estado 'pagada',
-              y persistencia correcta de comensales.
+              Uso de nuevos nombres en español de utils y Store.
+              Todos los catch registran error.
    ================================================================ */
 
 import { DB } from '../db.js';
@@ -65,7 +64,6 @@ const PedidoRepositoryLocal = (() => {
     else data.items = String(data.items || '[]').substring(0, 5000);
     if (Array.isArray(data.transacciones)) data.transacciones = JSON.stringify(data.transacciones).substring(0, 5000);
     else data.transacciones = String(data.transacciones || '[]').substring(0, 5000);
-    // Asegurar que comensales se persista
     data.comensales = Number(data.comensales) || 1;
     return data;
   }
@@ -85,9 +83,13 @@ const PedidoRepositoryLocal = (() => {
       else await DBAppwrite.actualizar(coleccion, id, datos);
     } catch (e) {
       if (esNuevo && e.code === 409) {
-        try { await DBAppwrite.actualizar(coleccion, id, datos); } catch (e2) {}
+        try { await DBAppwrite.actualizar(coleccion, id, datos); } catch (e2) {
+          Logger.error('[Repo] Error al reintentar actualizar ' + coleccion + ':', e2);
+        }
       } else if (!esNuevo && e.code === 404) {
-        try { await DBAppwrite.crear(coleccion, id, datos); } catch (e2) {}
+        try { await DBAppwrite.crear(coleccion, id, datos); } catch (e2) {
+          Logger.error('[Repo] Error al reintentar crear ' + coleccion + ':', e2);
+        }
       } else if (e.code !== 409) {
         Logger.error('[Repo] Error al guardar ' + coleccion + ' ' + id + ':', e);
       }
@@ -337,7 +339,7 @@ const PedidoRepositoryLocal = (() => {
     if (existente) throw new Error(`Ya existe una mesa con el número ${datosMesa.numero}`);
     DB.mesas.push(datosMesa);
     DB.saveMesas();
-    Store.dispatch({ type: 'MESA_AGREGAR', payload: datosMesa });
+    Store.despachar({ type: 'MESA_AGREGAR', payload: datosMesa });
     await _syncMesa(datosMesa);
     return datosMesa;
   }
@@ -360,10 +362,10 @@ const PedidoRepositoryLocal = (() => {
     DB.saveMesas();
 
     if (mesa.esVirtual) {
-      (mesa.mesasFusionadas || []).forEach(num => Store.dispatch({ type: 'MESA_CAMBIAR_ESTADO', payload: { numero: num, estado: 'libre' } }));
-      Store.dispatch({ type: 'MESA_ELIMINAR', payload: mesa.numero });
+      (mesa.mesasFusionadas || []).forEach(num => Store.despachar({ type: 'MESA_CAMBIAR_ESTADO', payload: { numero: num, estado: 'libre' } }));
+      Store.despachar({ type: 'MESA_ELIMINAR', payload: mesa.numero });
     } else {
-      Store.dispatch({ type: 'MESA_CAMBIAR_ESTADO', payload: { numero: mesa.numero, estado: 'libre' } });
+      Store.despachar({ type: 'MESA_CAMBIAR_ESTADO', payload: { numero: mesa.numero, estado: 'libre' } });
     }
 
     if (!mesa.esVirtual) {
@@ -387,7 +389,7 @@ const PedidoRepositoryLocal = (() => {
 
     DB.pedidos[idx] = { ...DB.pedidos[idx], ...datosPedido };
     DB.savePedidos();
-    Store.dispatch({ type: 'PEDIDO_ACTUALIZADO', payload: { id: datosPedido.id, cambios: datosPedido } });
+    Store.despachar({ type: 'PEDIDO_ACTUALIZADO', payload: { id: datosPedido.id, cambios: datosPedido } });
     await _syncPedido(DB.pedidos[idx], false);
     return DB.pedidos[idx];
   }

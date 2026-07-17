@@ -1,15 +1,15 @@
 /* ================================================================
    LaTaberna - PubPOS — Módulo (ES6)
    Archivo: js/modulos/cliente/pantalla-eventos.js
-   Versión: 2.0.1
+   Versión: 2.0.2
    Propósito: Pantalla de eventos en vivo.
-              _asegurarVista reutiliza contenedor estático de index.html.
+              Migrado a nuevos nombres en español de utils y Store.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
 import { EventBus } from '../../lib/eventBus.js';
 import { DBAppwrite } from '../../db-appwrite.js';
-import { showToast } from '../../utils.js';
+import { mostrarToast } from '../../utils.js';
 
 const PantallaEventos = (() => {
   let _vista = null;
@@ -30,7 +30,6 @@ const PantallaEventos = (() => {
 
     _vista = main;
 
-    // Si ya tiene contenido, no reconstruir
     if (_vista.querySelector('.eventos-fondo')) return;
 
     _vista.innerHTML = `
@@ -68,7 +67,7 @@ const PantallaEventos = (() => {
     if (!container) return;
     container.classList.add('fade-out');
     setTimeout(() => {
-      const state = Store.getState(); const eventos = state.eventos_en_vivo || []; const activo = eventos.find(e => e.estado === 'activo');
+      const state = Store.obtenerEstado(); const eventos = state.eventos_en_vivo || []; const activo = eventos.find(e => e.estado === 'activo');
       if (!activo) { _mostrarSinEvento(container, badge, sub); } else { _mostrarEventoActivo(container, badge, sub, activo); }
       container.classList.remove('fade-out');
     }, 350);
@@ -100,14 +99,14 @@ const PantallaEventos = (() => {
       btn.addEventListener('click', async () => {
         const valor = btn.dataset.valor; botones.forEach(b => b.classList.remove('seleccionada')); btn.classList.add('seleccionada');
         _votoSeleccionado = { indice: btn.dataset.indice, valor };
-        const state = Store.getState(); const eventos = state.eventos_en_vivo || []; const eventoActual = eventos.find(e => e.id === idEvento);
-        if (!eventoActual) { showToast('error', 'No se encontró el evento. Reintentá.'); btn.classList.remove('seleccionada'); return; }
+        const state = Store.obtenerEstado(); const eventos = state.eventos_en_vivo || []; const eventoActual = eventos.find(e => e.id === idEvento);
+        if (!eventoActual) { mostrarToast('error', 'No se encontró el evento. Reintentá.'); btn.classList.remove('seleccionada'); return; }
         const resultados = { ...(eventoActual.resultados || {}) }; resultados[valor] = (resultados[valor] || 0) + 1;
         try {
           const actualizado = await DBAppwrite.actualizar('eventos_en_vivo', idEvento, { datos: { resultados } });
           if (!actualizado) throw new Error('No se pudo actualizar');
-          showToast('success', `Votaste por "${valor}". ¡Gracias por participar!`);
-        } catch (e) { btn.classList.remove('seleccionada'); _votoSeleccionado = null; showToast('error', 'Error al enviar tu voto. Intentá de nuevo.'); console.error('[PantallaEventos] Error al votar:', e); }
+          mostrarToast('success', `Votaste por "${valor}". ¡Gracias por participar!`);
+        } catch (e) { btn.classList.remove('seleccionada'); _votoSeleccionado = null; mostrarToast('error', 'Error al enviar tu voto. Intentá de nuevo.'); console.error('[PantallaEventos] Error al votar:', e); }
       });
     });
   }

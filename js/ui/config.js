@@ -1,16 +1,16 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/config.js
-   Versión: 1.1.0
+   Versión: 1.1.2
    Propósito: Vista de configuración: productos, zonas, impresoras, mozos.
-              v1.1.0: migra window.prompt a mostrarEntrada.
+              v1.1.2: migra a nombres en español (utils, store).
    ================================================================ */
 
 import { Store } from '../lib/store.js';
 import { EventBus } from '../lib/eventBus.js';
 import { Logger } from '../lib/logger.js';
 import { Auth } from '../auth.js';
-import { fmtMoney, showToast, mostrarConfirmacion, mostrarEntrada } from '../utils.js';
+import { formatearDinero, mostrarToast, mostrarConfirmacion, mostrarEntrada } from '../utils.js';
 import { DB } from '../db.js';
 import { DBAppwrite } from '../db-appwrite.js';
 
@@ -126,7 +126,7 @@ const Config = (() => {
       if (e.target.matches('input[type="text"]') || e.target.matches('input[type="number"]')) {
         const idx = parseInt(e.target.getAttribute('data-idx'));
         const campo = e.target.getAttribute('data-campo');
-        if (!isNaN(idx) && campo) _updateZona(idx, campo, e.target.value);
+        if (!isNaN(idx) && campo) _actualizarZona(idx, campo, e.target.value);
       }
     });
 
@@ -145,7 +145,7 @@ const Config = (() => {
     limpiar();
     _abortController = new AbortController();
 
-    const unsubscribeStore = Store.subscribe((state, action) => {
+    const unsubscribeStore = Store.suscribir((state, action) => {
       if (action.type.startsWith('PRODUCTO')) renderProductos();
       if (action.type.startsWith('MOZO')) renderMozos();
       if (action.type === 'CONFIG_INICIALIZAR') _renderZonas();
@@ -168,7 +168,7 @@ const Config = (() => {
 
   function cargar() {
     _asegurarVista();
-    const config = Store.getState().config || DB.config || {};
+    const config = Store.obtenerEstado().config || DB.config || {};
     if (config.cantidadMesas && !config.zonas) {
       config.zonas = [
         { nombre: 'salon',   cantidad: 12 },
@@ -231,7 +231,7 @@ const Config = (() => {
 
   async function _mostrarCambiarPassword(nombreUsuario) {
     if (!Auth.esMasterReal || !Auth.esMasterReal()) {
-      showToast('error', 'Solo el master puede cambiar contraseñas');
+      mostrarToast('error', 'Solo el master puede cambiar contraseñas');
       return;
     }
 
@@ -248,7 +248,7 @@ const Config = (() => {
       { type: 'password' }
     );
     if (confirmacion !== nueva) {
-      showToast('error', 'Las contraseñas no coinciden');
+      mostrarToast('error', 'Las contraseñas no coinciden');
       return;
     }
 
@@ -258,14 +258,14 @@ const Config = (() => {
         _renderUsuarios();
       }
     } else {
-      showToast('error', 'Función no disponible');
+      mostrarToast('error', 'Función no disponible');
     }
   }
 
   function _renderZonas() {
     const container = document.getElementById('zonasContainer');
     if (!container) return;
-    const config = Store.getState().config || {};
+    const config = Store.obtenerEstado().config || {};
     const zonas = config.zonas || [];
     container.innerHTML = zonas.map((z, idx) => `
       <div style="display:flex; align-items:center; gap:8px;">
@@ -278,15 +278,15 @@ const Config = (() => {
     `).join('');
   }
 
-  function _updateZona(idx, campo, valor) {
-    const config = Store.getState().config || {};
+  function _actualizarZona(idx, campo, valor) {
+    const config = Store.obtenerEstado().config || {};
     if (!config.zonas) return;
     if (campo === 'cantidad') config.zonas[idx].cantidad = parseInt(valor) || 0;
     else config.zonas[idx].nombre = valor.trim() || `zona_${idx+1}`;
   }
 
   async function agregarZona() {
-    const config = Store.getState().config || {};
+    const config = Store.obtenerEstado().config || {};
     if (!config.zonas) config.zonas = [];
     const nombre = await mostrarEntrada(
       'Nueva zona',
@@ -306,9 +306,9 @@ const Config = (() => {
   }
 
   async function eliminarZona(idx) {
-    const config = Store.getState().config || {};
+    const config = Store.obtenerEstado().config || {};
     if (!config.zonas || config.zonas.length <= 1) {
-      showToast('error', 'Debe existir al menos una zona.');
+      mostrarToast('error', 'Debe existir al menos una zona.');
       return;
     }
     const confirmado = await mostrarConfirmacion(
@@ -322,7 +322,7 @@ const Config = (() => {
 
   async function guardar() {
     const zonasContainer = document.getElementById('zonasContainer');
-    let config = Store.getState().config || {};
+    let config = Store.obtenerEstado().config || {};
 
     if (zonasContainer) {
       const filas = zonasContainer.querySelectorAll('div');
@@ -335,7 +335,7 @@ const Config = (() => {
       });
 
       if (zonasNuevas.length === 0) {
-        showToast('error', 'Debe existir al menos una zona.');
+        mostrarToast('error', 'Debe existir al menos una zona.');
         return;
       }
       config.zonas = zonasNuevas;
@@ -362,7 +362,7 @@ const Config = (() => {
 
     EventBus.emit('config:actualizada');
 
-    showToast('success', '<i class="fas fa-check-circle"></i> Configuración guardada');
+    mostrarToast('success', '<i class="fas fa-check-circle"></i> Configuración guardada');
 
     if (typeof DBAppwrite !== 'undefined' && DBAppwrite.habilitado) {
       try {
@@ -389,7 +389,7 @@ const Config = (() => {
     _asegurarVista();
     const cont = document.getElementById('productosLista');
     if (!cont) return;
-    const todos = Store.getState().productos || [];
+    const todos = Store.obtenerEstado().productos || [];
     if (!todos.length) {
       cont.innerHTML = `<p style="text-align:center;padding:20px;">No hay productos</p>`;
       return;
@@ -406,7 +406,7 @@ const Config = (() => {
       <div class="prod-config-item${p.activo === false ? ' inactivo' : ''}">
         <span class="prod-config-nombre">${p.nombre}</span>
         <span class="prod-config-cat">${p.destino}</span>
-        <span class="prod-config-precio">${fmtMoney(p.precio)}</span>
+        <span class="prod-config-precio">${formatearDinero(p.precio)}</span>
         ${p.imagen ? '<span class="prod-config-img"><i class="fas fa-image"></i></span>' : ''}
         <button class="btn-icon-sm edit" data-id="${p.id}"><i class="fas fa-pen"></i></button>
         <button class="btn-icon-sm del" data-id="${p.id}"><i class="fas fa-trash"></i></button>
@@ -484,8 +484,8 @@ const Config = (() => {
   async function guardarProducto() {
     const nombre = document.getElementById('prodNombre').value.trim();
     const precio = parseFloat(document.getElementById('prodPrecio')?.value) || 0;
-    if (!nombre) { showToast('error', 'Nombre obligatorio'); return; }
-    if (precio < 0) { showToast('error', 'Precio no puede ser negativo'); return; }
+    if (!nombre) { mostrarToast('error', 'Nombre obligatorio'); return; }
+    if (precio < 0) { mostrarToast('error', 'Precio no puede ser negativo'); return; }
     const id = document.getElementById('prodId').value || `prod_${Date.now()}_${Math.random().toString(36).substr(2,6)}`;
     const producto = {
       id, nombre, precio,
@@ -521,15 +521,15 @@ const Config = (() => {
       }
     }
 
-    Store.dispatch({ type: 'PRODUCTOS_INICIALIZAR', payload: DB.productos });
+    Store.despachar({ type: 'PRODUCTOS_INICIALIZAR', payload: DB.productos });
 
-    showToast('success', 'Producto guardado y sincronizado');
+    mostrarToast('success', 'Producto guardado y sincronizado');
     cerrarModalProducto();
     renderProductos();
   }
 
   async function _editarProducto(id) {
-    const prod = (Store.getState().productos || []).find(p => p.id === id);
+    const prod = (Store.obtenerEstado().productos || []).find(p => p.id === id);
     if (prod) abrirModalProducto(prod);
   }
 
@@ -553,10 +553,10 @@ const Config = (() => {
       }
     }
 
-    Store.dispatch({ type: 'PRODUCTOS_INICIALIZAR', payload: DB.productos });
+    Store.despachar({ type: 'PRODUCTOS_INICIALIZAR', payload: DB.productos });
 
     renderProductos();
-    showToast('success', 'Producto eliminado');
+    mostrarToast('success', 'Producto eliminado');
   }
 
   async function resetearMesas() {
@@ -569,16 +569,16 @@ const Config = (() => {
     if (typeof DB.resetearMesas === 'function') {
       await DB.resetearMesas();
       EventBus.emit('config:actualizada');
-      showToast('success', 'Mesas reseteadas correctamente');
+      mostrarToast('success', 'Mesas reseteadas correctamente');
     } else {
-      showToast('error', 'Función no disponible');
+      mostrarToast('error', 'Función no disponible');
     }
   }
 
   function renderMozos() {
     const container = document.getElementById('mozosLista');
     if (!container) return;
-    const mozos = Store.getState().mozos || [];
+    const mozos = Store.obtenerEstado().mozos || [];
     container.innerHTML = mozos.map((m, idx) => `
       <div style="display:flex; align-items:center; gap:8px;">
         <span style="flex:1;">${m.nombre}</span>
@@ -596,7 +596,7 @@ const Config = (() => {
     DB.mozos.push({ id: 'mozo_' + Date.now(), nombre, activo: true });
     DB.saveMozos();
     document.getElementById('nuevoMozoNombre').value = '';
-    showToast('success', 'Mozo añadido');
+    mostrarToast('success', 'Mozo añadido');
   }
 
   async function eliminarMozo(idx) {
@@ -608,10 +608,9 @@ const Config = (() => {
 
     DB.mozos.splice(idx, 1);
     DB.saveMozos();
-    showToast('warning', 'Mozo eliminado');
+    mostrarToast('warning', 'Mozo eliminado');
   }
 
-  // ── Inicialización ──
   activar();
 
   return {
@@ -631,7 +630,7 @@ const Config = (() => {
     agregarZona,
     eliminarZona,
     resetearMesas,
-    _updateZona,
+    _actualizarZona,
     _mostrarCambiarPassword,
     _autoajustarPrecio,
     _vistaPreviaImagen

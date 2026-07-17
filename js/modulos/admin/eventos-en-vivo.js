@@ -1,15 +1,16 @@
 /* ================================================================
-   La Taberna — MÓDULO: eventos-en-vivo.js (v1.3.0 – vista estática)
+   La Taberna — MÓDULO: eventos-en-vivo.js (v1.3.1 – español utils)
    Propósito: Panel del animador para eventos en vivo (bingo, karaoke, votaciones).
               Soporta contenedor estático en index.html (estándar B1).
               Sin asignaciones window. Eliminado updatedAt manual.
+              Migrado a nuevos nombres en español de utils.js.
    ================================================================ */
 
 import { EventBus } from '../../lib/eventBus.js';
 import { DBAppwrite } from '../../db-appwrite.js';
 import { Auth } from '../../auth.js';
 import { Logger } from '../../lib/logger.js';
-import { showToast } from '../../utils.js';
+import { mostrarToast } from '../../utils.js';
 
 const EventosEnVivo = (() => {
   let _estadoActual = null;
@@ -234,17 +235,17 @@ const EventosEnVivo = (() => {
   /* ── ACCIONES (sin updatedAt manual) ──────────────────── */
   async function crearEvento() {
     const tipo = document.getElementById('selTipoEvento').value;
-    if (!tipo) { showToast('error', 'Selecciona un tipo de evento'); return; }
+    if (!tipo) { mostrarToast('error', 'Selecciona un tipo de evento'); return; }
     const datosIniciales = {
       tipo, estado: 'configuracion', datos: {},
       creadoPor: Auth.getNombre()
     };
     try {
       const doc = await DBAppwrite.crear('eventos_en_vivo', 'unique()', datosIniciales);
-      showToast('success', `Evento de ${tipo} creado`);
+      mostrarToast('success', `Evento de ${tipo} creado`);
       _estadoActual = doc;
       _actualizarUI();
-    } catch (e) { Logger.error('[EventosEnVivo] Error al crear evento:', e); showToast('error', 'No se pudo crear el evento'); }
+    } catch (e) { Logger.error('[EventosEnVivo] Error al crear evento:', e); mostrarToast('error', 'No se pudo crear el evento'); }
   }
 
   async function cambiarEstado(nuevoEstado) {
@@ -253,7 +254,7 @@ const EventosEnVivo = (() => {
       await DBAppwrite.actualizar('eventos_en_vivo', _estadoActual.id, { estado: nuevoEstado });
       _estadoActual.estado = nuevoEstado;
       _actualizarUI();
-    } catch (e) { Logger.error('[EventosEnVivo] Error al cambiar estado:', e); showToast('error', 'No se pudo cambiar el estado'); }
+    } catch (e) { Logger.error('[EventosEnVivo] Error al cambiar estado:', e); mostrarToast('error', 'No se pudo cambiar el estado'); }
   }
 
   async function reiniciarEvento() {
@@ -262,20 +263,20 @@ const EventosEnVivo = (() => {
       await DBAppwrite.actualizar('eventos_en_vivo', _estadoActual.id, { estado: 'configuracion', datos: {} });
       _estadoActual.estado = 'configuracion'; _estadoActual.datos = {};
       _actualizarUI();
-    } catch (e) { Logger.error('[EventosEnVivo] Error al reiniciar evento:', e); showToast('error', 'No se pudo reiniciar el evento'); }
+    } catch (e) { Logger.error('[EventosEnVivo] Error al reiniciar evento:', e); mostrarToast('error', 'No se pudo reiniciar el evento'); }
   }
 
   async function cantarBola() {
     if (!_estadoActual || _estadoActual.tipo !== 'bingo' || _estadoActual.estado !== 'activo') return;
     const bolas = (_estadoActual.datos && _estadoActual.datos.bolas) || [];
-    if (bolas.length >= 90) { showToast('warning', 'Ya se cantaron todas las bolas'); return; }
+    if (bolas.length >= 90) { mostrarToast('warning', 'Ya se cantaron todas las bolas'); return; }
     let nuevaBola; do { nuevaBola = Math.floor(Math.random() * 90) + 1; } while (bolas.includes(nuevaBola));
     const nuevosDatos = { ..._estadoActual.datos, bolas: [...bolas, nuevaBola] };
     try {
       await DBAppwrite.actualizar('eventos_en_vivo', _estadoActual.id, { datos: nuevosDatos });
       _estadoActual.datos = nuevosDatos;
       _actualizarUI();
-    } catch (e) { Logger.error('[EventosEnVivo] Error al cantar bola:', e); showToast('error', 'No se pudo cantar la bola'); }
+    } catch (e) { Logger.error('[EventosEnVivo] Error al cantar bola:', e); mostrarToast('error', 'No se pudo cantar la bola'); }
   }
 
   async function actualizarLetra() {
@@ -286,7 +287,7 @@ const EventosEnVivo = (() => {
       await DBAppwrite.actualizar('eventos_en_vivo', _estadoActual.id, { datos: nuevosDatos });
       _estadoActual.datos = nuevosDatos;
       _actualizarUI();
-    } catch (e) { Logger.error('[EventosEnVivo] Error al actualizar letra:', e); showToast('error', 'No se pudo actualizar la letra'); }
+    } catch (e) { Logger.error('[EventosEnVivo] Error al actualizar letra:', e); mostrarToast('error', 'No se pudo actualizar la letra'); }
   }
 
   async function limpiarLetra() {
@@ -297,34 +298,34 @@ const EventosEnVivo = (() => {
       _estadoActual.datos = nuevosDatos;
       _actualizarUI();
       const ta = document.getElementById('letraKaraoke'); if (ta) ta.value = '';
-    } catch (e) { Logger.error('[EventosEnVivo] Error al limpiar letra:', e); showToast('error', 'No se pudo limpiar la letra'); }
+    } catch (e) { Logger.error('[EventosEnVivo] Error al limpiar letra:', e); mostrarToast('error', 'No se pudo limpiar la letra'); }
   }
 
   async function agregarOpcion() {
     if (!_estadoActual || _estadoActual.tipo !== 'votacion' || _estadoActual.estado !== 'activo') return;
     const input = document.getElementById('nuevaOpcion'); const opcion = input?.value.trim();
-    if (!opcion) { showToast('warning', 'Escribe una opción'); return; }
+    if (!opcion) { mostrarToast('warning', 'Escribe una opción'); return; }
     const opciones = (_estadoActual.datos && _estadoActual.datos.opciones) || [];
-    if (opciones.includes(opcion)) { showToast('warning', 'Esa opción ya existe'); return; }
+    if (opciones.includes(opcion)) { mostrarToast('warning', 'Esa opción ya existe'); return; }
     const nuevosDatos = { ..._estadoActual.datos, opciones: [...opciones, opcion] };
     try {
       await DBAppwrite.actualizar('eventos_en_vivo', _estadoActual.id, { datos: nuevosDatos });
       _estadoActual.datos = nuevosDatos;
       _actualizarUI(); if (input) input.value = '';
-    } catch (e) { Logger.error('[EventosEnVivo] Error al agregar opción:', e); showToast('error', 'No se pudo agregar la opción'); }
+    } catch (e) { Logger.error('[EventosEnVivo] Error al agregar opción:', e); mostrarToast('error', 'No se pudo agregar la opción'); }
   }
 
   async function eliminarUltimaOpcion() {
     if (!_estadoActual || _estadoActual.tipo !== 'votacion' || _estadoActual.estado !== 'activo') return;
     const opciones = (_estadoActual.datos && _estadoActual.datos.opciones) || [];
-    if (opciones.length === 0) { showToast('warning', 'No hay opciones para eliminar'); return; }
+    if (opciones.length === 0) { mostrarToast('warning', 'No hay opciones para eliminar'); return; }
     const nuevasOpciones = opciones.slice(0, -1);
     const nuevosDatos = { ..._estadoActual.datos, opciones: nuevasOpciones };
     try {
       await DBAppwrite.actualizar('eventos_en_vivo', _estadoActual.id, { datos: nuevosDatos });
       _estadoActual.datos = nuevosDatos;
       _actualizarUI();
-    } catch (e) { Logger.error('[EventosEnVivo] Error al eliminar opción:', e); showToast('error', 'No se pudo eliminar la opción'); }
+    } catch (e) { Logger.error('[EventosEnVivo] Error al eliminar opción:', e); mostrarToast('error', 'No se pudo eliminar la opción'); }
   }
 
   function _suscribirTiempoReal() {

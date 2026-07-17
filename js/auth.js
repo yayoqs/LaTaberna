@@ -1,14 +1,15 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/auth.js
-   Versión: 1.0.10
+   Versión: 1.0.11
    Propósito: Autenticación, hashing SHA-256, roles, login/logout.
               Modal con formularios de inicio de sesión y registro.
-              Textos en español neutro.
+              Métodos de consulta migrados al español.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
 import { EventBus } from './lib/eventBus.js';
+import { Store } from './lib/store.js';
 import { showToast } from './utils.js';
 import { Roles } from './roles.js';
 import { DBAppwrite } from './db-appwrite.js';
@@ -69,8 +70,8 @@ export const Auth = (() => {
     if (_usuarioActual) aplicarRestriccionesUI();
   }
 
-  function getDefaultView() {
-    const rol = getRolEfectivo();
+  function obtenerVistaPorDefecto() {
+    const rol = obtenerRolEfectivo();
     if (rol === 'cocina' || rol === 'barra') return 'cocina';
     if (rol === 'caja') return 'caja';
     if (rol === 'despensa') return 'despensa';
@@ -81,19 +82,24 @@ export const Auth = (() => {
   }
 
   async function login(nombre, password) {
-    const hashIngresado = await _sha256(password);
-    const usuario = _usuarios.find(u => u.nombre === nombre && u.hash === hashIngresado);
-    if (!usuario) { showToast('error', 'Usuario o contraseña incorrectos'); return false; }
-    const espacioTaberna = { id: 'esp_taberna', nombre: 'La Taberna', tipo: 'bar', rol: usuario.rol };
-    _usuarioActual = { nombre: usuario.nombre, rol: usuario.rol, espacios: [espacioTaberna], espacioActivoId: espacioTaberna.id };
-    _rolSimulado = null;
-    sessionStorage.setItem('usuarioActual', JSON.stringify(_usuarioActual));
-    aplicarRestriccionesUI();
-    cerrarModalLogin();
-    showToast('success', 'Bienvenido/a ' + usuario.nombre + ' (' + usuario.rol + ')');
-    const vistaInicial = getDefaultView();
-    EventBus.emit('app:cambiarVista', vistaInicial);
-    return true;
+    try {
+      const hashIngresado = await _sha256(password);
+      const usuario = _usuarios.find(u => u.nombre === nombre && u.hash === hashIngresado);
+      if (!usuario) { showToast('error', 'Usuario o contraseña incorrectos'); return false; }
+      const espacioTaberna = { id: 'esp_taberna', nombre: 'La Taberna', tipo: 'bar', rol: usuario.rol };
+      _usuarioActual = { nombre: usuario.nombre, rol: usuario.rol, espacios: [espacioTaberna], espacioActivoId: espacioTaberna.id };
+      _rolSimulado = null;
+      sessionStorage.setItem('usuarioActual', JSON.stringify(_usuarioActual));
+      aplicarRestriccionesUI();
+      cerrarModalLogin();
+      showToast('success', 'Bienvenido/a ' + usuario.nombre + ' (' + usuario.rol + ')');
+      const vistaInicial = obtenerVistaPorDefecto();
+      EventBus.emit('app:cambiarVista', vistaInicial);
+      return true;
+    } catch (e) {
+      Logger.error('[Auth] Error en login:', e);
+      return false;
+    }
   }
 
   function logout() {
@@ -104,7 +110,7 @@ export const Auth = (() => {
   }
 
   let _appwriteUserId = null;
-  async function getAppwriteUserId() {
+  async function obtenerIdUsuarioAppwrite() {
     if (_appwriteUserId) return _appwriteUserId;
     try {
       if (typeof DBAppwrite !== 'undefined' && DBAppwrite.cuenta) {
@@ -247,7 +253,7 @@ export const Auth = (() => {
     return { exito: true, nombre };
   }
 
-  function getRolEfectivo() {
+  function obtenerRolEfectivo() {
     if (_usuarioActual?.rol === 'master' && _rolSimulado) return _rolSimulado;
     if (_usuarioActual?.espacioActivoId) {
       const espacio = _usuarioActual.espacios?.find(e => e.id === _usuarioActual.espacioActivoId);
@@ -256,15 +262,15 @@ export const Auth = (() => {
     return _usuarioActual?.rol || null;
   }
 
-  function tienePermiso(permiso) { const rol = getRolEfectivo(); if (!rol) return false; return (typeof Roles !== 'undefined' && Roles.getPermisos(rol)[permiso] === true); }
-  function getRol() { return _usuarioActual?.rol || null; }
-  function getNombre() { return _usuarioActual?.nombre || ''; }
-  function getUsuarioActual() {
+  function tienePermiso(permiso) { const rol = obtenerRolEfectivo(); if (!rol) return false; return (typeof Roles !== 'undefined' && Roles.getPermisos(rol)[permiso] === true); }
+  function obtenerRol() { return _usuarioActual?.rol || null; }
+  function obtenerNombre() { return _usuarioActual?.nombre || ''; }
+  function obtenerUsuarioActual() {
     if (!_usuarioActual) return null;
-    return { nombre: _usuarioActual.nombre, rol: _usuarioActual.rol, rolEfectivo: getRolEfectivo(), simulando: _rolSimulado || null, espacios: _usuarioActual.espacios || [], espacioActivoId: _usuarioActual.espacioActivoId };
+    return { nombre: _usuarioActual.nombre, rol: _usuarioActual.rol, rolEfectivo: obtenerRolEfectivo(), simulando: _rolSimulado || null, espacios: _usuarioActual.espacios || [], espacioActivoId: _usuarioActual.espacioActivoId };
   }
-  function getEspacios() { return _usuarioActual?.espacios || []; }
-  function getEspacioActivo() { if (!_usuarioActual?.espacioActivoId) return null; return _usuarioActual.espacios?.find(e => e.id === _usuarioActual.espacioActivoId) || null; }
+  function obtenerEspacios() { return _usuarioActual?.espacios || []; }
+  function obtenerEspacioActivo() { if (!_usuarioActual?.espacioActivoId) return null; return _usuarioActual.espacios?.find(e => e.id === _usuarioActual.espacioActivoId) || null; }
 
   function cambiarEspacio(espacioId) {
     const espacio = _usuarioActual?.espacios?.find(e => e.id === espacioId);
@@ -272,7 +278,7 @@ export const Auth = (() => {
     _usuarioActual.espacioActivoId = espacioId;
     sessionStorage.setItem('usuarioActual', JSON.stringify(_usuarioActual));
     aplicarRestriccionesUI();
-    EventBus.emit('app:cambiarVista', getDefaultView());
+    EventBus.emit('app:cambiarVista', obtenerVistaPorDefecto());
     showToast('info', 'Cambiaste a "' + espacio.nombre + '" (' + espacio.rol + ')');
     Logger.info('[Auth] Espacio cambiado a "' + espacio.nombre + '"');
   }
@@ -288,16 +294,16 @@ export const Auth = (() => {
 
   function esMasterReal() { return _usuarioActual?.rol === 'master'; }
   function esMaster() { return _usuarioActual?.rol === 'master' && !_rolSimulado; }
-  function esAdmin() { const r = getRolEfectivo(); return r === 'admin' || r === 'master'; }
-  function esCocina() { const r = getRolEfectivo(); return r === 'cocina' || r === 'admin' || r === 'master'; }
-  function esBarra() { const r = getRolEfectivo(); return r === 'barra' || r === 'admin' || r === 'master'; }
-  function esCaja() { const r = getRolEfectivo(); return r === 'caja' || r === 'admin' || r === 'master'; }
-  function esMesero() { const r = getRolEfectivo(); return r === 'mesero' || r === 'admin' || r === 'master'; }
-  function esDespensa() { const r = getRolEfectivo(); return r === 'despensa' || r === 'admin' || r === 'master'; }
-  function esReparto() { const r = getRolEfectivo(); return r === 'reparto' || r === 'admin' || r === 'master'; }
-  function esCliente() { const r = getRolEfectivo(); return r === 'cliente' || r === 'admin' || r === 'master'; }
-  function esEventos() { const r = getRolEfectivo(); return r === 'eventos' || r === 'admin' || r === 'master'; }
-  function esArtista() { const r = getRolEfectivo(); return r === 'artista' || r === 'admin' || r === 'master'; }
+  function esAdmin() { const r = obtenerRolEfectivo(); return r === 'admin' || r === 'master'; }
+  function esCocina() { const r = obtenerRolEfectivo(); return r === 'cocina' || r === 'admin' || r === 'master'; }
+  function esBarra() { const r = obtenerRolEfectivo(); return r === 'barra' || r === 'admin' || r === 'master'; }
+  function esCaja() { const r = obtenerRolEfectivo(); return r === 'caja' || r === 'admin' || r === 'master'; }
+  function esMesero() { const r = obtenerRolEfectivo(); return r === 'mesero' || r === 'admin' || r === 'master'; }
+  function esDespensa() { const r = obtenerRolEfectivo(); return r === 'despensa' || r === 'admin' || r === 'master'; }
+  function esReparto() { const r = obtenerRolEfectivo(); return r === 'reparto' || r === 'admin' || r === 'master'; }
+  function esCliente() { const r = obtenerRolEfectivo(); return r === 'cliente' || r === 'admin' || r === 'master'; }
+  function esEventos() { const r = obtenerRolEfectivo(); return r === 'eventos' || r === 'admin' || r === 'master'; }
+  function esArtista() { const r = obtenerRolEfectivo(); return r === 'artista' || r === 'admin' || r === 'master'; }
 
   function puede(permiso) { return tienePermiso(permiso); }
   function puedeEliminarItemEnviado() { return tienePermiso('eliminarItemEnviado'); }
@@ -307,15 +313,15 @@ export const Auth = (() => {
   function puedeCambiarEstadoComanda() { return tienePermiso('cambiarEstadoComanda'); }
   function puedeEditarProductos() { return tienePermiso('editarProductos'); }
   function puedeEditarPrecios() { return tienePermiso('editarPrecios'); }
-  function puedeAccederRecetas() { const rol = getRolEfectivo(); return ['cocina', 'barra', 'admin', 'master'].includes(rol); }
-  function puedeAccederReparto() { const rol = getRolEfectivo(); return ['reparto', 'admin', 'master'].includes(rol); }
-  function puedeAccederMenu() { return getRolEfectivo() !== null; }
-  function puedeAccederEventos() { const rol = getRolEfectivo(); return ['eventos', 'artista', 'admin', 'master'].includes(rol); }
-  function puedeAccederPerfil() { return getRolEfectivo() !== null; }
+  function puedeAccederRecetas() { const rol = obtenerRolEfectivo(); return ['cocina', 'barra', 'admin', 'master'].includes(rol); }
+  function puedeAccederReparto() { const rol = obtenerRolEfectivo(); return ['reparto', 'admin', 'master'].includes(rol); }
+  function puedeAccederMenu() { return obtenerRolEfectivo() !== null; }
+  function puedeAccederEventos() { const rol = obtenerRolEfectivo(); return ['eventos', 'artista', 'admin', 'master'].includes(rol); }
+  function puedeAccederPerfil() { return obtenerRolEfectivo() !== null; }
 
   function aplicarRestriccionesUI() {
     const userEl = document.getElementById('usuarioActualDisplay');
-    const rolEfectivo = getRolEfectivo();
+    const rolEfectivo = obtenerRolEfectivo();
     if (userEl) {
       let displayText = _usuarioActual ? _usuarioActual.nombre + ' (' + rolEfectivo + ')' : '';
       if (_rolSimulado) displayText += ' ⇒ ' + _rolSimulado;
@@ -362,19 +368,32 @@ export const Auth = (() => {
     if (!_usuarioActual || _usuarioActual.rol !== 'master') return;
     if (!rol) { _rolSimulado = null; } else { if (typeof Roles !== 'undefined' && !Roles.lista.includes(rol)) return; _rolSimulado = rol; }
     aplicarRestriccionesUI();
-    const vistaInicial = getDefaultView();
+    const vistaInicial = obtenerVistaPorDefecto();
     EventBus.emit('app:cambiarVista', vistaInicial);
   }
 
+  // ── Aliases de compatibilidad (inglés) ──────────────────
+  const getDefaultView = obtenerVistaPorDefecto;
+  const getAppwriteUserId = obtenerIdUsuarioAppwrite;
+  const getRol = obtenerRol;
+  const getNombre = obtenerNombre;
+  const getUsuarioActual = obtenerUsuarioActual;
+  const getEspacios = obtenerEspacios;
+  const getEspacioActivo = obtenerEspacioActivo;
+  const getRolEfectivo = obtenerRolEfectivo;
+
   return {
-    init, login, logout, getRol, getNombre, getUsuarioActual, getEspacios, getEspacioActivo, cambiarEspacio,
+    init, login, logout,
+    obtenerRol, obtenerNombre, obtenerUsuarioActual, obtenerEspacios, obtenerEspacioActivo, cambiarEspacio,
     actualizarNombre, tienePermiso, puede, esMaster, esAdmin, esCocina, esBarra, esCaja, esMesero,
     esDespensa, esReparto, esCliente, esEventos, esArtista, puedeEliminarItemEnviado, puedeCerrarMesa,
     puedeAccederCaja, puedeAccederCocina, puedeCambiarEstadoComanda, puedeEditarProductos, puedeEditarPrecios,
-    getDefaultView, mostrarLogin, cerrarModalLogin, _loginFromModal, _cambiarRolSimulado, getRolEfectivo,
+    obtenerVistaPorDefecto, mostrarLogin, cerrarModalLogin, _loginFromModal, _cambiarRolSimulado, obtenerRolEfectivo,
     esMasterReal, aplicarRestriccionesUI, puedeAccederRecetas, puedeAccederReparto, puedeAccederMenu,
     puedeAccederEventos, puedeAccederPerfil, cambiarPassword, _cargarUsuarios, registrarCliente,
-    getAppwriteUserId, _mostrarRegistro
+    obtenerIdUsuarioAppwrite, _mostrarRegistro,
+    // Aliases en inglés
+    getDefaultView, getAppwriteUserId, getRol, getNombre, getUsuarioActual, getEspacios, getEspacioActivo, getRolEfectivo
   };
 })();
 

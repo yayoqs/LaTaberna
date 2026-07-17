@@ -1,10 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — DESPENSA SUBMÓDULO (ES6)
    Archivo: js/ui/despensa/ciclo-vida.js
-   Versión: 1.0.0
+   Versión: 1.0.1
    Propósito: Ciclo de vida de la vista de despensa.
-              Vincula eventos del DOM con AbortController y
-              suscribe al Store y EventBus.
+              v1.0.1: migra a nombres en español (store).
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -29,7 +28,6 @@ export function activar() {
 
   asegurarVista();
 
-  // ── Vinculación de eventos del DOM ──
   document.getElementById('despensaCatFilter')?.addEventListener('change', function () {
     setCategoriaFiltro(this.value);
     renderTabla();
@@ -82,8 +80,7 @@ export function activar() {
     ajusteRapido(null, _refresh);
   }, { signal });
 
-  // ── Suscripciones al Store y EventBus ──
-  const unsubscribeStore = Store.subscribe((state, action) => {
+  const unsubscribeStore = Store.suscribir((state, action) => {
     if (action.type.startsWith('INGREDIENTE') || action.type.startsWith('MOVIMIENTO')) {
       _refresh();
     }

@@ -1,20 +1,16 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/managers/turno-manager.js
-   Versión: 1.0.4
+   Versión: 1.1.1
    Propósito: Cierre de turno, respaldo en Google Drive y reseteo del sistema.
-              Comunicación con PedidoManager vía EventBus/Store.
+              Desacoplado de UI (emite eventos) y corregida referencia a syncQueue.
    ================================================================ */
 
 import { EventBus } from '../lib/eventBus.js';
 import { Logger } from '../lib/logger.js';
 import { DB } from '../db.js';
-import { showToast } from '../utils.js';
+import { mostrarToast } from '../utils.js';
 import { mesaVacia } from '../db-core.js';
-import { Mesas } from '../ui/mesas.js';
-import { KDS } from '../ui/kds.js';
-import { Caja } from '../ui/caja.js';
-import { Reparto } from '../ui/reparto.js';
 
 export const TurnoManager = (() => {
 
@@ -55,7 +51,7 @@ export const TurnoManager = (() => {
     let urlArchivo = null;
     try {
       if (DB.llamar) {
-        showToast('info', '<i class="fas fa-cloud-upload-alt fa-spin"></i> Subiendo cierre de turno...');
+        mostrarToast('info', '<i class="fas fa-cloud-upload-alt fa-spin"></i> Subiendo cierre de turno...');
         const respuesta = await DB.llamar('guardarCierreTurno', {
           turnoId: turno.id,
           datos: datosTurno
@@ -75,7 +71,7 @@ export const TurnoManager = (() => {
       }
       const backupKey = 'pubpos_backup_fallback_' + turno.id;
       localStorage.setItem(backupKey, JSON.stringify(datosTurno));
-      showToast('error', `No se pudo subir el cierre: ${mensajeError}. Se guardó un respaldo local.`);
+      mostrarToast('error', `No se pudo subir el cierre: ${mensajeError}. Se guardó un respaldo local.`);
     }
 
     try {
@@ -107,36 +103,28 @@ export const TurnoManager = (() => {
       });
       DB.mesas = DB.mesas.filter(m => !m.esVirtual);
       DB.saveMesas();
+      EventBus.emit('mesas:guardadas', DB.mesas);
     }
 
     if (DB.pedidos) {
       DB.pedidos = [];
       DB.savePedidos();
+      EventBus.emit('pedidos:guardados', []);
     }
 
     if (DB.pedidosDelivery) {
       DB.pedidosDelivery = [];
       DB.savePedidosDelivery();
+      EventBus.emit('pedidosDelivery:guardados', []);
     }
 
     if (DB.comandas) {
       DB.comandas = [];
       DB.saveComandas();
-    }
-
-    if (DB.syncQueue) {
-      DB.syncQueue = [];
-      if (typeof DB._saveSyncQueue === 'function') {
-        DB._saveSyncQueue();
-      }
+      EventBus.emit('comandas:guardadas', []);
     }
 
     localStorage.removeItem('pubpos_audit_' + turno.id);
-
-    if (Mesas && Mesas.render) Mesas.render();
-    if (KDS && KDS.refresh) KDS.refresh();
-    if (Caja && Caja.render) Caja.render();
-    if (Reparto && Reparto.render) Reparto.render();
   }
 
   function obtenerEstado() {

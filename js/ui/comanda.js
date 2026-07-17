@@ -1,17 +1,18 @@
 /* ================================================================
    LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/comanda.js
-   Versión: 2.0.5
+   Versión: 2.0.8
    Propósito: Gestión de la comanda actual (ítems, cantidades,
               observaciones, split bill). Sin onclick. Usa delegación.
-              Incluye listener para precarga:items_listos.
-              Migración de prompt a mostrarEntrada.
+              Migración a Store y utils español.
+              Corrección: eliminada dependencia oculta de actualizarTotalCierre,
+              reemplazada por evento 'comanda:total_actualizado'.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
 import { EventBus } from '../lib/eventBus.js';
 import { Logger } from '../lib/logger.js';
-import { fmtMoney, showToast, mostrarEntrada } from '../utils.js';
+import { formatearDinero, mostrarToast, mostrarEntrada } from '../utils.js';
 import { Auth } from '../auth.js';
 import { DB } from '../db.js';
 
@@ -38,40 +39,49 @@ const Comanda = (() => {
 
   function _syncMesaStoreADB(mesaActualizada) {
     if (!mesaActualizada) return;
-    const idx = DB.mesas.findIndex(m => m.numero == mesaActualizada.numero);
-    if (idx >= 0) {
-      if (!_mesasIguales(DB.mesas[idx], mesaActualizada)) {
-        DB.mesas[idx] = mesaActualizada;
-        if (typeof DB.saveMesas === 'function') {
-          DB.saveMesas();
+    try {
+      const idx = DB.mesas.findIndex(m => m.numero == mesaActualizada.numero);
+      if (idx >= 0) {
+        if (!_mesasIguales(DB.mesas[idx], mesaActualizada)) {
+          DB.mesas[idx] = mesaActualizada;
+          if (typeof DB.saveMesas === 'function') {
+            DB.saveMesas();
+          }
+          Logger.debug('[Comanda] Mesa sincronizada a DB:', mesaActualizada.numero);
         }
-        Logger.debug('[Comanda] Mesa sincronizada a DB:', mesaActualizada.numero);
       }
+    } catch (e) {
+      Logger.error('[Comanda] Error al sincronizar mesa con DB:', e);
     }
   }
 
-  function _initStoreSync() {
-    Store.subscribe((state, action) => {
-      if (!action || !action.type) return;
-      if (!['COMANDA_ITEM_AGREGAR', 'COMANDA_ITEM_CAMBIAR', 'COMANDA_ITEM_QUITAR'].includes(action.type)) return;
-      if (!_mesaActiva) return;
+  function _inicializarSincroniaStore() {
+    try {
+      Store.suscribir((state, action) => {
+        if (!action || !action.type) return;
+        if (!['COMANDA_ITEM_AGREGAR', 'COMANDA_ITEM_CAMBIAR', 'COMANDA_ITEM_QUITAR'].includes(action.type)) return;
+        if (!_mesaActiva) return;
 
-      const mesaStore = state.mesas.find(m => m.numero == _mesaActiva.numero);
-      if (!mesaStore) return;
+        const mesaStore = state.mesas.find(m => m.numero == _mesaActiva.numero);
+        if (!mesaStore) return;
 
-      _syncMesaStoreADB(mesaStore);
-      _mesaActiva = mesaStore;
-      EventBus.emit('mesa:actualizada', { mesa: _mesaActiva.numero, estado: _mesaActiva.estado });
-      _render();
-      if (typeof actualizarTotalCierre === 'function') {
-        actualizarTotalCierre();
-      }
-    });
+        _syncMesaStoreADB(mesaStore);
+        _mesaActiva = mesaStore;
+        EventBus.emit('mesa:actualizada', { mesa: _mesaActiva.numero, estado: _mesaActiva.estado });
+        EventBus.emit('comanda:total_actualizado', {
+          mesa: _mesaActiva.numero,
+          total: mesaStore.total || _mesaActiva.total || 0
+        });
+        _render();
+      });
+    } catch (e) {
+      Logger.error('[Comanda] Error al inicializar sincronía del Store:', e);
+    }
   }
 
-  _initStoreSync();
+  _inicializarSincroniaStore();
 
-  function setMesaActiva(mesa) {
+  function establecerMesaActiva(mesa) {
     _mesaActiva = mesa;
     _render();
     _sincronizarCamposHeader();
@@ -121,30 +131,34 @@ const Comanda = (() => {
     `;
 
     document.getElementById('personaActivaSelect').addEventListener('change', function() {
-      setPersonaActiva(this.value);
+      establecerPersonaActiva(this.value);
     });
     document.getElementById('btnAgregarPersona').addEventListener('click', agregarPersona);
   }
 
-  function setPersonaActiva(nombre) {
+  function establecerPersonaActiva(nombre) {
     if (_mesaActiva) {
       _mesaActiva.personaActiva = nombre;
     }
   }
 
   async function agregarPersona() {
-    const nombre = await mostrarEntrada(
-      'Agregar persona',
-      'Nombre de la persona:',
-      { placeholder: 'Ej: Juan' }
-    );
-    if (!nombre) return;
-    if (!_mesaActiva.personas) _mesaActiva.personas = [];
-    if (!_mesaActiva.personas.includes(nombre)) {
-      _mesaActiva.personas.push(nombre);
+    try {
+      const nombre = await mostrarEntrada(
+        'Agregar persona',
+        'Nombre de la persona:',
+        { placeholder: 'Ej: Juan' }
+      );
+      if (!nombre) return;
+      if (!_mesaActiva.personas) _mesaActiva.personas = [];
+      if (!_mesaActiva.personas.includes(nombre)) {
+        _mesaActiva.personas.push(nombre);
+      }
+      _mesaActiva.personaActiva = nombre;
+      _renderSelectorPersona();
+    } catch (e) {
+      Logger.error('[Comanda] Error al agregar persona:', e);
     }
-    _mesaActiva.personaActiva = nombre;
-    _renderSelectorPersona();
   }
 
   function agregarItem(producto) {
@@ -163,10 +177,14 @@ const Comanda = (() => {
       enviadoTs: null
     };
 
-    Store.dispatch({
-      type: 'COMANDA_ITEM_AGREGAR',
-      payload: { numeroMesa: _mesaActiva.numero, item }
-    });
+    try {
+      Store.despachar({
+        type: 'COMANDA_ITEM_AGREGAR',
+        payload: { numeroMesa: _mesaActiva.numero, item }
+      });
+    } catch (e) {
+      Logger.error('[Comanda] Error al agregar ítem a la comanda:', e);
+    }
   }
 
   function cambiarCantidad(idx, delta) {
@@ -174,22 +192,30 @@ const Comanda = (() => {
     const item = _mesaActiva.items[idx];
     if (!item) return;
     if (item.enviado && !Auth.puede('eliminarItemEnviado')) {
-      showToast('error', 'No tienes permiso para modificar ítems ya enviados');
+      mostrarToast('error', 'No tienes permiso para modificar ítems ya enviados');
       return;
     }
     const nuevaCantidad = Math.max(1, item.qty + delta);
-    Store.dispatch({
-      type: 'COMANDA_ITEM_CAMBIAR',
-      payload: { numeroMesa: _mesaActiva.numero, index: idx, cambios: { qty: nuevaCantidad } }
-    });
+    try {
+      Store.despachar({
+        type: 'COMANDA_ITEM_CAMBIAR',
+        payload: { numeroMesa: _mesaActiva.numero, index: idx, cambios: { qty: nuevaCantidad } }
+      });
+    } catch (e) {
+      Logger.error('[Comanda] Error al cambiar cantidad del ítem:', e);
+    }
   }
 
-  function setObservacion(idx, valor) {
+  function establecerObservacion(idx, valor) {
     if (_mesaActiva?.items[idx]) {
-      Store.dispatch({
-        type: 'COMANDA_ITEM_CAMBIAR',
-        payload: { numeroMesa: _mesaActiva.numero, index: idx, cambios: { obs: valor } }
-      });
+      try {
+        Store.despachar({
+          type: 'COMANDA_ITEM_CAMBIAR',
+          payload: { numeroMesa: _mesaActiva.numero, index: idx, cambios: { obs: valor } }
+        });
+      } catch (e) {
+        Logger.error('[Comanda] Error al establecer observación del ítem:', e);
+      }
     }
   }
 
@@ -197,30 +223,42 @@ const Comanda = (() => {
     if (!_mesaActiva) return;
     const item = _mesaActiva.items[idx];
     if (item.enviado && !Auth.puede('eliminarItemEnviado')) {
-      showToast('error', 'Solo administrador puede eliminar ítems enviados');
+      mostrarToast('error', 'Solo administrador puede eliminar ítems enviados');
       return;
     }
-    Store.dispatch({
-      type: 'COMANDA_ITEM_QUITAR',
-      payload: { numeroMesa: _mesaActiva.numero, index: idx }
-    });
+    try {
+      Store.despachar({
+        type: 'COMANDA_ITEM_QUITAR',
+        payload: { numeroMesa: _mesaActiva.numero, index: idx }
+      });
+    } catch (e) {
+      Logger.error('[Comanda] Error al quitar ítem de la comanda:', e);
+    }
   }
 
-  function setMozo(mozo) {
+  function establecerMozo(mozo) {
     if (_mesaActiva) {
       _mesaActiva.mozo = mozo;
-      DB.saveMesas();
+      try {
+        DB.saveMesas();
+      } catch (e) {
+        Logger.error('[Comanda] Error al guardar mozo en DB:', e);
+      }
     }
   }
 
-  function setComensales(cant) {
+  function establecerComensales(cant) {
     if (_mesaActiva) {
       _mesaActiva.comensales = parseInt(cant) || 1;
-      DB.saveMesas();
+      try {
+        DB.saveMesas();
+      } catch (e) {
+        Logger.error('[Comanda] Error al guardar comensales en DB:', e);
+      }
     }
   }
 
-  function setObservacionGeneral(obs) {
+  function establecerObservacionGeneral(obs) {
     if (_mesaActiva) {
       _mesaActiva.observaciones = obs;
     }
@@ -235,7 +273,7 @@ const Comanda = (() => {
     const subtotalEl = document.getElementById('subtotalDisplay');
     if (!contenedor || !_mesaActiva) return;
 
-    const state = Store.getState();
+    const state = Store.obtenerEstado();
     const mesaDelStore = state.mesas.find(m => m.numero == _mesaActiva.numero);
     const items = mesaDelStore ? mesaDelStore.items : _mesaActiva.items;
 
@@ -251,7 +289,7 @@ const Comanda = (() => {
     }
 
     contenedor.innerHTML = items.map((item, idx) => _htmlItem(item, idx)).join('');
-    if (subtotalEl) subtotalEl.textContent = fmtMoney(mesaDelStore?.total || _mesaActiva.total || 0);
+    if (subtotalEl) subtotalEl.textContent = formatearDinero(mesaDelStore?.total || _mesaActiva.total || 0);
     _renderSelectorPersona();
 
     contenedor.querySelectorAll('.qty-btn').forEach(btn => {
@@ -265,7 +303,7 @@ const Comanda = (() => {
     contenedor.querySelectorAll('.item-obs-input').forEach(input => {
       input.addEventListener('input', function() {
         const idx = parseInt(this.dataset.idx);
-        if (!isNaN(idx)) setObservacion(idx, this.value);
+        if (!isNaN(idx)) establecerObservacion(idx, this.value);
       });
     });
 
@@ -292,51 +330,56 @@ const Comanda = (() => {
           <div class="item-nombre">${item.nombre} ${personaBadge}</div>
           <input class="item-obs-input" data-idx="${idx}" placeholder="Aclaración..." value="${item.obs || ''}" ${disabledAttr}>
         </div>
-        <span class="item-precio">${fmtMoney(item.precio * item.qty)}</span>
+        <span class="item-precio">${formatearDinero(item.precio * item.qty)}</span>
         <button class="item-remove" data-idx="${idx}">
           <i class="fas fa-times"></i>
         </button>
       </div>`;
   }
 
-  function _initEventListeners() {
+  function _inicializarEscuchadores() {
     EventBus.on('producto:seleccionado', agregarItem);
-    EventBus.on('mesa:abierta', setMesaActiva);
+    EventBus.on('mesa:abierta', establecerMesaActiva);
 
     EventBus.on('precarga:items_listos', (payload) => {
-      const mesaActiva = Comanda.getMesaActiva();
-      if (!mesaActiva || mesaActiva.numero !== payload.mesa) {
-        showToast('warning', 'Abrí la mesa antes de cargar la precarga.');
-        return;
-      }
-      payload.items.forEach(item => {
-        const producto = {
-          id: item.prodId,
-          nombre: item.nombre,
-          precio: item.precio,
-          categoria: item.categoria,
-          destino: item.destino
-        };
-        for (let i = 0; i < (item.qty || 1); i++) {
-          Comanda.agregarItem(producto);
+      try {
+        const mesaActiva = Comanda.getMesaActiva();
+        if (!mesaActiva || mesaActiva.numero !== payload.mesa) {
+          mostrarToast('warning', 'Abrí la mesa antes de cargar la precarga.');
+          return;
         }
-      });
-      EventBus.emit('mesas:limpiar_badge', { mesa: payload.mesa });
+        payload.items.forEach(item => {
+          const producto = {
+            id: item.prodId,
+            nombre: item.nombre,
+            precio: item.precio,
+            categoria: item.categoria,
+            destino: item.destino
+          };
+          for (let i = 0; i < (item.qty || 1); i++) {
+            Comanda.agregarItem(producto);
+          }
+        });
+        EventBus.emit('mesas:limpiar_badge', { mesa: payload.mesa });
+      } catch (e) {
+        Logger.error('[Comanda] Error al procesar precarga:', e);
+        mostrarToast('error', 'Error al cargar la precarga.');
+      }
     });
   }
 
-  _initEventListeners();
+  _inicializarEscuchadores();
 
   return {
-    setMesaActiva,
-    setMozo,
-    setComensales,
-    setObservacionGeneral,
-    setPersonaActiva,
+    establecerMesaActiva,
+    establecerMozo,
+    establecerComensales,
+    establecerObservacionGeneral,
+    establecerPersonaActiva,
     agregarPersona,
     agregarItem,
     cambiarCantidad,
-    setObservacion,
+    establecerObservacion,
     quitarItem,
     render,
     getMesaActiva: () => _mesaActiva

@@ -1,14 +1,14 @@
 /* ================================================================
    LaTaberna - PubPOS — DESPENSA SUBMÓDULO (ES6)
    Archivo: js/ui/despensa/acciones.js
-   Versión: 1.1.0
+   Versión: 1.1.1
    Propósito: Ajuste rápido de stock de ingredientes.
-              v1.1.0: migra window.prompt a mostrarEntrada.
+              v1.1.1: migra a nombres en español (utils).
    ================================================================ */
 
 import { DB } from '../../db.js';
 import { InventarioService } from '../../servicios/inventario-service.js';
-import { showToast, mostrarEntrada } from '../../utils.js';
+import { mostrarToast, mostrarEntrada } from '../../utils.js';
 
 export async function ajusteRapido(ingredienteId = null, onAjustado = null) {
   if (!ingredienteId) {
@@ -19,7 +19,7 @@ export async function ajusteRapido(ingredienteId = null, onAjustado = null) {
     );
     if (!nombre) return;
     const ing = DB.ingredientes.find(i => i.nombre.toLowerCase() === nombre.toLowerCase());
-    if (!ing) { showToast('error', 'Ingrediente no encontrado'); return; }
+    if (!ing) { mostrarToast('error', 'Ingrediente no encontrado'); return; }
     ingredienteId = ing.id;
   }
   const ing = DB.ingredientes.find(i => i.id === ingredienteId);
@@ -32,7 +32,7 @@ export async function ajusteRapido(ingredienteId = null, onAjustado = null) {
   );
   if (deltaStr === null || deltaStr === undefined) return;
   const cantidad = parseFloat(deltaStr);
-  if (isNaN(cantidad)) { showToast('error', 'Cantidad inválida'); return; }
+  if (isNaN(cantidad)) { mostrarToast('error', 'Cantidad inválida'); return; }
   const motivo = await mostrarEntrada(
     'Ajuste rápido',
     'Motivo (opcional):',
@@ -42,16 +42,16 @@ export async function ajusteRapido(ingredienteId = null, onAjustado = null) {
   if (typeof InventarioService !== 'undefined' && InventarioService.ajustarStock) {
     const resultado = await InventarioService.ajustarStock(ingredienteId, cantidad, motivo);
     if (resultado.exito) {
-      showToast('success', `Stock de ${ing.nombre} actualizado`);
+      mostrarToast('success', `Stock de ${ing.nombre} actualizado`);
       if (typeof onAjustado === 'function') onAjustado();
       return;
     } else {
-      showToast('error', resultado.error);
+      mostrarToast('error', resultado.error);
       return;
     }
   }
 
   DB.ajustarStock(ingredienteId, cantidad, motivo);
-  showToast('success', `Stock de ${ing.nombre} actualizado`);
+  mostrarToast('success', `Stock de ${ing.nombre} actualizado`);
   if (typeof onAjustado === 'function') onAjustado();
 }

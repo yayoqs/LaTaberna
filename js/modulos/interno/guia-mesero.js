@@ -1,10 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO INTERNO (ES6)
    Archivo: js/modulos/interno/guia-mesero.js
-   Versión: 2.0.1
+   Versión: 2.0.2
    Propósito: Guía interactiva para el mesero nuevo.
-              Sin asignaciones window.
-   Dependencias: js/lib/eventBus.js, js/lib/logger.js
+              Log de inicialización movido a función activar().
    ================================================================ */
 
 import { EventBus } from '../../lib/eventBus.js';
@@ -32,6 +31,7 @@ const GuiaMesero = (() => {
   let _pasoActual = 0;
   let _contenedor = null;
   let _activa = false;
+  let _activado = false;
 
   function _iniciar() {
     if (_activa) return;
@@ -129,15 +129,22 @@ const GuiaMesero = (() => {
     Logger.info('[GuiaMesero] Guía completada.');
   }
 
-  EventBus.on('vista:cambiada', (vista) => {
-    if (vista === 'mesas') {
-      setTimeout(_iniciar, 300);
-    }
-  });
+  function activar() {
+    if (_activado) return;
+    _activado = true;
 
-  Logger.info('[GuiaMesero] Módulo inicializado (ES6 v2.0.1).');
+    EventBus.on('vista:cambiada', (vista) => {
+      if (vista === 'mesas') {
+        setTimeout(_iniciar, 300);
+      }
+    });
 
-  return {};
+    Logger.info('[GuiaMesero] Módulo inicializado (ES6 v2.0.2).');
+  }
+
+  activar();
+
+  return { activar };
 })();
 
 export { GuiaMesero };

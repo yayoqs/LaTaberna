@@ -1,21 +1,21 @@
 /* ================================================================
    LaTaberna - PubPOS — UTILIDADES COMPARTIDAS (ES6)
    Archivo: js/utils.js
-   Versión: 1.3.0
+   Versión: 1.4.0
    Propósito: Utilidades compartidas entre todas las células.
-              Incluye mostrarConfirmacion, mostrarEntrada y
-              obtenerColorDesdeNombre.
+              Nombres migrados al español. Se mantienen alias en
+              inglés por una iteración.
    ================================================================ */
 
-export function fmtMoney(n) {
+export function formatearDinero(n) {
   return '$' + (n || 0).toLocaleString('es-AR', { minimumFractionDigits: 0 });
 }
 
-export function fmtMoneyTicket(n) {
+export function formatearDineroTicket(n) {
   return '$' + (n || 0).toLocaleString('es-AR', { minimumFractionDigits: 0 });
 }
 
-export function fmtFechaLarga() {
+export function formatearFechaLarga() {
   const now = new Date();
   const s = now.toLocaleDateString('es-AR', {
     weekday: 'long', day: '2-digit', month: 'long', year: 'numeric'
@@ -23,18 +23,18 @@ export function fmtFechaLarga() {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-export function fmtHoraCompleta() {
+export function formatearHoraCompleta() {
   return new Date().toLocaleTimeString('es-AR', {
     hour: '2-digit', minute: '2-digit', second: '2-digit'
   });
 }
 
-export function fmtHoraCorta(ts) {
+export function formatearHoraCorta(ts) {
   if (!ts) return '—';
   return new Date(ts).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
 }
 
-export function fmtFechaCorta() {
+export function formatearFechaCorta() {
   return new Date().toLocaleDateString('es-AR', {
     day: '2-digit', month: '2-digit', year: 'numeric'
   });
@@ -53,7 +53,7 @@ export function calcularTotal(items) {
   return (items || []).reduce((sum, it) => sum + it.precio * it.qty, 0);
 }
 
-export function showToast(tipo, htmlMsg, ms = 3500) {
+export function mostrarToast(tipo, htmlMsg, ms = 3500) {
   const cont  = document.getElementById('toastContainer');
   if (!cont) return;
   const toast = document.createElement('div');
@@ -70,12 +70,6 @@ export function $id(id) { return document.getElementById(id); }
 
 export function $val(id) { return ($id(id)?.value || '').trim(); }
 
-/**
- * Genera un color HSL consistente a partir de un nombre.
- * Útil para fondos de tarjetas de producto, recetas, etc.
- * @param {string} nombre - El nombre desde el cual generar el color.
- * @returns {string} Color en formato HSL (ej: "hsl(210, 55%, 45%)").
- */
 export function obtenerColorDesdeNombre(nombre) {
   let hash = 0;
   for (let i = 0; i < nombre.length; i++) {
@@ -86,18 +80,6 @@ export function obtenerColorDesdeNombre(nombre) {
   return `hsl(${h}, 55%, 45%)`;
 }
 
-/**
- * Muestra un modal de confirmación estilizado con el tema de La Taberna.
- * Reemplaza window.confirm() de forma no bloqueante.
- *
- * @param {string} titulo   - Título del modal.
- * @param {string} mensaje  - Texto descriptivo.
- * @param {object} [opciones] - Opciones adicionales.
- * @param {string} [opciones.textoConfirmar="Confirmar"] - Texto del botón de confirmación.
- * @param {string} [opciones.textoCancelar="Cancelar"]   - Texto del botón de cancelación.
- * @param {string} [opciones.claseConfirmar="btn-primary"] - Clase CSS para el botón de confirmación.
- * @returns {Promise<boolean>} true si el usuario confirma, false si cancela o cierra.
- */
 export function mostrarConfirmacion(titulo, mensaje, opciones = {}) {
   const {
     textoConfirmar = 'Confirmar',
@@ -151,18 +133,6 @@ export function mostrarConfirmacion(titulo, mensaje, opciones = {}) {
   });
 }
 
-/**
- * Muestra un modal de entrada de texto estilizado con el tema de La Taberna.
- * Reemplaza window.prompt() de forma no bloqueante.
- *
- * @param {string} titulo   - Título del modal.
- * @param {string} mensaje  - Texto descriptivo.
- * @param {object} [opciones] - Opciones adicionales.
- * @param {string} [opciones.valorPredefinido=""] - Valor inicial del campo.
- * @param {string} [opciones.placeholder=""]      - Placeholder del input.
- * @param {string} [opciones.tipo="text"]         - Tipo del input (text, number, password).
- * @returns {Promise<string|null>} El texto ingresado, o null si cancela o cierra.
- */
 export function mostrarEntrada(titulo, mensaje, opciones = {}) {
   const {
     valorPredefinido = '',
@@ -225,3 +195,12 @@ export function mostrarEntrada(titulo, mensaje, opciones = {}) {
     document.addEventListener('keydown', onKeyDown);
   });
 }
+
+// ── Alias temporales (una iteración) ─────────────────────
+export const fmtMoney         = formatearDinero;
+export const fmtMoneyTicket   = formatearDineroTicket;
+export const fmtFechaLarga    = formatearFechaLarga;
+export const fmtHoraCompleta  = formatearHoraCompleta;
+export const fmtHoraCorta     = formatearHoraCorta;
+export const fmtFechaCorta    = formatearFechaCorta;
+export const showToast        = mostrarToast;

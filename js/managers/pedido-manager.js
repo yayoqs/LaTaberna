@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/managers/pedido-manager.js
-   Versión: 1.0.4
+   Versión: 1.0.5
    Propósito: Gestor de pedidos de mesa y delivery, turnos y auditoría.
-              Eliminado stub agregarItemAPedido (sin consumidores reales).
+              Corrección: Logger en todos los catch.
    ================================================================ */
 
 import { Logger } from '../lib/logger.js';
@@ -27,7 +27,12 @@ export const PedidoManager = (() => {
 
     const turnoGuardado = localStorage.getItem('pubpos_turno_actual');
     if (turnoGuardado) {
-      try { turnoActual = JSON.parse(turnoGuardado); } catch { turnoActual = null; }
+      try {
+        turnoActual = JSON.parse(turnoGuardado);
+      } catch (e) {
+        Logger.warn('[PedidoManager] Error al parsear turno guardado, se iniciará uno nuevo:', e);
+        turnoActual = null;
+      }
     }
 
     if (!turnoActual || turnoActual.estado === 'cerrado') {
@@ -60,7 +65,16 @@ export const PedidoManager = (() => {
   function _cargarAuditLog() {
     if (!turnoActual) return;
     const raw = localStorage.getItem('pubpos_audit_' + turnoActual.id);
-    auditLog = raw ? (() => { try { return JSON.parse(raw); } catch { return []; } })() : [];
+    if (raw) {
+      try {
+        auditLog = JSON.parse(raw);
+      } catch (e) {
+        Logger.warn('[PedidoManager] Error al parsear audit log, se inicializa vacío:', e);
+        auditLog = [];
+      }
+    } else {
+      auditLog = [];
+    }
   }
 
   function _guardarAuditLog() {

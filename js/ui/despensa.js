@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/despensa.js
-   Versión: 2.0.0
-   Propósito: Fachada de la vista de despensa. Reexporta funciones
-              de los submódulos. Delega inicialización a ciclo-vida.
+   Versión: 2.0.2
+   Propósito: Fachada de la vista de despensa.
+              v2.0.2: elimina autoactivación.
    ================================================================ */
 
 import { activar, limpiar } from './despensa/ciclo-vida.js';
@@ -39,8 +39,5 @@ const Despensa = {
   exportarCSV,
   exportarPDF
 };
-
-// ── Inicialización ──
-activar();
 
 export { Despensa };

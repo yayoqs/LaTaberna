@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — COMANDO JS (ES6)
    Archivo: js/comandos/completar-subcomanda.js
-   Versión: 1.0.3
+   Versión: 1.0.4
    Propósito: Marcar una subcomanda como completada.
-              Con imports explícitos.
+              Log de registro movido dentro del callback.
    ================================================================ */
 
 import { CommandBus } from '../lib/command-bus.js';
@@ -19,6 +19,8 @@ export function crearComandoCompletarSubcomanda(idOriginal, destino) {
 }
 
 CommandBus.registrar('completarSubcomanda', async function(payload) {
+  Logger.info('[completarSubcomanda] Comando registrado en CommandBus.');
+
   const datos = payload && payload.datos ? payload.datos : payload;
   const { idOriginal, destino } = datos;
 
@@ -46,6 +48,7 @@ CommandBus.registrar('completarSubcomanda', async function(payload) {
             : comanda.subcomandas)
         : {};
     } catch (e) {
+      Logger.warn('[completarSubcomanda] Error al parsear subcomandas:', e);
       subcomandas = {};
     }
 
@@ -82,5 +85,3 @@ CommandBus.registrar('completarSubcomanda', async function(payload) {
     return { exito: false, error: e.message };
   }
 });
-
-Logger.info('[completarSubcomanda] Comando registrado en CommandBus.');

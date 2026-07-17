@@ -1,13 +1,12 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/tickets.js
-   Versión: 1.0.1
+   Versión: 1.1.0
    Propósito: Generación y visualización de tickets de comanda, cuenta y cierre.
-              Sin asignaciones window.
-   Dependencias: js/utils.js, js/db.js, js/lib/logger.js
+              Migración a nombres en español (utils).
    ================================================================ */
 
-import { fmtMoney, fmtMoneyTicket, fmtHoraCorta, fmtFechaCorta, calcularTotal, showToast } from '../utils.js';
+import { formatearDinero, formatearDineroTicket, formatearHoraCorta, formatearFechaCorta, calcularTotal, mostrarToast } from '../utils.js';
 import { DB } from '../db.js';
 import { Logger } from '../lib/logger.js';
 
@@ -15,8 +14,8 @@ const Tickets = (() => {
 
   const Renderer = {
     generarComanda(comanda, destino) {
-      const hora  = fmtHoraCorta(Date.now());
-      const fecha = fmtFechaCorta();
+      const hora  = formatearHoraCorta(Date.now());
+      const fecha = formatearFechaCorta();
       let items = (comanda && comanda.items) ? comanda.items : [];
       if (destino === 'cocina') {
         items = items.filter(it => it.destino === 'cocina' || it.destino === 'ambos');
@@ -47,14 +46,14 @@ const Tickets = (() => {
 
     generarCuenta(mesa, config) {
       const cfg = config || {};
-      const fecha = fmtFechaCorta();
-      const hora = fmtHoraCorta(Date.now());
+      const fecha = formatearFechaCorta();
+      const hora = formatearHoraCorta(Date.now());
       const grupos = _agruparItems(mesa.items || []);
       const total = calcularTotal(mesa.items || []);
       const numTicket = String(Date.now()).slice(-6);
 
       const itemsHTML = grupos.map(g => `
-        <div class="t-item-row t-mb1"><span>${g.qty}x</span><span>${g.nombre}</span><span>${fmtMoneyTicket(g.precio * g.qty)}</span></div>
+        <div class="t-item-row t-mb1"><span>${g.qty}x</span><span>${g.nombre}</span><span>${formatearDineroTicket(g.precio * g.qty)}</span></div>
       `).join('');
 
       return `
@@ -67,7 +66,7 @@ const Tickets = (() => {
         <div class="t-row t-mb1"><span>Comensales: ${mesa.comensales || 1}</span><span>N° ${numTicket}</span></div>
         <hr class="t-hr-solid"><div class="t-center t-bold t-mb1">DETALLE DE CONSUMO</div><hr class="t-hr-dash">
         ${itemsHTML}<hr class="t-hr-dash">
-        <div class="t-total-row"><span>TOTAL</span><span>${fmtMoneyTicket(total)}</span></div>
+        <div class="t-total-row"><span>TOTAL</span><span>${formatearDineroTicket(total)}</span></div>
         <hr class="t-hr-solid"><div class="t-footer">${cfg.pieTicket || '¡Gracias por visitarnos!'}</div>
         <div class="t-footer t-small t-mt2">*** NO ES COMPROBANTE FISCAL ***</div><div class="t-spacer"></div>
       `;
@@ -75,14 +74,14 @@ const Tickets = (() => {
 
     generarCierre(mesa, totalFinal, descuento, formaPago, config) {
       const cfg = config || {};
-      const fecha = fmtFechaCorta();
-      const hora = fmtHoraCorta(Date.now());
+      const fecha = formatearFechaCorta();
+      const hora = formatearHoraCorta(Date.now());
       const grupos = _agruparItems(mesa.items || []);
       const subtotal = calcularTotal(mesa.items || []);
       const numTicket = String(Date.now()).slice(-6);
 
       const itemsHTML = grupos.map(g => `
-        <div class="t-item-row t-mb1"><span>${g.qty}x</span><span>${g.nombre}</span><span>${fmtMoneyTicket(g.precio * g.qty)}</span></div>
+        <div class="t-item-row t-mb1"><span>${g.qty}x</span><span>${g.nombre}</span><span>${formatearDineroTicket(g.precio * g.qty)}</span></div>
       `).join('');
 
       return `
@@ -95,9 +94,9 @@ const Tickets = (() => {
         <div class="t-row t-mb1"><span>Comensales: ${mesa.comensales || 1}</span><span>N° ${numTicket}</span></div>
         <hr class="t-hr-solid"><div class="t-center t-bold t-mb1">CIERRE DE MESA</div><hr class="t-hr-dash">
         ${itemsHTML}<hr class="t-hr-dash">
-        <div class="t-row t-mb1"><span>Subtotal</span><span>${fmtMoneyTicket(subtotal)}</span></div>
-        ${descuento ? `<div class="t-row t-mb1"><span>Descuento (${descuento}%)</span><span>-${fmtMoneyTicket(subtotal * descuento / 100)}</span></div>` : ''}
-        <div class="t-total-row"><span>TOTAL</span><span>${fmtMoneyTicket(totalFinal)}</span></div>
+        <div class="t-row t-mb1"><span>Subtotal</span><span>${formatearDineroTicket(subtotal)}</span></div>
+        ${descuento ? `<div class="t-row t-mb1"><span>Descuento (${descuento}%)</span><span>-${formatearDineroTicket(subtotal * descuento / 100)}</span></div>` : ''}
+        <div class="t-total-row"><span>TOTAL</span><span>${formatearDineroTicket(totalFinal)}</span></div>
         <hr class="t-hr-solid">
         <div class="t-row t-mb1"><span>Forma de pago</span><span>${formaPago || 'Efectivo'}</span></div>
         <div class="t-footer">${cfg.pieTicket || '¡Gracias por visitarnos!'}</div>
@@ -107,8 +106,8 @@ const Tickets = (() => {
 
     generarCierreParcial(mesa, pago, config) {
       const cfg = config || {};
-      const fecha = fmtFechaCorta();
-      const hora = fmtHoraCorta(Date.now());
+      const fecha = formatearFechaCorta();
+      const hora = formatearHoraCorta(Date.now());
       const numTicket = String(Date.now()).slice(-6);
 
       return `
@@ -120,7 +119,7 @@ const Tickets = (() => {
         <div class="t-row t-mb1"><span>Mesa: <strong>${mesa.numero || '?'}</strong></span><span>N° ${numTicket}</span></div>
         <hr class="t-hr-dash">
         <div class="t-center t-bold">${pago.persona || 'Persona'}</div>
-        <div class="t-total-row"><span>TOTAL</span><span>${fmtMoneyTicket(pago.monto || 0)}</span></div>
+        <div class="t-total-row"><span>TOTAL</span><span>${formatearDineroTicket(pago.monto || 0)}</span></div>
         <hr class="t-hr-solid">
         <div class="t-row t-mb1"><span>Forma de pago</span><span>${pago.formaPago || 'Efectivo'}</span></div>
         <div class="t-footer">${cfg.pieTicket || '¡Gracias por visitarnos!'}</div>
@@ -300,7 +299,7 @@ const Tickets = (() => {
   function _imprimirEnVentana(contenido, titulo) {
     const win = window.open('', '_blank', 'width=420,height=680');
     if (!win) {
-      showToast('error', 'El navegador bloqueó la ventana emergente.');
+      mostrarToast('error', 'El navegador bloqueó la ventana emergente.');
       return;
     }
     win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>${titulo}</title>

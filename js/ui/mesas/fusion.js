@@ -1,14 +1,14 @@
 /* ================================================================
    LaTaberna - PubPOS — MESAS SUBMÓDULO (ES6)
    Archivo: js/ui/mesas/fusion.js
-   Versión: 1.0.2
+   Versión: 1.0.3
    Propósito: Modo fusión (toggle, selección, confirmar).
-              Migración de prompt a mostrarEntrada.
+              Migración a mostrarToast.
    ================================================================ */
 
 import { EventBus } from '../../lib/eventBus.js';
 import { DB } from '../../db.js';
-import { showToast, mostrarEntrada } from '../../utils.js';
+import { mostrarToast, mostrarEntrada } from '../../utils.js';
 import { isModoSeleccion, setModoSeleccion, getMesasSeleccionadas, limpiarSeleccion } from './renderer.js';
 import { renderGrid } from './renderer.js';
 
@@ -44,7 +44,7 @@ export function toggleSeleccionMesa(num, isChecked) {
 export async function fusionarMesasSeleccionadas() {
   const seleccionadas = getMesasSeleccionadas();
   if (seleccionadas.size < 2) {
-    showToast('warning', 'Selecciona al menos dos mesas para fusionar.');
+    mostrarToast('warning', 'Selecciona al menos dos mesas para fusionar.');
     return;
   }
   const numeros = Array.from(seleccionadas).sort((a, b) => {
@@ -58,15 +58,14 @@ export async function fusionarMesasSeleccionadas() {
     'Nombre para la mesa fusionada (opcional):\nFormato automático: 1+2',
     { placeholder: 'Ej: DJ, VIP' }
   );
-  // Si el usuario cancela, nombrePersonalizado será null/undefined, se usará '' para el automático
   const nombreFinal = nombrePersonalizado || '';
 
   const mesaVirtual = DB.fusionarMesas(numeros, mozo, nombreFinal);
   if (mesaVirtual) {
-    showToast('success', `Mesas fusionadas: ${mesaVirtual.numero}`);
+    mostrarToast('success', `Mesas fusionadas: ${mesaVirtual.numero}`);
     toggleModoFusion();
     EventBus.emit('mesa:seleccionada', mesaVirtual.numero);
   } else {
-    showToast('error', 'No se pudo fusionar. Verifica que el nombre no esté en uso.');
+    mostrarToast('error', 'No se pudo fusionar. Verifica que el nombre no esté en uso.');
   }
 }

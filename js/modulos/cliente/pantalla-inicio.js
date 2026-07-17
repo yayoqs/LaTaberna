@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — Módulo (ES6)
    Archivo: js/modulos/cliente/pantalla-inicio.js
-   Versión: 2.1.4
+   Versión: 2.1.5
    Propósito: Pantalla de inicio con triángulo neón, cabecera,
              vitrinas con imagen, títulos de sección y modal expansivo.
-             Lógica de registro delegada al Core (Auth v1.0.10).
+             Corregida la gestión del listener de cierre de login.
    ================================================================ */
 
 import { Auth } from '../../auth.js';
@@ -22,6 +22,7 @@ const PantallaInicio = (() => {
   ];
 
   let _cbLoginCorner, _cbModalClose, _cbModalAction;
+  let _cbCerrarModalLogin = null;  // ← nueva referencia para limpiar
   let _modalCards = [];
 
   function _asegurarVista() {
@@ -200,7 +201,6 @@ const PantallaInicio = (() => {
     _cbLoginCorner = () => _mostrarLogin();
 
     document.getElementById('btnLoginCorner').addEventListener('click', _cbLoginCorner);
-    // El enlace Registrarse del triángulo no tiene acción
 
     _iniciarEsloganDinamico();
     _conectarModalPortal();
@@ -210,7 +210,16 @@ const PantallaInicio = (() => {
     if (!_activada) return;
     _activada = false;
 
-    if (_cbLoginCorner) document.getElementById('btnLoginCorner').removeEventListener('click', _cbLoginCorner);
+    if (_cbLoginCorner) {
+      document.getElementById('btnLoginCorner').removeEventListener('click', _cbLoginCorner);
+    }
+
+    // Eliminar listener del botón de cerrar modal de login
+    if (_cbCerrarModalLogin) {
+      const btnCerrar = document.getElementById('btnCerrarModalLogin');
+      if (btnCerrar) btnCerrar.removeEventListener('click', _cbCerrarModalLogin);
+      _cbCerrarModalLogin = null;
+    }
 
     if (_intervaloEslogan) { clearInterval(_intervaloEslogan); _intervaloEslogan = null; }
 
@@ -300,13 +309,21 @@ const PantallaInicio = (() => {
 
   function _mostrarLogin() {
     if (typeof Auth.mostrarLogin === 'function') Auth.mostrarLogin();
-    // Restaurar la pantalla de inicio si se cierra el modal de login
+
+    // Eliminar listener previo antes de agregar uno nuevo
+    if (_cbCerrarModalLogin) {
+      const btnCerrarPrev = document.getElementById('btnCerrarModalLogin');
+      if (btnCerrarPrev) btnCerrarPrev.removeEventListener('click', _cbCerrarModalLogin);
+    }
+
+    _cbCerrarModalLogin = function() {
+      setTimeout(() => { PantallaInicio.mostrar(); }, 100);
+    };
+
     setTimeout(() => {
       const btnCerrar = document.getElementById('btnCerrarModalLogin');
       if (btnCerrar) {
-        btnCerrar.addEventListener('click', function() {
-          setTimeout(() => { PantallaInicio.mostrar(); }, 100);
-        }, { once: true });
+        btnCerrar.addEventListener('click', _cbCerrarModalLogin);
       }
     }, 100);
   }

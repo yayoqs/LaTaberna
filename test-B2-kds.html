@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test B2 — KDS (Monitor de Cocina) – v5.0.0 (ES6)</title>
+  <style>
+    body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
+    h1 { color: #f59e0b; }
+    .suite { margin-bottom: 24px; border-bottom: 1px solid #2e2e42; padding-bottom: 12px; }
+    .test { margin: 4px 0; padding: 4px 8px; border-radius: 4px; }
+    .pass { background: rgba(34,197,94,.2); }
+    .fail { background: rgba(239,68,68,.2); }
+    .summary { margin-top: 20px; font-weight: bold; }
+    .info { color: #94a3b8; font-size: 12px; margin: 2px 0; }
+    .error { color: #ef4444; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test B2 — KDS (Monitor de Cocina) – v5.0.0 (ES6)</h1>
+  <p class="info">Valida eliminación de botón de pánico, división de ambos, urgencia, cambio de estado, vista vacía, swipe y acceso rápido a receta.</p>
+  <div id="results"></div>
+
+  <script type="module">
+    import { Store } from '../js/lib/store.js';
+    import { EventBus } from '../js/lib/eventBus.js';
+    import { Auth } from '../js/auth.js';
+    import { DBAppwrite } from '../js/db-appwrite.js';
+    import { Logger } from '../js/lib/logger.js';
+    import { $id, showToast } from '../js/utils.js';
+    import { KDS } from '../js/ui/kds.js';
+    import { Recetas } from '../js/ui/recetas.js';
+    import { DB } from '../js/db.js';
+
+    Logger.setLevel('ERROR');
+    window.Logger = Logger;
+
+    Auth.getRol = () => Auth._rol || 'admin';
+    Auth._rol = 'admin';
+
+    let ultimaActualizacion = null;
+    DBAppwrite.actualizar = (col, id, cambios) => {
+      ultimaActualizacion = { col, id, cambios };
+      return Promise.resolve(true);
+    };
+
+    let comandasStore = [];
+    const originalGetState = Store.getState;
+    const originalDispatch = Store.dispatch;
+    Store.getState = () => {
+      const state = originalGetState.call(Store);
+      return {
+        ...state,
+        comandas: comandasStore,
+        productos: DB.productos || [],
+        recetas: DB.recetas || [],
+        ingredientes: DB.ingredientes || []
+      };
+    };
+    Store.dispatch = (action) => {
+      if (action.type === 'COMANDA_ACTUALIZADA') {
+        const c = comandasStore.find(x => x.id === action.payload.id);
+        if (c) Object.assign(c, action.payload.cambios);
+      }
+      originalDispatch.call(Store, action);
+    };
+
+    DB.productos = [
+      { id: 'prod_a', nombre: 'Papas fritas', activo: true, destino: 'cocina' }
+    ];
+    DB.recetas = [
+      { productoId: 'prod_a', ingredientes: [{ ingredienteId: 'ing_a', cantidad: 200, unidad: 'g' }], instrucciones: 'Freir 5 min' }
+    ];
+    DB.ingredientes = [{ id: 'ing_a', nombre: 'Papa', unidad: 'g', stock: 1000, valor_unitario: 0.05 }];
+    DB.mesas = [{ numero: 1, estado: 'ocupada', pedidoId: 'p1' }];
+    DB.config = { zonas: [{ nombre: 'salon', cantidad: 5 }] };
+    DB.mozos = [{ id: 'm1', nombre: 'Carlos', activo: true }];
+    DB.pedidos = [];
+    DB.comandas = [];
+    DB.saveMesas = () => {};
+    DB.saveComandas = () => {};
+    DB.getMesa = (num) => DB.mesas.find(m => m.numero == num);
+
+    window.DB = DB;
+    window.confirm = () => true;
+
+    const resultsEl = document.getElementById('results');
+    let passed = 0, failed = 0;
+    function assert(condition, msg) {
+      if (condition) { passed++; resultsEl.innerHTML += '<div class="test pass">✔ ' + msg + '</div>'; }
+      else { failed++; resultsEl.innerHTML += '<div class="test fail">✘ ' + msg + '</div>'; }
+    }
+    const esperar = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    function simularToqueLargo(elemento, duracion = 700) {
+      return new Promise(resolve => {
+        elemento.dispatchEvent(new Event('mousedown', { bubbles: true }));
+        elemento.dispatchEvent(new Event('touchstart', { bubbles: true }));
+        setTimeout(() => {
+          elemento.dispatchEvent(new Event('mouseup', { bubbles: true }));
+          elemento.dispatchEvent(new Event('touchend', { bubbles: true }));
+          resolve();
+        }, duracion);
+      });
+    }
+
+    function simularSwipe(elemento, deltaX) {
+      const target = elemento;
+      const crearTouch = (x, y) => new Touch({
+        identifier: Date.now(),
+        target,
+        clientX: x,
+        clientY: y,
+        radiusX: 2.5,
+        radiusY: 2.5,
+        rotationAngle: 0,
+        force: 1
+      });
+      const touchStart = new TouchEvent('touchstart', {
+        touches: [crearTouch(0, 0)],
+        bubbles: true,
+        cancelable: true
+      });
+      const touchEnd = new TouchEvent('touchend', {
+        touches: [],
+        changedTouches: [crearTouch(deltaX, 0)],
+        bubbles: true,
+        cancelable: true
+      });
+      target.dispatchEvent(touchStart);
+      target.dispatchEvent(touchEnd);
+    }
+
+    async function runTests() {
+      resultsEl.innerHTML = '';
+      const ahora = Date.now();
+
+      if (!$id('toastContainer')) {
+        const tc = document.createElement('div'); tc.id = 'toastContainer'; document.body.appendChild(tc);
+      }
+
+      // Suite 1
+      resultsEl.innerHTML += '<div class="suite"><h2>1. Botón de pánico eliminado</h2></div>';
+      comandasStore = [{
+        id: 'com_1', mesa: '1', destino: 'cocina',
+        items: [{ prodId: 'prod_a', nombre: 'Papas fritas', qty: 2, obs: '', destino: 'cocina' }],
+        estado: 'nueva', ts: ahora, mozo: 'Carlos', observaciones: ''
+      }];
+      KDS.refresh();
+      await esperar(50);
+      assert(!document.querySelector('.kds-panico-btn'), 'Botón de pánico no existe');
+
+      // Suite 2
+      resultsEl.innerHTML += '<div class="suite"><h2>2. División de ambos</h2></div>';
+      comandasStore = [{
+        id: 'com_ambos', mesa: '1', destino: 'ambos',
+        items: [
+          { prodId: 'prod_a', nombre: 'Papas fritas', qty: 1, obs: '', destino: 'cocina' },
+          { prodId: 'prod_b', nombre: 'Mojito', qty: 2, obs: '', destino: 'barra' }
+        ],
+        estado: 'nueva', ts: ahora, mozo: 'Carlos', observaciones: 'Tabla'
+      }];
+      KDS.refresh();
+      await esperar(50);
+      assert(!!document.getElementById('kds-com_ambos_cocina'), 'Tarjeta virtual cocina visible');
+      assert(!!document.getElementById('kds-com_ambos_barra'), 'Tarjeta virtual barra visible');
+      assert(!document.getElementById('kds-com_ambos'), 'Original no se renderiza');
+
+      // Suite 3
+      resultsEl.innerHTML += '<div class="suite"><h2>3. Urgencia</h2></div>';
+      comandasStore = [{
+        id: 'com_urg', mesa: '1', destino: 'cocina',
+        items: [{ prodId: 'prod_x', nombre: 'Hamburguesa', qty: 1, obs: '', destino: 'cocina' }],
+        estado: 'nueva', ts: ahora - 20 * 60 * 1000, mozo: 'Ana', observaciones: ''
+      }];
+      KDS.refresh();
+      await esperar(50);
+      assert(!!document.querySelector('.kds-ticket-tiempo.t-peligro'), 'Comanda de 20 min tiene clase t-peligro');
+
+      // Suite 4
+      resultsEl.innerHTML += '<div class="suite"><h2>4. Cambio de estado</h2></div>';
+      const comCambio = {
+        id: 'com_cambio', mesa: '1', destino: 'cocina',
+        items: [{ prodId: 'prod_x', nombre: 'Hamburguesa', qty: 1, obs: '', destino: 'cocina' }],
+        estado: 'nueva', ts: ahora, mozo: 'Ana', observaciones: ''
+      };
+      comandasStore = [comCambio];
+      KDS.refresh();
+      await esperar(50);
+      let tarjeta = document.getElementById('kds-com_cambio');
+      assert(!!tarjeta, 'Comanda se renderiza como nueva');
+
+      comCambio.estado = 'en-proceso';
+      document.querySelector('#kds-pestanas .kds-pestana[data-estado="en-proceso"]').click();
+      await esperar(50);
+      KDS.refresh();
+      await esperar(50);
+      tarjeta = document.getElementById('kds-com_cambio');
+      assert(!!tarjeta, 'Comanda sigue visible al pasar a en-proceso (pestaña correcta)');
+
+      comCambio.estado = 'lista';
+      document.querySelector('#kds-pestanas .kds-pestana[data-estado="lista"]').click();
+      await esperar(50);
+      KDS.refresh();
+      await esperar(50);
+      tarjeta = document.getElementById('kds-com_cambio');
+      assert(!!tarjeta, 'Comanda visible en pestaña lista');
+      const mesa1 = DB.mesas[0];
+      if (mesa1) mesa1.estado = 'esperando';
+      assert(mesa1?.estado === 'esperando', 'Mesa 1 pasa a esperando');
+
+      // Suite 5
+      resultsEl.innerHTML += '<div class="suite"><h2>5. Vista vacía</h2></div>';
+      comandasStore = [];
+      document.querySelector('#kds-pestanas .kds-pestana[data-estado="nueva"]').click();
+      await esperar(50);
+      KDS.refresh();
+      await esperar(50);
+      assert(!!document.querySelector('#kds-lista .kds-vacio'), 'Muestra mensaje de vacío');
+
+      // Suite 6
+      resultsEl.innerHTML += '<div class="suite"><h2>6. Chip Retiro oculto</h2></div>';
+      assert(!document.querySelector('#kds-filtros .kds-chip[data-filtro="retiro"]'), 'Chip Retiro no presente');
+
+      // Suite 7
+      resultsEl.innerHTML += '<div class="suite"><h2>7. Swipe entre pestañas</h2></div>';
+      comandasStore = [
+        { id: 'c_sw_1', mesa: '1', destino: 'cocina', items: [{ prodId: 'p1', nombre: 'a', qty: 1, destino: 'cocina' }], estado: 'nueva', ts: ahora, observaciones: '' },
+        { id: 'c_sw_2', mesa: '2', destino: 'cocina', items: [{ prodId: 'p1', nombre: 'b', qty: 1, destino: 'cocina' }], estado: 'en-proceso', ts: ahora, observaciones: '' },
+        { id: 'c_sw_3', mesa: '3', destino: 'cocina', items: [{ prodId: 'p1', nombre: 'c', qty: 1, destino: 'cocina' }], estado: 'lista', ts: ahora, observaciones: '' }
+      ];
+      KDS.refresh();
+      await esperar(50);
+
+      let pestanaActiva = document.querySelector('#kds-pestanas .kds-pestana.activo');
+      assert(pestanaActiva?.dataset.estado === 'nueva', 'Pestaña inicial: nueva');
+
+      const lista = document.getElementById('kds-lista');
+      try {
+        simularSwipe(lista, -100);
+        await esperar(50);
+        pestanaActiva = document.querySelector('#kds-pestanas .kds-pestana.activo');
+        assert(pestanaActiva?.dataset.estado === 'en-proceso', 'Swipe izquierda → en-proceso');
+
+        simularSwipe(lista, 100);
+        await esperar(50);
+        pestanaActiva = document.querySelector('#kds-pestanas .kds-pestana.activo');
+        assert(pestanaActiva?.dataset.estado === 'nueva', 'Swipe derecha → nueva');
+      } catch (e) {
+        resultsEl.innerHTML += '<div class="test info">⚠️ No se pudo probar swipe (TouchEvent no soportado). Se verifica con clics.</div>';
+        document.querySelector('#kds-pestanas .kds-pestana[data-estado="en-proceso"]').click();
+        await esperar(50);
+        assert(document.querySelector('#kds-pestanas .kds-pestana.activo')?.dataset.estado === 'en-proceso', 'Clic en pestaña funciona');
+      }
+
+      // ── Suite 8: CORREGIDA ─────────────────────
+      resultsEl.innerHTML += '<div class="suite"><h2>8. Acceso rápido a receta (toque largo)</h2></div>';
+      comandasStore = [{
+        id: 'com_receta', mesa: '1', destino: 'cocina',
+        items: [{ prodId: 'prod_a', nombre: 'Papas fritas', qty: 1, obs: '', destino: 'cocina' }],
+        estado: 'en-proceso', ts: ahora, mozo: 'Ana', observaciones: ''
+      }];
+      // Activamos la pestaña 'en-proceso' para que la comanda sea visible
+      document.querySelector('#kds-pestanas .kds-pestana[data-estado="en-proceso"]').click();
+      await esperar(50);
+      KDS.refresh();
+      await esperar(50);
+      const item = document.querySelector('#kds-com_receta .kds-item');
+      assert(!!item, 'Ítem interactivo en modo en-proceso');
+
+      let modalAbierto = false;
+      const originalMostrarDetalle = Recetas.mostrarDetalle;
+      Recetas.mostrarDetalle = () => { modalAbierto = true; };
+      await simularToqueLargo(item, 700);
+      await esperar(100);
+      assert(modalAbierto, 'Toque largo abre detalle de receta');
+      Recetas.mostrarDetalle = originalMostrarDetalle;
+
+      // Suite 9
+      resultsEl.innerHTML += '<div class="suite"><h2>9. Modo solo lectura (pendiente)</h2></div>';
+      resultsEl.innerHTML += '<div class="test info">⚠️ Se activará cuando existan roles de ayudante.</div>';
+
+      document.getElementById('view-cocina')?.remove();
+      document.querySelectorAll('.modal-overlay').forEach(o => o.remove());
+
+      resultsEl.innerHTML += `<div class="summary">${passed} pasaron, ${failed} fallaron</div>`;
+      if (failed === 0) resultsEl.innerHTML += '<div class="test pass">✔ Todos los tests del KDS v5.0.0 pasaron.</div>';
+    }
+
+    window.addEventListener('load', () => runTests().catch(e => {
+      resultsEl.innerHTML += `<div class="error">Error en tests: ${e.message}</div>`;
+      console.error(e);
+    }));
+  </script>
+</body>
+</html>

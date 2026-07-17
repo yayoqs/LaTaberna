@@ -1,12 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/mesa-detalles.js
-   Versión: 3.0.3
+   Versión: 3.0.5
    Propósito: Centro de operaciones de mesa. Panel unificado con
               columna colapsable (swipe), apertura inline, precargas,
-              resumen de comanda. Sin onclick, sin window.
-              Vinculación cliente-mesa corregida: actualiza Store,
-              emite evento correcto y mantiene panel abierto.
+              resumen de comanda. Corrección: eliminada dependencia
+              de mesa.total, usando solo cálculo desde ítems.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -18,7 +17,7 @@ import { Cobro } from './cobro.js';
 import { CommandBus } from '../lib/command-bus.js';
 import { Auth } from '../auth.js';
 import { DB } from '../db.js';
-import { showToast } from '../utils.js';
+import { mostrarToast } from '../utils.js';
 
 const MesaDetalles = (() => {
 
@@ -28,7 +27,6 @@ const MesaDetalles = (() => {
   let _comensalesApertura = 2;
   let _modoApertura = false;
 
-  // ── Swipe ─────────────────────────────────────────────────
   let _touchStartX = 0;
   let _touchStartY = 0;
 
@@ -52,7 +50,6 @@ const MesaDetalles = (() => {
     }
   }
 
-  // ── Construcción del modal ─────────────────────────────────
   function _asegurarModal() {
     if (document.getElementById('modalMesaDetalles')) return;
 
@@ -76,7 +73,6 @@ const MesaDetalles = (() => {
           </button>
         </div>
         <div class="centro-body" id="centroBody">
-          <!-- Columna izquierda (solo mesa ocupada) -->
           <div class="columna-izquierda" id="columnaIzquierda">
             <div class="dato-item-sm"><div class="dato-icon"><i class="fas fa-user-tag"></i></div><div class="dato-cuerpo"><div class="dato-label">Mozo</div><div class="dato-valor" id="mdMozo">—</div></div></div>
             <div class="dato-item-sm"><div class="dato-icon"><i class="fas fa-clock"></i></div><div class="dato-cuerpo"><div class="dato-label">Tiempo</div><div class="dato-valor" id="mdTiempo">—</div></div></div>
@@ -85,21 +81,13 @@ const MesaDetalles = (() => {
               <div class="comensales-lista" id="comensalesGrid"></div>
             </div>
           </div>
-          <!-- Columna derecha (contenido principal) -->
           <div class="columna-derecha" id="columnaDerecha">
-            <!-- Datos básicos (visible en libre/pagada) -->
             <div class="centro-datos" id="centroDatos"></div>
-            <!-- Mensaje pagada -->
             <div class="pagada-mensaje" id="pagadaMensaje" style="display:none;"></div>
-            <!-- Sección atención (cliente esperando) -->
             <div class="seccion-atencion" id="seccionEspera" style="display:none;"></div>
-            <!-- Resumen comanda (mesa ocupada) -->
             <div class="comanda-resumen" id="comandaResumen" style="display:none;"></div>
-            <!-- Precargas -->
             <div id="precargasContainer"></div>
-            <!-- Formulario apertura inline -->
             <div class="apertura-form" id="aperturaForm" style="display:none;"></div>
-            <!-- Acciones -->
             <div class="acciones-lista" id="accionesContainer"></div>
           </div>
         </div>
@@ -108,18 +96,15 @@ const MesaDetalles = (() => {
 
     document.body.appendChild(overlay);
 
-    // Listeners
     document.getElementById('btnCerrarMesaDetalles').addEventListener('click', cerrar);
     overlay.addEventListener('click', function(e) {
       if (e.target === overlay) cerrar();
     });
 
-    // Swipe en columna izquierda
     const columna = document.getElementById('columnaIzquierda');
     columna.addEventListener('touchstart', _onTouchStart, { passive: true });
     columna.addEventListener('touchend', _onTouchEnd, { passive: true });
 
-    // Delegación en columna derecha (acciones, apertura, precarga)
     document.getElementById('columnaDerecha').addEventListener('click', function(e) {
       const actionCard = e.target.closest('.action-card');
       if (actionCard) {
@@ -176,12 +161,10 @@ const MesaDetalles = (() => {
     });
   }
 
-  // ── Renderizado por estado ─────────────────────────────────
   function _renderizarEstado(mesa) {
     _mesaActual = mesa;
     const estado = mesa.estado;
 
-    // Título y badge
     document.getElementById('mdTitulo').textContent = mesa.esVirtual ? `Mesas ${mesa.mesasFusionadas.join(' + ')}` : `Mesa ${mesa.numero}`;
     const badge = document.getElementById('mdEstado');
     badge.textContent = Mesas.labelEstado(estado);
@@ -195,11 +178,9 @@ const MesaDetalles = (() => {
     const seccionEspera = document.getElementById('seccionEspera');
     const aperturaForm = document.getElementById('aperturaForm');
 
-    // Limpiar clases de layout
     centroBody.classList.remove('layout-simple');
 
     if (estado === 'ocupada' || estado === 'esperando' || estado === 'cuenta') {
-      // Layout con columna izquierda
       centroBody.classList.remove('layout-simple');
       columnaIzquierda.style.display = 'flex';
       datosContainer.style.display = 'none';
@@ -213,17 +194,14 @@ const MesaDetalles = (() => {
       _renderizarComensales(mesa.personas || []);
       _renderizarComanda(mesa);
     } else {
-      // Layout simple (libre / pagada)
       centroBody.classList.add('layout-simple');
       columnaIzquierda.style.display = 'none';
       datosContainer.style.display = 'grid';
       comandaResumen.style.display = 'none';
       aperturaForm.style.display = 'none';
 
-      // Mostrar datos básicos
       datosContainer.innerHTML = _htmlDatosBasicos(mesa);
 
-      // Pagada
       if (estado === 'pagada') {
         pagadaMensaje.style.display = 'block';
         pagadaMensaje.innerHTML = `
@@ -236,7 +214,6 @@ const MesaDetalles = (() => {
       }
     }
 
-    // Sección atención (espera/precarga)
     const infoAtencion = Mesas.getBadgeAtencion(mesa.numero);
     if (infoAtencion && infoAtencion.tipo === 'esperando' && estado === 'libre') {
       seccionEspera.style.display = 'flex';
@@ -262,10 +239,8 @@ const MesaDetalles = (() => {
       seccionEspera.style.display = 'none';
     }
 
-    // Acciones
     _renderizarAcciones(estado);
 
-    // Resetear modo apertura
     _modoApertura = false;
     _comensalesApertura = 2;
   }
@@ -333,7 +308,7 @@ const MesaDetalles = (() => {
             <div class="action-arrow"><i class="fas fa-angle-right"></i></div>
           </div>`;
       }
-    } else { // ocupada, esperando, cuenta
+    } else {
       container.innerHTML = `
         <div class="action-card primaria">
           <div class="action-icon"><i class="fas fa-utensils"></i></div>
@@ -353,7 +328,6 @@ const MesaDetalles = (() => {
     }
   }
 
-  // ── Apertura inline ───────────────────────────────────────
   function activarModoApertura() {
     _modoApertura = true;
     _comensalesApertura = 2;
@@ -402,19 +376,19 @@ const MesaDetalles = (() => {
         }
       });
       if (resultado.exito) {
-        showToast('success', `Mesa ${num} abierta`);
-        const mesas = Store.getState().mesas;
+        mostrarToast('success', `Mesa ${num} abierta`);
+        const mesas = Store.obtenerEstado().mesas;
         const mesaActualizada = mesas.find(m => m.numero == num);
         if (mesaActualizada) {
           _renderizarEstado(mesaActualizada);
         }
         EventBus.emit('mesa:tomar_pedido', { mesa: num });
       } else {
-        showToast('error', resultado.error || 'Error al abrir mesa');
+        mostrarToast('error', resultado.error || 'Error al abrir mesa');
       }
     } catch (e) {
       Logger.error('[MesaDetalles] Error al abrir mesa:', e);
-      showToast('error', 'Error inesperado al abrir mesa');
+      mostrarToast('error', 'Error inesperado al abrir mesa');
     }
   }
 
@@ -423,10 +397,9 @@ const MesaDetalles = (() => {
     return min === 0 ? 'Ahora' : `Hace ${min} min`;
   }
 
-  // ── API pública ──────────────────────────────────────────
   function abrir(numMesa) {
     _asegurarModal();
-    const mesas = Store.getState().mesas || [];
+    const mesas = Store.obtenerEstado().mesas || [];
     const mesa = mesas.find(m => m.numero == numMesa);
     if (!mesa) { Logger.warn('[MesaDetalles] Mesa no encontrada:', numMesa); return; }
 
@@ -450,7 +423,6 @@ const MesaDetalles = (() => {
   function cerrarMesa() { cerrar(); if (Cobro && Cobro.abrirModalCierre) Cobro.abrirModalCierre(); }
 
   function aceptarVinculacion(numMesa) {
-    // 1. Actualizar DB
     const mesa = DB.mesas.find(m => m.numero == numMesa);
     if (mesa) {
       mesa.estado = 'ocupada';
@@ -458,8 +430,7 @@ const MesaDetalles = (() => {
       DB.saveMesas();
     }
 
-    // 2. Actualizar Store
-    Store.dispatch({
+    Store.despachar({
       type: 'MESA_ACTUALIZAR',
       payload: {
         numero: numMesa,
@@ -467,17 +438,14 @@ const MesaDetalles = (() => {
       }
     });
 
-    // 3. Emitir evento en el formato que el cliente escucha
     EventBus.emit('mesas:actualizada', {
       numero: numMesa,
       estado: 'ocupada',
       permite_prepedidos: true
     });
 
-    // 4. Limpiar badge de atención
     Mesas.clearBadgeAtencion(numMesa);
 
-    // 5. Refrescar panel para mostrar vista de ocupada sin cerrar
     _mesaActual = DB.mesas.find(m => m.numero == numMesa) || _mesaActual;
     if (_mesaActual) {
       _renderizarEstado(_mesaActual);
@@ -497,7 +465,7 @@ const MesaDetalles = (() => {
     abrir(numMesa);
   });
 
-  Logger.info('[MesaDetalles] Módulo inicializado (ES6 v3.0.3).');
+  Logger.info('[MesaDetalles] Módulo inicializado (ES6 v3.0.5).');
 
   return {
     abrir,

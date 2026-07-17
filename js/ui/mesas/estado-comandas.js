@@ -1,15 +1,15 @@
 /* ================================================================
    LaTaberna - PubPOS — MESAS SUBMÓDULO (ES6)
    Archivo: js/ui/mesas/estado-comandas.js
-   Versión: 1.0.0
-   Propósito: Obtiene el estado más avanzado de las comandas
-              de una mesa para cocina y barra.
+   Versión: 1.0.1
+   Propósito: Obtiene el estado más avanzado de las comandas.
+              Migración a Store.obtenerEstado.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
 
 export function getEstadoComandas(mesaNumero) {
-  const comandas = Store.getState().comandas || [];
+  const comandas = Store.obtenerEstado().comandas || [];
   const estados = { cocina: 'pendiente', barra: 'pendiente' };
 
   comandas.forEach(c => {

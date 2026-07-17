@@ -1,0 +1,37 @@
+┌──────────────────────────────────────────────────────────┐
+│ REMITENTE: Coordinador de Integración                   │
+│ FECHA:     2026-07-08 01:00 UTC                        │
+│ TIPO:      DOCUMENTO OFICIAL                           │
+│ REFERENCIA: Flujo de acceso del cliente                  │
+└──────────────────────────────────────────────────────────┘
+
+# 📱 Flujo de Acceso del Cliente — La Taberna
+
+**Decisión oficial del Coordinador Puente.**
+
+### 1. Uso del QR
+
+  · El código QR se utiliza **exclusivamente** para dirigir al cliente a
+    la página de inicio de la aplicación.
+  · No se utiliza para identificar mesas, menús personalizados ni
+    ninguna otra funcionalidad.
+  · El QR contiene únicamente la URL pública de La Taberna.
+
+### 2. Flujo del cliente
+
+  1. El cliente escanea el QR o abre la aplicación.
+  2. La pantalla de inicio (`view-inicio`) le da la bienvenida.
+  3. El cliente inicia sesión con su cuenta o se registra.
+  4. El cliente indica en qué mesa se encuentra.
+  5. El garzón valida la presencia del cliente en la mesa.
+  6. El cliente accede al menú y realiza su pedido.
+
+### 3. Lo que NO debe hacerse
+
+  · Generar QR por mesa.
+  · Usar QR para menús personalizados.
+  · Cualquier otra funcionalidad que dependa de QR.
+
+---
+*Documento generado el 2026-07-08. Cualquier pregunta sobre este tema debe
+remitirse a este documento.*

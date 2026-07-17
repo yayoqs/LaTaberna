@@ -1,8 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — DESPENSA SUBMÓDULO (ES6)
    Archivo: js/ui/despensa/exportacion.js
-   Versión: 1.0.0
+   Versión: 1.0.1
    Propósito: Exportación del inventario a CSV y PDF.
+              v1.0.1: migra a nombres en español (store).
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -24,7 +25,7 @@ export function exportarCSV() {
 }
 
 export function exportarPDF() {
-  const ingredientes = Store.getState().ingredientes || DB.ingredientes || [];
+  const ingredientes = Store.obtenerEstado().ingredientes || DB.ingredientes || [];
 
   const html = `
     <html>

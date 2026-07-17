@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — REPARTO SUBMÓDULO (ES6)
    Archivo: js/ui/reparto/tabla.js
-   Versión: 1.0.3
+   Versión: 1.0.4
    Propósito: Render de la tabla de pedidos delivery y filtro por estado.
-              v1.0.3: asegurarVista corregida según estándar B1.
+              v1.0.4: renombra setEstadoFiltro a establecerEstadoFiltro.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -16,7 +16,7 @@ export function getEstadoFiltro() {
   return _estadoFiltro;
 }
 
-export function setEstadoFiltro(estado) {
+export function establecerEstadoFiltro(estado) {
   _estadoFiltro = estado;
 }
 
@@ -60,7 +60,7 @@ export function asegurarVista(onNuevoPedido, onEditarItems, onEnviarCocina, onDe
   const selectEstado = document.getElementById('repartoEstadoFilter');
   if (selectEstado) {
     selectEstado.addEventListener('change', function () {
-      setEstadoFiltro(this.value);
+      establecerEstadoFiltro(this.value);
       if (typeof onNuevoPedido === 'function') onNuevoPedido();
     });
   }

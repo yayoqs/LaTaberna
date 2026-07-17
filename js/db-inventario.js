@@ -1,14 +1,18 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-inventario.js
-   Versión: 1.0.4
+   Versión: 1.0.8
    Propósito: Gestión de ingredientes, recetas, stock y movimientos.
-              Incluye imports de Logger y EventBus.
+              Métodos auxiliares de validación ahora son privados.
+              Auth importado explícitamente.
+              Eliminada función duplicada validarStockParaArticulos.
+              Todos los catch registran error.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
 import { EventBus } from './lib/eventBus.js';
 import { DBAppwrite } from './db-appwrite.js';
+import { Auth } from './auth.js';
 
 export const DBInventario = (function() {
   const module = {};
@@ -17,63 +21,71 @@ export const DBInventario = (function() {
   module.recetas = [];
   module.movimientos = [];
 
+  // ══ FUNCIONES AUXILIARES PRIVADAS (no expuestas) ══
+
+  function _validarId(val, prefijo) {
+    if (typeof val === 'string' && val.length > 0) return val;
+    return `${prefijo}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+  }
+
+  function _validarString(val, defecto) {
+    return (typeof val === 'string' && val.trim()) ? val.trim() : defecto;
+  }
+
+  function _validarNumero(val, defecto) {
+    const num = Number(val);
+    return isNaN(num) ? defecto : num;
+  }
+
   /* ── NORMALIZACIONES ─────────────────────────────────────── */
   module._normalizarIngrediente = function(i) {
     return {
-      id: this._validarId(i.id, 'ins'),
-      nombre: this._validarString(i.nombre, 'Sin nombre'),
-      stock: this._validarNumero(i.stock, 0),
-      unidad: this._validarString(i.unidad, 'u'),
-      stock_minimo: this._validarNumero(i.stock_minimo, 0),
-      categoria: this._validarString(i.categoria, 'general'),
-      ubicacion: this._validarString(i.ubicacion, ''),
-      valor_unitario: this._validarNumero(i.valor_unitario, 0)
+      id: _validarId(i.id, 'ins'),
+      nombre: _validarString(i.nombre, 'Sin nombre'),
+      stock: _validarNumero(i.stock, 0),
+      unidad: _validarString(i.unidad, 'u'),
+      stock_minimo: _validarNumero(i.stock_minimo, 0),
+      categoria: _validarString(i.categoria, 'general'),
+      ubicacion: _validarString(i.ubicacion, ''),
+      valor_unitario: _validarNumero(i.valor_unitario, 0)
     };
   };
 
   module._normalizarReceta = function(r) {
     return {
-      id: this._validarId(r.id, 'rec'),
-      productoId: this._validarId(r.productoId, 'prod'),
+      id: _validarId(r.id, 'rec'),
+      productoId: _validarId(r.productoId, 'prod'),
       ingredientes: Array.isArray(r.ingredientes) ? r.ingredientes.map(ing => ({
-        ingredienteId: this._validarId(ing.ingredienteId, 'ins'),
-        cantidad: this._validarNumero(ing.cantidad, 0)
+        ingredienteId: _validarId(ing.ingredienteId, 'ins'),
+        cantidad: _validarNumero(ing.cantidad, 0)
       })) : [],
-      instrucciones: this._validarString(r.instrucciones, '')
+      instrucciones: _validarString(r.instrucciones, '')
     };
   };
 
   module._normalizarMovimiento = function(mov) {
     return {
-      id: this._validarId(mov.id, 'mov'),
-      ingredienteId: this._validarId(mov.ingredienteId, 'ins'),
+      id: _validarId(mov.id, 'mov'),
+      ingredienteId: _validarId(mov.ingredienteId, 'ins'),
       tipo: ['entrada', 'salida', 'ajuste'].includes(mov.tipo) ? mov.tipo : 'ajuste',
-      cantidad: this._validarNumero(mov.cantidad, 0),
+      cantidad: _validarNumero(mov.cantidad, 0),
       fecha: mov.fecha || new Date().toISOString(),
-      motivo: this._validarString(mov.motivo, ''),
-      usuario: this._validarString(mov.usuario, 'sistema')
+      motivo: _validarString(mov.motivo, ''),
+      usuario: _validarString(mov.usuario, 'sistema')
     };
-  };
-
-  /* ── VALIDACIONES AUXILIARES ───────────────────────────── */
-  module._validarId = function(val, prefijo) {
-    if (typeof val === 'string' && val.length > 0) return val;
-    return `${prefijo}_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-  };
-  module._validarString = function(val, defecto) {
-    return (typeof val === 'string' && val.trim()) ? val.trim() : defecto;
-  };
-  module._validarNumero = function(val, defecto) {
-    const num = Number(val);
-    return isNaN(num) ? defecto : num;
   };
 
   /* ── PERSISTENCIA LOCAL ────────────────────────────────── */
   module._cargarIngredientesLocal = function() {
     const raw = localStorage.getItem('pubpos_ingredientes');
     if (raw) {
-      const ingParseados = JSON.parse(raw);
-      this.ingredientes = ingParseados.map(i => this._normalizarIngrediente(i));
+      try {
+        const ingParseados = JSON.parse(raw);
+        this.ingredientes = ingParseados.map(i => this._normalizarIngrediente(i));
+      } catch (e) {
+        Logger.error('[DBInventario] Error al parsear ingredientes locales:', e);
+        this.ingredientes = [];
+      }
     } else {
       this.ingredientes = [];
     }
@@ -82,8 +94,13 @@ export const DBInventario = (function() {
   module._cargarRecetasLocal = function() {
     const raw = localStorage.getItem('pubpos_recetas');
     if (raw) {
-      const recParseadas = JSON.parse(raw);
-      this.recetas = recParseadas.map(r => this._normalizarReceta(r));
+      try {
+        const recParseadas = JSON.parse(raw);
+        this.recetas = recParseadas.map(r => this._normalizarReceta(r));
+      } catch (e) {
+        Logger.error('[DBInventario] Error al parsear recetas locales:', e);
+        this.recetas = [];
+      }
     } else {
       this.recetas = [];
     }
@@ -92,8 +109,13 @@ export const DBInventario = (function() {
   module._cargarMovimientosLocal = function() {
     const raw = localStorage.getItem('pubpos_movimientos');
     if (raw) {
-      const movParseados = JSON.parse(raw);
-      this.movimientos = movParseados.map(m => this._normalizarMovimiento(m));
+      try {
+        const movParseados = JSON.parse(raw);
+        this.movimientos = movParseados.map(m => this._normalizarMovimiento(m));
+      } catch (e) {
+        Logger.error('[DBInventario] Error al parsear movimientos locales:', e);
+        this.movimientos = [];
+      }
     } else {
       this.movimientos = [];
     }
@@ -159,7 +181,7 @@ export const DBInventario = (function() {
         cantidad: -cantidadADescontar,
         fecha: new Date().toISOString(),
         motivo: motivo,
-        usuario: (typeof Auth !== 'undefined' && Auth.getNombre) ? Auth.getNombre() : 'sistema'
+        usuario: (Auth && Auth.obtenerNombre) ? Auth.obtenerNombre() : 'sistema'
       }));
 
       if (ingrediente.stock <= ingrediente.stock_minimo) {
@@ -190,7 +212,7 @@ export const DBInventario = (function() {
       cantidad: cantidadDelta,
       fecha: new Date().toISOString(),
       motivo: motivo,
-      usuario: (typeof Auth !== 'undefined' && Auth.getNombre) ? Auth.getNombre() : 'sistema'
+      usuario: (Auth && Auth.obtenerNombre) ? Auth.obtenerNombre() : 'sistema'
     }));
 
     this.saveIngredientes();
@@ -205,46 +227,6 @@ export const DBInventario = (function() {
       });
     }
     return true;
-  };
-
-  module.validarStockParaItems = function(items) {
-    const faltantes = [];
-    const totalNecesario = new Map();
-
-    for (const item of items) {
-      const receta = this.recetas.find(r => r.productoId == item.prodId);
-      if (!receta) continue;
-
-      for (const ingReceta of receta.ingredientes) {
-        const ingData = this.ingredientes.find(i => i.id === ingReceta.ingredienteId);
-        if (!ingData) continue;
-
-        const cantidadNecesaria = ingReceta.cantidad * item.qty;
-
-        if (!totalNecesario.has(ingReceta.ingredienteId)) {
-          totalNecesario.set(ingReceta.ingredienteId, {
-            nombre: ingData.nombre,
-            unidad: ingData.unidad,
-            stockActual: ingData.stock,
-            cantidadNecesaria: 0
-          });
-        }
-        totalNecesario.get(ingReceta.ingredienteId).cantidadNecesaria += cantidadNecesaria;
-      }
-    }
-
-    for (const [ingId, datos] of totalNecesario.entries()) {
-      if (datos.stockActual < datos.cantidadNecesaria) {
-        faltantes.push({
-          ingrediente: datos.nombre,
-          faltante: datos.cantidadNecesaria - datos.stockActual,
-          stockActual: datos.stockActual,
-          unidad: datos.unidad
-        });
-      }
-    }
-
-    return { ok: faltantes.length === 0, faltantes };
   };
 
   return module;

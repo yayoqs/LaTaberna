@@ -1,247 +1,328 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/kds.css
-   Versión: 1.0.0
-   Propósito: Monitor de cocina (KDS), tarjetas de comanda y estados.
+   Versión: 3.0.0
+   Propósito: Estilos para la vista del Jefe de Cocina/Barra.
+              Encapsulado bajo #view-cocina. Sin :root.
    ================================================================ */
 
-/* ── GRID KDS ──────────────────────────────────────────────── */
-.kds-grid {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
-  align-content: start;
+/* ── Filtros ────────────────────────────────── */
+#view-cocina .kds-filtros {
+  display: flex;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+  overflow-x: auto;
+}
+#view-cocina .kds-chip {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-sec);
+  padding: 5px 13px;
+  border-radius: 99px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--t);
+}
+#view-cocina .kds-chip.activo {
+  background: var(--color-accent);
+  color: #000;
+  border-color: var(--color-accent);
 }
 
-/* ── TARJETA KDS ───────────────────────────────────────────── */
-.kds-card {
+/* ── Pestañas de estado ─────────────────────── */
+#view-cocina .kds-pestanas {
+  display: flex;
+  gap: 6px;
+  padding: 10px 16px;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+}
+#view-cocina .kds-pestana {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 7px 4px;
+  cursor: pointer;
+}
+#view-cocina .kds-pestana b { font-size: 16px; }
+#view-cocina .kds-pestana span {
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .3px;
+  color: var(--color-text-muted);
+}
+#view-cocina .kds-pestana[data-estado="nueva"].activo {
+  box-shadow: inset 0 0 0 2px var(--color-warning);
+}
+#view-cocina .kds-pestana[data-estado="nueva"].activo b { color: var(--color-warning); }
+#view-cocina .kds-pestana[data-estado="en-proceso"].activo {
+  box-shadow: inset 0 0 0 2px var(--color-cocina);
+}
+#view-cocina .kds-pestana[data-estado="en-proceso"].activo b { color: var(--color-cocina); }
+#view-cocina .kds-pestana[data-estado="lista"].activo {
+  box-shadow: inset 0 0 0 2px var(--color-success);
+}
+#view-cocina .kds-pestana[data-estado="lista"].activo b { color: var(--color-success); }
+
+/* ── Resumen ───────────────────────────────── */
+#view-cocina .kds-resumen {
+  display: flex;
+  gap: 8px;
+  padding: 8px 16px;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+  overflow-x: auto;
+}
+#view-cocina .kds-pildora {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  padding: 5px 11px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-sec);
+  white-space: nowrap;
+}
+#view-cocina .kds-pildora b { color: var(--color-text); }
+#view-cocina .kds-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+/* ── Lista de comandas ──────────────────────── */
+#view-cocina .kds-lista {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 14px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+#view-cocina .kds-vacio {
+  text-align: center;
+  color: var(--color-text-muted);
+  margin-top: 50px;
+}
+
+/* ── Ticket ─────────────────────────────────── */
+#view-cocina .kds-ticket {
   background: var(--color-card);
   border: 2px solid var(--color-border);
   border-radius: var(--radius);
-  overflow: hidden;
-  box-shadow: var(--shadow-sm);
-  transition: var(--t);
-  display: flex;
-  flex-direction: column;
+  padding: 13px 14px;
+  box-shadow: var(--shadow);
+  animation: kds-llegar .3s ease-out;
 }
+@keyframes kds-llegar {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+#view-cocina .kds-ticket.kds-saliendo {
+  animation: kds-salir .22s ease-in forwards;
+}
+@keyframes kds-salir {
+  to { opacity: 0; transform: scale(.95) translateY(6px); }
+}
+#view-cocina .kds-ticket.kds-urgente { border-color: var(--color-danger); }
 
-/* ── ESTADOS DE LA TARJETA ─────────────────────────────────── */
-.kds-card.nueva {
-  border-color: var(--color-warning);
-  animation: kds-pulse 2s infinite;
-}
-.kds-card.en-proceso { border-color: var(--color-info); }
-.kds-card.lista      { border-color: var(--color-success); opacity: .75; }
-
-@keyframes kds-pulse {
-  0%,100% { box-shadow: 0 0 0 0   rgba(245,158,11,.35); }
-  50%      { box-shadow: 0 0 0 8px rgba(245,158,11,0); }
-}
-
-/* ── HEADER ────────────────────────────────────────────────── */
-.kds-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 14px;
-  background: var(--color-panel);
-  gap: 8px;
-}
-.kds-mesa {
-  font-size: 16px;
-  font-weight: 800;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.kds-mesa i { color: var(--color-accent); }
-.kds-mozo { font-size: 11px; color: var(--color-text-muted); font-weight: 400; }
-
-.kds-meta {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 3px;
-}
-.kds-destino-tag {
-  font-size: 10px;
-  font-weight: 700;
-  padding: 2px 10px;
-  border-radius: 99px;
-  text-transform: uppercase;
-}
-.kds-destino-tag.cocina { background: rgba(249,115,22,.2); color: var(--color-cocina); }
-.kds-destino-tag.barra  { background: rgba(139,92,246,.2); color: var(--color-barra); }
-.kds-destino-tag.ambos  { background: rgba(245,158,11,.2); color: var(--color-accent); }
-
-.kds-time { font-size: 11px; color: var(--color-text-muted); }
-.kds-time.urgente { color: var(--color-danger); font-weight: 700; }
-
-/* ── GRUPO ─────────────────────────────────────────────────── */
-.kds-grupo-tag {
-  font-size: 10px;
-  background: rgba(139,92,246,.15);
-  color: #c4b5fd;
-  padding: 2px 8px;
-  border-radius: 99px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-/* ── LISTA DE ÍTEMS ────────────────────────────────────────── */
-.kds-items {
-  padding: 12px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  flex: 1;
-}
-.kds-item {
+#view-cocina .kds-ticket-cabecera {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  font-size: 13px;
+  justify-content: space-between;
+  gap: 8px;
 }
-.kds-qty {
+#view-cocina .kds-ticket-numero {
+  font-size: 23px;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--color-text);
+}
+#view-cocina .kds-ticket-mesa {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  font-weight: 600;
+  margin-top: 2px;
+}
+#view-cocina .kds-ticket-tipo {
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 99px;
+  letter-spacing: .4px;
+  flex-shrink: 0;
+}
+#view-cocina .kds-tipo-mesa { background: rgba(59,130,246,.2); color: var(--color-info); }
+#view-cocina .kds-tipo-reparto { background: rgba(139,92,246,.2); color: var(--color-barra); }
+#view-cocina .kds-tipo-retiro { background: rgba(34,197,94,.2); color: var(--color-success); }
+
+#view-cocina .kds-ticket-tiempo {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 700;
+  font-size: 12px;
+  padding: 3px 9px;
+  border-radius: var(--radius-xs);
+  margin-top: 8px;
+}
+#view-cocina .t-ok { background: rgba(34,197,94,.15); color: var(--color-success); }
+#view-cocina .t-warn { background: rgba(245,158,11,.15); color: var(--color-warning); }
+#view-cocina .t-peligro {
+  background: rgba(239,68,68,.15);
+  color: var(--color-danger);
+  animation: kds-pulso 1s infinite;
+}
+@keyframes kds-pulso {
+  0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,.35); }
+  50% { box-shadow: 0 0 0 5px rgba(239,68,68,0); }
+}
+
+#view-cocina .kds-ticket-items {
+  margin-top: 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+#view-cocina .kds-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13.5px;
+  padding: 5px 6px;
+  margin: 0 -6px;
+  border-radius: var(--radius-xs);
+  transition: background .15s;
+}
+#view-cocina .kds-item.kds-item-tocable { cursor: pointer; }
+#view-cocina .kds-item.kds-item-tocable:active { background: rgba(255,255,255,.05); }
+#view-cocina .kds-item-cantidad {
   background: var(--color-accent);
   color: #000;
   font-weight: 800;
-  width: 26px;
-  height: 26px;
+  width: 21px;
+  height: 21px;
   border-radius: var(--radius-xs);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 13px;
+  font-size: 11px;
   flex-shrink: 0;
 }
-.kds-item-name  { font-weight: 500; flex: 1; display: flex; align-items: center; gap: 6px; }
-.kds-item-obs   { font-size: 11px; color: var(--color-warning); margin-top: 2px; }
-
-/* Observación general */
-.kds-obs {
-  padding: 0 14px 10px;
-  font-size: 11px;
-  color: var(--color-warning);
-  font-style: italic;
-}
-
-/* ── BOTÓN DE PÁNICO ───────────────────────────────────────── */
-.kds-panico-btn {
-  background: transparent;
-  border: 1px solid var(--color-danger);
-  color: var(--color-danger);
-  border-radius: 50%;
+#view-cocina .kds-item-check {
   width: 20px;
   height: 20px;
-  font-size: 10px;
-  cursor: pointer;
-  display: inline-flex;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 2px solid var(--color-border);
+  display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0;
-  margin-left: 4px;
-  transition: all 0.15s;
+  font-size: 10px;
+  color: transparent;
+  transition: var(--t);
 }
-.kds-panico-btn:hover {
-  background: var(--color-danger);
-  color: #fff;
+#view-cocina .kds-item-check.kds-item-marcado {
+  background: var(--color-success);
+  border-color: var(--color-success);
+  color: #04220f;
+}
+#view-cocina .kds-item-nombre { flex: 1; }
+#view-cocina .kds-item.kds-item-listo .kds-item-nombre {
+  color: var(--color-text-muted);
+  text-decoration: line-through;
 }
 
-/* ── FOOTER / ACCIONES ─────────────────────────────────────── */
-.kds-footer {
-  padding: 10px 14px;
-  border-top: 1px solid var(--color-border);
-  display: flex;
-  gap: 8px;
-}
-.kds-btn {
-  flex: 1;
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  padding: 8px;
-  font-size: 12px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: var(--t);
+#view-cocina .kds-progreso {
+  font-size: 10.5px;
+  color: var(--color-text-muted);
+  font-weight: 600;
+  margin-top: 6px;
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 5px;
 }
-.kds-btn-proceso {
-  background: rgba(59,130,246,.2);
-  color: var(--color-info);
-  border-color: rgba(59,130,246,.3);
-}
-.kds-btn-proceso:hover { background: var(--color-info); color: #fff; }
-.kds-btn-lista {
-  background: rgba(34,197,94,.2);
-  color: var(--color-success);
-  border-color: rgba(34,197,94,.3);
-}
-.kds-btn-lista:hover { background: var(--color-success); color: #fff; }
-.kds-lista-ok {
+#view-cocina .kds-progreso-barra {
   flex: 1;
-  text-align: center;
-  color: var(--color-success);
+  height: 4px;
+  background: var(--color-border);
+  border-radius: 99px;
+  overflow: hidden;
+}
+#view-cocina .kds-progreso-lleno {
+  height: 100%;
+  background: var(--color-success);
+  border-radius: 99px;
+  transition: width .25s;
+}
+
+#view-cocina .kds-ticket-banderas {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+#view-cocina .kds-bandera {
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 3px 7px;
+  border-radius: var(--radius-xs);
+}
+#view-cocina .kds-bandera-grupo { background: rgba(139,92,246,.15); color: #c4b5fd; }
+
+#view-cocina .kds-ticket-acciones { margin-top: 12px; }
+#view-cocina .kds-boton {
+  width: 100%;
+  padding: 13px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: transform .12s, background .15s;
+  border: none;
+}
+#view-cocina .kds-boton:active { transform: scale(.97); }
+#view-cocina .kds-boton-iniciar { background: var(--color-warning); color: #1a0d00; }
+#view-cocina .kds-boton-listo { background: var(--color-success); color: #04220f; }
+#view-cocina .kds-boton-entregar { background: var(--color-info); color: #04122b; }
+
+#view-cocina .kds-acciones-secundarias {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+#view-cocina .kds-boton-reabrir {
+  background: transparent;
+  border: 1px solid var(--color-info);
+  color: var(--color-info);
+  padding: 5px 10px;
+  border-radius: var(--radius-xs);
+  font-size: 11px;
   font-weight: 700;
-  font-size: 12px;
+  cursor: pointer;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
+  gap: 4px;
+  transition: var(--t);
 }
-
-/* ── ESTADO VACÍO ──────────────────────────────────────────── */
-.kds-empty {
-  grid-column: 1/-1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 60px;
-  color: var(--color-text-muted);
-  text-align: center;
-}
-.kds-empty i { font-size: 48px; opacity: .2; }
-.kds-empty-title { font-size: 16px; font-weight: 700; color: var(--color-text-sec); }
-
-/* ── VISTA COMPACTA (tablets ≤ 600px) ──────────────────────── */
-@media (max-width: 600px) {
-  .kds-grid {
-    grid-template-columns: 1fr;
-    padding: 12px;
-    gap: 10px;
-  }
-  .kds-header {
-    padding: 8px 10px;
-  }
-  .kds-mesa {
-    font-size: 14px;
-  }
-  .kds-items {
-    padding: 8px 10px;
-    gap: 5px;
-  }
-  .kds-item {
-    font-size: 12px;
-  }
-  .kds-qty {
-    width: 22px;
-    height: 22px;
-    font-size: 11px;
-  }
-  .kds-btn {
-    padding: 6px;
-    font-size: 11px;
-  }
-  .kds-footer {
-    padding: 8px 10px;
-  }
-}
+#view-cocina .kds-boton-reabrir:active { background: var(--color-info); color: #04122b; }

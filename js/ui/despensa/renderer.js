@@ -1,22 +1,20 @@
 /* ================================================================
    LaTaberna - PubPOS — DESPENSA SUBMÓDULO (ES6)
    Archivo: js/ui/despensa/renderer.js
-   Versión: 1.0.0
-   Propósito: Renderizado de la vista de despensa: tabla, resumen,
-              alertas de stock bajo y movimientos.
+   Versión: 1.0.1
+   Propósito: Renderizado de la vista de despensa.
+              v1.0.1: migra a nombres en español (utils, store).
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
 import { Auth } from '../../auth.js';
-import { fmtMoney } from '../../utils.js';
+import { formatearDinero } from '../../utils.js';
 import {
   getCategoriaFiltro,
   getOrdenColumnas,
   getPaginaMovimientos,
   getMovsPorPagina
 } from './estado.js';
-
-// ── CONSTRUCCIÓN DEL DOM ──────────────────────────────────
 
 export function asegurarVista() {
   let main = document.getElementById('view-despensa');
@@ -95,29 +93,24 @@ export function asegurarVista() {
   `;
 }
 
-// ── TABLA DE INGREDIENTES ─────────────────────────────────
-
 export function renderTabla() {
   const tbody = document.getElementById('ingredientesBody');
   if (!tbody) return;
 
-  let ingredientes = Store.getState().ingredientes || [];
+  let ingredientes = Store.obtenerEstado().ingredientes || [];
   const rol = Auth.getRol();
 
-  // Filtro por rol (para modo operativo de cocina/barra)
   if (rol === 'cocina') {
     ingredientes = ingredientes.filter(i => i.categoria === 'cocina');
   } else if (rol === 'barra') {
     ingredientes = ingredientes.filter(i => i.categoria === 'barra');
   }
 
-  // Filtro de categoría
   const catFiltro = getCategoriaFiltro();
   if (catFiltro !== 'todas') {
     ingredientes = ingredientes.filter(i => (i.categoria || 'general') === catFiltro);
   }
 
-  // Filtro de búsqueda textual
   const termino = (document.getElementById('ingredienteSearch')?.value || '').trim().toLowerCase();
   if (termino) {
     ingredientes = ingredientes.filter(i =>
@@ -127,7 +120,6 @@ export function renderTabla() {
     );
   }
 
-  // Filtros avanzados (checkboxes + ubicación)
   const filtroBajo = document.getElementById('filtroBajoMinimo')?.checked;
   const filtroValor = document.getElementById('filtroConValor')?.checked;
   const filtroUbicacion = (document.getElementById('filtroUbicacion')?.value || '').trim().toLowerCase();
@@ -142,7 +134,6 @@ export function renderTabla() {
     ingredientes = ingredientes.filter(i => (i.ubicacion || '').toLowerCase().includes(filtroUbicacion));
   }
 
-  // Ordenamiento
   const orden = getOrdenColumnas();
   if (orden.length > 0) {
     ingredientes.sort((a, b) => {
@@ -157,7 +148,6 @@ export function renderTabla() {
       return 0;
     });
   } else {
-    // Orden por defecto: críticos primero
     ingredientes.sort((a, b) => {
       const critA = a.stock <= a.stock_minimo ? 1 : 0;
       const critB = b.stock <= b.stock_minimo ? 1 : 0;
@@ -193,8 +183,8 @@ export function renderTabla() {
         <td>${ing.unidad}</td>
         <td>${ing.stock_minimo}</td>
         <td>${ing.ubicacion || '—'}</td>
-        <td>${valorUnitario ? fmtMoney(valorUnitario) : '—'}</td>
-        <td><strong>${valorTotal ? fmtMoney(valorTotal) : '—'}</strong></td>
+        <td>${valorUnitario ? formatearDinero(valorUnitario) : '—'}</td>
+        <td><strong>${valorTotal ? formatearDinero(valorTotal) : '—'}</strong></td>
         <td>
           <button class="btn-ajuste" data-accion="editar" data-id="${ing.id}"><i class="fas fa-edit"></i></button>
           <button class="btn-ajuste" data-accion="ajuste" data-id="${ing.id}"><i class="fas fa-pen"></i></button>
@@ -203,13 +193,11 @@ export function renderTabla() {
   }).join('');
 }
 
-// ── RESUMEN SUPERIOR ──────────────────────────────────────
-
 export function renderResumen() {
   const cont = document.getElementById('inventarioResumen');
   if (!cont) return;
 
-  const ingredientes = Store.getState().ingredientes || [];
+  const ingredientes = Store.obtenerEstado().ingredientes || [];
   const totalItems = ingredientes.length;
   const bajoMin = ingredientes.filter(i => i.stock <= i.stock_minimo).length;
   const valorTotal = ingredientes.reduce((sum, i) => sum + (i.stock * (i.valor_unitario || 0)), 0);
@@ -217,18 +205,16 @@ export function renderResumen() {
   cont.innerHTML = `
     <div class="resumen-card">
       <span><i class="fas fa-cubes"></i> Total ítems: <strong>${totalItems}</strong></span>
-      <span><i class="fas fa-dollar-sign"></i> Valor inventario: <strong>${fmtMoney(valorTotal)}</strong></span>
+      <span><i class="fas fa-dollar-sign"></i> Valor inventario: <strong>${formatearDinero(valorTotal)}</strong></span>
       <span style="color:var(--color-warning);"><i class="fas fa-exclamation-triangle"></i> Bajo mínimo: <strong>${bajoMin}</strong></span>
     </div>
   `;
 }
 
-// ── ALERTAS DE STOCK BAJO ─────────────────────────────────
-
 export function renderAlertas() {
   const cont = document.getElementById('alertasStockList');
   if (!cont) return;
-  const ingredientes = Store.getState().ingredientes || [];
+  const ingredientes = Store.obtenerEstado().ingredientes || [];
   const criticos = ingredientes.filter(i => i.stock <= i.stock_minimo);
   if (!criticos.length) {
     cont.innerHTML = `<p style="color:var(--color-text-muted);"><i class="fas fa-check-circle"></i> Todo en orden</p>`;
@@ -242,14 +228,12 @@ export function renderAlertas() {
     </div>`).join('');
 }
 
-// ── ÚLTIMOS MOVIMIENTOS ───────────────────────────────────
-
 export function renderMovimientos() {
   const cont = document.getElementById('movimientosList');
   const paginador = document.getElementById('movimientosPaginador');
   if (!cont) return;
 
-  const movs = Store.getState().movimientos || [];
+  const movs = Store.obtenerEstado().movimientos || [];
   const recientes = [...movs].reverse();
 
   const totalMovs = recientes.length;
@@ -265,7 +249,7 @@ export function renderMovimientos() {
   }
 
   cont.innerHTML = movsPaginados.map(mov => {
-    const ing = (Store.getState().ingredientes || []).find(i => i.id === mov.ingredienteId);
+    const ing = (Store.obtenerEstado().ingredientes || []).find(i => i.id === mov.ingredienteId);
     const nombre = ing ? ing.nombre : mov.ingredienteId;
     const signo = mov.cantidad >= 0 ? '+' : '';
     const clase = mov.cantidad >= 0 ? 'success' : 'danger';
@@ -285,8 +269,6 @@ export function renderMovimientos() {
     paginador.innerHTML = '';
   }
 }
-
-// ── RENDER COMPLETO ───────────────────────────────────────
 
 export function renderCompleto() {
   renderResumen();

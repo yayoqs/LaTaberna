@@ -1,23 +1,23 @@
 /* ================================================================
    LaTaberna - PubPOS — REPARTO SUBMÓDULO (ES6)
    Archivo: js/ui/reparto/acciones.js
-   Versión: 1.0.1
+   Versión: 1.0.2
    Propósito: Acciones sobre pedidos de delivery: enviar a cocina,
               despachar, confirmar entrega, eliminar.
-              v1.0.1: migra confirm a mostrarConfirmacion.
+              v1.0.2: migra a nombres en español (utils).
    ================================================================ */
 
 import { DB } from '../../db.js';
 import { DeliveryService } from '../../servicios/delivery-service.js';
 import { EventBus } from '../../lib/eventBus.js';
 import { Logger } from '../../lib/logger.js';
-import { showToast, mostrarConfirmacion } from '../../utils.js';
+import { mostrarToast, mostrarConfirmacion } from '../../utils.js';
 
 export async function enviarACocina(deliveryId) {
   if (typeof DB !== 'undefined' && DB.comandas) {
     const existeComanda = DB.comandas.find(c => c.deliveryId === deliveryId);
     if (existeComanda) {
-      showToast('warning', 'Este pedido ya tiene una comanda en cocina.');
+      mostrarToast('warning', 'Este pedido ya tiene una comanda en cocina.');
       return;
     }
   }
@@ -26,19 +26,19 @@ export async function enviarACocina(deliveryId) {
     const r = await DeliveryService.enviarACocina(deliveryId);
     if (r.exito) {
       _crearComandaParaDelivery(deliveryId);
-      showToast('success', 'Enviado a Cocina');
+      mostrarToast('success', 'Enviado a Cocina');
       return;
     } else {
-      showToast('error', r.error);
+      mostrarToast('error', r.error);
       return;
     }
   }
 
   const ped = DB.pedidosDelivery.find(p => p.id === deliveryId);
-  if (!ped) { showToast('error', 'No encontrado'); return; }
+  if (!ped) { mostrarToast('error', 'No encontrado'); return; }
   DB.actualizarPedidoDelivery(deliveryId, { estado: 'en_preparacion' });
   _crearComandaParaDelivery(deliveryId);
-  showToast('success', 'Enviado a Cocina');
+  mostrarToast('success', 'Enviado a Cocina');
 }
 
 function _crearComandaParaDelivery(deliveryId) {
@@ -83,15 +83,15 @@ export async function despachar(deliveryId) {
     const r = await DeliveryService.despachar(deliveryId);
     if (r.exito) {
       DB.actualizarPedidoDelivery(deliveryId, { estado: 'en_camino' });
-      showToast('success', 'En camino');
+      mostrarToast('success', 'En camino');
       return;
     } else {
-      showToast('error', r.error);
+      mostrarToast('error', r.error);
       return;
     }
   }
   DB.actualizarPedidoDelivery(deliveryId, { estado: 'en_camino' });
-  showToast('success', 'En camino');
+  mostrarToast('success', 'En camino');
 }
 
 export async function confirmarEntrega(deliveryId) {
@@ -99,15 +99,15 @@ export async function confirmarEntrega(deliveryId) {
     const r = await DeliveryService.confirmarEntrega(deliveryId);
     if (r.exito) {
       DB.actualizarPedidoDelivery(deliveryId, { estado: 'entregado' });
-      showToast('success', 'Entregado');
+      mostrarToast('success', 'Entregado');
       return;
     } else {
-      showToast('error', r.error);
+      mostrarToast('error', r.error);
       return;
     }
   }
   DB.actualizarPedidoDelivery(deliveryId, { estado: 'entregado' });
-  showToast('success', 'Entregado');
+  mostrarToast('success', 'Entregado');
 }
 
 export async function eliminarPedido(id) {
@@ -121,13 +121,13 @@ export async function eliminarPedido(id) {
     DeliveryService.cancelar(id).then(r => {
       if (r.exito) {
         DB.eliminarPedidoDelivery(id);
-        showToast('warning', 'Cancelado');
+        mostrarToast('warning', 'Cancelado');
       } else {
-        showToast('error', r.error);
+        mostrarToast('error', r.error);
       }
     });
     return;
   }
   DB.eliminarPedidoDelivery(id);
-  showToast('warning', 'Eliminado');
+  mostrarToast('warning', 'Eliminado');
 }

@@ -1,13 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db.js
-   Versión: 1.0.10
+   Versión: 1.0.12
    Propósito: Orquestador de base de datos (Appwrite + localStorage).
               Sincronización y reseteo de mesas por configuración de zonas.
-              Incluye imports de Logger, EventBus, Store y Auth.
-              Fallback local robusto si Appwrite no responde.
-              mesaVacia disponible como parte del combined.
-              Timestamp unificado a actualizadoEn en PEDIDO_CERRADO.
+              Fallback offline robusto: si Appwrite no responde,
+              carga desde localStorage y continúa operando.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -37,97 +35,66 @@ export const DB = (function() {
 
   combined.init = async function() {
     try {
-      Logger.info("[DB] Iniciando carga de datos (Appwrite)...");
+      Logger.info("[DB] Iniciando carga de datos...");
 
+      // 1. Intentar inicializar Appwrite
       var appwriteOk = false;
       if (appwrite && appwrite.iniciar) {
-        appwriteOk = await appwrite.iniciar();
+        try {
+          appwriteOk = await appwrite.iniciar();
+        } catch (e) {
+          Logger.warn("[DB] No se pudo iniciar Appwrite:", e.message);
+          appwriteOk = false;
+        }
       }
 
-      if (!appwriteOk) {
-        Logger.warn("[DB] Appwrite no disponible. La aplicación no puede iniciar.");
-        this._mostrarErrorCarga();
-        return false;
-      }
-
+      // 2. Cargar configuración (intenta Appwrite, fallback a localStorage)
       await inicializarAuth();
       await this._cargarConfiguracion();
       this._cargarMozosLocal();
 
-      Logger.info('[DB] Cargando datos desde Appwrite (paralelo)...');
-      try {
-        var resultados = {};
-        var promesas = [
-          'productos',
-          'pedidos',
-          'mesas',
-          'comandas',
-          'ingredientes',
-          'recetas',
-          'pedidos_delivery'
-        ].map(function(coleccion) {
-          return appwrite.listar(coleccion).then(function(lista) {
-            resultados[coleccion] = lista;
-          }).catch(function(e) {
-            Logger.warn('[DB] Error al cargar ' + coleccion + ':', e);
-            resultados[coleccion] = [];
+      // 3. Si Appwrite está disponible, intentar cargar desde la nube
+      if (appwriteOk) {
+        Logger.info('[DB] Appwrite disponible. Cargando datos desde la nube (paralelo)...');
+        try {
+          var resultados = {};
+          var promesas = [
+            'productos',
+            'pedidos',
+            'mesas',
+            'comandas',
+            'ingredientes',
+            'recetas',
+            'pedidos_delivery'
+          ].map(function(coleccion) {
+            return appwrite.listar(coleccion).then(function(lista) {
+              resultados[coleccion] = lista;
+            }).catch(function(e) {
+              Logger.warn('[DB] Error al cargar ' + coleccion + ' desde Appwrite, usando fallback local:', e.message);
+              resultados[coleccion] = null; // Marcar como fallido para usar local
+            });
           });
-        });
 
-        await Promise.all(promesas);
+          await Promise.all(promesas);
 
-        var prodAppwrite = resultados.productos || [];
-        if (prodAppwrite.length) {
-          this.productos = prodAppwrite.map(p => this._normalizarProducto(p));
-          EventBus.emit('productos:cargados', this.productos);
+          // Procesar cada colección: Appwrite si ok, si no localStorage
+          this._procesarProductos(resultados.productos);
+          this._procesarPedidos(resultados.pedidos);
+          this._procesarMesas(resultados.mesas);
+          this._procesarComandas(resultados.comandas);
+          this._procesarIngredientes(resultados.ingredientes);
+          this._procesarRecetas(resultados.recetas);
+          this._procesarPedidosDelivery(resultados.pedidos_delivery);
+
+          Logger.info('[DB] Datos cargados exitosamente.');
+        } catch (e) {
+          Logger.error('[DB] Error al cargar desde Appwrite, usando fallback local:', e);
+          this._cargarTodoLocal();
         }
-
-        var pedidosAppwrite = resultados.pedidos || [];
-        if (pedidosAppwrite.length) {
-          this.pedidos = pedidosAppwrite.map(p => ({
-            ...p,
-            items: typeof p.items === 'string' ? p.items : JSON.stringify(p.items)
-          }));
-        }
-
-        var comandasAppwrite = resultados.comandas || [];
-        if (comandasAppwrite.length) {
-          this.comandas = comandasAppwrite.map(c => ({
-            ...c,
-            items: typeof c.items === 'string' ? JSON.parse(c.items) : c.items
-          }));
-        }
-
-        var mesasAppwrite = resultados.mesas || [];
-        this.mesas = mesasAppwrite.length > 0
-          ? mesasAppwrite.map(m => this._normalizarMesa(m))
-          : [];
-
-        var ingAppwrite = resultados.ingredientes || [];
-        if (ingAppwrite.length) {
-          this.ingredientes = ingAppwrite.map(i => this._normalizarIngrediente(i));
-        }
-
-        var recAppwrite = resultados.recetas || [];
-        if (recAppwrite.length) {
-          this.recetas = recAppwrite.map(function(r) {
-            if (typeof r.ingredientes === 'string') {
-              try { r.ingredientes = JSON.parse(r.ingredientes); } catch (e) { r.ingredientes = []; }
-            }
-            return r;
-          });
-        }
-
-        var delivAppwrite = resultados.pedidos_delivery || [];
-        if (delivAppwrite.length) {
-          this.pedidosDelivery = delivAppwrite;
-        }
-
-        Logger.info('[DB] Datos de Appwrite cargados exitosamente.');
-      } catch (e) {
-        Logger.error('[DB] Error al cargar desde Appwrite:', e);
-        this._mostrarErrorCarga();
-        return false;
+      } else {
+        // 4. Si Appwrite no está disponible, cargar todo desde localStorage
+        Logger.info('[DB] Appwrite no disponible. Cargando datos desde localStorage...');
+        this._cargarTodoLocal();
       }
 
       Logger.info("[DB] Inicialización completada.");
@@ -135,10 +102,107 @@ export const DB = (function() {
       return true;
     } catch (e) {
       Logger.error("[DB] Error crítico en init:", e);
-      this._mostrarErrorCarga();
+      EventBus.emit('app:error', 'No se pudieron cargar los datos iniciales.');
       return false;
     }
   };
+
+  // ══ MÉTODOS DE CARGA POR COLECCIÓN (Appwrite o localStorage) ══
+
+  combined._procesarProductos = function(lista) {
+    if (lista && Array.isArray(lista) && lista.length > 0) {
+      this.productos = lista.map(p => this._normalizarProducto(p));
+    } else {
+      this._cargarProductosLocal();
+    }
+    EventBus.emit('productos:cargados', this.productos);
+  };
+
+  combined._cargarProductosLocal = function() {
+    const raw = localStorage.getItem('pubpos_productos');
+    if (raw) {
+      try {
+        this.productos = JSON.parse(raw).map(p => this._normalizarProducto(p));
+      } catch (e) {
+        Logger.error('[DB] Error al parsear productos locales:', e);
+        this.productos = [];
+      }
+    }
+  };
+
+  combined._procesarPedidos = function(lista) {
+    if (lista && Array.isArray(lista) && lista.length > 0) {
+      this.pedidos = lista.map(p => ({
+        ...p,
+        items: typeof p.items === 'string' ? p.items : JSON.stringify(p.items)
+      }));
+    } else {
+      this._cargarPedidosLocal();
+    }
+  };
+
+  combined._procesarComandas = function(lista) {
+    if (lista && Array.isArray(lista) && lista.length > 0) {
+      this.comandas = lista.map(c => ({
+        ...c,
+        items: typeof c.items === 'string' ? JSON.parse(c.items) : c.items
+      }));
+    } else {
+      this._cargarComandasLocal();
+    }
+  };
+
+  combined._procesarMesas = function(lista) {
+    if (lista && Array.isArray(lista) && lista.length > 0) {
+      this.mesas = lista.map(m => this._normalizarMesa(m));
+    } else {
+      this._cargarMesasLocal();
+    }
+    this.mesas.sort((a, b) => a.numero - b.numero);
+  };
+
+  combined._procesarIngredientes = function(lista) {
+    if (lista && Array.isArray(lista) && lista.length > 0) {
+      this.ingredientes = lista.map(i => this._normalizarIngrediente(i));
+    } else {
+      this._cargarIngredientesLocal();
+    }
+  };
+
+  combined._procesarRecetas = function(lista) {
+    if (lista && Array.isArray(lista) && lista.length > 0) {
+      this.recetas = lista.map(function(r) {
+        if (typeof r.ingredientes === 'string') {
+          try { r.ingredientes = JSON.parse(r.ingredientes); } catch (e) { r.ingredientes = []; }
+        }
+        return r;
+      });
+    } else {
+      this._cargarRecetasLocal();
+    }
+  };
+
+  combined._procesarPedidosDelivery = function(lista) {
+    if (lista && Array.isArray(lista) && lista.length > 0) {
+      this.pedidosDelivery = lista;
+    } else {
+      this._cargarPedidosDeliveryLocal();
+    }
+  };
+
+  combined._cargarTodoLocal = function() {
+    this._cargarProductosLocal();
+    this._cargarPedidosLocal();
+    this._cargarMesasLocal();
+    this._cargarComandasLocal();
+    this._cargarIngredientesLocal();
+    this._cargarRecetasLocal();
+    this._cargarPedidosDeliveryLocal();
+    this.saveMesas();
+    Logger.info('[DB] Todos los datos cargados desde localStorage.');
+  };
+
+  // ══ RESTO DE MÉTODOS (sin cambios desde v1.0.11) ══
 
   combined.sincronizarMesasConConfig = async function() {
     if (!appwrite || !appwrite.habilitado) return;

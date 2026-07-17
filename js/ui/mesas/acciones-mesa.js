@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MESAS SUBMÓDULO (ES6)
    Archivo: js/ui/mesas/acciones-mesa.js
-   Versión: 1.0.0
+   Versión: 1.0.1
    Propósito: Funciones de acción sobre mesas (agregar, badges,
-              zonas, labels) extraídas de la fachada mesas.js
-              para romper dependencia circular con ciclo-vida.
+              zonas, labels). Migración a nuevos nombres en español
+              de utils y store.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -12,15 +12,15 @@ import { EventBus } from '../../lib/eventBus.js';
 import { Logger } from '../../lib/logger.js';
 import { DB } from '../../db.js';
 import { CommandBus } from '../../lib/command-bus.js';
-import { showToast } from '../../utils.js';
+import { mostrarToast } from '../../utils.js';
 import { LABELS } from './constantes.js';
 import { getNotificaciones, addNotificacion, removeNotificacion, clearNotificaciones } from './notificaciones.js';
 import { renderGrid, renderZoneButtons, setZonaActiva } from './renderer.js';
 
 function agregarMesa() {
-  const zonas = (Store.getState().config && Store.getState().config.zonas) || DB.config.zonas || [];
+  const zonas = (Store.obtenerEstado().config && Store.obtenerEstado().config.zonas) || DB.config.zonas || [];
   const zona = zonas.length > 0 ? zonas[0].nombre : 'salon';
-  const mesas = Store.getState().mesas;
+  const mesas = Store.obtenerEstado().mesas;
   const maxNum = mesas.reduce((max, m) => Math.max(max, typeof m.numero === 'number' ? m.numero : 0), 0);
   const nuevoNum = maxNum + 1;
 
@@ -29,13 +29,13 @@ function agregarMesa() {
     datos: { numero: nuevoNum, zona }
   }).then(resultado => {
     if (resultado.exito) {
-      showToast('success', `Mesa ${nuevoNum} agregada (${zona})`);
+      mostrarToast('success', `Mesa ${nuevoNum} agregada (${zona})`);
     } else {
-      showToast('error', resultado.error || 'Error al agregar mesa');
+      mostrarToast('error', resultado.error || 'Error al agregar mesa');
     }
   }).catch(err => {
     Logger.error('[Mesas] Error al ejecutar comando agregarMesa:', err);
-    showToast('error', 'Error inesperado al agregar mesa');
+    mostrarToast('error', 'Error inesperado al agregar mesa');
   });
 }
 
@@ -66,7 +66,7 @@ function getBadgeAtencion(numMesa) {
   
   const espera = notificaciones.find(n => n.tipo === 'esperando');
   if (espera) {
-    const mesa = (Store.getState().mesas || []).find(m => m.numero == numMesa);
+    const mesa = (Store.obtenerEstado().mesas || []).find(m => m.numero == numMesa);
     if (mesa && mesa.estado === 'libre' && mesa.permite_prepedidos === false) {
       return { tipo: 'esperando', nombre: 'Cliente', iniciales: 'C' };
     }

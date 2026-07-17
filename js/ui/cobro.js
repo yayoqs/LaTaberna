@@ -1,14 +1,14 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/cobro.js
-   Versión: 2.0.2
+   Versión: 2.0.4
    Propósito: Modal de cierre de mesa, split bill con pagos por persona,
               pago total y liberación controlada por caja.
-              Desacoplado de Comanda y Pedido vía EventBus.
+              Migración a nombres en español (utils/store).
    ================================================================ */
 
 import { Auth } from '../auth.js';
-import { fmtMoney, showToast, calcularTotal, $id } from '../utils.js';
+import { formatearDinero, mostrarToast, calcularTotal, $id } from '../utils.js';
 import { Logger } from '../lib/logger.js';
 import { Deps } from '../lib/deps.js';
 import { CommandBus } from '../lib/command-bus.js';
@@ -28,7 +28,7 @@ const Cobro = (() => {
     try {
       _pedidoService = Deps.obtener('pedidoService');
     } catch (e) {
-      Logger.error('[Cobro] No se pudo obtener pedidoService');
+      Logger.error('[Cobro] No se pudo obtener pedidoService:', e);
     }
     return _pedidoService;
   }
@@ -84,24 +84,23 @@ const Cobro = (() => {
 
   function abrirModalCierre(mesaOpcional) {
     if (!Auth.puedeCerrarMesa()) {
-      showToast('error', 'No tienes permiso para cerrar mesas');
+      mostrarToast('error', 'No tienes permiso para cerrar mesas');
       return;
     }
 
-    // Obtener la mesa activa: usar la opcional o la que tenga estado 'cuenta'/'ocupada'
     if (!mesaOpcional) {
-      const mesas = Store.getState().mesas || [];
+      const mesas = Store.obtenerEstado().mesas || [];
       _mesaACerrar = mesas.find(m => m.estado === 'cuenta' || m.estado === 'ocupada');
     } else {
       _mesaACerrar = mesaOpcional;
     }
 
     if (!_mesaACerrar) {
-      showToast('warning', 'No hay ninguna mesa para cerrar.');
+      mostrarToast('warning', 'No hay ninguna mesa para cerrar.');
       return;
     }
     if (!_mesaACerrar.items || _mesaACerrar.items.length === 0) {
-      showToast('warning', 'La mesa no tiene consumos.');
+      mostrarToast('warning', 'La mesa no tiene consumos.');
       return;
     }
 
@@ -134,13 +133,13 @@ const Cobro = (() => {
     });
     let html = `<div><strong>Mesa ${_mesaACerrar.numero}</strong> - ${_mesaACerrar.mozo}</div>`;
     for (const [persona, data] of Object.entries(porPersona)) {
-      html += `<div class="cierre-persona-group"><div class="cierre-persona-header">${persona} <span>${fmtMoney(data.subtotal)}</span></div>`;
+      html += `<div class="cierre-persona-group"><div class="cierre-persona-header">${persona} <span>${formatearDinero(data.subtotal)}</span></div>`;
       data.items.forEach(it => {
-        html += `<div class="cierre-resumen-row"><span>${it.qty}x ${it.nombre}</span><span>${fmtMoney(it.precio * it.qty)}</span></div>`;
+        html += `<div class="cierre-resumen-row"><span>${it.qty}x ${it.nombre}</span><span>${formatearDinero(it.precio * it.qty)}</span></div>`;
       });
       html += `</div>`;
     }
-    html += `<div class="cierre-resumen-row total-row"><span>Total</span><span>${fmtMoney(_mesaACerrar.total)}</span></div>`;
+    html += `<div class="cierre-resumen-row total-row"><span>Total</span><span>${formatearDinero(_mesaACerrar.total)}</span></div>`;
     resumenEl.innerHTML = html;
 
     if (Object.keys(porPersona).length > 1) {
@@ -170,7 +169,7 @@ const Cobro = (() => {
       const forma = pagoExistente ? pagoExistente.formaPago : 'Efectivo';
 
       html += `<div class="pago-persona-row" id="fila-${persona.replace(/\s/g, '_')}">
-        <span>${persona}: ${fmtMoney(montoSugerido)}</span>
+        <span>${persona}: ${formatearDinero(montoSugerido)}</span>
         <select class="select-forma-pago" data-persona="${persona}">
           <option value="Efectivo" ${forma === 'Efectivo' ? 'selected' : ''}>Efectivo</option>
           <option value="Débito" ${forma === 'Débito' ? 'selected' : ''}>Débito</option>
@@ -233,7 +232,7 @@ const Cobro = (() => {
       .filter(p => p.pagado)
       .reduce((s, p) => s + p.monto, 0);
     const pendiente = total - pagado;
-    infoEl.textContent = `Pagado: ${fmtMoney(pagado)} | Pendiente: ${fmtMoney(pendiente)}`;
+    infoEl.textContent = `Pagado: ${formatearDinero(pagado)} | Pendiente: ${formatearDinero(pendiente)}`;
   }
 
   function actualizarFormaPagoPersona(persona, forma) {
@@ -250,25 +249,31 @@ const Cobro = (() => {
 
   async function cobrarPersona(persona) {
     const pago = _pagosParciales.find(p => p.persona === persona);
-    if (!pago) return showToast('error', 'Persona no encontrada en pagos');
+    if (!pago) return mostrarToast('error', 'Persona no encontrada en pagos');
 
     if (!_mesaACerrar || !_mesaACerrar.pedidoId) {
-      return showToast('error', 'La mesa no tiene un pedido asociado.');
+      return mostrarToast('error', 'La mesa no tiene un pedido asociado.');
     }
 
     const pedidoService = _getPedidoService();
     if (!pedidoService) {
-      return showToast('error', 'Servicio de pedidos no disponible.');
+      return mostrarToast('error', 'Servicio de pedidos no disponible.');
     }
 
-    const resultado = await pedidoService.agregarTransaccion(_mesaACerrar.pedidoId, {
-      persona,
-      monto: pago.monto,
-      formaPago: pago.formaPago
-    });
+    let resultado;
+    try {
+      resultado = await pedidoService.agregarTransaccion(_mesaACerrar.pedidoId, {
+        persona,
+        monto: pago.monto,
+        formaPago: pago.formaPago
+      });
+    } catch (e) {
+      Logger.error('[Cobro] Error al agregar transacción:', e);
+      return mostrarToast('error', 'Error al procesar el pago.');
+    }
 
     if (!resultado.exito) {
-      return showToast('error', resultado.error || 'Error al cobrar');
+      return mostrarToast('error', resultado.error || 'Error al cobrar');
     }
 
     pago.pagado = true;
@@ -287,7 +292,6 @@ const Cobro = (() => {
         onImprimir: () => true,
         textoExtra: 'Liberar Mesa',
         onExtra: async () => {
-          // Emitir evento en lugar de llamar a Pedido directamente
           EventBus.emit('pago:confirmado', {
             mesa: _mesaACerrar.numero,
             pedidoId: _mesaACerrar.pedidoId,
@@ -301,19 +305,19 @@ const Cobro = (() => {
             });
             if (res.exito) {
               EventBus.emit('pedido:cerrado', { mesa: _mesaACerrar.numero });
-              showToast('success', `Mesa ${_mesaACerrar.numero} liberada.`);
+              mostrarToast('success', `Mesa ${_mesaACerrar.numero} liberada.`);
             } else {
-              showToast('error', 'Error al liberar la mesa: ' + res.error);
+              mostrarToast('error', 'Error al liberar la mesa: ' + res.error);
             }
           } catch (err) {
             Logger.error('[Cobro] Error al liberar mesa:', err);
-            showToast('error', 'Error inesperado al liberar la mesa.');
+            mostrarToast('error', 'Error inesperado al liberar la mesa.');
           }
           _mesaACerrar = null;
         }
       });
     } else {
-      showToast('success', `${persona} pagó ${fmtMoney(pago.monto)}. Saldo pendiente: ${fmtMoney(resultado.datos.saldoRestante)}`);
+      mostrarToast('success', `${persona} pagó ${formatearDinero(pago.monto)}. Saldo pendiente: ${formatearDinero(resultado.datos.saldoRestante)}`);
     }
   }
 
@@ -343,7 +347,7 @@ const Cobro = (() => {
     const descuento = parseFloat(descuentoInput?.value) || 0;
     const total = subtotal * (1 - descuento / 100);
     const totalEl = document.getElementById('cierreTotalFinal');
-    if (totalEl) totalEl.textContent = `TOTAL A COBRAR: ${fmtMoney(total)}`;
+    if (totalEl) totalEl.textContent = `TOTAL A COBRAR: ${formatearDinero(total)}`;
   }
 
   async function confirmarCierre() {
@@ -355,7 +359,7 @@ const Cobro = (() => {
     if (usarSplit) {
       const pendientes = _pagosParciales.filter(p => !p.pagado);
       if (pendientes.length === 0) {
-        showToast('warning', 'No hay pagos pendientes.');
+        mostrarToast('warning', 'No hay pagos pendientes.');
         return;
       }
       for (const pago of pendientes) {
@@ -364,7 +368,6 @@ const Cobro = (() => {
       return;
     }
 
-    // Modo pago único
     const subtotal = calcularTotal(_mesaACerrar.items);
     const descuentoInput = document.getElementById('cierreDescuento');
     const descuento = parseFloat(descuentoInput?.value) || 0;
@@ -372,12 +375,12 @@ const Cobro = (() => {
 
     const pedidoService = _getPedidoService();
     if (!pedidoService) {
-      showToast('error', 'Servicio de pedidos no disponible.');
+      mostrarToast('error', 'Servicio de pedidos no disponible.');
       return;
     }
 
     if (!_mesaACerrar.pedidoId) {
-      showToast('error', 'La mesa no tiene un pedido asociado.');
+      mostrarToast('error', 'La mesa no tiene un pedido asociado.');
       return;
     }
 
@@ -392,12 +395,12 @@ const Cobro = (() => {
       });
     } catch (e) {
       Logger.error('[Cobro] Error al cerrar pedido:', e);
-      showToast('error', 'Error al procesar el pago: ' + e.message);
+      mostrarToast('error', 'Error al procesar el pago: ' + e.message);
       return;
     }
 
     if (!resultado.exito) {
-      showToast('error', resultado.error || 'Error al procesar el pago');
+      mostrarToast('error', resultado.error || 'Error al procesar el pago');
       return;
     }
 
@@ -419,7 +422,7 @@ const Cobro = (() => {
         Logger.info('[Cobro] Pedido sincronizado con Sheets tras el cierre.');
       } catch (e) {
         Logger.warn('[Cobro] Error al sincronizar con Sheets, encolado.', e);
-        showToast('warning', 'El ticket se guardó localmente y se enviará cuando haya conexión.');
+        mostrarToast('warning', 'El ticket se guardó localmente y se enviará cuando haya conexión.');
       }
     }
 
@@ -432,7 +435,6 @@ const Cobro = (() => {
       onImprimir: () => true,
       textoExtra: 'Liberar Mesa',
       onExtra: async () => {
-        // Emitir evento en lugar de llamar a Pedido directamente
         EventBus.emit('pago:confirmado', {
           mesa: _mesaACerrar.numero,
           pedidoId: _mesaACerrar.pedidoId,
@@ -446,13 +448,13 @@ const Cobro = (() => {
           });
           if (res.exito) {
             EventBus.emit('pedido:cerrado', { mesa: _mesaACerrar.numero });
-            showToast('success', `Mesa ${_mesaACerrar.numero} liberada.`);
+            mostrarToast('success', `Mesa ${_mesaACerrar.numero} liberada.`);
           } else {
-            showToast('error', 'Error al liberar la mesa: ' + res.error);
+            mostrarToast('error', 'Error al liberar la mesa: ' + res.error);
           }
         } catch (err) {
           Logger.error('[Cobro] Error al liberar mesa:', err);
-          showToast('error', 'Error inesperado al liberar la mesa.');
+          mostrarToast('error', 'Error inesperado al liberar la mesa.');
         }
         _mesaACerrar = null;
       }

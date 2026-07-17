@@ -3,27 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>Jefe de Cocina — La Taberna</title>
+  <title>Encargado de Cocina — La Taberna (Prototipo)</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
   <style>
+    /* Variables de prueba (no :root en producción) */
     :root {
-      --bg: #0f0f0f;
-      --card: #1a1a1a;
-      --panel: #262626;
-      --border: #333;
-      --text: #e0e0e0;
-      --text-sec: #b0b0b0;
-      --text-muted: #888;
-      --accent: #f59e0b;
-      --success: #22c55e;
-      --info: #3b82f6;
-      --warning: #f59e0b;
-      --danger: #ef4444;
-      --cocina: #f97316;
-      --barra: #8b5cf6;
+      --color-bg: #0f0f0f;
+      --color-card: #1a1a1a;
+      --color-panel: #262626;
+      --color-border: #333;
+      --color-text: #e0e0e0;
+      --color-text-sec: #b0b0b0;
+      --color-text-muted: #888;
+      --color-accent: #f59e0b;
+      --color-success: #22c55e;
+      --color-info: #3b82f6;
+      --color-warning: #f59e0b;
+      --color-danger: #ef4444;
+      --color-cocina: #f97316;
+      --color-barra: #8b5cf6;
       --radius: 12px;
-      --radius-xs: 6px;
       --radius-sm: 8px;
+      --radius-xs: 6px;
       --shadow: 0 4px 14px rgba(0,0,0,.4);
       --t: .2s ease;
     }
@@ -31,8 +32,8 @@
     html, body { height: 100%; }
     body {
       font-family: 'Segoe UI', system-ui, sans-serif;
-      background: var(--bg);
-      color: var(--text);
+      background: var(--color-bg);
+      color: var(--color-text);
       max-width: 520px;
       margin: 0 auto;
       min-height: 100vh;
@@ -43,44 +44,42 @@
       padding-bottom: env(safe-area-inset-bottom);
     }
 
-    /* ── Header con pestañas ──────────────────── */
-    .app-header {
+    /* ── Toolbar ──────────────────────────────── */
+    .toolbar {
       position: sticky;
       top: 0;
       z-index: 30;
-      background: var(--panel);
-      border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-    .header-top {
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding: 12px 16px 10px;
+      background: var(--color-panel);
+      border-bottom: 1px solid var(--color-border);
+      flex-shrink: 0;
     }
-    .header-top h2 {
+    .toolbar h2 {
       font-size: 17px;
       display: flex;
       align-items: center;
       gap: 8px;
-      color: var(--cocina);
+      color: var(--color-cocina);
     }
-    .header-top h2 small {
+    .toolbar h2 small {
       display: block;
       font-size: 10px;
-      color: var(--text-muted);
+      color: var(--color-text-muted);
       font-weight: 500;
       margin-top: 1px;
     }
-    .header-actions {
+    .toolbar-acciones {
       display: flex;
       align-items: center;
       gap: 8px;
     }
-    .btn-icon {
-      background: var(--card);
-      border: 1px solid var(--border);
-      color: var(--text-sec);
+    .btn-icono {
+      background: var(--color-card);
+      border: 1px solid var(--color-border);
+      color: var(--color-text-sec);
       width: 34px; height: 34px;
       border-radius: var(--radius-sm);
       font-size: 13px;
@@ -90,71 +89,36 @@
       justify-content: center;
       transition: var(--t);
     }
-    .btn-icon:active { background: var(--border); }
+    .btn-icono:active { background: var(--color-border); }
     .campana { position: relative; }
     .campana .punto {
       position: absolute; top: -3px; right: -3px;
       width: 9px; height: 9px; border-radius: 50%;
-      background: var(--danger); box-shadow: 0 0 0 2px var(--panel);
+      background: var(--color-danger); box-shadow: 0 0 0 2px var(--color-panel);
       display: none;
     }
     .campana.activa .punto { display: block; }
     .reloj {
       font-size: 14px;
       font-weight: 600;
-      color: var(--text);
+      color: var(--color-text);
       min-width: 46px;
       text-align: right;
     }
 
-    .header-tabs {
-      display: flex;
-      gap: 0;
-      border-top: 1px solid var(--border);
-    }
-    .tab-nav {
-      flex: 1;
-      background: transparent;
-      border: none;
-      color: var(--text-muted);
-      padding: 10px 8px;
-      font-size: 13px;
-      font-weight: 700;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      border-bottom: 2px solid transparent;
-      transition: var(--t);
-    }
-    .tab-nav.activo {
-      color: var(--cocina);
-      border-bottom-color: var(--cocina);
-    }
-    .tab-nav i { font-size: 14px; }
-
-    /* ── Contenido principal ──────────────────── */
-    .view-container {
-      flex: 1;
-      overflow-y: auto;
-    }
-    .view-panel { display: none; }
-    .view-panel.activo { display: flex; flex-direction: column; }
-
-    /* ── Filtros y resumen (comandas) ─────────── */
-    .filtros {
+    /* ── Filtros ──────────────────────────────── */
+    .kds-filtros {
       display: flex;
       gap: 6px;
       padding: 8px 16px;
-      background: var(--bg);
-      border-bottom: 1px solid var(--border);
+      background: var(--color-bg);
+      border-bottom: 1px solid var(--color-border);
       overflow-x: auto;
     }
-    .chip {
-      background: var(--card);
-      border: 1px solid var(--border);
-      color: var(--text-sec);
+    .kds-chip {
+      background: var(--color-card);
+      border: 1px solid var(--color-border);
+      color: var(--color-text-sec);
       padding: 5px 13px;
       border-radius: 99px;
       font-size: 11.5px;
@@ -163,61 +127,64 @@
       white-space: nowrap;
       transition: var(--t);
     }
-    .chip.activo { background: var(--accent); color: #000; border-color: var(--accent); }
+    .kds-chip.activo { background: var(--color-accent); color: #000; border-color: var(--color-accent); }
 
-    .tabs-estado {
+    /* ── Pestañas de estado ───────────────────── */
+    .kds-pestanas {
       display: flex;
       gap: 6px;
       padding: 10px 16px;
-      background: var(--bg);
-      border-bottom: 1px solid var(--border);
+      background: var(--color-bg);
+      border-bottom: 1px solid var(--color-border);
     }
-    .tab-estado {
+    .kds-pestana {
       flex: 1;
       display: flex;
       flex-direction: column;
       align-items: center;
       gap: 1px;
-      background: var(--card);
-      border: 1px solid var(--border);
+      background: var(--color-card);
+      border: 1px solid var(--color-border);
       border-radius: var(--radius-sm);
       padding: 7px 4px;
       cursor: pointer;
     }
-    .tab-estado b { font-size: 16px; }
-    .tab-estado span { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; color: var(--text-muted); }
-    .tab-estado[data-estado="nueva"].activo { box-shadow: inset 0 0 0 2px var(--warning); }
-    .tab-estado[data-estado="nueva"].activo b { color: var(--warning); }
-    .tab-estado[data-estado="preparacion"].activo { box-shadow: inset 0 0 0 2px var(--cocina); }
-    .tab-estado[data-estado="preparacion"].activo b { color: var(--cocina); }
-    .tab-estado[data-estado="lista"].activo { box-shadow: inset 0 0 0 2px var(--success); }
-    .tab-estado[data-estado="lista"].activo b { color: var(--success); }
+    .kds-pestana b { font-size: 16px; }
+    .kds-pestana span { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; color: var(--color-text-muted); }
+    .kds-pestana[data-estado="nueva"].activo { box-shadow: inset 0 0 0 2px var(--color-warning); }
+    .kds-pestana[data-estado="nueva"].activo b { color: var(--color-warning); }
+    .kds-pestana[data-estado="en-proceso"].activo { box-shadow: inset 0 0 0 2px var(--color-cocina); }
+    .kds-pestana[data-estado="en-proceso"].activo b { color: var(--color-cocina); }
+    .kds-pestana[data-estado="lista"].activo { box-shadow: inset 0 0 0 2px var(--color-success); }
+    .kds-pestana[data-estado="lista"].activo b { color: var(--color-success); }
 
-    .resumen {
+    /* ── Resumen ──────────────────────────────── */
+    .kds-resumen {
       display: flex;
       gap: 8px;
       padding: 8px 16px;
-      background: var(--bg);
-      border-bottom: 1px solid var(--border);
+      background: var(--color-bg);
+      border-bottom: 1px solid var(--color-border);
       overflow-x: auto;
     }
-    .pill {
+    .kds-pildora {
       display: flex;
       align-items: center;
       gap: 6px;
-      background: var(--card);
-      border: 1px solid var(--border);
+      background: var(--color-card);
+      border: 1px solid var(--color-border);
       padding: 5px 11px;
       border-radius: 99px;
       font-size: 11px;
       font-weight: 600;
-      color: var(--text-sec);
+      color: var(--color-text-sec);
       white-space: nowrap;
     }
-    .pill b { color: var(--text); }
-    .swatch { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
+    .kds-pildora b { color: var(--color-text); }
+    .kds-swatch { width: 8px; height: 8px; border-radius: 2px; flex-shrink: 0; }
 
-    .lista-comandas {
+    /* ── Lista de comandas ────────────────────── */
+    .kds-lista {
       flex: 1;
       overflow-y: auto;
       padding: 14px 14px 24px;
@@ -225,83 +192,79 @@
       flex-direction: column;
       gap: 12px;
     }
-    .vacio {
-      text-align: center;
-      color: var(--text-muted);
-      margin-top: 50px;
-    }
-    .vacio .icono { font-size: 30px; margin-bottom: 10px; opacity: .5; }
-    .vacio p { font-size: 13px; font-style: italic; }
+    .kds-vacio { text-align: center; color: var(--color-text-muted); margin-top: 50px; }
 
     /* ── Ticket ───────────────────────────────── */
-    .ticket {
-      background: var(--card);
-      border: 2px solid var(--border);
+    .kds-ticket {
+      background: var(--color-card);
+      border: 2px solid var(--color-border);
       border-radius: var(--radius);
       padding: 13px 14px;
       box-shadow: var(--shadow);
-      animation: llegar .3s ease-out;
+      animation: kds-llegar .3s ease-out;
     }
-    @keyframes llegar { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-    .ticket.saliendo { animation: sale .22s ease-in forwards; }
-    @keyframes sale { to { opacity: 0; transform: scale(.95) translateY(6px); } }
-    .ticket.urgente { border-color: var(--danger); }
-    .ticket-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-    .ticket-num { font-size: 23px; font-weight: 800; line-height: 1; color: var(--text); }
-    .ticket-mesa { font-size: 11px; color: var(--text-muted); font-weight: 600; margin-top: 2px; }
-    .badge-tipo {
+    @keyframes kds-llegar { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    .kds-ticket.kds-saliendo { animation: kds-salir .22s ease-in forwards; }
+    @keyframes kds-salir { to { opacity: 0; transform: scale(.95) translateY(6px); } }
+    .kds-ticket.kds-urgente { border-color: var(--color-danger); }
+
+    .kds-ticket-cabecera { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+    .kds-ticket-numero { font-size: 23px; font-weight: 800; line-height: 1; color: var(--color-text); }
+    .kds-ticket-mesa { font-size: 11px; color: var(--color-text-muted); font-weight: 600; margin-top: 2px; }
+    .kds-ticket-tipo {
       font-size: 9px; font-weight: 800; text-transform: uppercase;
       padding: 3px 8px; border-radius: 99px; letter-spacing: .4px; flex-shrink: 0;
     }
-    .badge-mesa { background: rgba(59,130,246,.2); color: var(--info); }
-    .badge-reparto { background: rgba(139,92,246,.2); color: var(--barra); }
-    .badge-retiro { background: rgba(34,197,94,.2); color: var(--success); }
-    .ticket-timer {
+    .kds-tipo-mesa { background: rgba(59,130,246,.2); color: var(--color-info); }
+    .kds-tipo-reparto { background: rgba(139,92,246,.2); color: var(--color-barra); }
+    .kds-tipo-retiro { background: rgba(34,197,94,.2); color: var(--color-success); }
+
+    .kds-ticket-tiempo {
       display: inline-flex; align-items: center; gap: 5px;
       font-weight: 700; font-size: 12px; padding: 3px 9px;
       border-radius: var(--radius-xs); margin-top: 8px;
     }
-    .t-ok { background: rgba(34,197,94,.15); color: var(--success); }
-    .t-warn { background: rgba(245,158,11,.15); color: var(--warning); }
-    .t-danger { background: rgba(239,68,68,.15); color: var(--danger); animation: pulso 1s infinite; }
-    @keyframes pulso { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,.35); } 50% { box-shadow: 0 0 0 5px rgba(239,68,68,0); } }
-    .ticket-items { margin-top: 9px; display: flex; flex-direction: column; gap: 3px; }
-    .item-row {
+    .t-ok { background: rgba(34,197,94,.15); color: var(--color-success); }
+    .t-warn { background: rgba(245,158,11,.15); color: var(--color-warning); }
+    .t-peligro { background: rgba(239,68,68,.15); color: var(--color-danger); animation: kds-pulso 1s infinite; }
+    @keyframes kds-pulso { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,.35); } 50% { box-shadow: 0 0 0 5px rgba(239,68,68,0); } }
+
+    .kds-ticket-items { margin-top: 9px; display: flex; flex-direction: column; gap: 3px; }
+    .kds-item {
       display: flex; align-items: center; gap: 8px; font-size: 13.5px;
       padding: 5px 6px; margin: 0 -6px; border-radius: var(--radius-xs);
       transition: background .15s;
     }
-    .item-row.tocable { cursor: pointer; }
-    .item-row.tocable:active { background: rgba(255,255,255,.05); }
-    .item-qty {
-      background: var(--accent); color: #000; font-weight: 800;
+    .kds-item.kds-item-tocable { cursor: pointer; }
+    .kds-item.kds-item-tocable:active { background: rgba(255,255,255,.05); }
+    .kds-item-cantidad {
+      background: var(--color-accent); color: #000; font-weight: 800;
       width: 21px; height: 21px; border-radius: var(--radius-xs);
       display: flex; align-items: center; justify-content: center;
       font-size: 11px; flex-shrink: 0;
     }
-    .item-check {
+    .kds-item-check {
       width: 20px; height: 20px; border-radius: 50%; flex-shrink: 0;
-      border: 2px solid var(--border); display: flex; align-items: center; justify-content: center;
+      border: 2px solid var(--color-border); display: flex; align-items: center; justify-content: center;
       font-size: 10px; color: transparent; transition: var(--t);
     }
-    .item-check.marcado { background: var(--success); border-color: var(--success); color: #04220f; }
-    .item-nombre { flex: 1; }
-    .item-row.listo .item-nombre { color: var(--text-muted); text-decoration: line-through; }
-    .item-obs { font-size: 10px; color: var(--warning); font-style: italic; }
-    .progreso-items {
-      font-size: 10.5px; color: var(--text-muted); font-weight: 600;
+    .kds-item-check.kds-item-marcado { background: var(--color-success); border-color: var(--color-success); color: #04220f; }
+    .kds-item-nombre { flex: 1; }
+    .kds-item.kds-item-listo .kds-item-nombre { color: var(--color-text-muted); text-decoration: line-through; }
+
+    .kds-progreso {
+      font-size: 10.5px; color: var(--color-text-muted); font-weight: 600;
       margin-top: 6px; display: flex; align-items: center; gap: 5px;
     }
-    .progreso-barra {
-      flex: 1; height: 4px; background: var(--border); border-radius: 99px; overflow: hidden;
-    }
-    .progreso-fill { height: 100%; background: var(--success); border-radius: 99px; transition: width .25s; }
-    .ticket-flags { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 5px; }
-    .flag { font-size: 9px; font-weight: 800; text-transform: uppercase; padding: 3px 7px; border-radius: var(--radius-xs); }
-    .flag-grupo { background: rgba(139,92,246,.15); color: #c4b5fd; }
-    .flag-alerta { background: rgba(239,68,68,.15); color: var(--danger); border: 1px dashed var(--danger); }
-    .ticket-actions { margin-top: 12px; }
-    .btn-accion {
+    .kds-progreso-barra { flex: 1; height: 4px; background: var(--color-border); border-radius: 99px; overflow: hidden; }
+    .kds-progreso-lleno { height: 100%; background: var(--color-success); border-radius: 99px; transition: width .25s; }
+
+    .kds-ticket-banderas { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 5px; }
+    .kds-bandera { font-size: 9px; font-weight: 800; text-transform: uppercase; padding: 3px 7px; border-radius: var(--radius-xs); }
+    .kds-bandera-grupo { background: rgba(139,92,246,.15); color: #c4b5fd; }
+
+    .kds-ticket-acciones { margin-top: 12px; }
+    .kds-boton {
       width: 100%;
       padding: 13px 10px;
       border-radius: var(--radius-sm);
@@ -315,15 +278,16 @@
       transition: transform .12s, background .15s;
       border: none;
     }
-    .btn-accion:active { transform: scale(.97); }
-    .btn-iniciar { background: var(--warning); color: #1a0d00; }
-    .btn-listo { background: var(--success); color: #04220f; }
-    .btn-entregar { background: var(--info); color: #04122b; }
-    .acciones-secundarias { display: flex; justify-content: flex-end; margin-top: 6px; }
-    .btn-reabrir-sm {
+    .kds-boton:active { transform: scale(.97); }
+    .kds-boton-iniciar { background: var(--color-warning); color: #1a0d00; }
+    .kds-boton-listo { background: var(--color-success); color: #04220f; }
+    .kds-boton-entregar { background: var(--color-info); color: #04122b; }
+
+    .kds-acciones-secundarias { display: flex; justify-content: flex-end; margin-top: 6px; }
+    .kds-boton-reabrir {
       background: transparent;
-      border: 1px solid var(--info);
-      color: var(--info);
+      border: 1px solid var(--color-info);
+      color: var(--color-info);
       padding: 5px 10px;
       border-radius: var(--radius-xs);
       font-size: 11px;
@@ -334,306 +298,138 @@
       gap: 4px;
       transition: var(--t);
     }
-    .btn-reabrir-sm:active { background: var(--info); color: #04122b; }
+    .kds-boton-reabrir:active { background: var(--color-info); color: #04122b; }
 
-    /* ── Recetario ────────────────────────────── */
-    .recetas-search {
-      display: flex;
-      gap: 8px;
-      padding: 10px 16px;
-      background: var(--bg);
-      border-bottom: 1px solid var(--border);
-    }
-    .recetas-search .input-wrap {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 8px 12px;
-    }
-    .recetas-search .input-wrap i { color: var(--text-muted); font-size: 14px; }
-    .recetas-search input {
-      background: transparent;
-      border: none;
-      outline: none;
-      color: var(--text);
-      font-size: 13px;
-      flex: 1;
-    }
-    .recetas-search input::placeholder { color: var(--text-muted); }
-    .btn-nueva-receta {
-      background: var(--accent);
-      color: #000;
-      border: none;
-      border-radius: var(--radius-sm);
-      padding: 8px 14px;
-      font-size: 12px;
-      font-weight: 700;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      white-space: nowrap;
-    }
-    .recetas-grid {
-      flex: 1;
-      overflow-y: auto;
-      padding: 16px;
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-      gap: 14px;
-      align-content: start;
-    }
-    .receta-card {
-      background: var(--card);
-      border: 1px solid var(--border);
+    /* ── Panel de simulación ──────────────────── */
+    .kds-simulacion {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      z-index: 20;
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
       border-radius: var(--radius);
-      overflow: hidden;
-      cursor: pointer;
-      transition: var(--t);
-    }
-    .receta-card:active { transform: scale(.97); }
-    .receta-card-img {
-      height: 110px;
+      padding: 12px 14px;
+      width: 200px;
       display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 42px;
-      font-weight: 800;
-      color: rgba(255,255,255,.9);
-      position: relative;
+      flex-direction: column;
+      gap: 6px;
     }
-    .receta-card-badge {
-      position: absolute;
-      top: 8px;
-      right: 8px;
-      background: rgba(0,0,0,.6);
-      color: #fff;
-      font-size: 10px;
-      font-weight: 700;
-      padding: 3px 8px;
-      border-radius: 99px;
-    }
-    .receta-card-nombre {
-      padding: 10px 12px;
-      font-size: 13px;
+    .kds-simulacion button {
+      background: var(--color-card);
+      border: 1px solid var(--color-border);
+      color: var(--color-text);
+      padding: 6px 10px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 11px;
       font-weight: 600;
-      text-align: center;
     }
-
-    /* ── Modal de detalle ─────────────────────── */
-    .modal-overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,.7);
-      display: flex; align-items: center; justify-content: center;
-      z-index: 100; padding: 20px;
-    }
-    .modal-detalle {
-      background: var(--panel); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 20px; width: 100%; max-width: 400px;
-      max-height: 90vh; overflow-y: auto;
-    }
-    .modal-detalle h3 { margin-bottom: 4px; }
-    .modal-detalle .item-row { margin: 6px 0; }
-    .modal-close {
-      background: var(--card); border: 1px solid var(--border); color: var(--text);
-      padding: 10px 16px; border-radius: var(--radius-sm); cursor: pointer;
-      margin-top: 14px; font-weight: 600; width: 100%;
-    }
-    .ing-stock {
-      font-size: 10px; padding: 2px 8px; border-radius: 99px;
-      display: inline-flex; align-items: center; gap: 4px;
-    }
-    .stock-ok { background: rgba(34,197,94,.15); color: var(--success); }
-    .stock-bajo { background: rgba(239,68,68,.15); color: var(--danger); }
-    .paso-item {
-      display: flex; gap: 12px; align-items: flex-start; margin-bottom: 10px;
-    }
-    .paso-num {
-      width: 26px; height: 26px; border-radius: 50%;
-      background: var(--accent); color: #000; font-weight: 800;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 13px; flex-shrink: 0;
-    }
-    .paso-texto { flex: 1; font-size: 13px; line-height: 1.5; }
-
-    /* ── Modal de edición de receta ───────────── */
-    .modal-receta-form {
-      background: var(--panel); border: 1px solid var(--border);
-      border-radius: var(--radius); padding: 20px; width: 100%; max-width: 400px;
-      max-height: 90vh; overflow-y: auto;
-    }
-    .modal-receta-form h3 { margin-bottom: 12px; }
-    .modal-receta-form label { display: block; font-size: 12px; font-weight: 600; color: var(--text-sec); margin: 10px 0 4px; }
-    .modal-receta-form input, .modal-receta-form select, .modal-receta-form textarea {
-      width: 100%; background: var(--card); border: 1px solid var(--border);
-      color: var(--text); padding: 8px 10px; border-radius: var(--radius-xs);
-      font-size: 13px; font-family: inherit;
-    }
-    .modal-receta-form textarea { resize: vertical; min-height: 80px; }
-    .form-actions { display: flex; gap: 8px; margin-top: 14px; }
-    .form-actions button { flex: 1; }
+    .kds-simulacion button:hover { background: var(--color-border); }
+    .kds-simulacion .kds-nota { font-size: 9px; color: var(--color-text-muted); margin-top: 4px; }
 
     /* ── Toast ────────────────────────────────── */
-    #toastWrap {
+    #kds-toast-contenedor {
       position: fixed; top: calc(env(safe-area-inset-top) + 8px); left: 50%;
       transform: translateX(-50%); z-index: 60;
       display: flex; flex-direction: column; gap: 6px;
       width: calc(100% - 32px); max-width: 488px;
     }
-    .toast {
-      background: var(--panel); border: 1px solid var(--border); border-left: 4px solid var(--cocina);
-      color: var(--text); padding: 10px 14px; border-radius: var(--radius-xs);
+    .kds-toast {
+      background: var(--color-panel); border: 1px solid var(--color-border); border-left: 4px solid var(--color-cocina);
+      color: var(--color-text); padding: 10px 14px; border-radius: var(--radius-xs);
       font-size: 12.5px; font-weight: 600; box-shadow: var(--shadow);
-      animation: toastIn .25s ease-out, toastOut .3s ease-in 2.7s forwards;
+      animation: kds-toast-entrada .25s ease-out, kds-toast-salida .3s ease-in 2.7s forwards;
     }
-    @keyframes toastIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-    @keyframes toastOut { to { opacity: 0; transform: translateY(-8px); } }
+    @keyframes kds-toast-entrada { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes kds-toast-salida { to { opacity: 0; transform: translateY(-8px); } }
 
     @media (prefers-reduced-motion: reduce) {
-      .ticket, .toast, .t-danger { animation: none !important; }
+      .kds-ticket, .kds-toast, .t-peligro { animation: none !important; }
     }
   </style>
 </head>
 <body>
 
-  <div id="toastWrap"></div>
+  <div id="kds-toast-contenedor"></div>
 
-  <!-- ── HEADER ──────────────────────────────── -->
-  <header class="app-header">
-    <div class="header-top">
-      <h2><i id="iconoVista" class="fas fa-fire-burner"></i> <span id="tituloVista">Jefe de Cocina<small>La Taberna · en vivo</small></span></h2>
-      <div class="header-actions">
-        <button class="btn-icon" id="btnModo" title="Cambiar Cocina/Barra"><i class="fas fa-exchange-alt"></i></button>
-        <button class="btn-icon" id="btnStock"><i class="fas fa-boxes"></i></button>
-        <div class="btn-icon campana" id="campana"><i class="fas fa-bell"></i><span class="punto"></span></div>
-        <span class="reloj" id="reloj">--:--</span>
-      </div>
+  <div class="toolbar">
+    <h2><i class="fas fa-fire-burner"></i> <span>Encargado de Cocina<small>La Taberna · en vivo</small></span></h2>
+    <div class="toolbar-acciones">
+      <button class="btn-icono" id="btnModo" title="Cambiar Cocina/Barra"><i class="fas fa-exchange-alt"></i></button>
+      <button class="btn-icono" id="btnRecetario"><i class="fas fa-book-open"></i></button>
+      <div class="btn-icono campana" id="campana"><i class="fas fa-bell"></i><span class="punto"></span></div>
+      <span class="reloj" id="reloj">--:--</span>
     </div>
-    <div class="header-tabs">
-      <button class="tab-nav activo" data-panel="comandas"><i class="fas fa-list-check"></i> Comandas</button>
-      <button class="tab-nav" data-panel="recetas"><i class="fas fa-book-open"></i> Recetario</button>
-    </div>
-  </header>
-
-  <!-- ── PANEL: COMANDAS ──────────────────────── -->
-  <div class="view-container" id="panelComandas">
-    <div class="filtros" id="filtros">
-      <span class="chip activo" data-filtro="todos">Todos</span>
-      <span class="chip" data-filtro="mesa">Mesa</span>
-      <span class="chip" data-filtro="reparto">Reparto</span>
-      <span class="chip" data-filtro="retiro">Retiro</span>
-    </div>
-    <div class="tabs-estado" id="tabsEstado">
-      <div class="tab-estado activo" data-estado="nueva"><b id="cNueva">0</b><span>Nuevas</span></div>
-      <div class="tab-estado" data-estado="preparacion"><b id="cPreparacion">0</b><span id="labelPreparacion">Preparación</span></div>
-      <div class="tab-estado" data-estado="lista"><b id="cLista">0</b><span>Listas</span></div>
-    </div>
-    <div class="resumen" id="resumen"></div>
-    <div class="lista-comandas" id="listaComandas"></div>
   </div>
 
-  <!-- ── PANEL: RECETARIO ─────────────────────── -->
-  <div class="view-container" id="panelRecetas" style="display:none;">
-    <div class="recetas-search">
-      <div class="input-wrap">
-        <i class="fas fa-search"></i>
-        <input type="text" id="recetasSearch" placeholder="Buscar receta...">
-      </div>
-      <div class="input-wrap">
-        <i class="fas fa-boxes"></i>
-        <input type="text" id="recetasIngredienteSearch" placeholder="Por ingrediente...">
-      </div>
-      <button class="btn-nueva-receta" id="btnNuevaReceta"><i class="fas fa-plus"></i> Nueva</button>
-    </div>
-    <div class="recetas-grid" id="recetasGrid"></div>
+  <div class="kds-filtros" id="kds-filtros">
+    <span class="kds-chip activo" data-filtro="todos">Todos</span>
+    <span class="kds-chip" data-filtro="mesa">Mesa</span>
+    <span class="kds-chip" data-filtro="reparto">Reparto</span>
+    <span class="kds-chip" data-filtro="retiro">Retiro</span>
+  </div>
+
+  <div class="kds-pestanas" id="kds-pestanas">
+    <div class="kds-pestana activo" data-estado="nueva"><b id="kds-num-nuevas">0</b><span>Nuevas</span></div>
+    <div class="kds-pestana" data-estado="en-proceso"><b id="kds-num-proceso">0</b><span>En preparación</span></div>
+    <div class="kds-pestana" data-estado="lista"><b id="kds-num-listas">0</b><span>Listas</span></div>
+  </div>
+
+  <div class="kds-resumen" id="kds-resumen"></div>
+
+  <div class="kds-lista" id="kds-lista"></div>
+
+  <div class="kds-simulacion">
+    <button id="btnNuevaComanda">➕ Nueva comanda</button>
+    <button id="btnAvanzar">➡ Avanzar más antiguo</button>
+    <button id="btnRetirar">✔ Retirar de listas</button>
+    <span class="kds-nota">Simulación para pruebas</span>
   </div>
 
 <script>
   (() => {
-    // ─── CATÁLOGOS ──────────────────────────────
+    /* ─── Estado y catálogo ───────────────────── */
+    let _modo = 'cocina';
+    let _pedidos = [];
+    let _contador = 1;
+    let _filtroActivo = 'todos';
+    let _estadoActivo = 'nueva';
+    let _ctxAudio = null;
+
     const CATALOGO = {
       cocina: {
-        icono: 'fa-fire-burner', titulo: 'Jefe de Cocina', color: 'var(--cocina)',
-        labelPreparacion: 'Preparación',
+        icono: 'fa-fire-burner', titulo: 'Encargado de Cocina', color: 'var(--color-cocina)',
         items: [
           { nombre: 'Hamburguesa', icono: '🍔' }, { nombre: 'Papas fritas', icono: '🍟' },
           { nombre: 'Pizza muzzarella', icono: '🍕' }, { nombre: 'Ensalada mixta', icono: '🥗' },
           { nombre: 'Milanesa napolitana', icono: '🍖' }, { nombre: 'Pasta al pesto', icono: '🍝' },
           { nombre: 'Sopa del día', icono: '🥣' }, { nombre: 'Empanadas', icono: '🥟' }
-        ],
-        alergenos: ['SIN TACC', 'ALERGIA — MANÍ', 'ALERGIA — LÁCTEOS', 'VEGANO']
+        ]
       },
       barra: {
-        icono: 'fa-wine-glass', titulo: 'Jefe de Barra', color: 'var(--barra)',
-        labelPreparacion: 'Preparación',
+        icono: 'fa-wine-glass', titulo: 'Encargado de Barra', color: 'var(--color-barra)',
         items: [
           { nombre: 'Gin tonic', icono: '🍸' }, { nombre: 'Fernet con cola', icono: '🥃' },
           { nombre: 'Mojito', icono: '🍹' }, { nombre: 'Cerveza IPA', icono: '🍺' },
           { nombre: 'Café cortado', icono: '☕' }, { nombre: 'Limonada', icono: '🍋' },
           { nombre: 'Vino tinto copa', icono: '🍷' }, { nombre: 'Aperol spritz', icono: '🧊' }
-        ],
-        alergenos: ['SIN ALCOHOL', 'DOBLE MEDIDA', 'SIN HIELO']
+        ]
       }
     };
 
-    // ─── ESTADO ──────────────────────────────────
-    let modo = 'cocina';
-    let pedidos = [];
-    let recetas = [];
-    let ingredientes = [];
-    let productos = [];
-    let contador = 1;
-    let filtroActivo = 'todos';
-    let estadoActivo = 'nueva';
-    let panelActivo = 'comandas';
-    let audioCtx = null;
-    let terminoBusqueda = '';
-    let terminoIngrediente = '';
+    /* ─── Funciones auxiliares ────────────────── */
+    function _idUnico() { return 'c' + (_contador++) + '_' + Math.random().toString(36).slice(2,6); }
 
-    function idUnico() { return 'c' + (contador++) + '_' + Math.random().toString(36).slice(2,6); }
-
-    // ─── DATOS DE PRUEBA: RECETAS ────────────────
-    function inicializarRecetas() {
-      productos = [
-        { id: 'prod_1', nombre: 'Hamburguesa', activo: true, destino: 'cocina' },
-        { id: 'prod_2', nombre: 'Papas fritas', activo: true, destino: 'cocina' },
-        { id: 'prod_3', nombre: 'Gin tonic', activo: true, destino: 'barra' },
-        { id: 'prod_4', nombre: 'Mojito', activo: true, destino: 'barra' },
-        { id: 'prod_5', nombre: 'Pizza muzzarella', activo: true, destino: 'cocina' },
-        { id: 'prod_6', nombre: 'Empanadas', activo: true, destino: 'cocina' }
-      ];
-      ingredientes = [
-        { id: 'ing_1', nombre: 'Carne picada', unidad: 'kg', stock: 5, valor_unitario: 1200 },
-        { id: 'ing_2', nombre: 'Papa', unidad: 'kg', stock: 20, valor_unitario: 300 },
-        { id: 'ing_3', nombre: 'Ginebra', unidad: 'botella', stock: 4, valor_unitario: 2500 },
-        { id: 'ing_4', nombre: 'Tónica', unidad: 'unidad', stock: 30, valor_unitario: 200 },
-        { id: 'ing_5', nombre: 'Muzzarella', unidad: 'kg', stock: 3, valor_unitario: 900 },
-        { id: 'ing_6', nombre: 'Harina', unidad: 'kg', stock: 25, valor_unitario: 150 },
-        { id: 'ing_7', nombre: 'Ron', unidad: 'botella', stock: 2, valor_unitario: 1800 },
-        { id: 'ing_8', nombre: 'Menta', unidad: 'manojo', stock: 8, valor_unitario: 100 }
-      ];
-      recetas = [
-        { productoId: 'prod_1', ingredientes: [{ ingredienteId: 'ing_1', cantidad: 0.2 }, { ingredienteId: 'ing_6', cantidad: 0.05 }], instrucciones: '1. Mezclar carne con condimentos\n2. Formar medallones\n3. Cocinar a la plancha 4 min por lado' },
-        { productoId: 'prod_2', ingredientes: [{ ingredienteId: 'ing_2', cantidad: 0.3 }], instrucciones: '1. Cortar papas en bastones\n2. Freír en aceite caliente hasta dorar' },
-        { productoId: 'prod_3', ingredientes: [{ ingredienteId: 'ing_3', cantidad: 0.06 }, { ingredienteId: 'ing_4', cantidad: 1 }], instrucciones: '1. Servir hielo en vaso\n2. Verter ginebra\n3. Completar con tónica' },
-        { productoId: 'prod_4', ingredientes: [{ ingredienteId: 'ing_7', cantidad: 0.05 }, { ingredienteId: 'ing_8', cantidad: 0.02 }], instrucciones: '1. Macerar menta con azúcar\n2. Agregar hielo, ron y lima\n3. Completar con soda' },
-        { productoId: 'prod_5', ingredientes: [{ ingredienteId: 'ing_5', cantidad: 0.25 }, { ingredienteId: 'ing_6', cantidad: 0.1 }], instrucciones: '1. Preparar masa con harina\n2. Estirar y agregar muzzarella\n3. Hornear a 220°C por 12 min' }
-      ];
-    }
-
-    // ─── COMANDAS ────────────────────────────────
-    function crearPedido() {
-      const cat = CATALOGO[modo];
+    function _crearPedido() {
+      const cat = CATALOGO[_modo];
       const tipos = ['mesa', 'reparto', 'retiro'];
       const tipo = tipos[Math.floor(Math.random() * tipos.length)];
       const numItems = Math.floor(Math.random() * 3) + 1;
       const items = [];
       for (let i = 0; i < numItems; i++) {
         const prod = cat.items[Math.floor(Math.random() * cat.items.length)];
-        items.push({ ...prod, qty: Math.floor(Math.random() * 2) + 1, obs: '', listo: false });
+        items.push({ ...prod, qty: Math.floor(Math.random() * 2) + 1, listo: false });
       }
       let etiqueta;
       if (tipo === 'mesa') etiqueta = 'Mesa ' + (Math.floor(Math.random() * 20) + 1);
@@ -641,301 +437,261 @@
       else etiqueta = 'Retiro #' + (Math.floor(Math.random() * 50) + 1);
 
       return {
-        id: idUnico(),
-        numero: String(contador - 1).padStart(2, '0'),
+        id: _idUnico(),
+        numero: String(_contador - 1).padStart(2, '0'),
         tipo, etiqueta, items,
         estado: 'nueva',
         ts: Date.now(),
-        grupo: Math.random() > 0.78 ? 'Combo' : null,
-        alerta: Math.random() > 0.85 ? cat.alergenos[Math.floor(Math.random() * cat.alergenos.length)] : null
+        grupo: Math.random() > 0.78 ? 'Combo' : null
       };
     }
 
-    function clasificarTiempo(ms) { const min = ms / 60000; if (min < 5) return 't-ok'; if (min < 12) return 't-warn'; return 't-danger'; }
-    function fmtTiempo(ms) { const s = Math.floor(ms / 1000), m = Math.floor(s / 60), r = s % 60; return m + ':' + String(r).padStart(2, '0'); }
+    function _clasificarTiempo(ms) { const min = ms / 60000; if (min < 5) return 't-ok'; if (min < 12) return 't-warn'; return 't-peligro'; }
+    function _formatearTiempo(ms) { const s = Math.floor(ms / 1000), m = Math.floor(s / 60), r = s % 60; return m + ':' + String(r).padStart(2, '0'); }
 
-    function sonarAlerta() {
+    function _reproducirAlerta() {
       try {
-        audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-        const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+        _ctxAudio = _ctxAudio || new (window.AudioContext || window.webkitAudioContext)();
+        const o = _ctxAudio.createOscillator(), g = _ctxAudio.createGain();
         o.frequency.value = 880; o.type = 'sine';
-        g.gain.setValueAtTime(0.001, audioCtx.currentTime);
-        g.gain.linearRampToValueAtTime(0.12, audioCtx.currentTime + 0.02);
-        g.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.35);
-        o.connect(g); g.connect(audioCtx.destination);
-        o.start(); o.stop(audioCtx.currentTime + 0.4);
+        g.gain.setValueAtTime(0.001, _ctxAudio.currentTime);
+        g.gain.linearRampToValueAtTime(0.12, _ctxAudio.currentTime + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.001, _ctxAudio.currentTime + 0.35);
+        o.connect(g); g.connect(_ctxAudio.destination);
+        o.start(); o.stop(_ctxAudio.currentTime + 0.4);
       } catch (e) {}
       if (navigator.vibrate) navigator.vibrate(120);
     }
 
-    function toast(msg) {
-      const wrap = document.getElementById('toastWrap');
-      const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
-      wrap.appendChild(t);
+    function _mostrarToast(msg) {
+      const cont = document.getElementById('kds-toast-contenedor');
+      const t = document.createElement('div'); t.className = 'kds-toast'; t.textContent = msg;
+      cont.appendChild(t);
       setTimeout(() => t.remove(), 3050);
     }
 
-    // ─── RENDER: COMANDAS ────────────────────────
-    function crearTicketEl(p) {
+    /* ─── Render de tickets ───────────────────── */
+    function _crearTicket(p) {
       const el = document.createElement('div');
       el.dataset.id = p.id;
       const transcurrido = Date.now() - p.ts;
-      const claseTiempo = clasificarTiempo(transcurrido);
-      const badgeClase = p.tipo === 'mesa' ? 'badge-mesa' : (p.tipo === 'reparto' ? 'badge-reparto' : 'badge-retiro');
-      const urgente = claseTiempo === 't-danger';
-      const tocable = p.estado === 'preparacion';
+      const claseTiempo = _clasificarTiempo(transcurrido);
+      const urgente = claseTiempo === 't-peligro';
+      const tipoClase = p.tipo === 'mesa' ? 'kds-tipo-mesa' : (p.tipo === 'reparto' ? 'kds-tipo-reparto' : 'kds-tipo-retiro');
+      const interactivo = p.estado === 'en-proceso';
       const listos = p.items.filter(i => i.listo).length;
 
-      el.className = 'ticket' + (urgente ? ' urgente' : '');
+      el.className = 'kds-ticket' + (urgente ? ' kds-urgente' : '');
       el.innerHTML = `
-        <div class="ticket-top"><div><div class="ticket-num">#${p.numero}</div><div class="ticket-mesa">${p.etiqueta}</div></div><span class="badge-tipo ${badgeClase}">${p.tipo}</span></div>
-        <span class="ticket-timer ${claseTiempo}">⏱ ${fmtTiempo(transcurrido)}</span>
-        <div class="ticket-items">${p.items.map((i, idx) => `<div class="item-row ${tocable ? 'tocable' : ''} ${i.listo ? 'listo' : ''}" data-idx="${idx}"><span class="item-check ${i.listo ? 'marcado' : ''}"><i class="fas fa-check"></i></span><span class="item-qty">${i.qty}</span><span class="item-nombre">${i.nombre} ${i.icono}</span></div>`).join('')}</div>
-        ${p.estado === 'preparacion' ? `<div class="progreso-items"><span>${listos}/${p.items.length} listos</span><span class="progreso-barra"><span class="progreso-fill" style="width:${(listos/p.items.length)*100}%"></span></span></div>` : ''}
-        ${(p.grupo || p.alerta) ? `<div class="ticket-flags">${p.grupo ? `<span class="flag flag-grupo">${p.grupo}</span>` : ''}${p.alerta ? `<span class="flag flag-alerta">${p.alerta}</span>` : ''}</div>` : ''}
-        <div class="ticket-actions">
-          ${p.estado === 'nueva' ? `<button class="btn-accion btn-iniciar" data-accion="iniciar"><i class="fas fa-fire"></i> Iniciar</button>` : ''}
-          ${p.estado === 'preparacion' ? `<button class="btn-accion btn-listo" data-accion="listo"><i class="fas fa-check-double"></i> Marcar todo listo</button>` : ''}
-          ${p.estado === 'lista' ? `<button class="btn-accion btn-entregar" data-accion="entregar"><i class="fas fa-box-open"></i> Entregar / Retirar</button>` : ''}
+        <div class="kds-ticket-cabecera">
+          <div><div class="kds-ticket-numero">#${p.numero}</div><div class="kds-ticket-mesa">${p.etiqueta}</div></div>
+          <span class="kds-ticket-tipo ${tipoClase}">${p.tipo}</span>
         </div>
-        ${p.estado === 'lista' ? `<div class="acciones-secundarias"><button class="btn-reabrir-sm" data-accion="reabrir"><i class="fas fa-undo"></i> Reabrir</button></div>` : ''}
+        <span class="kds-ticket-tiempo ${claseTiempo}">⏱ ${_formatearTiempo(transcurrido)}</span>
+        <div class="kds-ticket-items">${p.items.map((i, idx) => `
+          <div class="kds-item ${interactivo ? 'kds-item-tocable' : ''} ${i.listo ? 'kds-item-listo' : ''}" data-idx="${idx}">
+            <span class="kds-item-check ${i.listo ? 'kds-item-marcado' : ''}"><i class="fas fa-check"></i></span>
+            <span class="kds-item-cantidad">${i.qty}</span>
+            <span class="kds-item-nombre">${i.nombre} ${i.icono || ''}</span>
+          </div>`).join('')}
+        </div>
+        ${interactivo ? `<div class="kds-progreso"><span>${listos}/${p.items.length} listos</span><span class="kds-progreso-barra"><span class="kds-progreso-lleno" style="width:${(listos/p.items.length)*100}%"></span></span></div>` : ''}
+        ${p.grupo ? `<div class="kds-ticket-banderas"><span class="kds-bandera kds-bandera-grupo">${p.grupo}</span></div>` : ''}
+        <div class="kds-ticket-acciones">
+          ${p.estado === 'nueva' ? `<button class="kds-boton kds-boton-iniciar"><i class="fas fa-fire"></i> Iniciar</button>` : ''}
+          ${p.estado === 'en-proceso' ? `<button class="kds-boton kds-boton-listo"><i class="fas fa-check-double"></i> Marcar todo listo</button>` : ''}
+          ${p.estado === 'lista' ? `<button class="kds-boton kds-boton-entregar"><i class="fas fa-box-open"></i> Entregar / Retirar</button>` : ''}
+        </div>
+        ${p.estado === 'lista' ? `<div class="kds-acciones-secundarias"><button class="kds-boton-reabrir"><i class="fas fa-undo"></i> Reabrir</button></div>` : ''}
       `;
 
-      if (tocable) {
-        el.querySelectorAll('.item-row').forEach(row => {
-          row.addEventListener('click', (e) => {
-            e.stopPropagation();
+      if (interactivo) {
+        el.querySelectorAll('.kds-item').forEach(row => {
+          row.addEventListener('click', (ev) => {
+            ev.stopPropagation();
             const idx = Number(row.dataset.idx);
             p.items[idx].listo = !p.items[idx].listo;
             if (navigator.vibrate) navigator.vibrate(20);
-            if (p.items.every(i => i.listo)) { p.estado = 'lista'; toast(`Comanda #${p.numero} lista`); }
-            renderComandas();
+            if (p.items.every(i => i.listo)) {
+              p.estado = 'lista';
+              _mostrarToast(`Comanda #${p.numero} lista`);
+            }
+            _pintar();
           });
         });
       }
 
-      const btnPrincipal = el.querySelector('.btn-accion');
-      if (btnPrincipal) {
-        btnPrincipal.addEventListener('click', (e) => {
-          e.stopPropagation();
+      const btn = el.querySelector('.kds-boton');
+      if (btn) {
+        btn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
           if (navigator.vibrate) navigator.vibrate(30);
-          if (p.estado === 'preparacion') p.items.forEach(i => i.listo = true);
-          if (p.estado === 'lista') {
-            el.classList.add('saliendo');
-            toast(`📦 Comanda #${p.numero} entregada`);
-            setTimeout(() => { pedidos = pedidos.filter(x => x.id !== p.id); renderComandas(); }, 240);
+          if (p.estado === 'en-proceso') {
+            p.items.forEach(i => i.listo = true);
+            p.estado = 'lista';
+            _mostrarToast(`Comanda #${p.numero} lista para pase`);
+          } else if (p.estado === 'lista') {
+            el.classList.add('kds-saliendo');
+            setTimeout(() => {
+              _pedidos = _pedidos.filter(x => x.id !== p.id);
+              _pintar();
+            }, 240);
+            _mostrarToast(`📦 Comanda #${p.numero} entregada`);
           } else {
-            p.estado = p.estado === 'nueva' ? 'preparacion' : 'lista';
-            toast(p.estado === 'preparacion' ? `Comanda #${p.numero} iniciada` : `Comanda #${p.numero} lista para pase`);
-            renderComandas();
+            p.estado = 'en-proceso';
+            _mostrarToast(`Comanda #${p.numero} iniciada`);
           }
+          _pintar();
         });
       }
 
-      const btnReabrir = el.querySelector('.btn-reabrir-sm');
-      if (btnReabrir) btnReabrir.addEventListener('click', (e) => { e.stopPropagation(); p.estado = 'preparacion'; toast(`Comanda #${p.numero} reabierta`); renderComandas(); });
+      const btnReabrir = el.querySelector('.kds-boton-reabrir');
+      if (btnReabrir) {
+        btnReabrir.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          p.estado = 'en-proceso';
+          _mostrarToast(`Comanda #${p.numero} reabierta`);
+          _pintar();
+        });
+      }
 
       return el;
     }
 
-    function renderComandas() {
-      const filtradas = (filtroActivo === 'todos' ? pedidos : pedidos.filter(p => p.tipo === filtroActivo));
-      const porEstado = filtradas.filter(p => p.estado === estadoActivo).sort((a,b) => a.ts - b.ts);
-      const lista = document.getElementById('listaComandas');
+    function _pintar() {
+      const filtradas = _filtroActivo === 'todos' ? _pedidos : _pedidos.filter(p => p.tipo === _filtroActivo);
+      const visibles = filtradas.filter(p => p.estado === _estadoActivo).sort((a, b) => a.ts - b.ts);
+
+      const lista = document.getElementById('kds-lista');
       lista.innerHTML = '';
-      if (!porEstado.length) {
-        const textos = { nueva: 'Sin pedidos nuevos', preparacion: 'Nada en preparación', lista: 'Nada listo por ahora' };
-        lista.innerHTML = `<div class="vacio"><div class="icono"><i class="fas fa-inbox"></i></div><p>${textos[estadoActivo]}</p></div>`;
-      } else porEstado.forEach(p => lista.appendChild(crearTicketEl(p)));
+      if (!visibles.length) {
+        const textos = { nueva: 'Sin pedidos nuevos', 'en-proceso': 'Nada en preparación', lista: 'Nada listo por ahora' };
+        lista.innerHTML = `<div class="kds-vacio"><p>${textos[_estadoActivo]}</p></div>`;
+      } else {
+        visibles.forEach(p => lista.appendChild(_crearTicket(p)));
+      }
 
-      document.getElementById('cNueva').textContent = filtradas.filter(p => p.estado === 'nueva').length;
-      document.getElementById('cPreparacion').textContent = filtradas.filter(p => p.estado === 'preparacion').length;
-      document.getElementById('cLista').textContent = filtradas.filter(p => p.estado === 'lista').length;
+      document.getElementById('kds-num-nuevas').textContent = filtradas.filter(p => p.estado === 'nueva').length;
+      document.getElementById('kds-num-proceso').textContent = filtradas.filter(p => p.estado === 'en-proceso').length;
+      document.getElementById('kds-num-listas').textContent = filtradas.filter(p => p.estado === 'lista').length;
 
-      const urgentes = pedidos.filter(p => p.estado !== 'lista' && clasificarTiempo(Date.now() - p.ts) === 't-danger').length;
-      document.getElementById('resumen').innerHTML = `
-        <div class="pill"><span class="swatch" style="background:var(--warning)"></span> Activos <b>${pedidos.filter(p => p.estado !== 'lista').length}</b></div>
-        <div class="pill"><span class="swatch" style="background:var(--danger)"></span> Demorados <b>${urgentes}</b></div>
-        <div class="pill"><span class="swatch" style="background:var(--success)"></span> Listos <b>${pedidos.filter(p => p.estado === 'lista').length}</b></div>
+      const urgentes = _pedidos.filter(p => p.estado !== 'lista' && _clasificarTiempo(Date.now() - p.ts) === 't-peligro').length;
+      document.getElementById('kds-resumen').innerHTML = `
+        <div class="kds-pildora"><span class="kds-swatch" style="background:var(--color-warning)"></span> Activos <b>${_pedidos.filter(p => p.estado !== 'lista').length}</b></div>
+        <div class="kds-pildora"><span class="kds-swatch" style="background:var(--color-danger)"></span> Demorados <b>${urgentes}</b></div>
+        <div class="kds-pildora"><span class="kds-swatch" style="background:var(--color-success)"></span> Listos <b>${_pedidos.filter(p => p.estado === 'lista').length}</b></div>
       `;
-      document.getElementById('campana').classList.toggle('activa', pedidos.some(p => p.estado === 'nueva'));
+
+      document.getElementById('campana').classList.toggle('activa', _pedidos.some(p => p.estado === 'nueva'));
     }
 
-    function actualizarCronometros() {
-      document.querySelectorAll('#listaComandas .ticket').forEach(el => {
-        const p = pedidos.find(x => x.id === el.dataset.id);
+    function _actualizarCronometros() {
+      document.querySelectorAll('.kds-ticket').forEach(el => {
+        const p = _pedidos.find(x => x.id === el.dataset.id);
         if (!p) return;
         const transcurrido = Date.now() - p.ts;
-        const claseTiempo = clasificarTiempo(transcurrido);
-        const badge = el.querySelector('.ticket-timer');
-        if (badge) { badge.textContent = '⏱ ' + fmtTiempo(transcurrido); badge.classList.remove('t-ok','t-warn','t-danger'); badge.classList.add(claseTiempo); }
-        const yaUrgente = el.classList.contains('urgente');
-        if (claseTiempo === 't-danger' && !yaUrgente) el.classList.add('urgente');
-        if (claseTiempo !== 't-danger' && yaUrgente) el.classList.remove('urgente');
+        const claseTiempo = _clasificarTiempo(transcurrido);
+        const badge = el.querySelector('.kds-ticket-tiempo');
+        if (badge) {
+          badge.textContent = '⏱ ' + _formatearTiempo(transcurrido);
+          badge.classList.remove('t-ok', 't-warn', 't-peligro');
+          badge.classList.add(claseTiempo);
+        }
+        const yaUrgente = el.classList.contains('kds-urgente');
+        if (claseTiempo === 't-peligro' && !yaUrgente) el.classList.add('kds-urgente');
+        if (claseTiempo !== 't-peligro' && yaUrgente) el.classList.remove('kds-urgente');
       });
     }
 
-    // ─── RENDER: RECETARIO ───────────────────────
-    function obtenerColorDesdeNombre(nombre) {
-      let hash = 0;
-      for (let i = 0; i < nombre.length; i++) { hash = nombre.charCodeAt(i) + ((hash << 5) - hash); hash = hash & hash; }
-      return `hsl(${Math.abs(hash) % 360}, 55%, 45%)`;
+    /* ─── Simulación ──────────────────────────── */
+    function _agregarComanda() {
+      const p = _crearPedido();
+      _pedidos.push(p);
+      _reproducirAlerta();
+      _mostrarToast(`📥 Nueva comanda #${p.numero} — ${p.etiqueta}`);
+      _pintar();
     }
 
-    function renderRecetas() {
-      const grid = document.getElementById('recetasGrid');
-      let filtradas = productos.filter(p => p.activo !== false && recetas.some(r => r.productoId === p.id));
-      if (terminoBusqueda) filtradas = filtradas.filter(p => p.nombre.toLowerCase().includes(terminoBusqueda.toLowerCase()));
-      if (terminoIngrediente) {
-        filtradas = filtradas.filter(prod => {
-          const receta = recetas.find(r => r.productoId === prod.id);
-          if (!receta) return false;
-          return receta.ingredientes.some(ing => {
-            const ingData = ingredientes.find(i => i.id === ing.ingredienteId);
-            return ingData && ingData.nombre.toLowerCase().includes(terminoIngrediente.toLowerCase());
-          });
-        });
+    function _avanzar() {
+      for (const estado of ['nueva', 'en-proceso']) {
+        const candidatos = _pedidos.filter(p => p.estado === estado).sort((a, b) => a.ts - b.ts);
+        if (candidatos.length) {
+          candidatos[0].estado = estado === 'nueva' ? 'en-proceso' : 'lista';
+          _pintar();
+          return;
+        }
       }
-      filtradas.sort((a,b) => a.nombre.localeCompare(b.nombre));
-
-      grid.innerHTML = filtradas.length ? filtradas.map(prod => {
-        const receta = recetas.find(r => r.productoId === prod.id);
-        const numIng = receta ? receta.ingredientes.length : 0;
-        const color = obtenerColorDesdeNombre(prod.nombre);
-        return `<div class="receta-card" data-prod-id="${prod.id}">
-          <div class="receta-card-img" style="background-color:${color}"><span>${prod.nombre.charAt(0).toUpperCase()}</span><span class="receta-card-badge">${numIng} <i class="fas fa-boxes"></i></span></div>
-          <div class="receta-card-nombre">${prod.nombre}</div>
-        </div>`;
-      }).join('') : `<div class="vacio" style="grid-column:1/-1;"><p>No se encontraron recetas</p></div>`;
-
-      document.querySelectorAll('.receta-card').forEach(card => {
-        card.addEventListener('click', () => mostrarDetalleReceta(card.dataset.prodId));
-      });
     }
 
-    function mostrarDetalleReceta(prodId) {
-      const prod = productos.find(p => p.id === prodId);
-      const receta = recetas.find(r => r.productoId === prodId);
-      if (!prod || !receta) return;
-
-      const overlay = document.createElement('div');
-      overlay.className = 'modal-overlay';
-      overlay.innerHTML = `<div class="modal-detalle">
-        <h3>${prod.nombre}</h3>
-        <h4 style="color:var(--accent);margin-top:12px;">Ingredientes</h4>
-        ${receta.ingredientes.map(ing => {
-          const ingData = ingredientes.find(i => i.id === ing.ingredienteId);
-          const nombre = ingData ? ingData.nombre : ing.ingredienteId;
-          const unidad = ingData ? ingData.unidad : '';
-          const stock = ingData ? ingData.stock : 0;
-          const suficiente = stock >= ing.cantidad;
-          return `<div class="item-row"><span class="item-qty">${ing.cantidad}</span><span class="item-nombre">${nombre} ${unidad}</span><span class="ing-stock ${suficiente ? 'stock-ok' : 'stock-bajo'}"><i class="fas ${suficiente ? 'fa-check' : 'fa-exclamation-triangle'}"></i> Stock: ${stock}</span></div>`;
-        }).join('')}
-        <h4 style="color:var(--accent);margin-top:14px;">Preparación</h4>
-        <div>${(receta.instrucciones || 'Sin instrucciones').split('\n').map((line, i) => `<div class="paso-item"><span class="paso-num">${i+1}</span><span class="paso-texto">${line}</span></div>`).join('')}</div>
-        <button class="modal-close">Cerrar</button>
-      </div>`;
-      document.body.appendChild(overlay);
-      overlay.addEventListener('click', (e) => { if (e.target === overlay || e.target.classList.contains('modal-close')) overlay.remove(); });
+    function _retirar() {
+      const listas = _pedidos.filter(p => p.estado === 'lista').sort((a, b) => a.ts - b.ts);
+      if (listas.length) {
+        _pedidos = _pedidos.filter(p => p.id !== listas[0].id);
+        _pintar();
+      }
     }
 
-    // ─── CAMBIO DE PANEL ─────────────────────────
-    function setPanel(panel) {
-      panelActivo = panel;
-      document.getElementById('panelComandas').style.display = panel === 'comandas' ? '' : 'none';
-      document.getElementById('panelRecetas').style.display = panel === 'recetas' ? '' : 'none';
-      document.querySelectorAll('.tab-nav').forEach(t => t.classList.toggle('activo', t.dataset.panel === panel));
-      if (panel === 'recetas') renderRecetas();
+    function _programarLlegada() {
+      const espera = 9000 + Math.random() * 14000;
+      setTimeout(() => { _agregarComanda(); _programarLlegada(); }, espera);
     }
 
-    // ─── CAMBIO DE MODO (COCINA/BARRA) ───────────
-    function aplicarModo(nuevoModo) {
-      modo = nuevoModo;
-      const cat = CATALOGO[modo];
-      document.getElementById('iconoVista').className = 'fas ' + cat.icono;
-      document.getElementById('tituloVista').innerHTML = cat.titulo + '<small>La Taberna · en vivo</small>';
-      document.getElementById('labelPreparacion').textContent = cat.labelPreparacion;
-      document.querySelector('.header-top h2').style.color = cat.color;
-    }
-
-    // ─── EVENTOS ──────────────────────────────────
-    document.querySelectorAll('.tab-nav').forEach(btn => {
-      btn.addEventListener('click', () => setPanel(btn.dataset.panel));
-    });
-
-    document.getElementById('tabsEstado').addEventListener('click', (e) => {
-      const tab = e.target.closest('.tab-estado');
-      if (!tab) return;
-      estadoActivo = tab.dataset.estado;
-      document.querySelectorAll('.tab-estado').forEach(t => t.classList.toggle('activo', t === tab));
-      renderComandas();
-    });
-
-    document.getElementById('filtros').addEventListener('click', (e) => {
-      const chip = e.target.closest('.chip');
+    /* ─── Eventos ─────────────────────────────── */
+    document.getElementById('kds-filtros').addEventListener('click', (e) => {
+      const chip = e.target.closest('.kds-chip');
       if (!chip) return;
-      document.querySelectorAll('#filtros .chip').forEach(c => c.classList.remove('activo'));
+      document.querySelectorAll('#kds-filtros .kds-chip').forEach(c => c.classList.remove('activo'));
       chip.classList.add('activo');
-      filtroActivo = chip.dataset.filtro;
-      renderComandas();
+      _filtroActivo = chip.dataset.filtro;
+      _pintar();
     });
 
-    document.getElementById('btnStock').addEventListener('click', () => toast('📦 Stock — próximamente'));
+    document.getElementById('kds-pestanas').addEventListener('click', (e) => {
+      const pestana = e.target.closest('.kds-pestana');
+      if (!pestana) return;
+      _estadoActivo = pestana.dataset.estado;
+      document.querySelectorAll('#kds-pestanas .kds-pestana').forEach(p => p.classList.toggle('activo', p === pestana));
+      _pintar();
+    });
+
+    document.getElementById('btnNuevaComanda').addEventListener('click', _agregarComanda);
+    document.getElementById('btnAvanzar').addEventListener('click', _avanzar);
+    document.getElementById('btnRetirar').addEventListener('click', _retirar);
+
     document.getElementById('btnModo').addEventListener('click', () => {
-      aplicarModo(modo === 'cocina' ? 'barra' : 'cocina');
-      pedidos = []; contador = 1;
-      for (let i = 0; i < 4; i++) pedidos.push(crearPedido());
-      pedidos[0].estado = 'preparacion'; pedidos[0].ts -= 8 * 60000;
-      pedidos[1].estado = 'lista'; pedidos[1].ts -= 10 * 60000;
-      pedidos[2].ts -= 14 * 60000;
-      pedidos[2].alerta = CATALOGO[modo].alergenos[0];
-      pedidos[3].grupo = 'Combo';
-      renderComandas();
+      _modo = _modo === 'cocina' ? 'barra' : 'cocina';
+      const cat = CATALOGO[_modo];
+      document.querySelector('.toolbar h2 i').className = 'fas ' + cat.icono;
+      document.querySelector('.toolbar h2 span').innerHTML = cat.titulo + '<small>La Taberna · en vivo</small>';
+      document.querySelector('.toolbar h2').style.color = cat.color;
+      _pedidos = []; _contador = 1;
+      for (let i = 0; i < 4; i++) _pedidos.push(_crearPedido());
+      _pedidos[0].estado = 'en-proceso'; _pedidos[0].ts -= 8 * 60000;
+      _pedidos[1].estado = 'lista'; _pedidos[1].ts -= 10 * 60000;
+      _pedidos[2].ts -= 14 * 60000;
+      _pedidos[3].grupo = 'Combo';
+      _pintar();
     });
 
-    document.getElementById('recetasSearch').addEventListener('input', (e) => {
-      terminoBusqueda = e.target.value.trim();
-      renderRecetas();
-    });
-    document.getElementById('recetasIngredienteSearch').addEventListener('input', (e) => {
-      terminoIngrediente = e.target.value.trim();
-      renderRecetas();
-    });
-    document.getElementById('btnNuevaReceta').addEventListener('click', () => {
-      // Placeholder: abrir modal de nueva receta (próximamente)
-      toast('➕ Nueva receta — próximamente');
+    document.getElementById('btnRecetario').addEventListener('click', () => {
+      _mostrarToast('📖 Recetario — próximamente');
     });
 
-    function llegaPedidoNuevo() {
-      pedidos.push(crearPedido());
-      sonarAlerta();
-      toast(`📥 Nueva comanda #${pedidos[pedidos.length-1].numero} — ${pedidos[pedidos.length-1].etiqueta}`);
-      renderComandas();
-    }
-
-    function programarLlegadaAleatoria() {
-      setTimeout(() => { llegaPedidoNuevo(); programarLlegadaAleatoria(); }, 9000 + Math.random() * 14000);
-    }
-
-    function actualizarReloj() {
+    function _actualizarReloj() {
       document.getElementById('reloj').textContent = new Date().toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
     }
 
-    // ─── INICIO ───────────────────────────────────
-    inicializarRecetas();
-    aplicarModo('cocina');
-    for (let i = 0; i < 4; i++) pedidos.push(crearPedido());
-    pedidos[0].estado = 'preparacion'; pedidos[0].ts -= 8 * 60000;
-    pedidos[1].estado = 'lista'; pedidos[1].ts -= 10 * 60000;
-    pedidos[2].ts -= 14 * 60000; pedidos[2].alerta = 'SIN TACC';
-    pedidos[3].grupo = 'Combo';
-
-    setPanel('comandas');
-    renderComandas();
-    actualizarReloj();
-    setInterval(actualizarCronometros, 1000);
-    setInterval(actualizarReloj, 1000);
-    programarLlegadaAleatoria();
+    /* ─── Inicialización ──────────────────────── */
+    for (let i = 0; i < 4; i++) _pedidos.push(_crearPedido());
+    _pedidos[0].estado = 'en-proceso'; _pedidos[0].ts -= 8 * 60000;
+    _pedidos[1].estado = 'lista'; _pedidos[1].ts -= 10 * 60000;
+    _pedidos[2].ts -= 14 * 60000;
+    _pedidos[3].grupo = 'Combo';
+    _pintar();
+    _actualizarReloj();
+    setInterval(_actualizarCronometros, 1000);
+    setInterval(_actualizarReloj, 1000);
+    _programarLlegada();
   })();
 </script>
 </body>

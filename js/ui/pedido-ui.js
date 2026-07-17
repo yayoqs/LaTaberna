@@ -1,13 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/pedido-ui.js
-   Versión: 2.1.3
+   Versión: 2.1.6
    Propósito: Modal de pedido, revisar comandas, validación de stock.
-              Sin onclick. Apertura de mesa delegada a MesaDetalles.
-              Migración de prompt a mostrarEntrada.
-              Corrección: valorInicial → valorPredefinido.
-   Dependencias: CommandBus, EventBus, Logger, DB, Store, Mesas, Comanda,
-                 Carta, Cuenta, Cobro, Tickets, Auth, mesaVacia, showToast, $id
+              Controla el ciclo de vida de Carta (activar/limpiar).
    ================================================================ */
 
 import { CommandBus } from '../lib/command-bus.js';
@@ -23,7 +19,7 @@ import { Cobro } from './cobro.js';
 import { Tickets } from './tickets.js';
 import { Auth } from '../auth.js';
 import { mesaVacia } from '../db-core.js';
-import { showToast, $id, mostrarEntrada } from '../utils.js';
+import { mostrarToast, $id, mostrarEntrada } from '../utils.js';
 
 const Pedido = (() => {
 
@@ -115,13 +111,13 @@ const Pedido = (() => {
 
     $id('searchProducto').addEventListener('input', () => Carta.filtrar());
     $id('comandaMozo').addEventListener('change', function () {
-      Comanda.setMozo(this.value);
+      Comanda.establecerMozo(this.value);
     });
     $id('comandaComensales').addEventListener('change', function () {
-      Comanda.setComensales(this.value);
+      Comanda.establecerComensales(this.value);
     });
     $id('comandaObs').addEventListener('input', function () {
-      Comanda.setObservacionGeneral(this.value);
+      Comanda.establecerObservacionGeneral(this.value);
     });
   }
 
@@ -136,6 +132,7 @@ const Pedido = (() => {
       badgeEl.className = 'estado-badge ' + mesa.estado;
     }
 
+    Carta.activar();
     EventBus.emit('mesa:abierta', mesa);
     Carta.render();
     const modal = document.getElementById('modalPedido');
@@ -152,6 +149,8 @@ const Pedido = (() => {
   }
 
   function cerrar() {
+    Carta.limpiar();
+
     const modal = document.getElementById('modalPedido');
     if (modal) {
       modal.style.display = 'none';
@@ -170,7 +169,11 @@ const Pedido = (() => {
         const idx = DB.mesas.findIndex(m => m.numero === mesa.numero);
         if (idx >= 0) {
           DB.mesas[idx] = mesaVacia(mesa.numero);
-          DB.saveMesas();
+          try {
+            DB.saveMesas();
+          } catch (e) {
+            Logger.error('[Pedido] Error al guardar mesas al cerrar:', e);
+          }
           EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: 'libre' });
           Mesas.render();
         }
@@ -181,7 +184,7 @@ const Pedido = (() => {
 
   async function revisarComanda() {
     const mesa = Comanda.getMesaActiva();
-    if (!mesa) { showToast('warning', 'No hay mesa activa.'); return; }
+    if (!mesa) { mostrarToast('warning', 'No hay mesa activa.'); return; }
 
     const pendientes = mesa.items.filter(it => !it.enviado);
 
@@ -198,10 +201,10 @@ const Pedido = (() => {
       return;
     }
 
-    showToast('warning', 'No hay comandas para revisar. Envía nuevos ítems primero.');
+    mostrarToast('warning', 'No hay comandas para revisar. Envía nuevos ítems primero.');
   }
 
-  function _ejecutarEnvioComanda(mesa, pendientes, overrideStock) {
+  async function _ejecutarEnvioComanda(mesa, pendientes, overrideStock) {
     overrideStock = overrideStock || false;
     const mozoSelect = document.getElementById('comandaMozo');
     const comensalesInput = document.getElementById('comandaComensales');
@@ -210,17 +213,22 @@ const Pedido = (() => {
     if (comensalesInput) mesa.comensales = parseInt(comensalesInput.value) || 1;
     if (obsInput) mesa.observaciones = obsInput.value;
 
-    return CommandBus.ejecutar({
-      type: 'enviarComanda',
-      datos: {
-        mesa: mesa,
-        mozo: mesa.mozo,
-        comensales: mesa.comensales,
-        observaciones: mesa.observaciones || '',
-        itemsPendientes: pendientes,
-        overrideStock: overrideStock
-      }
-    });
+    try {
+      return await CommandBus.ejecutar({
+        type: 'enviarComanda',
+        datos: {
+          mesa: mesa,
+          mozo: mesa.mozo,
+          comensales: mesa.comensales,
+          observaciones: mesa.observaciones || '',
+          itemsPendientes: pendientes,
+          overrideStock: overrideStock
+        }
+      });
+    } catch (e) {
+      Logger.error('[Pedido] Error al ejecutar envío de comanda:', e);
+      return { exito: false, error: e.message };
+    }
   }
 
   function _mostrarRevisarPendientes(mesa, pendientes) {
@@ -243,18 +251,18 @@ const Pedido = (() => {
                   _mostrarDialogoStockInsuficiente(mesa, pendientes, err.faltantes, err.mensaje);
                   return false;
                 }
-                showToast('error', 'Error al enviar comanda: ' + (err?.message || err));
+                mostrarToast('error', 'Error al enviar comanda: ' + (err?.message || err));
                 return false;
               }
               _comandasEnviadas[tempId] = true;
-              showToast('success', 'Comanda(s) enviada(s)');
+              mostrarToast('success', 'Comanda(s) enviada(s)');
               Comanda.render();
               Mesas.render();
               EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: mesa.estado });
               return true;
             } catch (e) {
               Logger.error('[Pedido] Error al enviar comanda:', e);
-              showToast('error', 'Error al enviar comanda.');
+              mostrarToast('error', 'Error al enviar comanda.');
               return false;
             }
           }
@@ -336,15 +344,15 @@ const Pedido = (() => {
       try {
         const resultado = await _ejecutarEnvioComanda(mesa, pendientes, true);
         if (resultado.exito) {
-          showToast('success', 'Comanda(s) enviada(s) (stock ignorado)');
+          mostrarToast('success', 'Comanda(s) enviada(s) (stock ignorado)');
           Comanda.render();
           Mesas.render();
         } else {
-          showToast('error', 'Error al enviar comanda: ' + (resultado.error?.message || resultado.error));
+          mostrarToast('error', 'Error al enviar comanda: ' + (resultado.error?.message || resultado.error));
         }
       } catch (e) {
         Logger.error('[Pedido] Error al forzar envío:', e);
-        showToast('error', 'Error al enviar comanda.');
+        mostrarToast('error', 'Error al enviar comanda.');
       }
     };
   }
@@ -368,24 +376,29 @@ const Pedido = (() => {
 
   async function _editarComandaCallback(comanda, htmlActual) {
     if (!comanda) return htmlActual;
-    const nota = await mostrarEntrada(
-      'Comentario de comanda',
-      'Agregar comentario a la comanda:',
-      { placeholder: 'Ej: Sin sal', valorPredefinido: comanda.observaciones || '' }
-    );
-    if (nota !== null && nota !== undefined) {
-      comanda.observaciones = nota;
-      return Tickets.generarComanda(comanda, comanda.destino);
+    try {
+      const nota = await mostrarEntrada(
+        'Comentario de comanda',
+        'Agregar comentario a la comanda:',
+        { placeholder: 'Ej: Sin sal', valorPredefinido: comanda.observaciones || '' }
+      );
+      if (nota !== null && nota !== undefined) {
+        comanda.observaciones = nota;
+        return Tickets.generarComanda(comanda, comanda.destino);
+      }
+      return htmlActual;
+    } catch (e) {
+      Logger.error('[Pedido] Error al editar comentario de comanda:', e);
+      return htmlActual;
     }
-    return htmlActual;
   }
 
   function transferirMesa(mesaOrigenNum, mesaDestinoNum) {
-    if (!Auth.esAdmin()) { showToast('error', 'Solo administradores pueden transferir pedidos entre mesas'); return false; }
+    if (!Auth.esAdmin()) { mostrarToast('error', 'Solo administradores pueden transferir pedidos entre mesas'); return false; }
     const mesaOrigen = DB.getMesa(mesaOrigenNum), mesaDestino = DB.getMesa(mesaDestinoNum);
-    if (!mesaOrigen || !mesaDestino) { showToast('error', 'Una de las mesas no existe.'); return false; }
-    if (mesaDestino.estado !== 'libre') { showToast('error', 'La mesa ' + mesaDestinoNum + ' no está libre.'); return false; }
-    if (mesaOrigen.esVirtual || mesaDestino.esVirtual) { showToast('error', 'No se puede transferir desde/hacia una mesa fusionada.'); return false; }
+    if (!mesaOrigen || !mesaDestino) { mostrarToast('error', 'Una de las mesas no existe.'); return false; }
+    if (mesaDestino.estado !== 'libre') { mostrarToast('error', 'La mesa ' + mesaDestinoNum + ' no está libre.'); return false; }
+    if (mesaOrigen.esVirtual || mesaDestino.esVirtual) { mostrarToast('error', 'No se puede transferir desde/hacia una mesa fusionada.'); return false; }
 
     mesaDestino.estado = mesaOrigen.estado; mesaDestino.pedidoId = mesaOrigen.pedidoId;
     mesaDestino.items = mesaOrigen.items; mesaDestino.mozo = mesaOrigen.mozo;
@@ -398,39 +411,42 @@ const Pedido = (() => {
     }
     const idxOrigen = DB.mesas.findIndex(m => m.numero === mesaOrigenNum);
     if (idxOrigen >= 0) DB.mesas[idxOrigen] = mesaVacia(mesaOrigenNum);
-    DB.saveMesas();
+    try {
+      DB.saveMesas();
+    } catch (e) {
+      Logger.error('[Pedido] Error al guardar mesas al transferir:', e);
+    }
     EventBus.emit('mesa:actualizada', { mesa: mesaOrigenNum, estado: 'libre' });
     EventBus.emit('mesa:actualizada', { mesa: mesaDestinoNum, estado: mesaDestino.estado });
     Mesas.render();
     const mesaActiva = Comanda.getMesaActiva();
     if (mesaActiva && mesaActiva.numero === mesaOrigenNum) abrirMesa(mesaDestinoNum);
-    showToast('success', 'Pedido transferido de Mesa ' + mesaOrigenNum + ' a Mesa ' + mesaDestinoNum);
+    mostrarToast('success', 'Pedido transferido de Mesa ' + mesaOrigenNum + ' a Mesa ' + mesaDestinoNum);
     return true;
   }
 
   function mostrarSelectorTransferencia() {
     const mesaActual = Comanda.getMesaActiva();
-    if (!mesaActual) { showToast('warning', 'No hay mesa activa.'); return; }
-    if (!Auth.esAdmin()) { showToast('error', 'Solo administradores pueden transferir mesas.'); return; }
-    if (mesaActual.esVirtual) { showToast('info', 'No se puede transferir una mesa fusionada.'); return; }
+    if (!mesaActual) { mostrarToast('warning', 'No hay mesa activa.'); return; }
+    if (!Auth.esAdmin()) { mostrarToast('error', 'Solo administradores pueden transferir mesas.'); return; }
+    if (mesaActual.esVirtual) { mostrarToast('info', 'No se puede transferir una mesa fusionada.'); return; }
     const mesasLibres = DB.mesas.filter(m => m.estado === 'libre' && !m.esVirtual && m.numero !== mesaActual.numero);
-    if (!mesasLibres.length) { showToast('info', 'No hay mesas libres para transferir.'); return; }
+    if (!mesasLibres.length) { mostrarToast('info', 'No hay mesas libres para transferir.'); return; }
     const opciones = mesasLibres.map(m => m.numero).join(', ');
     const destino = prompt('Mesas libres: ' + opciones + '\nIngresa el número de mesa destino:');
     if (destino) {
       const numDestino = parseInt(destino);
       if (!isNaN(numDestino)) transferirMesa(mesaActual.numero, numDestino);
-      else showToast('error', 'Número de mesa inválido.');
+      else mostrarToast('error', 'Número de mesa inválido.');
     }
   }
 
   function pedirCuenta() { Cuenta.pedirCuenta(); }
   function cerrarMesa() { Cobro.abrirModalCierre(); }
-  function _setCat(cat) { Carta.setCategoria(cat); }
+  function _establecerCat(cat) { Carta.establecerCategoria(cat); }
   function filtrarProductos() { Carta.filtrar(); }
-  function actualizarObsGeneral(valor) { Comanda.setObservacionGeneral(valor); }
+  function actualizarObsGeneral(valor) { Comanda.establecerObservacionGeneral(valor); }
 
-  // Listeners de desacoplamiento
   EventBus.on('mesa-detalle:abierto', () => { _panelDetalleAbierto = true; });
   EventBus.on('mesa-detalle:cerrado', () => { _panelDetalleAbierto = false; });
   EventBus.on('mesa:tomar_pedido', (data) => { abrirMesa(data.mesa); });
@@ -444,7 +460,7 @@ const Pedido = (() => {
     mostrarSelectorTransferencia,
     pedirCuenta,
     cerrarMesa,
-    _setCat,
+    _establecerCat,
     filtrarProductos,
     actualizarObsGeneral
   };

@@ -1,13 +1,13 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/reparto.js
-   Versión: 2.1.0
-   Propósito: Fachada de la vista de reparto. Reexporta funciones
-              de los submódulos. Delega inicialización a ciclo-vida.
+   Versión: 2.1.2
+   Propósito: Fachada de la vista de reparto.
+              v2.1.2: migra a nombres en español (store).
    ================================================================ */
 
 import { activar, limpiar } from './reparto/ciclo-vida.js';
-import { renderTabla, getEstadoFiltro, setEstadoFiltro } from './reparto/tabla.js';
+import { renderTabla, getEstadoFiltro, establecerEstadoFiltro } from './reparto/tabla.js';
 import { enviarACocina, despachar, confirmarEntrega, eliminarPedido } from './reparto/acciones.js';
 import { mostrar as mostrarModalNuevo, cerrar as cerrarModalNuevo, getItemsTemporales, setItemsTemporales } from './reparto/modal-nuevo.js';
 import { mostrar as mostrarModalEditar, cerrar as cerrarModalEditar } from './reparto/modal-editar.js';
@@ -19,13 +19,13 @@ const Reparto = {
 
   render() {
     activar();
-    const pedidos = Store.getState().pedidosDelivery || [];
+    const pedidos = Store.obtenerEstado().pedidosDelivery || [];
     const pedidosValidos = pedidos.filter(p => p && p.id);
     renderTabla(pedidosValidos);
   },
 
   filtrarPorEstado(estado) {
-    setEstadoFiltro(estado);
+    establecerEstadoFiltro(estado);
     this.render();
   },
 

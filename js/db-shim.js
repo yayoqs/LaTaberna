@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-shim.js
-   Versión: 1.0.3
-   Propósito: Compatibilidad con Google Apps Script (funciones legacy).
-              Incluye import de Logger.
+   Versión: 1.0.5
+   Propósito: Compatibilidad con Google Apps Script.
+              Solo expone el método llamar para respaldo de cierre
+              de turno. Stubs vacíos eliminados.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -11,13 +12,12 @@ import { Logger } from './lib/logger.js';
 export const DBShim = (function() {
   var module = {};
 
-  // URL del Google Apps Script (actualizada con CORS habilitado)
+  // URL del Google Apps Script para respaldo de cierre de turno
   module.urlSheets = 'https://script.google.com/macros/s/AKfycbyApBQuGK7vBpwNVQAbvpQqqQd8xfrd_Hunwtb8hdjyeewlYQAyZpolUOWYYqPNN3MUTw/exec';
 
   /**
-   * Llama a una función del Google Apps Script (eventos, perfil, cierre de turno).
-   * Si la red falla, devuelve un objeto vacío en lugar de propagar el error,
-   * para no interrumpir la experiencia del usuario.
+   * Llama a una función del Google Apps Script.
+   * Si la red falla, registra el error y devuelve un objeto vacío.
    * @param {string} action
    * @param {object} payload
    * @returns {Promise<object>}
@@ -47,14 +47,7 @@ export const DBShim = (function() {
     }
   };
 
-  // Métodos vacíos para evitar errores en llamadas remanentes
-  module.syncGuardarPedido = async function() {};
-  module.syncGuardarProducto = async function() {};
-  module.syncEliminarProducto = async function() {};
-  module.syncGuardarMozo = async function() {};
-  module.syncGuardarIngrediente = async function() {};
-  module.syncEliminarIngrediente = async function() {};
-  module.syncGuardarReceta = async function() {};
+  // Métodos auxiliares requeridos por db.js (no-op, mantenidos para compatibilidad)
   module._encolarOperacion = function() {};
   module._procesarSyncQueue = async function() {};
   module._saveSyncQueue = function() {};

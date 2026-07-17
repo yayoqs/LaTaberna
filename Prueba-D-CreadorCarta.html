@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Menú — Diseñador de Carta</title>
+  <style>
+    :root {
+      --bg: #0f0f14; --panel: #1a1a24; --border: #2e2e42;
+      --text: #f1f5f9; --text-sec: #a0a0b0; --accent: #f59e0b;
+      --danger: #ef4444; --success: #22c55e; --radius: 12px;
+      font-family: system-ui, sans-serif; background: var(--bg); color: var(--text);
+    }
+    body {
+      margin: 0; display: flex; flex-direction: column; height: 100vh; height: 100dvh;
+      overflow: hidden; user-select: none; -webkit-user-select: none;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--border);
+      z-index: 20; flex-shrink: 0;
+    }
+    .header .hamburger {
+      background: transparent; border: 1px solid var(--border); color: var(--text-sec);
+      border-radius: 8px; width: 40px; height: 40px; display: flex; align-items: center;
+      justify-content: center; cursor: pointer; font-size: 20px; transition: .2s;
+    }
+    .header .hamburger:active { background: var(--accent); color: #000; border-color: var(--accent); }
+    .header h2 { font-size: 18px; margin: 0; display: flex; align-items: center; gap: 8px; flex: 1; }
+    .header h2 input {
+      background: transparent; border: none; color: var(--text); font-size: 18px;
+      font-weight: 600; outline: none; border-bottom: 1px dashed transparent; width: 160px;
+    }
+    .header h2 input:focus { border-bottom-color: var(--accent); }
+    .header-actions { display: flex; gap: 8px; }
+    .icon-btn {
+      background: transparent; border: 1px solid var(--border); color: var(--text-sec);
+      border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center;
+      justify-content: center; cursor: pointer; font-size: 18px; transition: .2s;
+    }
+    .icon-btn:active { background: var(--accent); color: #000; border-color: var(--accent); }
+
+    /* ── Sidebar (panel lateral de menús) ── */
+    .sidebar-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 30;
+      display: none; transition: opacity .3s;
+    }
+    .sidebar-overlay.active { display: block; }
+    .sidebar {
+      position: fixed; top: 0; left: 0; bottom: 0; z-index: 40;
+      width: 280px; max-width: 85vw; background: var(--panel);
+      border-right: 1px solid var(--border); transform: translateX(-100%);
+      transition: transform .3s cubic-bezier(.4,0,.2,1);
+      display: flex; flex-direction: column; box-shadow: 4px 0 20px rgba(0,0,0,.3);
+    }
+    .sidebar.active { transform: translateX(0); }
+    .sidebar-header {
+      padding: 16px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .sidebar-header h3 { margin: 0; font-size: 16px; }
+    .sidebar-list { flex: 1; overflow-y: auto; padding: 8px; }
+    .menu-item {
+      padding: 12px 16px; border-radius: 8px; cursor: pointer; margin-bottom: 4px;
+      display: flex; align-items: center; gap: 10px; transition: background .2s;
+    }
+    .menu-item:hover, .menu-item:active { background: #252535; }
+    .menu-item.activo { background: rgba(245,158,11,.15); border-left: 3px solid var(--accent); }
+    .menu-item .menu-icon { font-size: 20px; }
+    .menu-item .menu-info { flex: 1; }
+    .menu-item .menu-info strong { font-size: 14px; display: block; }
+    .menu-item .menu-info span { font-size: 11px; color: var(--text-sec); }
+
+    /* ── Canvas ── */
+    .canvas-wrap {
+      flex: 1; overflow: auto; position: relative; padding: 16px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .canvas {
+      width: 100%; max-width: 600px; min-height: 400px; height: 70vh;
+      position: relative; border-radius: var(--radius);
+      box-shadow: 0 0 0 1px var(--border); transition: background .3s;
+      background-size: cover; background-position: center;
+    }
+    .canvas.grid {
+      background-image: linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
+                        linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+    .ficha {
+      position: absolute; min-width: 90px; background: rgba(0,0,0,.7);
+      border: 2px solid transparent; border-radius: 8px; display: flex;
+      flex-direction: column; align-items: center; padding: 8px;
+      cursor: move; touch-action: none;
+    }
+    .ficha:active { border-color: var(--accent); }
+    .ficha img { width: 60px; height: 60px; object-fit: cover; border-radius: 6px; pointer-events: none; }
+    .ficha .nombre { font-weight: 600; font-size: 12px; margin-top: 4px; text-align: center; }
+    .ficha .precio { font-size: 11px; color: var(--accent); margin-top: 2px; }
+    .ficha.titulo { background: transparent; font-size: 24px; font-weight: 800; padding: 12px; border: none; }
+    .ficha.descripcion { background: rgba(255,255,255,.05); font-size: 14px; padding: 12px; max-width: 300px; }
+    .ficha.imagen-decorativa { background: transparent; padding: 0; border-radius: 8px; }
+    .ficha.fondo-seccion { background: rgba(255,255,255,.03); border-radius: 12px; min-width: 200px; min-height: 80px; z-index: -1; }
+    .ficha.circulo { border-radius: 50%; min-width: 80px; min-height: 80px; }
+    .ficha.circulo img { border-radius: 50%; }
+
+    /* ── FAB y menú radial ── */
+    .fab {
+      position: fixed; bottom: 24px; right: 24px; width: 56px; height: 56px;
+      background: var(--accent); border-radius: 50%; display: flex; align-items: center;
+      justify-content: center; font-size: 28px; color: #000; cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,0,0,.4); z-index: 40; border: none;
+    }
+    .radial-menu {
+      position: fixed; bottom: 90px; right: 30px; z-index: 50;
+      display: none; flex-direction: column-reverse; align-items: flex-end; gap: 8px;
+    }
+    .radial-menu.active { display: flex; }
+    .radial-btn {
+      background: var(--panel); border: 1px solid var(--border); color: var(--text);
+      border-radius: 24px; padding: 10px 16px; display: flex; align-items: center; gap: 8px;
+      font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap;
+      box-shadow: 0 4px 12px rgba(0,0,0,.3); transition: .2s;
+    }
+    .radial-btn:active { background: var(--accent); color: #000; border-color: var(--accent); }
+    .fab-overlay {
+      position: fixed; inset: 0; z-index: 39; display: none; background: rgba(0,0,0,.4);
+    }
+    .fab-overlay.active { display: block; }
+
+    /* ── Bottom Sheet ── */
+    .sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 50; display: none; }
+    .sheet-overlay.active { display: block; }
+    .bottom-sheet {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 60;
+      background: var(--panel); border-radius: 16px 16px 0 0;
+      max-height: 60vh; transform: translateY(100%); transition: transform .3s;
+      display: flex; flex-direction: column; box-shadow: 0 -8px 30px rgba(0,0,0,.5);
+    }
+    .bottom-sheet.active { transform: translateY(0); }
+    .sheet-handle { padding: 12px; text-align: center; font-weight: 700; font-size: 14px; border-bottom: 1px solid var(--border); color: var(--text-sec); }
+    .sheet-list { flex: 1; overflow-y: auto; padding: 8px; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+    .product-card { background: #252535; border-radius: 8px; padding: 8px; cursor: grab; display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; touch-action: none; }
+    .product-card img { width: 60px; height: 60px; object-fit: cover; border-radius: 6px; pointer-events: none; }
+    .product-card .info strong { font-size: 12px; }
+    .product-card .info span { font-size: 10px; color: var(--text-sec); }
+
+    /* ── Panel de propiedades ── */
+    .props-panel { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; width: calc(100% - 40px); max-width: 360px; z-index: 100; display: none; flex-direction: column; gap: 10px; }
+    .props-panel.active { display: flex; }
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 99; display: none; }
+    .overlay.active { display: block; }
+    .props-panel label { font-size: 12px; color: var(--text-sec); }
+    .props-panel input, .props-panel select, .props-panel textarea { background: #252535; border: 1px solid var(--border); color: var(--text); padding: 8px 12px; border-radius: 6px; width: 100%; resize: vertical; }
+
+    /* ── Vista previa ── */
+    .preview-modal { position: fixed; inset: 0; background: rgba(0,0,0,.85); z-index: 200; display: none; align-items: center; justify-content: center; }
+    .preview-modal.active { display: flex; }
+    .preview-content { width: 90vw; max-height: 80vh; background: var(--panel); border-radius: var(--radius); overflow: auto; padding: 20px; position: relative; }
+    .preview-content .close-btn { position: absolute; top: 10px; right: 20px; background: var(--danger); color: #fff; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+
+    /* ── Menú contextual ── */
+    .context-menu { position: absolute; top: 50px; right: 20px; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px; z-index: 80; display: none; flex-direction: column; gap: 6px; box-shadow: 0 8px 20px rgba(0,0,0,.5); min-width: 200px; }
+    .context-menu.active { display: flex; }
+    .context-menu label { font-size: 12px; color: var(--text-sec); }
+    .context-menu select, .context-menu input { background: #252535; border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 6px; width: 100%; }
+    .context-menu button { margin-top: 4px; background: var(--accent); border: none; color: #000; padding: 8px; border-radius: 6px; font-weight: 600; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <!-- Header con botón hamburguesa -->
+  <div class="header">
+    <button class="hamburger" id="hamburgerBtn" title="Menús">☰</button>
+    <h2>📋 <input type="text" id="menuName" value="Cena de Verano"></h2>
+    <div class="header-actions">
+      <button class="icon-btn" id="ctxBtn" title="Opciones">⚙️</button>
+      <button class="icon-btn" id="previewBtn" title="Vista previa">👁</button>
+      <button class="icon-btn" id="saveBtn" title="Guardar">💾</button>
+    </div>
+  </div>
+
+  <!-- Sidebar (panel lateral de menús) -->
+  <div class="sidebar-overlay" id="sidebarOverlay"></div>
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h3>📁 Mis Menús</h3>
+      <button class="icon-btn" id="closeSidebarBtn" style="border-radius:8px;">✕</button>
+    </div>
+    <div class="sidebar-list" id="sidebarList">
+      <!-- Se llena dinámicamente -->
+    </div>
+  </div>
+
+  <!-- Lienzo -->
+  <div class="canvas-wrap">
+    <div class="canvas" id="canvas" style="background-color:#1a1a2e;"></div>
+  </div>
+
+  <!-- Menú contextual (⚙️) -->
+  <div class="context-menu" id="contextMenu">
+    <label>Fondo</label>
+    <select id="bgSelect">
+      <option value="#1a1a2e">Oscuro</option><option value="#2e2e2e">Gris</option>
+      <option value="#1e3a2f">Verde</option><option value="#3a1e1e">Burdeos</option>
+    </select>
+    <label>Tipografía</label>
+    <select id="fontSelect">
+      <option value="'Inter', sans-serif">Inter</option>
+      <option value="'Georgia', serif">Georgia</option>
+      <option value="'Courier New', monospace">Courier</option>
+    </select>
+    <label style="display:flex; align-items:center; gap:8px;">
+      <input type="checkbox" id="gridToggle"> Grilla
+    </label>
+    <button id="publishBtn">🚀 Publicar</button>
+  </div>
+
+  <!-- Overlay del FAB -->
+  <div class="fab-overlay" id="fabOverlay"></div>
+  <!-- Menú radial -->
+  <div class="radial-menu" id="radialMenu">
+    <button class="radial-btn" data-action="producto">🍔 Producto del recetario</button>
+    <button class="radial-btn" data-action="titulo">🔤 Título de sección</button>
+    <button class="radial-btn" data-action="descripcion">📝 Descripción</button>
+    <button class="radial-btn" data-action="imagen">🖼️ Imagen decorativa</button>
+    <button class="radial-btn" data-action="fondo">🎨 Fondo de sección</button>
+  </div>
+  <button class="fab" id="fabBtn">+</button>
+
+  <!-- Bottom Sheet (Biblioteca) -->
+  <div class="sheet-overlay" id="sheetOverlay"></div>
+  <div class="bottom-sheet" id="bottomSheet">
+    <div class="sheet-handle">☰ Biblioteca de Productos</div>
+    <div class="sheet-list" id="sheetList"></div>
+  </div>
+
+  <!-- Panel de propiedades -->
+  <div class="overlay" id="propsOverlay"></div>
+  <div class="props-panel" id="propsPanel">
+    <h3>Propiedades</h3>
+    <label>Contenido</label>
+    <textarea id="propContent" rows="2"></textarea>
+    <label>Forma</label>
+    <select id="propShape"><option value="rect">Rectángulo</option><option value="circle">Círculo</option></select>
+    <label>Mostrar</label>
+    <select id="propDisplay"><option value="both">Nombre + Imagen</option><option value="name">Solo nombre</option><option value="img">Solo imagen</option></select>
+    <label>Precio venta</label>
+    <input type="number" id="propPrice" step="1" value="0">
+    <label>Costo: <span id="propCost">$0</span> — Margen: <span id="propMargin">0%</span></label>
+    <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:12px;">
+      <button id="closeProps" style="background:transparent; border:1px solid var(--border); color:var(--text); padding:8px 16px; border-radius:6px;">Cerrar</button>
+      <button id="deleteFicha" style="background:var(--danger); border:none; color:#fff; padding:8px 16px; border-radius:6px;">Eliminar</button>
+    </div>
+  </div>
+
+  <!-- Modal Vista previa -->
+  <div class="preview-modal" id="previewModal">
+    <div class="preview-content" id="previewContent">
+      <button class="close-btn" id="closePreview">✕ Cerrar</button>
+    </div>
+  </div>
+
+  <script>
+    const productos = [
+      { id:'p1', nombre:'Hamburguesa Clásica', costo:1200, imagen:'https://placehold.co/100x100/f59e0b/000?text=🍔' },
+      { id:'p2', nombre:'Cerveza Artesanal', costo:600, imagen:'https://placehold.co/100x100/3b82f6/fff?text=🍺' },
+      { id:'p3', nombre:'Nachos con Guacamole', costo:900, imagen:'https://placehold.co/100x100/22c55e/000?text=🌮' },
+      { id:'p4', nombre:'Mojito Cubano', costo:800, imagen:'https://placehold.co/100x100/06b6d4/000?text=🍹' },
+      { id:'p5', nombre:'Pizza Margherita', costo:1100, imagen:'https://placehold.co/100x100/ef4444/fff?text=🍕' },
+      { id:'p6', nombre:'Vino Tinto Malbec', costo:1500, imagen:'https://placehold.co/100x100/8b5cf6/fff?text=🍷' }
+    ];
+
+    // Menús de ejemplo
+    const menus = [
+      { id:'m1', nombre:'Cena de Verano', estado:'borrador' },
+      { id:'m2', nombre:'Menú Ejecutivo', estado:'publicado' },
+      { id:'m3', nombre:'Carta de Invierno', estado:'borrador' }
+    ];
+    let menuActivo = menus[0];
+
+    const canvas = document.getElementById('canvas');
+    const sidebar = document.getElementById('sidebar');
+    const sidebarOverlay = document.getElementById('sidebarOverlay');
+    const sidebarList = document.getElementById('sidebarList');
+    const fabBtn = document.getElementById('fabBtn');
+    const fabOverlayEl = document.getElementById('fabOverlay');
+    const radialMenu = document.getElementById('radialMenu');
+    const bottomSheet = document.getElementById('bottomSheet');
+    const sheetOverlay = document.getElementById('sheetOverlay');
+    const sheetListEl = document.getElementById('sheetList');
+    const ctxMenu = document.getElementById('contextMenu');
+    const propsPanel = document.getElementById('propsPanel');
+    const propsOverlay = document.getElementById('propsOverlay');
+
+    // ── Sidebar ──
+    function renderSidebar() {
+      sidebarList.innerHTML = menus.map(m => `
+        <div class="menu-item ${m.id === menuActivo.id ? 'activo' : ''}" data-id="${m.id}">
+          <span class="menu-icon">📄</span>
+          <div class="menu-info">
+            <strong>${m.nombre}</strong>
+            <span>${m.estado === 'publicado' ? '🟢 Publicado' : '📝 Borrador'}</span>
+          </div>
+        </div>
+      `).join('');
+    }
+    renderSidebar();
+
+    function abrirSidebar() {
+      sidebar.classList.add('active');
+      sidebarOverlay.classList.add('active');
+    }
+    function cerrarSidebar() {
+      sidebar.classList.remove('active');
+      sidebarOverlay.classList.remove('active');
+    }
+    document.getElementById('hamburgerBtn').addEventListener('click', abrirSidebar);
+    document.getElementById('closeSidebarBtn').addEventListener('click', cerrarSidebar);
+    sidebarOverlay.addEventListener('click', cerrarSidebar);
+
+    // Swipe desde borde izquierdo para abrir sidebar
+    let touchStartX = 0;
+    document.addEventListener('touchstart', e => {
+      touchStartX = e.touches[0].clientX;
+    });
+    document.addEventListener('touchend', e => {
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      if (dx > 60 && touchStartX < 30) {
+        abrirSidebar();
+      }
+    });
+
+    // Seleccionar menú del sidebar
+    sidebarList.addEventListener('click', e => {
+      const item = e.target.closest('.menu-item');
+      if (!item) return;
+      const id = item.dataset.id;
+      menuActivo = menus.find(m => m.id === id);
+      document.getElementById('menuName').value = menuActivo.nombre;
+      canvas.innerHTML = ''; // Limpiar lienzo al cambiar de menú
+      renderSidebar();
+      cerrarSidebar();
+    });
+
+    // ── Menú radial del botón "+" ──
+    fabBtn.addEventListener('click', () => {
+      radialMenu.classList.toggle('active');
+      fabOverlayEl.classList.toggle('active');
+      fabBtn.textContent = radialMenu.classList.contains('active') ? '✕' : '+';
+    });
+    fabOverlayEl.addEventListener('click', () => {
+      radialMenu.classList.remove('active');
+      fabOverlayEl.classList.remove('active');
+      fabBtn.textContent = '+';
+    });
+
+    document.querySelectorAll('.radial-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const action = btn.dataset.action;
+        radialMenu.classList.remove('active');
+        fabOverlayEl.classList.remove('active');
+        fabBtn.textContent = '+';
+        switch(action) {
+          case 'producto': toggleSheet(); break;
+          case 'titulo': crearFicha('titulo', { texto: 'Título de sección' }, 100, 100); break;
+          case 'descripcion': crearFicha('descripcion', { texto: 'Descripción de la sección...' }, 100, 150); break;
+          case 'imagen': crearFicha('imagen-decorativa', { imagen: 'https://placehold.co/200x100/6366f1/fff?text=Imagen' }, 100, 200); break;
+          case 'fondo': crearFicha('fondo-seccion', { color: 'rgba(255,255,255,0.03)' }, 100, 250); break;
+        }
+      });
+    });
+
+    // ── Biblioteca (bottom sheet) ──
+    function toggleSheet() {
+      bottomSheet.classList.toggle('active');
+      sheetOverlay.classList.toggle('active');
+    }
+    sheetOverlay.addEventListener('click', toggleSheet);
+
+    function renderBiblioteca() {
+      sheetListEl.innerHTML = productos.map(p => `
+        <div class="product-card" draggable="true" data-id="${p.id}">
+          <img src="${p.imagen}" alt="${p.nombre}" onerror="this.style.display='none'">
+          <div class="info"><strong>${p.nombre}</strong><span>Costo $${p.costo}</span></div>
+        </div>
+      `).join('');
+    }
+    renderBiblioteca();
+
+    // ── Drag & drop ──
+    let draggedId = null;
+    document.querySelectorAll('.product-card').forEach(card => {
+      card.addEventListener('dragstart', e => { draggedId = card.dataset.id; });
+      card.addEventListener('touchstart', e => {
+        draggedId = card.dataset.id;
+        card.style.opacity = '0.6';
+      });
+      card.addEventListener('touchend', e => {
+        card.style.opacity = '1';
+        if (draggedId) {
+          const touch = e.changedTouches[0];
+          const canvasRect = canvas.getBoundingClientRect();
+          const x = touch.clientX - canvasRect.left - 30;
+          const y = touch.clientY - canvasRect.top - 30;
+          if (x > 0 && y > 0 && x < canvasRect.width && y < canvasRect.height) {
+            const prod = productos.find(p => p.id === draggedId);
+            if (prod) crearFicha('producto', prod, x, y);
+          }
+          draggedId = null;
+        }
+      });
+    });
+
+    canvas.addEventListener('dragover', e => e.preventDefault());
+    canvas.addEventListener('drop', e => {
+      e.preventDefault();
+      if (!draggedId) return;
+      const prod = productos.find(p => p.id === draggedId);
+      if (!prod) return;
+      const rect = canvas.getBoundingClientRect();
+      crearFicha('producto', prod, e.clientX - rect.left - 30, e.clientY - rect.top - 30);
+      draggedId = null;
+    });
+
+    function crearFicha(tipo, data, x, y) {
+      const ficha = document.createElement('div');
+      ficha.className = `ficha ${tipo}`;
+      ficha.style.left = x + 'px';
+      ficha.style.top = y + 'px';
+
+      switch(tipo) {
+        case 'producto':
+          ficha.dataset.id = data.id; ficha.dataset.shape = 'rect'; ficha.dataset.display = 'both';
+          ficha.dataset.price = Math.round(data.costo * 1.5); ficha.dataset.cost = data.costo; ficha.dataset.type = 'producto';
+          ficha.innerHTML = `<img src="${data.imagen}" onerror="this.style.display='none'"><div class="nombre">${data.nombre}</div><div class="precio">$${Math.round(data.costo * 1.5)}</div>`;
+          break;
+        case 'titulo': ficha.dataset.type = 'titulo'; ficha.dataset.content = data.texto; ficha.innerHTML = data.texto; ficha.style.fontSize = '24px'; ficha.style.fontWeight = '800'; break;
+        case 'descripcion': ficha.dataset.type = 'descripcion'; ficha.dataset.content = data.texto; ficha.innerHTML = data.texto; break;
+        case 'imagen-decorativa': ficha.dataset.type = 'imagen'; ficha.dataset.imagen = data.imagen; ficha.innerHTML = `<img src="${data.imagen}" style="width:200px; height:100px; object-fit:cover; border-radius:8px;">`; break;
+        case 'fondo-seccion': ficha.dataset.type = 'fondo'; ficha.dataset.color = data.color; ficha.style.backgroundColor = data.color; ficha.style.width = '200px'; ficha.style.height = '80px'; ficha.style.borderRadius = '12px'; ficha.innerHTML = ''; break;
+      }
+      ficha.addEventListener('mousedown', startDragFicha);
+      ficha.addEventListener('touchstart', startDragFichaTouch);
+      ficha.addEventListener('click', e => { e.stopPropagation(); abrirProps(ficha); });
+      canvas.appendChild(ficha);
+    }
+
+    let fichaArrastrada = null, offset = { x:0, y:0 };
+    function startDragFicha(e) { if (e.target.closest('button')) return; fichaArrastrada = e.currentTarget; offset.x = e.clientX - fichaArrastrada.offsetLeft; offset.y = e.clientY - fichaArrastrada.offsetTop; document.addEventListener('mousemove', moveFicha); document.addEventListener('mouseup', stopDragFicha); }
+    function moveFicha(e) { if (!fichaArrastrada) return; fichaArrastrada.style.left = (e.clientX - offset.x) + 'px'; fichaArrastrada.style.top = (e.clientY - offset.y) + 'px'; }
+    function stopDragFicha() { fichaArrastrada = null; document.removeEventListener('mousemove', moveFicha); document.removeEventListener('mouseup', stopDragFicha); }
+    function startDragFichaTouch(e) { if (e.target.closest('button')) return; fichaArrastrada = e.currentTarget; const touch = e.touches[0]; offset.x = touch.clientX - fichaArrastrada.offsetLeft; offset.y = touch.clientY - fichaArrastrada.offsetTop; document.addEventListener('touchmove', moveFichaTouch); document.addEventListener('touchend', stopDragFichaTouch); }
+    function moveFichaTouch(e) { if (!fichaArrastrada) return; e.preventDefault(); const touch = e.touches[0]; fichaArrastrada.style.left = (touch.clientX - offset.x) + 'px'; fichaArrastrada.style.top = (touch.clientY - offset.y) + 'px'; }
+    function stopDragFichaTouch() { fichaArrastrada = null; document.removeEventListener('touchmove', moveFichaTouch); document.removeEventListener('touchend', stopDragFichaTouch); }
+
+    // ── Propiedades ──
+    function abrirProps(ficha) {
+      const tipo = ficha.dataset.type;
+      propsPanel.dataset.fichaId = ficha.dataset.id || ficha.dataset.type;
+      document.getElementById('propShape').style.display = (tipo === 'producto') ? '' : 'none';
+      document.getElementById('propDisplay').style.display = (tipo === 'producto') ? '' : 'none';
+      document.getElementById('propPrice').style.display = (tipo === 'producto') ? '' : 'none';
+      document.getElementById('propCost').parentElement.style.display = (tipo === 'producto') ? '' : 'none';
+      document.getElementById('propContent').style.display = (tipo === 'titulo' || tipo === 'descripcion') ? '' : 'none';
+      if (tipo === 'producto') { document.getElementById('propShape').value = ficha.dataset.shape || 'rect'; document.getElementById('propDisplay').value = ficha.dataset.display || 'both'; document.getElementById('propPrice').value = ficha.dataset.price; document.getElementById('propCost').textContent = '$' + ficha.dataset.cost; actualizarMargen(); }
+      if (tipo === 'titulo' || tipo === 'descripcion') { document.getElementById('propContent').value = ficha.dataset.content || ''; }
+      propsPanel.classList.add('active'); propsOverlay.classList.add('active');
+    }
+    document.getElementById('closeProps').addEventListener('click', () => { propsPanel.classList.remove('active'); propsOverlay.classList.remove('active'); });
+    propsOverlay.addEventListener('click', () => { propsPanel.classList.remove('active'); propsOverlay.classList.remove('active'); });
+    document.getElementById('deleteFicha').addEventListener('click', () => {
+      const id = propsPanel.dataset.fichaId;
+      const f = canvas.querySelector(`.ficha[data-id="${id}"], .ficha[data-type="${id}"]`);
+      if (f) f.remove();
+      propsPanel.classList.remove('active'); propsOverlay.classList.remove('active');
+    });
+    function actualizarMargen() { const costo = parseFloat(document.getElementById('propCost').textContent.replace('$','')); const precio = parseFloat(document.getElementById('propPrice').value) || 0; const margen = costo > 0 ? Math.round((precio - costo) / costo * 100) : 0; document.getElementById('propMargin').textContent = margen + '%'; }
+    document.getElementById('propPrice').addEventListener('input', actualizarMargen);
+    function aplicarProps() {
+      const tipo = propsPanel.dataset.fichaId;
+      const f = canvas.querySelector(`.ficha[data-type="${tipo}"]`) || canvas.querySelector(`.ficha[data-id="${tipo}"]`);
+      if (!f) return;
+      if (f.dataset.type === 'producto') { f.dataset.shape = document.getElementById('propShape').value; f.dataset.display = document.getElementById('propDisplay').value; f.dataset.price = document.getElementById('propPrice').value; f.classList.toggle('circulo', f.dataset.shape === 'circle'); const nombreEl = f.querySelector('.nombre'), imgEl = f.querySelector('img'), precioEl = f.querySelector('.precio'); if (nombreEl) nombreEl.style.display = (f.dataset.display === 'both' || f.dataset.display === 'name') ? '' : 'none'; if (imgEl) imgEl.style.display = (f.dataset.display === 'both' || f.dataset.display === 'img') ? '' : 'none'; if (precioEl) precioEl.textContent = '$' + Math.round(f.dataset.price); }
+      if (f.dataset.type === 'titulo' || f.dataset.type === 'descripcion') { const contenido = document.getElementById('propContent').value; f.dataset.content = contenido; f.textContent = contenido; }
+    }
+    document.getElementById('propShape').addEventListener('change', aplicarProps);
+    document.getElementById('propDisplay').addEventListener('change', aplicarProps);
+    document.getElementById('propPrice').addEventListener('change', aplicarProps);
+    document.getElementById('propContent').addEventListener('input', aplicarProps);
+
+    // ── Menú contextual ──
+    document.getElementById('ctxBtn').addEventListener('click', () => ctxMenu.classList.toggle('active'));
+    document.getElementById('bgSelect').addEventListener('change', function() { canvas.style.backgroundColor = this.value; });
+    document.getElementById('fontSelect').addEventListener('change', function() { canvas.style.fontFamily = this.value; });
+    document.getElementById('gridToggle').addEventListener('change', function() { canvas.classList.toggle('grid', this.checked); });
+    document.getElementById('publishBtn').addEventListener('click', () => { menuActivo.estado = 'publicado'; renderSidebar(); toast('🚀 Menú publicado (simulado)'); ctxMenu.classList.remove('active'); });
+
+    // ── Vista previa ──
+    document.getElementById('previewBtn').addEventListener('click', () => {
+      const clone = canvas.cloneNode(true); clone.style.width = '100%'; clone.style.height = 'auto'; clone.style.minHeight = '400px';
+      clone.querySelectorAll('.ficha').forEach(f => { f.style.cursor = 'default'; f.style.touchAction = 'auto'; });
+      const previewContent = document.getElementById('previewContent');
+      previewContent.innerHTML = '<button class="close-btn" id="closePreview">✕ Cerrar</button>';
+      previewContent.appendChild(clone);
+      document.getElementById('previewModal').classList.add('active');
+      document.getElementById('closePreview').addEventListener('click', () => document.getElementById('previewModal').classList.remove('active'));
+    });
+
+    function toast(msg) { const t = document.createElement('div'); t.textContent = msg; t.style.cssText = 'position:fixed; bottom:20px; right:20px; background:#22c55e; color:#000; padding:10px 20px; border-radius:8px; z-index:300;'; document.body.appendChild(t); setTimeout(() => t.remove(), 2000); }
+    document.getElementById('saveBtn').addEventListener('click', () => toast('💾 Borrador guardado'));
+  </script>
+</body>
+</html>

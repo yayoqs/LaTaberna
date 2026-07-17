@@ -1,16 +1,16 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/caja.js
-   Versión: 1.1.4
+   Versión: 1.2.1
    Propósito: Vista de caja: resumen de turno, estadísticas, tabla de pedidos
               y sección de cobros pendientes (split bill).
-              Botón "Cierre de Caja" usa CommandBus ('turno:cerrar').
+              Corrección: listener de vista:cambiada movido a activar().
    ================================================================ */
 
 import { Store } from '../lib/store.js';
 import { EventBus } from '../lib/eventBus.js';
 import { CommandBus } from '../lib/command-bus.js';
-import { fmtMoney, fmtHoraCorta, $id, showToast } from '../utils.js';
+import { formatearDinero, formatearHoraCorta, $id, mostrarToast } from '../utils.js';
 import { Cobro } from './cobro.js';
 
 export const Caja = (() => {
@@ -68,10 +68,10 @@ export const Caja = (() => {
     });
 
     document.getElementById('btnVentaBarra').addEventListener('click', () => {
-      const mesas = Store.getState().mesas || [];
+      const mesas = Store.obtenerEstado().mesas || [];
       let mesaBarra = mesas.find(m => m.numero === 'barra');
       if (!mesaBarra) {
-        showToast('warning', 'No se encontró la mesa "barra". Debe configurarse desde administración.');
+        mostrarToast('warning', 'No se encontró la mesa "barra". Debe configurarse desde administración.');
         return;
       }
       Cobro.abrirModalCierre(mesaBarra);
@@ -85,7 +85,8 @@ export const Caja = (() => {
     _asegurarVista();
     render();
 
-    const unsubscribeStore = Store.subscribe((state, action) => {
+    // Suscripción a cambios en pedidos
+    const unsubscribeStore = Store.suscribir((state, action) => {
       if (!_estaActiva) return;
       if (action.type.startsWith('PEDIDOS') || action.type.startsWith('PEDIDO')) {
         render();
@@ -93,9 +94,19 @@ export const Caja = (() => {
     });
     _cleanups.push(unsubscribeStore);
 
+    // Escuchar db:inicializada
     const onDbInicializada = () => { if (_estaActiva) render(); };
     EventBus.on('db:inicializada', onDbInicializada);
     _cleanups.push(() => EventBus.off('db:inicializada', onDbInicializada));
+
+    // Escuchar cambios de vista para auto-desactivar
+    const onVistaCambiada = (vista) => {
+      if (vista !== 'caja') {
+        limpiar();
+      }
+    };
+    EventBus.on('vista:cambiada', onVistaCambiada);
+    _cleanups.push(() => EventBus.off('vista:cambiada', onVistaCambiada));
   }
 
   function limpiar() {
@@ -114,7 +125,7 @@ export const Caja = (() => {
     const pendientesLista = $id('pendientesLista');
     if (!statsEl || !bodyEl) return;
 
-    const pedidos = Store.getState().pedidos || [];
+    const pedidos = Store.obtenerEstado().pedidos || [];
     const cerrados = pedidos.filter(p => p.estado === 'cerrada');
     const abiertos = pedidos.filter(p => p.estado !== 'cerrada' && p.estado !== 'cancelada');
 
@@ -142,7 +153,7 @@ export const Caja = (() => {
           const cubierto = (p.transacciones || []).reduce((s, t) => s + (t.monto || 0), 0);
           return `<div style="display:flex; align-items:center; gap:12px; padding:8px 0; border-bottom:1px solid var(--color-border);">
             <strong>Mesa ${p.mesa}</strong>
-            <span>Cubierto: ${fmtMoney(cubierto)} de ${fmtMoney(total)}</span>
+            <span>Cubierto: ${formatearDinero(cubierto)} de ${formatearDinero(total)}</span>
             <button class="btn-secondary btn-cobrar-pendiente" data-mesa="${p.mesa}" style="margin-left:auto; font-size:12px;">Cobrar pendiente</button>
           </div>`;
         }).join('');
@@ -150,7 +161,7 @@ export const Caja = (() => {
         pendientesLista.querySelectorAll('.btn-cobrar-pendiente').forEach(btn => {
           btn.addEventListener('click', () => {
             const numeroMesa = btn.dataset.mesa;
-            const mesa = (Store.getState().mesas || []).find(m => m.numero == numeroMesa);
+            const mesa = (Store.obtenerEstado().mesas || []).find(m => m.numero == numeroMesa);
             if (mesa) {
               Cobro.abrirModalCierre(mesa);
             } else {
@@ -166,9 +177,9 @@ export const Caja = (() => {
 
   function _htmlStats(totalVentas, cerradas, promedio, abiertas) {
     const tarjetas = [
-      { icon: 'fa-dollar-sign', label: 'Total Ventas', value: fmtMoney(totalVentas), color: 'var(--color-success)' },
+      { icon: 'fa-dollar-sign', label: 'Total Ventas', value: formatearDinero(totalVentas), color: 'var(--color-success)' },
       { icon: 'fa-chair', label: 'Mesas Cerradas', value: cerradas, color: 'var(--color-accent)' },
-      { icon: 'fa-chart-line', label: 'Ticket Promedio', value: fmtMoney(promedio), color: 'var(--color-primary)' },
+      { icon: 'fa-chart-line', label: 'Ticket Promedio', value: formatearDinero(promedio), color: 'var(--color-primary)' },
       { icon: 'fa-door-open', label: 'Mesas Abiertas', value: abiertas, color: 'var(--color-danger)' }
     ];
     return tarjetas.map(t => `
@@ -182,8 +193,8 @@ export const Caja = (() => {
     let items = [];
     try { items = JSON.parse(p.items || '[]'); } catch {}
     const cant = items.reduce((s, it) => s + it.qty, 0);
-    const apertura = fmtHoraCorta(p.creadoEn || p.created_at);
-    const cierre = p.estado === 'cerrada' ? fmtHoraCorta(p.actualizadoEn || p.updated_at) : '—';
+    const apertura = formatearHoraCorta(p.creadoEn || p.created_at);
+    const cierre = p.estado === 'cerrada' ? formatearHoraCorta(p.actualizadoEn || p.updated_at) : '—';
     return `
       <tr>
         <td><strong>Mesa ${p.mesa}</strong></td>
@@ -192,18 +203,10 @@ export const Caja = (() => {
         <td>${p.mozo || '—'}</td>
         <td>${p.comensales || 1}</td>
         <td>${cant}</td>
-        <td><strong style="color:var(--color-success)">${fmtMoney(p.total)}</strong></td>
+        <td><strong style="color:var(--color-success)">${formatearDinero(p.total)}</strong></td>
         <td><span class="status-pill ${p.estado}">${p.estado}</span></td>
       </tr>`;
   }
-
-  EventBus.on('vista:cambiada', (vista) => {
-    if (vista === 'caja') {
-      activar();
-    } else {
-      limpiar();
-    }
-  });
 
   return { activar, limpiar, render };
 })();

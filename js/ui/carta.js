@@ -1,15 +1,15 @@
 /* ================================================================
    LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/carta.js
-   Versión: 2.1.0
-   Propósito: Carta de productos: categorías, búsqueda y selección.
-              Sin onclick. Usa delegación de eventos.
-              Ciclo de vida activar/limpiar según estándar de B1.
+   Versión: 2.1.4
+   Propósito: Carta de productos. Sin autoactivación.
+              Ciclo de vida controlado por el modal de pedido.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
 import { EventBus } from '../lib/eventBus.js';
-import { fmtMoney, $id } from '../utils.js';
+import { Logger } from '../lib/logger.js';
+import { formatearDinero, $id } from '../utils.js';
 
 const Carta = (() => {
   let _categoriaActiva = 'Todos';
@@ -22,26 +22,44 @@ const Carta = (() => {
     if (_activada) return;
     _activada = true;
 
-    _unsubscribeStore = Store.subscribe((state, action) => {
-      if (action.type.startsWith('PRODUCTO')) {
-        render();
-      }
-    });
+    try {
+      _unsubscribeStore = Store.suscribir((state, action) => {
+        if (action.type.startsWith('PRODUCTO')) {
+          render();
+        }
+      });
+    } catch (e) {
+      Logger.error('[Carta] Error al suscribirse al Store:', e);
+    }
 
-    _unsubscribeEventBus = EventBus.on('vista:cambiada', (vista) => {
-      if (vista === 'mesas') render();
-    });
+    try {
+      _unsubscribeEventBus = EventBus.on('vista:cambiada', (vista) => {
+        if (vista === 'mesas') render();
+      });
+    } catch (e) {
+      Logger.error('[Carta] Error al suscribirse a EventBus:', e);
+    }
   }
 
   function limpiar() {
-    if (_unsubscribeStore) {
-      _unsubscribeStore();
-      _unsubscribeStore = null;
+    try {
+      if (_unsubscribeStore) {
+        _unsubscribeStore();
+        _unsubscribeStore = null;
+      }
+    } catch (e) {
+      Logger.error('[Carta] Error al desuscribirse del Store:', e);
     }
-    if (_unsubscribeEventBus) {
-      _unsubscribeEventBus();
-      _unsubscribeEventBus = null;
+
+    try {
+      if (_unsubscribeEventBus) {
+        _unsubscribeEventBus();
+        _unsubscribeEventBus = null;
+      }
+    } catch (e) {
+      Logger.error('[Carta] Error al desuscribirse de EventBus:', e);
     }
+
     _activada = false;
   }
 
@@ -54,7 +72,7 @@ const Carta = (() => {
     const container = $id('categoriasTabs');
     if (!container) return;
 
-    const productos = Store.getState().productos || [];
+    const productos = Store.obtenerEstado().productos || [];
     const categorias = ['Todos', ...new Set(
       productos.filter(p => p.activo !== false).map(p => p.categoria)
     )].filter(Boolean);
@@ -64,11 +82,11 @@ const Carta = (() => {
       .join('');
 
     container.querySelectorAll('.cat-tab').forEach(btn => {
-      btn.addEventListener('click', () => setCategoria(btn.dataset.categoria));
+      btn.addEventListener('click', () => establecerCategoria(btn.dataset.categoria));
     });
   }
 
-  function setCategoria(cat) {
+  function establecerCategoria(cat) {
     _categoriaActiva = cat;
     render();
   }
@@ -82,7 +100,7 @@ const Carta = (() => {
     const cont = $id('cartaProductos');
     if (!cont) return;
 
-    let productosFiltrados = (Store.getState().productos || []).filter(p => p.activo !== false);
+    let productosFiltrados = (Store.obtenerEstado().productos || []).filter(p => p.activo !== false);
 
     if (_categoriaActiva !== 'Todos') {
       productosFiltrados = productosFiltrados.filter(p => p.categoria === _categoriaActiva);
@@ -117,7 +135,7 @@ const Carta = (() => {
         <div class="prod-nombre">${p.nombre}</div>
         ${p.descripcion ? `<div class="prod-desc">${p.descripcion}</div>` : ''}
         <div class="prod-footer">
-          <span class="prod-precio">${fmtMoney(p.precio)}</span>
+          <span class="prod-precio">${formatearDinero(p.precio)}</span>
           <span class="prod-destino-tag ${p.destino}">
             <i class="fas ${destinoIcon}"></i> ${p.destino}
           </span>
@@ -126,20 +144,19 @@ const Carta = (() => {
   }
 
   function seleccionarProducto(prodId) {
-    const producto = (Store.getState().productos || []).find(p => p.id === prodId);
+    const producto = (Store.obtenerEstado().productos || []).find(p => p.id === prodId);
     if (producto) {
       EventBus.emit('producto:seleccionado', producto);
     }
   }
 
-  // Inicializar el ciclo de vida al importar
-  activar();
+  // Sin autoactivación. El modal de pedido activa/limpia.
 
   return {
     activar,
     limpiar,
     render,
-    setCategoria,
+    establecerCategoria,
     filtrar,
     seleccionarProducto
   };

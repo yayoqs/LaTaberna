@@ -1,11 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MESAS SUBMÓDULO (ES6)
    Archivo: js/ui/mesas/ciclo-vida.js
-   Versión: 1.0.8
-   Propósito: Ciclo de vida (activar/limpiar) con AbortController
-              y desuscripción funcional del EventBus.
-              Corrección: se elimina Carta.destroy() de limpiar()
-              (hallazgo post-refactor). Carta es gestionada por el modal.
+   Versión: 1.0.9
+   Propósito: Ciclo de vida (activar/limpiar) con AbortController.
+              Migración a Store.suscribir.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -29,7 +27,7 @@ export function activar() {
   document.getElementById('btnFusionar')?.addEventListener('click', toggleModoFusion, { signal });
   document.getElementById('btnConfirmarFusion')?.addEventListener('click', fusionarMesasSeleccionadas, { signal });
 
-  const unsubscribeStore = Store.subscribe((state, action) => {
+  const unsubscribeStore = Store.suscribir((state, action) => {
     if (action.type.startsWith('MESA') || action.type.startsWith('MESAS') || action.type.startsWith('COMANDA')) {
       renderGrid();
     }
@@ -55,8 +53,8 @@ export function activar() {
     if (data && data.mesa) {
       addNotificacion(data.mesa, 'esperando', {});
       Logger.debug('[Mesas] Cliente esperando en mesa ' + data.mesa + ' - estado: ' + 
-        (Store.getState().mesas.find(m => m.numero == data.mesa)?.estado || '?') + 
-        ', permite_prepedidos: ' + (Store.getState().mesas.find(m => m.numero == data.mesa)?.permite_prepedidos || false));
+        (Store.obtenerEstado().mesas.find(m => m.numero == data.mesa)?.estado || '?') + 
+        ', permite_prepedidos: ' + (Store.obtenerEstado().mesas.find(m => m.numero == data.mesa)?.permite_prepedidos || false));
       renderGrid();
       Logger.info(`[Mesas] Cliente esperando en mesa ${data.mesa}`);
     }

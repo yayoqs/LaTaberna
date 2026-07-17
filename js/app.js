@@ -1,14 +1,13 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/app.js
-   Versión: 1.2.4
+   Versión: 1.2.8
    Propósito: Punto de entrada modular. Control de vistas con ciclo
-              de vida (limpiar/activar). Vincula header y eventos.
-              Incluye import del comando cerrar-turno.
+              de vida (limpiar/activar). Corrección en vista config.
    ================================================================ */
 
 // ── Utilidades y librerías ────────────────────────────────
-import { $id, showToast } from './utils.js';
+import { $id, mostrarToast } from './utils.js';
 import { Logger } from './lib/logger.js';
 import { EventBus } from './lib/eventBus.js';
 import { CommandBus } from './lib/command-bus.js';
@@ -48,7 +47,7 @@ import './comandos/agregar-mesa.js';
 import './comandos/liberar-mesa.js';
 import './comandos/completar-subcomanda.js';
 import './comandos/marcar-agotado.js';
-import './comandos/cerrar-turno.js';  // ← NUEVO COMANDO (Célula A)
+import './comandos/cerrar-turno.js';
 
 // ── Repositorios ──────────────────────────────────────────
 import './repositorios/pedido-repository.js';
@@ -97,7 +96,8 @@ const modulosVista = {
   menu: Menu,
   eventos: Eventos,
   'eventos-en-vivo': EventosEnVivo,
-  perfil: Perfil
+  perfil: Perfil,
+  'carta-editor': Menu
   // Las vistas 'inicio' y 'bienvenida' se gestionan internamente
 };
 
@@ -110,7 +110,7 @@ export const App = {
   async init() {
     Logger.info('[App] Iniciando UI...');
     this._iniciarReloj();
-    this._initRealVH();
+    this.ajustarAlturaReal();
     this._mejorarFocoEnModales();
     this._suscribirEventos();
     this._iniciarMonitoreoConexion();
@@ -129,14 +129,14 @@ export const App = {
     setInterval(actualizar, 1000);
   },
 
-  _initRealVH() {
-    function setRealVH() {
+  ajustarAlturaReal() {
+    function aplicarVH() {
       const vh = window.innerHeight * 0.01;
       document.documentElement.style.setProperty('--vh', `${vh}px`);
     }
-    window.addEventListener('resize', setRealVH);
-    window.addEventListener('orientationchange', setRealVH);
-    setRealVH();
+    window.addEventListener('resize', aplicarVH);
+    window.addEventListener('orientationchange', aplicarVH);
+    aplicarVH();
   },
 
   _mejorarFocoEnModales() {
@@ -165,7 +165,11 @@ export const App = {
   showView(nombre) {
     // ── Ciclo de vida: limpiar vista anterior ──────────
     if (_vistaActual && modulosVista[_vistaActual] && typeof modulosVista[_vistaActual].limpiar === 'function') {
-      modulosVista[_vistaActual].limpiar();
+      try {
+        modulosVista[_vistaActual].limpiar();
+      } catch (e) {
+        Logger.error('[App] Error al limpiar vista ' + _vistaActual + ':', e);
+      }
     }
 
     // ── Control de header ─────────────────────────────
@@ -206,30 +210,30 @@ export const App = {
     }
 
     // Validaciones de permisos
-    if (nombre === 'caja' && !Auth.puedeAccederCaja()) { showToast('error', 'No tienes permiso para acceder a Caja'); return; }
-    if (nombre === 'cocina' && !Auth.puedeAccederCocina()) { showToast('error', 'No tienes permiso para acceder a Cocina'); return; }
-    if (nombre === 'config' && !Auth.esAdmin()) { showToast('error', 'Solo administradores pueden acceder a Configuración'); return; }
+    if (nombre === 'caja' && !Auth.puedeAccederCaja()) { mostrarToast('error', 'No tienes permiso para acceder a Caja'); return; }
+    if (nombre === 'cocina' && !Auth.puedeAccederCocina()) { mostrarToast('error', 'No tienes permiso para acceder a Cocina'); return; }
+    if (nombre === 'config' && !Auth.esAdmin()) { mostrarToast('error', 'Solo administradores pueden acceder a Configuración'); return; }
     if (nombre === 'despensa') {
       if (!Auth.esAdmin() && !Auth.esCocina() && !Auth.esBarra() && !Auth.esDespensa()) {
-        showToast('error', 'No tienes permiso para acceder a Despensa'); return;
+        mostrarToast('error', 'No tienes permiso para acceder a Despensa'); return;
       }
     }
     if (nombre === 'recetas') {
       if (!Auth.esCocina() && !Auth.esBarra() && !Auth.esAdmin() && !Auth.esMaster()) {
-        showToast('error', 'No tienes permiso para acceder a Recetas'); return;
+        mostrarToast('error', 'No tienes permiso para acceder a Recetas'); return;
       }
     }
     if (nombre === 'reparto') {
-      if (!Auth.puedeAccederReparto()) { showToast('error', 'No tienes permiso para acceder a Reparto'); return; }
+      if (!Auth.puedeAccederReparto()) { mostrarToast('error', 'No tienes permiso para acceder a Reparto'); return; }
     }
     if (nombre === 'menu') {
-      if (!Auth.puedeAccederMenu()) { showToast('error', 'No tienes permiso para acceder al Menú'); return; }
+      if (!Auth.puedeAccederMenu()) { mostrarToast('error', 'No tienes permiso para acceder al Menú'); return; }
     }
     if (nombre === 'eventos') {
-      if (!Auth.puedeAccederEventos()) { showToast('error', 'No tienes permiso para acceder a Eventos'); return; }
+      if (!Auth.puedeAccederEventos()) { mostrarToast('error', 'No tienes permiso para acceder a Eventos'); return; }
     }
     if (nombre === 'perfil') {
-      if (!Auth.puedeAccederPerfil()) { showToast('error', 'No tienes permiso para acceder a Perfil'); return; }
+      if (!Auth.puedeAccederPerfil()) { mostrarToast('error', 'No tienes permiso para acceder a Perfil'); return; }
     }
 
     document.querySelectorAll('.view').forEach(v => {
@@ -248,7 +252,11 @@ export const App = {
 
     // ── Ciclo de vida: activar nueva vista ────────────
     if (modulosVista[nombre] && typeof modulosVista[nombre].activar === 'function') {
-      modulosVista[nombre].activar();
+      try {
+        modulosVista[nombre].activar();
+      } catch (e) {
+        Logger.error('[App] Error al activar vista ' + nombre + ':', e);
+      }
     }
 
     _vistaActual = nombre;
@@ -260,27 +268,30 @@ export const App = {
     }
 
     // ── Renderizados explícitos (a revisar en futuras iteraciones) ─
-    if (nombre === 'mesas' && typeof Mesas !== 'undefined') Mesas.render();
-    if (nombre === 'cocina' && typeof KDS !== 'undefined') KDS.refresh();
-    if (nombre === 'caja' && typeof Caja !== 'undefined') Caja.render();
-    if (nombre === 'config' && typeof Config !== 'undefined') Config.renderProductos();
-    if (nombre === 'despensa' && typeof Despensa !== 'undefined') Despensa.render();
-    if (nombre === 'recetas' && typeof Recetas !== 'undefined') Recetas.render();
-    if (nombre === 'reparto' && typeof Reparto !== 'undefined') Reparto.render();
-    if (nombre === 'menu' && typeof Menu !== 'undefined') Menu.render();
-    if (nombre === 'eventos' && typeof Eventos !== 'undefined') Eventos.render();
-    if (nombre === 'eventos-en-vivo' && typeof EventosEnVivo !== 'undefined') EventosEnVivo.render();
-    if (nombre === 'perfil' && typeof Perfil !== 'undefined') Perfil.render();
+    try {
+      if (nombre === 'mesas' && typeof Mesas !== 'undefined') Mesas.render();
+      if (nombre === 'cocina' && typeof KDS !== 'undefined') KDS.refresh();
+      if (nombre === 'caja' && typeof Caja !== 'undefined') Caja.render();
+      if (nombre === 'config' && typeof Config !== 'undefined') Config.cargar();  // ← CORREGIDO: cargar() en lugar de renderProductos()
+      if (nombre === 'despensa' && typeof Despensa !== 'undefined') Despensa.render();
+      if (nombre === 'recetas' && typeof Recetas !== 'undefined') Recetas.render();
+      if (nombre === 'reparto' && typeof Reparto !== 'undefined') Reparto.render();
+      if (nombre === 'eventos' && typeof Eventos !== 'undefined') Eventos.render();
+      if (nombre === 'eventos-en-vivo' && typeof EventosEnVivo !== 'undefined') EventosEnVivo.render();
+      if (nombre === 'perfil' && typeof Perfil !== 'undefined') Perfil.render();
+    } catch (e) {
+      Logger.error('[App] Error al renderizar vista ' + nombre + ':', e);
+    }
   },
 
   _iniciarMonitoreoConexion() {
     window.addEventListener('online', () => {
-      showToast('success', '<i class="fas fa-wifi"></i> Conexión restablecida. Sincronizando...');
+      mostrarToast('success', '<i class="fas fa-wifi"></i> Conexión restablecida. Sincronizando...');
       Logger.info('[App] Conexión restablecida.');
     });
 
     window.addEventListener('offline', () => {
-      showToast('warning', '<i class="fas fa-exclamation-triangle"></i> Sin conexión. Los cambios se guardarán localmente.');
+      mostrarToast('warning', '<i class="fas fa-exclamation-triangle"></i> Sin conexión. Los cambios se guardarán localmente.');
       Logger.warn('[App] Conexión perdida.');
     });
   },
@@ -300,7 +311,7 @@ export const App = {
     EventBus.on('pedido:cerrado', () => { if (typeof Caja !== 'undefined') Caja.render(); });
     EventBus.on('mesa:seleccionada', (num) => { if (typeof Pedido !== 'undefined') Pedido.abrirMesa(num); });
     EventBus.on('inventario:stock_bajo', (data) => {
-      showToast('warning', `⚠️ Stock bajo: ${data.ingrediente} (${data.stock} ${data.unidad})`);
+      mostrarToast('warning', `⚠️ Stock bajo: ${data.ingrediente} (${data.stock} ${data.unidad})`);
     });
     EventBus.on('productos:cargados', () => {
       if (typeof Recetas !== 'undefined') Recetas.render();
@@ -335,34 +346,12 @@ export const App = {
       if (typeof Caja !== 'undefined') Caja.render();
     });
     EventBus.on('turno:cerrado', () => {
-      showToast('success', 'Turno cerrado correctamente.');
+      mostrarToast('success', 'Turno cerrado correctamente.');
       if (typeof Caja !== 'undefined') Caja.render();
     });
     EventBus.on('audit:actualizado', (info) => {
       Logger.info(`[App] Bitácora actualizada: ${info.total} registros.`);
     });
-  },
-
-  async cerrarTurnoApp() {
-    if (typeof TurnoManager === 'undefined') {
-      showToast('error', 'Sistema de turnos no disponible.');
-      return;
-    }
-
-    if (!confirm('¿Estás seguro de cerrar el turno actual? Se resetearán mesas y pedidos. Se guardará un respaldo en Drive.')) {
-      return;
-    }
-
-    const resultado = await TurnoManager.cerrarTurno();
-    if (resultado.exito) {
-      showToast('success', resultado.mensaje);
-      if (typeof Mesas !== 'undefined') Mesas.render();
-      if (typeof KDS !== 'undefined') KDS.refresh();
-      if (typeof Caja !== 'undefined') Caja.render();
-      if (typeof Reparto !== 'undefined') Reparto.render();
-    } else {
-      showToast('error', resultado.mensaje);
-    }
   }
 };
 

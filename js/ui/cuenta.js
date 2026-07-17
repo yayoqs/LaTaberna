@@ -1,15 +1,13 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/cuenta.js
-   Versión: 1.0.1
-   Propósito: Solicitud de cuenta (pre-cierre) y cambio de estado de mesa.
-              Sin asignaciones window.
-   Dependencias: js/auth.js, js/utils.js, js/lib/eventBus.js, js/db.js,
-                 js/ui/comanda.js, js/ui/tickets.js
+   Versión: 1.0.2
+   Propósito: Solicitud de cuenta (pre-cierre).
+              Migración a mostrarToast.
    ================================================================ */
 
 import { Auth } from '../auth.js';
-import { showToast } from '../utils.js';
+import { mostrarToast } from '../utils.js';
 import { EventBus } from '../lib/eventBus.js';
 import { DB } from '../db.js';
 import { Comanda } from './comanda.js';
@@ -21,17 +19,17 @@ const Cuenta = (() => {
     const rol = Auth.getRol();
     const rolesPermitidos = ['mesero', 'admin', 'master', 'caja'];
     if (!rolesPermitidos.includes(rol)) {
-      showToast('error', 'No tienes permiso para pedir la cuenta');
+      mostrarToast('error', 'No tienes permiso para pedir la cuenta');
       return;
     }
 
     const mesa = Comanda.getMesaActiva();
     if (!mesa) {
-      showToast('warning', 'No hay ninguna mesa abierta.');
+      mostrarToast('warning', 'No hay ninguna mesa abierta.');
       return;
     }
     if (!mesa.items || mesa.items.length === 0) {
-      showToast('warning', 'La mesa no tiene consumos para cobrar.');
+      mostrarToast('warning', 'La mesa no tiene consumos para cobrar.');
       return;
     }
 
@@ -50,7 +48,7 @@ const Cuenta = (() => {
 
     const ticketHTML = Tickets.generarCuenta(mesa);
     Tickets.mostrar(ticketHTML, `Cuenta — Mesa ${mesa.numero}`);
-    showToast('info', `Cuenta generada para Mesa ${mesa.numero}`);
+    mostrarToast('info', `Cuenta generada para Mesa ${mesa.numero}`);
   }
 
   EventBus.on('cuenta:solicitada', pedirCuenta);

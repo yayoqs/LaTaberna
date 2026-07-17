@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/lib/store.js
-   Versión: 2.0.3
-   Propósito: Estado centralizado con slice 'cliente' para la Célula C.
-              Incluye reducers para COMANDA_ITEM_* y MESA_ACTUALIZAR.
-              Timestamps unificados en español (creadoEn, actualizadoEn).
+   Versión: 2.0.6
+   Propósito: Estado centralizado con slices 'cliente', 'menus' y
+              'precargas_cliente'. Métodos públicos migrados al español.
+              Se mantienen alias en inglés por una iteración.
    ================================================================ */
 
 import { EventBus } from './eventBus.js';
@@ -23,18 +23,20 @@ const Store = (() => {
     config: {},
     espacios: [],
     espacioActivo: null,
+    menus: [],
+    precargas_cliente: [],   // ← nuevo slice
     cliente: { permitePrepedidos: false, mesa: null }
   };
 
   const listeners = [];
 
-  function getState() {
+  function obtenerEstado() {
     return state;
   }
 
-  function dispatch(action) {
+  function despachar(action) {
     if (!action || !action.type) {
-      Logger.warn('[Store] Intento de dispatch sin type:', action);
+      Logger.warn('[Store] Intento de despachar sin type:', action);
       return;
     }
 
@@ -60,7 +62,7 @@ const Store = (() => {
     EventBus.emit('state:cambiado', { state, action });
   }
 
-  function subscribe(fn) {
+  function suscribir(fn) {
     listeners.push(fn);
     return () => {
       const idx = listeners.indexOf(fn);
@@ -71,18 +73,20 @@ const Store = (() => {
   function rootReducer(currentState, action) {
     const newState = { ...currentState };
 
-    newState.mesas           = mesasReducer(newState.mesas, action, newState);
-    newState.pedidos         = pedidosReducer(newState.pedidos, action, newState);
-    newState.pedidosDelivery = deliveryReducer(newState.pedidosDelivery, action, newState);
-    newState.comandas        = comandasReducer(newState.comandas, action, newState);
-    newState.productos       = productosReducer(newState.productos, action, newState);
-    newState.ingredientes    = ingredientesReducer(newState.ingredientes, action, newState);
-    newState.recetas         = recetasReducer(newState.recetas, action, newState);
-    newState.mozos           = mozosReducer(newState.mozos, action, newState);
-    newState.config          = configReducer(newState.config, action, newState);
-    newState.espacios        = espaciosReducer(newState.espacios, action, newState);
-    newState.espacioActivo   = espacioActivoReducer(newState.espacioActivo, action, newState);
-    newState.cliente         = clienteReducer(newState.cliente, action);
+    newState.mesas              = mesasReducer(newState.mesas, action, newState);
+    newState.pedidos            = pedidosReducer(newState.pedidos, action, newState);
+    newState.pedidosDelivery    = deliveryReducer(newState.pedidosDelivery, action, newState);
+    newState.comandas           = comandasReducer(newState.comandas, action, newState);
+    newState.productos          = productosReducer(newState.productos, action, newState);
+    newState.ingredientes       = ingredientesReducer(newState.ingredientes, action, newState);
+    newState.recetas            = recetasReducer(newState.recetas, action, newState);
+    newState.mozos              = mozosReducer(newState.mozos, action, newState);
+    newState.config             = configReducer(newState.config, action, newState);
+    newState.espacios           = espaciosReducer(newState.espacios, action, newState);
+    newState.espacioActivo      = espacioActivoReducer(newState.espacioActivo, action, newState);
+    newState.menus              = menusReducer(newState.menus, action);
+    newState.precargas_cliente  = precargasClienteReducer(newState.precargas_cliente, action);  // ← nuevo reducer
+    newState.cliente            = clienteReducer(newState.cliente, action);
 
     return newState;
   }
@@ -231,6 +235,22 @@ const Store = (() => {
     }
   }
 
+  function menusReducer(menus, action) {
+    switch (action.type) {
+      case 'MENUS_INICIALIZAR': return action.payload || [];
+      default: return menus;
+    }
+  }
+
+  function precargasClienteReducer(precargas, action) {   // ← nuevo reducer
+    switch (action.type) {
+      case 'PRECARGAS_CLIENTE_ACTUALIZAR':
+        return action.payload || [];
+      default:
+        return precargas;
+    }
+  }
+
   function clienteReducer(cliente, action) {
     switch (action.type) {
       case 'CLIENTE_PERMISO_PREPEDIDOS':
@@ -243,9 +263,13 @@ const Store = (() => {
   }
 
   return {
-    getState,
-    dispatch,
-    subscribe
+    obtenerEstado,
+    despachar,
+    suscribir,
+    // Alias temporales (una iteración)
+    getState: obtenerEstado,
+    dispatch: despachar,
+    subscribe: suscribir
   };
 })();
 

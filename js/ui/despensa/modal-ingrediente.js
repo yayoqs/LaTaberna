@@ -1,13 +1,14 @@
 /* ================================================================
    LaTaberna - PubPOS — DESPENSA SUBMÓDULO (ES6)
    Archivo: js/ui/despensa/modal-ingrediente.js
-   Versión: 1.0.0
+   Versión: 1.0.1
    Propósito: Modal para crear y editar ingredientes del inventario.
+              v1.0.1: migra a nombres en español (utils).
    ================================================================ */
 
 import { DB } from '../../db.js';
 import { InventarioService } from '../../servicios/inventario-service.js';
-import { showToast } from '../../utils.js';
+import { mostrarToast } from '../../utils.js';
 
 export function mostrar(ingrediente = null, onGuardado = null) {
   const esEdicion = !!ingrediente;
@@ -62,7 +63,7 @@ export function cerrar(onCerrar) {
 export async function guardar(onGuardado) {
   const id = document.getElementById('ingId').value;
   const nombre = document.getElementById('ingNombre').value.trim();
-  if (!nombre) { showToast('error', 'Nombre obligatorio'); return; }
+  if (!nombre) { mostrarToast('error', 'Nombre obligatorio'); return; }
 
   const datos = {
     id: id || `ins_${Date.now()}_${Math.random().toString(36).substr(2,6)}`,
@@ -79,10 +80,10 @@ export async function guardar(onGuardado) {
     const resultado = await InventarioService.guardarIngrediente(datos);
     if (resultado.exito) {
       cerrar(onGuardado);
-      showToast('success', 'Ingrediente guardado');
+      mostrarToast('success', 'Ingrediente guardado');
       return;
     } else {
-      showToast('error', resultado.error);
+      mostrarToast('error', resultado.error);
       return;
     }
   }
@@ -90,9 +91,9 @@ export async function guardar(onGuardado) {
   try {
     await DB.syncGuardarIngrediente(datos);
     cerrar(onGuardado);
-    showToast('success', 'Ingrediente guardado');
+    mostrarToast('success', 'Ingrediente guardado');
   } catch (e) {
-    showToast('error', 'Error al guardar ingrediente');
+    mostrarToast('error', 'Error al guardar ingrediente');
   }
 }
 

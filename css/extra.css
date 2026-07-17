@@ -1,13 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/extra.css
-   Versión: 1.0.0
+   Versión: 1.0.1
    Propósito: Estilos adicionales previamente inline en index.html
    ================================================================ */
-
-.app-header {
-  display: none;
-}
 
 .item-persona-badge {
   font-size: 10px;

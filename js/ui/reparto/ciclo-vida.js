@@ -1,14 +1,14 @@
 /* ================================================================
    LaTaberna - PubPOS — REPARTO SUBMÓDULO (ES6)
    Archivo: js/ui/reparto/ciclo-vida.js
-   Versión: 1.0.0
+   Versión: 1.0.2
    Propósito: Suscripciones al Store y EventBus para reparto.
-              Patrón activar/limpiar con desuscripción funcional.
+              v1.0.2: migra a nombres en español (store).
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
 import { EventBus } from '../../lib/eventBus.js';
-import { asegurarVista, renderTabla, setEstadoFiltro } from './tabla.js';
+import { asegurarVista, renderTabla, establecerEstadoFiltro } from './tabla.js';
 import { mostrar as mostrarModalNuevo } from './modal-nuevo.js';
 import { mostrar as mostrarModalEditar } from './modal-editar.js';
 import { enviarACocina, despachar, confirmarEntrega, eliminarPedido } from './acciones.js';
@@ -17,7 +17,7 @@ let _abortController = null;
 let _desuscripciones = [];
 
 function _renderCompleto() {
-  const pedidos = Store.getState().pedidosDelivery || [];
+  const pedidos = Store.obtenerEstado().pedidosDelivery || [];
   const pedidosValidos = pedidos.filter(p => p && p.id);
   renderTabla(pedidosValidos);
 }
@@ -35,12 +35,11 @@ export function activar() {
     (id) => { eliminarPedido(id); setTimeout(_renderCompleto, 200); }
   );
 
-  // Vincular eventos del DOM que dependen del AbortController
   const { signal } = _abortController;
   const selectEstado = document.getElementById('repartoEstadoFilter');
   if (selectEstado) {
     selectEstado.addEventListener('change', function () {
-      setEstadoFiltro(this.value);
+      establecerEstadoFiltro(this.value);
       _renderCompleto();
     }, { signal });
   }
@@ -50,8 +49,7 @@ export function activar() {
     btnNuevo.addEventListener('click', () => mostrarModalNuevo(_renderCompleto), { signal });
   }
 
-  // Suscripciones al Store y EventBus
-  const unsubscribeStore = Store.subscribe((state, action) => {
+  const unsubscribeStore = Store.suscribir((state, action) => {
     if (action.type.startsWith('DELIVERY') || action.type.startsWith('PEDIDOSDELIVERY')) {
       _renderCompleto();
     }

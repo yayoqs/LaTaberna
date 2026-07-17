@@ -13,7 +13,7 @@
         📄 app.js
             🔹 export const App = {
             🔹 const actualizar = () => {
-            🔹 function setRealVH() {
+            🔹 function aplicarVH() {
             🔹 const onTouchStart = (e) => { touchStartY = e.touches[0].clientY; };
             🔹 const onTouchEnd = (e) => {
             🔹 const limpiarSwipe = () => {
@@ -85,26 +85,27 @@
             🔹 export const Auth = (() => {
             🔹 function _guardarUsuarios() { localStorage.setItem('pubpos_usuarios', JSON.stringify(_usuarios)); }
             🔹 function init() {
-            🔹 function getDefaultView() {
+            🔹 function obtenerVistaPorDefecto() {
             🔹 const usuario = _usuarios.find(u => u.nombre === nombre && u.hash === hashIngresado);
             🔹 function logout() {
             🔹 function mostrarLogin() {
+            🔹 function _mostrarLoginPanel() {
+            🔹 function _mostrarRegistro() {
             🔹 function cerrarModalLogin() { if (loginModal) loginModal.style.display = 'none'; }
-            🔹 function _mostrarRegistro() { EventBus.emit('auth:mostrarRegistro'); }
             🔹 const idx = _usuarios.findIndex(u => u.nombre === nombreUsuario);
             🔹 const existe = _usuarios.find(u => u.nombre === nombre);
-            🔹 function getRolEfectivo() {
+            🔹 function obtenerRolEfectivo() {
             🔹 const espacio = _usuarioActual.espacios?.find(e => e.id === _usuarioActual.espacioActivoId);
-            🔹 function getRol() { return _usuarioActual?.rol || null; }
-            🔹 function getNombre() { return _usuarioActual?.nombre || ''; }
-            🔹 function getUsuarioActual() {
-            🔹 function getEspacios() { return _usuarioActual?.espacios || []; }
+            🔹 function obtenerRol() { return _usuarioActual?.rol || null; }
+            🔹 function obtenerNombre() { return _usuarioActual?.nombre || ''; }
+            🔹 function obtenerUsuarioActual() {
+            🔹 function obtenerEspacios() { return _usuarioActual?.espacios || []; }
             🔹 function cambiarEspacio(espacioId) {
             🔹 const espacio = _usuarioActual?.espacios?.find(e => e.id === espacioId);
             🔹 function actualizarNombre(nuevoNombre) {
             🔹 function esMasterReal() { return _usuarioActual?.rol === 'master'; }
             🔹 function esMaster() { return _usuarioActual?.rol === 'master' && !_rolSimulado; }
-            🔹 function esAdmin() { const r = getRolEfectivo(); return r === 'admin' || r === 'master'; }
+            🔹 function esAdmin() { const r = obtenerRolEfectivo(); return r === 'admin' || r === 'master'; }
             🔹 function puede(permiso) { return tienePermiso(permiso); }
             🔹 function puedeEliminarItemEnviado() { return tienePermiso('eliminarItemEnviado'); }
             🔹 function puedeCerrarMesa() { return tienePermiso('cerrarMesa'); }
@@ -113,8 +114,8 @@
             🔹 function puedeCambiarEstadoComanda() { return tienePermiso('cambiarEstadoComanda'); }
             🔹 function puedeEditarProductos() { return tienePermiso('editarProductos'); }
             🔹 function puedeEditarPrecios() { return tienePermiso('editarPrecios'); }
-            🔹 function puedeAccederMenu() { return getRolEfectivo() !== null; }
-            🔹 function puedeAccederPerfil() { return getRolEfectivo() !== null; }
+            🔹 function puedeAccederMenu() { return obtenerRolEfectivo() !== null; }
+            🔹 function puedeAccederPerfil() { return obtenerRolEfectivo() !== null; }
             🔹 function aplicarRestriccionesUI() {
             🔹 const roles = el.dataset.rol.split(',').map(r => r.trim());
             🔹 function _renderSelectorEspacio() {
@@ -127,6 +128,7 @@
     📁 comandos/
             📄 agregar-mesa.js
                 🔹 export function crearComandoAgregarMesa(datos) {
+            📄 cerrar-turno.js
             📄 completar-subcomanda.js
                 🔹 export function crearComandoCompletarSubcomanda(idOriginal, destino) {
                 🔹 const comanda = comandas.find(c => c.id === idOriginal);
@@ -140,6 +142,9 @@
             📄 liberar-mesa.js
                 🔹 export function crearComandoLiberarMesa(datos) {
             📄 marcar-agotado.js
+        📄 config-appwrite.js
+            🔹 export const APPWRITE_ENDPOINT =
+            🔹 export const APPWRITE_PROJECT_ID =
         📄 db-appwrite.js
             🔹 export const DBAppwrite = (function() {
             🔹 function _limpiarFila(fila) {
@@ -225,9 +230,9 @@
                 🔹 function init() {
             📄 store.js
                 🔹 const Store = (() => {
-                🔹 function getState() {
-                🔹 function dispatch(action) {
-                🔹 function subscribe(fn) {
+                🔹 function obtenerEstado() {
+                🔹 function despachar(action) {
+                🔹 function suscribir(fn) {
                 🔹 function rootReducer(currentState, action) {
                 🔹 function mesasReducer(mesas, action) {
                 🔹 const items = (m.items || []).map((item, i) => i === index ? { ...item, ...cambios } : item);
@@ -267,6 +272,7 @@
                 📄 eventos-en-vivo.js
                     🔹 const EventosEnVivo = (() => {
                     🔹 function _asegurarVista() {
+                    🔹 function _construirContenido(contenedor) {
                     🔹 function _usuarioAutorizado() {
                     🔹 function render() {
                     🔹 function _actualizarUI() {
@@ -278,15 +284,16 @@
         📁 cliente/
                 📄 menu-digital.js
                     🔹 const MenuDigital = (() => {
-                    🔹 function render() {
+                    🔹 function _asegurarVista() {
+                    🔹 function activar() {
+                    🔹 function limpiar() {
                     🔹 function _crearPanelOrden() {
-                    🔹 function _togglePanelOrden() {
+                    🔹 function _togglePanelOrden() { _panelOrden.classList.toggle('oculto'); _renderizarItemsOrden(); }
                     🔹 function _renderizarItemsOrden() {
-                    🔹 const item = items.find(i => i.prodId === id);
+                    🔹 const id = btn.dataset.id; const item = items.find(i => i.prodId === id); if (!item) return;
                     🔹 function _actualizarContador() {
-                    🔹 const totalCantidad = items.reduce((sum, i) => sum + i.qty, 0);
+                    🔹 const items = Orden.obtenerItems(); const totalCantidad = items.reduce((sum, i) => sum + i.qty, 0);
                     🔹 function mostrar() {
-                    🔹 function ocultar() {
                     🔹 function _actualizarEstado() {
                     🔹 function _verificarPermiso() {
                     🔹 function _renderCategorias() {
@@ -306,8 +313,9 @@
                     🔹 function obtenerTotal() {
                 📄 pantalla-bienvenida.js
                     🔹 const PantallaBienvenida = (() => {
-                    🔹 function render() {
-                    🔹 function _configurarEventos() {
+                    🔹 function _asegurarVista() {
+                    🔹 function activar() {
+                    🔹 function limpiar() {
                     🔹 function _actualizarPerfil() {
                     🔹 const iniciales = nombre.split(' ').map(n => n.charAt(0).toUpperCase()).slice(0, 2).join('');
                     🔹 function _guardarMesa() {
@@ -326,31 +334,31 @@
                     🔹 function permitePrepedidos() { return _permitePrepedidos; }
                     🔹 function _irAEventos() { EventBus.emit('app:cambiarVista', 'eventos'); }
                     🔹 function mostrar() {
-                    🔹 function ocultar() { if (_vista) _vista.classList.remove('active'); }
+                    🔹 function ocultar() {
                     🔹 function _initRealtime() {
                     🔹 const activo = eventos.find(e => e.estado === 'activo');
                 📄 pantalla-eventos.js
                     🔹 const PantallaEventos = (() => {
-                    🔹 function render() {
+                    🔹 function _asegurarVista() {
+                    🔹 function activar() {
+                    🔹 function limpiar() {
                     🔹 function mostrar() {
-                    🔹 function ocultar() {
+                    🔹 function ocultar() { if (_vista) _vista.classList.remove('active'); }
                     🔹 function _renderizarEvento() {
-                    🔹 const activo = eventos.find(e => e.estado === 'activo');
                     🔹 function _mostrarSinEvento(container, badge, sub) {
                     🔹 function _mostrarEventoActivo(container, badge, sub, evento) {
-                    🔹 function _renderBingo(evento) {
-                    🔹 function _renderKaraoke(evento) {
-                    🔹 function _renderVotacion(evento) {
                     🔹 function _configurarVotacion(evento) {
-                    🔹 const eventoActual = eventos.find(e => e.id === idEvento);
-                    🔹 function _iconoEvento(tipo) {
                     🔹 function _initRealtime() {
                 📄 pantalla-inicio.js
                     🔹 const PantallaInicio = (() => {
-                    🔹 function render() {
+                    🔹 function _asegurarVista() {
+                    🔹 function _crearModalPortal() {
+                    🔹 function activar() {
+                    🔹 function limpiar() {
+                    🔹 function _conectarModalPortal() {
+                    🔹 function _desconectarModalPortal() {
                     🔹 function _iniciarEsloganDinamico() {
                     🔹 function _mostrarLogin() {
-                    🔹 function _mostrarRegistro() {
                     🔹 function mostrar() {
                     🔹 function ocultar() {
                 📄 principal.js
@@ -408,6 +416,11 @@
             📄 caja.js
                 🔹 export const Caja = (() => {
                 🔹 function _asegurarVista() {
+                🔹 function _construirContenido(contenedor) {
+                🔹 function activar() {
+                🔹 const unsubscribeStore = Store.suscribir((state, action) => {
+                🔹 const onDbInicializada = () => { if (_estaActiva) render(); };
+                🔹 function limpiar() {
                 🔹 function render() {
                 🔹 const cerrados = pedidos.filter(p => p.estado === 'cerrada');
                 🔹 const abiertos = pedidos.filter(p => p.estado !== 'cerrada' && p.estado !== 'cancelada');
@@ -415,22 +428,22 @@
                 🔹 const pedidosPendientes = pedidos.filter(p => {
                 🔹 const cubierto = transacciones.reduce((s, t) => s + (t.monto || 0), 0);
                 🔹 const cubierto = (p.transacciones || []).reduce((s, t) => s + (t.monto || 0), 0);
-                🔹 const mesa = (Store.getState().mesas || []).find(m => m.numero == numeroMesa);
+                🔹 const mesa = (Store.obtenerEstado().mesas || []).find(m => m.numero == numeroMesa);
                 🔹 function _htmlStats(totalVentas, cerradas, promedio, abiertas) {
                 🔹 function _htmlFila(p) {
                 🔹 const cant = items.reduce((s, it) => s + it.qty, 0);
-                🔹 function _initListeners() {
             📄 carta.js
                 🔹 const Carta = (() => {
+                🔹 function activar() {
+                🔹 function limpiar() {
                 🔹 function render() {
                 🔹 function _renderCategorias() {
-                🔹 function setCategoria(cat) {
+                🔹 function establecerCategoria(cat) {
                 🔹 function filtrar() {
                 🔹 function _renderProductos() {
                 🔹 function _htmlProducto(p) {
                 🔹 function seleccionarProducto(prodId) {
-                🔹 const producto = (Store.getState().productos || []).find(p => p.id === prodId);
-                🔹 function _initListeners() {
+                🔹 const producto = (Store.obtenerEstado().productos || []).find(p => p.id === prodId);
             📄 cobro.js
                 🔹 const Cobro = (() => {
                 🔹 function _getPedidoService() {
@@ -455,37 +468,38 @@
                 🔹 function cerrarModalCierre() {
             📄 comanda.js
                 🔹 const Comanda = (() => {
+                🔹 function _mesasIguales(a, b) {
                 🔹 function _syncMesaStoreADB(mesaActualizada) {
                 🔹 const idx = DB.mesas.findIndex(m => m.numero == mesaActualizada.numero);
-                🔹 function _initStoreSync() {
+                🔹 function _inicializarSincroniaStore() {
                 🔹 const mesaStore = state.mesas.find(m => m.numero == _mesaActiva.numero);
-                🔹 function setMesaActiva(mesa) {
+                🔹 function establecerMesaActiva(mesa) {
                 🔹 function _sincronizarCamposHeader() {
                 🔹 function _renderSelectorPersona() {
-                🔹 function setPersonaActiva(nombre) {
-                🔹 function agregarPersona() {
+                🔹 function establecerPersonaActiva(nombre) {
                 🔹 function agregarItem(producto) {
                 🔹 function cambiarCantidad(idx, delta) {
-                🔹 function setObservacion(idx, valor) {
+                🔹 function establecerObservacion(idx, valor) {
                 🔹 function quitarItem(idx) {
-                🔹 function setMozo(mozo) {
-                🔹 function setComensales(cant) {
-                🔹 function setObservacionGeneral(obs) {
+                🔹 function establecerMozo(mozo) {
+                🔹 function establecerComensales(cant) {
+                🔹 function establecerObservacionGeneral(obs) {
                 🔹 function render() {
                 🔹 function _render() {
                 🔹 const mesaDelStore = state.mesas.find(m => m.numero == _mesaActiva.numero);
                 🔹 function _htmlItem(item, idx) {
-                🔹 function _initEventListeners() {
+                🔹 function _inicializarEscuchadores() {
             📄 config.js
                 🔹 const Config = (() => {
                 🔹 function _asegurarVista() {
                 🔹 function _vincularEventos() {
+                🔹 function activar() {
+                🔹 const unsubscribeStore = Store.suscribir((state, action) => {
+                🔹 function limpiar() {
                 🔹 function cargar() {
                 🔹 function _renderUsuarios() {
                 🔹 function _renderZonas() {
-                🔹 function _updateZona(idx, campo, valor) {
-                🔹 function agregarZona() {
-                🔹 function eliminarZona(idx) {
+                🔹 function _actualizarZona(idx, campo, valor) {
                 🔹 const zonasNuevas = Array.from(filas).map(fila => {
                 🔹 function renderProductos() {
                 🔹 function _htmlProdConfigItem(p) {
@@ -493,91 +507,129 @@
                 🔹 function cerrarModalProducto() {
                 🔹 function _autoajustarPrecio() {
                 🔹 function _vistaPreviaImagen() {
-                🔹 const prod = (Store.getState().productos || []).find(p => p.id === id);
+                🔹 const prod = (Store.obtenerEstado().productos || []).find(p => p.id === id);
                 🔹 function renderMozos() {
                 🔹 function agregarMozo() {
-                🔹 function eliminarMozo(idx) {
-                🔹 function _initListeners() {
             📄 cuenta.js
                 🔹 const Cuenta = (() => {
                 🔹 function pedirCuenta() {
+        📁 despensa/
+                📄 acciones.js
+                    🔹 const ing = DB.ingredientes.find(i => i.nombre.toLowerCase() === nombre.toLowerCase());
+                    🔹 const ing = DB.ingredientes.find(i => i.id === ingredienteId);
+                📄 ciclo-vida.js
+                    🔹 function _refresh() {
+                    🔹 export function activar() {
+                    🔹 const unsubscribeStore = Store.suscribir((state, action) => {
+                    🔹 export function limpiar() {
+                📄 estado.js
+                    🔹 export function getCategoriaFiltro() {
+                    🔹 export function setCategoriaFiltro(categoria) {
+                    🔹 export function getOrdenColumnas() {
+                    🔹 export function setOrdenColumnas(orden) {
+                    🔹 export function toggleOrdenColumna(columna, shiftKey) {
+                    🔹 const existente = _ordenColumnas.findIndex(o => o.columna === columna);
+                    🔹 export function resetearOrden() {
+                    🔹 export function getPaginaMovimientos() {
+                    🔹 export function incrementarPaginaMovimientos() {
+                    🔹 export function resetearPaginaMovimientos() {
+                    🔹 export function getMovsPorPagina() {
+                📄 exportacion.js
+                    🔹 export function exportarCSV() {
+                    🔹 export function exportarPDF() {
+                📄 modal-ingrediente.js
+                    🔹 export function mostrar(ingrediente = null, onGuardado = null) {
+                    🔹 export function cerrar(onCerrar) {
+                    🔹 export function editarIngrediente(id) {
+                    🔹 const ing = DB.ingredientes.find(i => i.id == id);
+                📄 renderer.js
+                    🔹 export function asegurarVista() {
+                    🔹 export function renderTabla() {
+                    🔹 export function renderResumen() {
+                    🔹 const bajoMin = ingredientes.filter(i => i.stock <= i.stock_minimo).length;
+                    🔹 const valorTotal = ingredientes.reduce((sum, i) => sum + (i.stock * (i.valor_unitario || 0)), 0);
+                    🔹 export function renderAlertas() {
+                    🔹 const criticos = ingredientes.filter(i => i.stock <= i.stock_minimo);
+                    🔹 export function renderMovimientos() {
+                    🔹 const ing = (Store.obtenerEstado().ingredientes || []).find(i => i.id === mov.ingredienteId);
+                    🔹 export function renderCompleto() {
             📄 despensa.js
-                🔹 const Despensa = (() => {
-                🔹 function _asegurarVista() {
-                🔹 function _vincularEventos() {
-                🔹 function render() {
-                🔹 function _renderResumen() {
-                🔹 const bajoMin = ingredientes.filter(i => i.stock <= i.stock_minimo).length;
-                🔹 const valorTotal = ingredientes.reduce((sum, i) => sum + (i.stock * (i.valor_unitario || 0)), 0);
-                🔹 function filtrarPorCategoria(cat) {
-                🔹 function _buscar() {
-                🔹 function _aplicarFiltros() {
-                🔹 function _renderTablaIngredientes() {
-                🔹 function ordenarTabla(columna, event) {
-                🔹 const existente = _ordenColumnas.findIndex(o => o.columna === columna);
-                🔹 function _renderMovimientos() {
-                🔹 function _mostrarMasMovimientos() {
-                🔹 function _renderAlertasStock() {
-                🔹 const criticos = ingredientes.filter(i => i.stock <= i.stock_minimo);
-                🔹 function mostrarModalIngrediente(ingrediente = null) {
-                🔹 function cerrarModalIngrediente() {
-                🔹 function editarIngrediente(id) {
-                🔹 const ing = DB.ingredientes.find(i => i.id == id);
-                🔹 const ing = DB.ingredientes.find(i => i.nombre.toLowerCase() === nombre.toLowerCase());
-                🔹 const ing = DB.ingredientes.find(i => i.id === ingredienteId);
-                🔹 function exportarIngredientes() {
-                🔹 function exportarPDF() {
-                🔹 function _initListeners() {
             📄 eventos.js
                 🔹 const Eventos = (() => {
                 🔹 function _asegurarVista() {
                 🔹 function mostrarFormulario() {
                 🔹 function cerrarFormulario() {
-                🔹 function _initEventListeners() {
+                🔹 function activar() {
+                🔹 function limpiar() {
             📄 kds.js
+                🔹 function _cambiarEstado(id, estado) {
+                🔹 function _actualizarLocal(id, cambios) {
+                🔹 const i = _comandas.findIndex(c => c.id === id);
                 🔹 function _asegurarVista() {
-                🔹 function refresh() {
+                🔹 function _construirVista(main) {
+                🔹 function _clasificarTiempo(ms) {
+                🔹 function _formatearTiempo(ms) {
+                🔹 function _reproducirAlerta() {
+                🔹 function _crearTicket(c) {
+                🔹 const listos = (c.items || []).filter(i => i.listo).length;
+                🔹 function _pintar() {
+                🔹 function recargar() {
                 🔹 const itemsCocina = c.items.filter(it => it.destino === 'cocina' || it.destino === 'ambos');
                 🔹 const itemsBarra = c.items.filter(it => it.destino === 'barra' || it.destino === 'ambos');
-                🔹 function _htmlKdsCard(c) {
-                🔹 const itemsHTML = items.map(it => {
-                🔹 function _panico(prodId) {
-                🔹 function _setEstado(id, estado) {
-                🔹 function _setupEventDelegation() {
-                🔹 function _initListeners() {
-                🔹 export const KDS = { refresh, _setEstado, _panico };
+                🔹 function activar() {
+                🔹 function limpiar() {
+                🔹 export const KDS = { refresh: recargar, activar, limpiar, _setEstado: _cambiarEstado, _panico };
             📄 menu.js
                 🔹 const Menu = (() => {
                 🔹 function _asegurarVista() {
+                🔹 function activar() {
+                🔹 const unsubscribeStore = Store.suscribir((state, action) => {
+                🔹 function limpiar() {
                 🔹 function render() {
                 🔹 function _renderCategorias() {
-                🔹 function setCategoria(cat) {
-                🔹 function filtrar() {
-                🔹 function _renderProductos() {
-                🔹 function mostrarDetalle(prodId) {
-                🔹 const producto = (state.productos || []).find(p => p.id == prodId);
-                🔹 const receta = (state.recetas || []).find(r => r.productoId == prodId);
-                🔹 const nombres = receta.ingredientes.map(ing => {
-                🔹 const ingData = (state.ingredientes || []).find(i => i.id == ing.ingredienteId);
-                🔹 function cerrarDetalle() {
-                🔹 function _initListeners() {
+                🔹 function filtrar(categoria) {
             📄 mesa-detalles.js
                 🔹 const MesaDetalles = (() => {
+                🔹 function _onTouchStart(e) {
+                🔹 function _onTouchEnd(e) {
                 🔹 function _asegurarModal() {
-                🔹 function _htmlDatos(mesa) {
-                🔹 function _htmlAcciones(mesa) {
+                🔹 function _renderizarEstado(mesa) {
+                🔹 function _htmlDatosBasicos(mesa) {
+                🔹 function _renderizarComensales(personas) {
+                🔹 const iniciales = nombre.split(' ').map(n => n.charAt(0).toUpperCase()).slice(0, 2).join('');
+                🔹 function _renderizarComanda(mesa) {
+                🔹 const total = items.reduce((sum, i) => sum + (i.precio || 0) * (i.qty || 1), 0);
+                🔹 function _renderizarAcciones(estado) {
+                🔹 function activarModoApertura() {
+                🔹 function cambiarComensales(delta) {
+                🔹 function cancelarApertura() {
+                🔹 const mesaActualizada = mesas.find(m => m.numero == num);
+                🔹 function _tiempoDesde(ts) {
                 🔹 function abrir(numMesa) {
                 🔹 const mesa = mesas.find(m => m.numero == numMesa);
                 🔹 function cerrar() {
                 🔹 function pedirCuenta() { cerrar(); if (Cuenta && Cuenta.pedirCuenta) Cuenta.pedirCuenta(); }
                 🔹 function cerrarMesa() { cerrar(); if (Cobro && Cobro.abrirModalCierre) Cobro.abrirModalCierre(); }
                 🔹 function aceptarVinculacion(numMesa) {
+                🔹 const mesa = DB.mesas.find(m => m.numero == numMesa);
                 🔹 function cargarPrecarga(precargaId) {
         📁 mesas/
+                📄 acciones-mesa.js
+                    🔹 function agregarMesa() {
+                    🔹 function labelEstado(estado) { return LABELS[estado] || estado; }
+                    🔹 function setBadge(numMesa, cantidad, precargaId) {
+                    🔹 function clearBadge(numMesa) {
+                    🔹 function setClienteEsperando(numMesa) {
+                    🔹 function clearClienteEsperando(numMesa) {
+                    🔹 function getBadgeAtencion(numMesa) {
+                    🔹 const espera = notificaciones.find(n => n.tipo === 'esperando');
+                    🔹 const mesa = (Store.obtenerEstado().mesas || []).find(m => m.numero == numMesa);
+                    🔹 const precarga = notificaciones.find(n => n.tipo === 'precarga');
+                    🔹 function clearBadgeAtencion(numMesa) {
+                    🔹 function setZona(zona) {
                 📄 ciclo-vida.js
                     🔹 export function activar() {
-                    🔹 const unsubscribeStore = Store.subscribe((state, action) => {
-                    🔹 const mesaObjetivo = mesas.find(m => m.numero == data.mesa);
+                    🔹 const unsubscribeStore = Store.suscribir((state, action) => {
                     🔹 export function limpiar() {
                 📄 constantes.js
                     🔹 export const ICONOS = {
@@ -588,7 +640,6 @@
                 📄 fusion.js
                     🔹 export function toggleModoFusion() {
                     🔹 export function toggleSeleccionMesa(num, isChecked) {
-                    🔹 export function fusionarMesasSeleccionadas() {
                     🔹 const numeros = Array.from(seleccionadas).sort((a, b) => {
                 📄 notificaciones.js
                     🔹 function getNotificaciones(numMesa) {
@@ -598,6 +649,7 @@
                     🔹 const filtrada = lista.filter(n => n.tipo !== tipo);
                     🔹 function clearNotificaciones(numMesa) {
                 📄 renderer.js
+                    🔹 function _limpiarPopoverListeners() {
                     🔹 export function setModoSeleccion(valor) { _modoSeleccion = valor; }
                     🔹 export function isModoSeleccion() { return _modoSeleccion; }
                     🔹 export function getMesasSeleccionadas() { return _mesasSeleccionadas; }
@@ -614,38 +666,25 @@
                     🔹 const esperaNotif = notificaciones.find(n => n.tipo === 'esperando');
                     🔹 export function mostrarPopover(mesa, card) {
                     🔹 const mesaComandas = comandas.filter(c => c.mesa == mesa.numero);
+                    🔹 const clickFuera = (e) => {
+                    🔹 const scrollCierre = () => {
                     🔹 export function asegurarVista(callbacks = {}) {
+                    🔹 function _construirContenido(contenedor, callbacks) {
             📄 mesas.js
                 🔹 const Mesas = (() => {
                 🔹 function render() {
-                🔹 function agregarMesa() {
-                🔹 function labelEstado(estado) { return LABELS[estado] || estado; }
-                🔹 function setBadge(numMesa, cantidad, precargaId) {
-                🔹 function clearBadge(numMesa) {
                 🔹 function onPrecargaClick(numMesa) {
                 🔹 const precarga = notificaciones.find(n => n.tipo === 'precarga');
-                🔹 function setClienteEsperando(numMesa) {
-                🔹 function clearClienteEsperando(numMesa) {
-                🔹 function getBadgeAtencion(numMesa) {
-                🔹 const espera = notificaciones.find(n => n.tipo === 'esperando');
-                🔹 const mesa = (Store.getState().mesas || []).find(m => m.numero == numMesa);
-                🔹 const precarga = notificaciones.find(n => n.tipo === 'precarga');
-                🔹 function clearBadgeAtencion(numMesa) {
-                🔹 function setZona(zona) {
             📄 pedido-ui.js
                 🔹 const Pedido = (() => {
                 🔹 function _asegurarModalPedido() {
-                🔹 function _mostrarModalApertura(mesa) {
-                🔹 function _cancelarApertura() {
-                🔹 const personas = personasRaw.split(/[,\n]/).map(s => s.trim()).filter(s => s.length > 0);
-                🔹 const mesa = DB.mesas.find(m => m.numero == num);
                 🔹 function _abrirModalPedido(mesa) {
+                🔹 function abrirMesa(num) {
                 🔹 const mesa = DB.mesas.find(m => m.numero == num);
                 🔹 function cerrar() {
                 🔹 const idx = DB.mesas.findIndex(m => m.numero === mesa.numero);
                 🔹 const pendientes = mesa.items.filter(it => !it.enviado);
                 🔹 const comandasMesa = DB.comandas.filter(c => {
-                🔹 function _ejecutarEnvioComanda(mesa, pendientes, overrideStock) {
                 🔹 function _mostrarRevisarPendientes(mesa, pendientes) {
                 🔹 function crearOpciones(comandaTemp) {
                 🔹 function crearComandaTemp(items, destino) {
@@ -654,7 +693,6 @@
                 🔹 function _mostrarDialogoStockInsuficiente(mesa, pendientes, faltantes, mensaje) {
                 🔹 const itemsList = faltantes.map(f => {
                 🔹 function _mostrarReimprimir(comandas) {
-                🔹 function _editarComandaCallback(comanda, htmlActual) {
                 🔹 function transferirMesa(mesaOrigenNum, mesaDestinoNum) {
                 🔹 const pedido = DB.pedidos.find(p => p.id === mesaDestino.pedidoId);
                 🔹 const idxOrigen = DB.mesas.findIndex(m => m.numero === mesaOrigenNum);
@@ -662,9 +700,9 @@
                 🔹 const opciones = mesasLibres.map(m => m.numero).join(', ');
                 🔹 function pedirCuenta() { Cuenta.pedirCuenta(); }
                 🔹 function cerrarMesa() { Cobro.abrirModalCierre(); }
-                🔹 function _setCat(cat) { Carta.setCategoria(cat); }
+                🔹 function _establecerCat(cat) { Carta.establecerCategoria(cat); }
                 🔹 function filtrarProductos() { Carta.filtrar(); }
-                🔹 function actualizarObsGeneral(valor) { Comanda.setObservacionGeneral(valor); }
+                🔹 function actualizarObsGeneral(valor) { Comanda.establecerObservacionGeneral(valor); }
             📄 perfil.js
                 🔹 const Perfil = (() => {
                 🔹 function _storageKey(usuario) {
@@ -675,35 +713,33 @@
                 🔹 function cerrarModalEditar() {
                 🔹 function _cargarExtras(usuario) {
                 🔹 function _guardarExtras(usuario, datos) {
+                🔹 function activar() {
+                🔹 function limpiar() {
             📄 recetas.js
                 🔹 function _asegurarVista() {
-                🔹 export function render(modo) {
-                🔹 const receta = recetas.find(r => r.productoId == prod.id);
+                🔹 function _construirVista(main) {
+                🔹 function _pintar(modo) {
+                🔹 const rec = recetas.find(r => r.productoId == prod.id);
                 🔹 const ingData = ingredientes.find(i => i.id == ing.ingredienteId);
                 🔹 const receta = recetas.find(r => r.productoId == prod.id);
-                🔹 const receta = recetas.find(r => r.productoId == prod.id);
-                🔹 export function filtrar() {
-                🔹 export function filtrarPorIngrediente() {
-                🔹 function _iconoPorCategoria(categoria) {
-                🔹 export function mostrarDetalle(prodId) {
-                🔹 const producto = (state.productos || []).find(p => p.id == prodId);
-                🔹 const receta = (state.recetas || []).find(r => r.productoId == prodId);
+                🔹 function _iconoPorCategoria(cat) {
+                🔹 function _mostrarDetalle(idProducto) {
+                🔹 const prod = (state.productos || []).find(p => p.id == idProducto);
+                🔹 const receta = (state.recetas || []).find(r => r.productoId == idProducto);
                 🔹 const ingData = ingredientesState.find(i => i.id == ing.ingredienteId);
-                🔹 export function cerrarDetalle() {
-                🔹 export function editarRecetaDesdeDetalle(prodId) {
-                🔹 export function exportarRecetaPDF(prodId) {
-                🔹 const producto = (state.productos || []).find(p => p.id == prodId);
-                🔹 const receta = (state.recetas || []).find(r => r.productoId == prodId);
+                🔹 function _exportarPDF(idProducto) {
+                🔹 const prod = (state.productos || []).find(p => p.id == idProducto);
+                🔹 const receta = (state.recetas || []).find(r => r.productoId == idProducto);
                 🔹 const ingData = ingredientesState.find(i => i.id == ing.ingredienteId);
                 🔹 function _asegurarModalReceta() {
-                🔹 export function mostrarModalReceta(productoId = null) {
+                🔹 function _mostrarModalReceta(productoId = null) {
                 🔹 const receta = (state.recetas || []).find(r => r.productoId == productoId);
-                🔹 export function cerrarModalReceta() {
-                🔹 export function _mostrarRecetaActual() {
-                🔹 const receta = (state.recetas || []).find(r => r.productoId == productoId);
-                🔹 const recetaLocal = DB.recetas.find(r => r.productoId == productoId);
-                🔹 const receta = DB.recetas.find(r => r.productoId == productoId);
-                🔹 function _initListeners() {
+                🔹 function _mostrarRecetaActual() {
+                🔹 const receta = (state.recetas || []).find(r => r.productoId == id);
+                🔹 const local = DB.recetas.find(r => r.productoId == id);
+                🔹 const receta = DB.recetas.find(r => r.productoId == idProducto);
+                🔹 function activar() {
+                🔹 function limpiar() {
                 🔹 export const Recetas = {
         📁 reparto/
                 📄 acciones.js
@@ -712,7 +748,12 @@
                     🔹 function _crearComandaParaDelivery(deliveryId) {
                     🔹 const ped = DB.pedidosDelivery.find(p => p.id === deliveryId);
                     🔹 const itemsParaComanda = ped.items.map(it => ({
-                    🔹 export function eliminarPedido(id) {
+                📄 ciclo-vida.js
+                    🔹 function _renderCompleto() {
+                    🔹 const pedidosValidos = pedidos.filter(p => p && p.id);
+                    🔹 export function activar() {
+                    🔹 const unsubscribeStore = Store.suscribir((state, action) => {
+                    🔹 export function limpiar() {
                 📄 constantes.js
                     🔹 export const ESTADO_BADGE = {
                     🔹 export const ESTADO_LABEL = {
@@ -720,7 +761,7 @@
                     🔹 export const ESTADO_DEFAULT = 'default';
                 📄 modal-editar.js
                     🔹 export function mostrar(deliveryId, onCerrar) {
-                    🔹 const ped = (Store.getState().pedidosDelivery || []).find(p => p.id === deliveryId);
+                    🔹 const ped = (Store.obtenerEstado().pedidosDelivery || []).find(p => p.id === deliveryId);
                     🔹 const items = (ped.items || []).map(it => ({
                     🔹 export function cerrar() {
                     🔹 function _filtrarProductosEdicion() {
@@ -751,16 +792,12 @@
                     🔹 const total = itemsListos.reduce((s, i) => s + i.precio * i.qty, 0);
                 📄 tabla.js
                     🔹 export function getEstadoFiltro() {
-                    🔹 export function setEstadoFiltro(estado) {
+                    🔹 export function establecerEstadoFiltro(estado) {
                     🔹 export function renderTabla(pedidos) {
                     🔹 const ordenados = [...pedidos].sort((a, b) => {
                     🔹 const resumen = items.map(i => `${i.qty}x ${i.nombre}`).join(', ') || '—';
             📄 reparto.js
-                🔹 const Reparto = (() => {
-                🔹 function render() {
                 🔹 const pedidosValidos = pedidos.filter(p => p && p.id);
-                🔹 function filtrarPorEstado(estado) {
-                🔹 function _initListeners() {
             📄 tickets.js
                 🔹 const Tickets = (() => {
                 🔹 const itemsHTML = items.map(it => `
@@ -769,20 +806,33 @@
                 🔹 function _agruparItems(items) {
                 🔹 function _imprimirEnVentana(contenido, titulo) {
         📄 utils.js
-            🔹 export function fmtMoney(n) {
-            🔹 export function fmtMoneyTicket(n) {
-            🔹 export function fmtFechaLarga() {
-            🔹 export function fmtHoraCompleta() {
-            🔹 export function fmtHoraCorta(ts) {
-            🔹 export function fmtFechaCorta() {
+            🔹 export function formatearDinero(n) {
+            🔹 export function formatearDineroTicket(n) {
+            🔹 export function formatearFechaLarga() {
+            🔹 export function formatearHoraCompleta() {
+            🔹 export function formatearHoraCorta(ts) {
+            🔹 export function formatearFechaCorta() {
             🔹 export function tiempoDesde(ts) {
             🔹 export function calcularTotal(items) {
-            🔹 export function showToast(tipo, htmlMsg, ms = 3500) {
+            🔹 export function mostrarToast(tipo, htmlMsg, ms = 3500) {
             🔹 export function $id(id) { return document.getElementById(id); }
             🔹 export function $val(id) { return ($id(id)?.value || '').trim(); }
             🔹 export function obtenerColorDesdeNombre(nombre) {
+            🔹 export function mostrarConfirmacion(titulo, mensaje, opciones = {}) {
+            🔹 const cerrar = (confirmado) => {
+            🔹 const onKeyDown = (e) => {
+            🔹 export function mostrarEntrada(titulo, mensaje, opciones = {}) {
+            🔹 const cerrar = (valor) => {
+            🔹 const onKeyDown = (e) => {
+            🔹 export const fmtMoney         = formatearDinero;
+            🔹 export const fmtMoneyTicket   = formatearDineroTicket;
+            🔹 export const fmtFechaLarga    = formatearFechaLarga;
+            🔹 export const fmtHoraCompleta  = formatearHoraCompleta;
+            🔹 export const fmtHoraCorta     = formatearHoraCorta;
+            🔹 export const fmtFechaCorta    = formatearFechaCorta;
+            🔹 export const showToast        = mostrarToast;
 
 
 === MAPEO COMPLETADO ===
-Total de funciones/declaraciones capturadas: 687
-Fecha de generación: 7/2/2026, 9:17:51 PM
+Total de funciones/declaraciones capturadas: 726
+Fecha de generación: 7/8/2026, 2:00:14 AM

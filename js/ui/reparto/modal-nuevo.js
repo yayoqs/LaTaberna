@@ -1,21 +1,20 @@
 /* ================================================================
    LaTaberna - PubPOS — REPARTO SUBMÓDULO (ES6)
    Archivo: js/ui/reparto/modal-nuevo.js
-   Versión: 1.0.0
+   Versión: 1.0.1
    Propósito: Modal para crear un nuevo pedido de delivery.
-              Maneja búsqueda de productos, ítems temporales y guardado.
+              v1.0.1: migra a nombres en español (utils).
    ================================================================ */
 
 import { DB } from '../../db.js';
 import { DeliveryService } from '../../servicios/delivery-service.js';
 import { PedidoManager } from '../../managers/pedido-manager.js';
 import { Logger } from '../../lib/logger.js';
-import { fmtMoney, showToast } from '../../utils.js';
+import { formatearDinero, mostrarToast } from '../../utils.js';
 
 let _itemsTemporales = [];
 let _productoSeleccionado = null;
 
-// ── Helpers para tests ──
 export function getItemsTemporales() { return _itemsTemporales; }
 export function setItemsTemporales(items) { _itemsTemporales = items; }
 
@@ -47,7 +46,6 @@ export function mostrar(onCerrar) {
       </div>`;
     document.body.appendChild(modal);
 
-    // Eventos del modal
     modal.querySelectorAll('.btn-cerrar-modal-reparto').forEach(b => b.addEventListener('click', () => cerrar(onCerrar)));
     modal.querySelector('.btn-guardar-pedido-reparto').addEventListener('click', () => guardar(onCerrar));
     modal.querySelector('.btn-agregar-item-reparto').addEventListener('click', _agregarItemAlPedido);
@@ -86,8 +84,6 @@ export function cerrar(onCerrar) {
   if (onCerrar) onCerrar();
 }
 
-// ── Funciones internas ──
-
 function _filtrarProductos() {
   const input = document.getElementById('repBusquedaProducto');
   const res = document.getElementById('repResultadosBusqueda');
@@ -100,7 +96,7 @@ function _filtrarProductos() {
     res.style.display = 'block';
     _productoSeleccionado = null;
   } else {
-    res.innerHTML = prod.map(p => `<div class="resultado-item" data-id="${p.id}" data-nombre="${p.nombre}" data-precio="${p.precio}" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--color-border);" onmouseover="this.style.background='var(--color-hover)'" onmouseout="this.style.background=''"><strong>${p.nombre}</strong> <span style="float:right;color:var(--color-accent);">${fmtMoney(p.precio)}</span></div>`).join('');
+    res.innerHTML = prod.map(p => `<div class="resultado-item" data-id="${p.id}" data-nombre="${p.nombre}" data-precio="${p.precio}" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--color-border);" onmouseover="this.style.background='var(--color-hover)'" onmouseout="this.style.background=''"><strong>${p.nombre}</strong> <span style="float:right;color:var(--color-accent);">${formatearDinero(p.precio)}</span></div>`).join('');
     res.style.display = 'block';
   }
 }
@@ -113,9 +109,9 @@ function _seleccionarProducto(el) {
 }
 
 function _agregarItemAlPedido() {
-  if (!_productoSeleccionado) { showToast('warning', 'Selecciona un producto'); return; }
+  if (!_productoSeleccionado) { mostrarToast('warning', 'Selecciona un producto'); return; }
   const cant = parseInt(document.getElementById('repCantidad')?.value) || 1;
-  if (cant <= 0) { showToast('warning', 'Cantidad inválida'); return; }
+  if (cant <= 0) { mostrarToast('warning', 'Cantidad inválida'); return; }
   const prod = DB.productos.find(p => p.id === _productoSeleccionado.id);
   if (!prod) return;
   const existente = _itemsTemporales.find(it => it.prodId === prod.id);
@@ -146,7 +142,7 @@ function _renderItemsTemporales() {
   container.innerHTML = _itemsTemporales.map((it, idx) => `
     <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--color-panel);border-radius:var(--radius-xs);font-size:12px;">
       <span style="flex:1;"><strong>${it.qty || 1}x</strong> ${it.nombre}</span>
-      <span style="font-weight:600;">${fmtMoney(it.precio * (it.qty || 1))}</span>
+      <span style="font-weight:600;">${formatearDinero(it.precio * (it.qty || 1))}</span>
       <button class="btn-icon-sm del btn-quitar-item-reparto" data-idx="${idx}"><i class="fas fa-times"></i></button>
     </div>`).join('');
 }
@@ -156,11 +152,11 @@ async function guardar(onCerrar) {
   const tel = document.getElementById('repTelefono').value.trim();
   const rep = document.getElementById('repRepartidor').value.trim();
   const obs = document.getElementById('repObservaciones').value.trim();
-  if (!dir) { showToast('error', 'Dirección obligatoria'); return; }
-  if (!_itemsTemporales.length) { showToast('error', 'Agrega al menos un producto'); return; }
+  if (!dir) { mostrarToast('error', 'Dirección obligatoria'); return; }
+  if (!_itemsTemporales.length) { mostrarToast('error', 'Agrega al menos un producto'); return; }
   const itemsListos = _itemsTemporales.map(it => ({ nombre: it.nombre, precio: it.precio, qty: it.qty || 1 }));
   const total = itemsListos.reduce((s, i) => s + i.precio * i.qty, 0);
-  if (total <= 0) { showToast('error', 'Total inválido'); return; }
+  if (total <= 0) { mostrarToast('error', 'Total inválido'); return; }
 
   let nuevo = null;
   if (typeof DeliveryService !== 'undefined' && DeliveryService.crearDelivery) {
@@ -179,8 +175,8 @@ async function guardar(onCerrar) {
 
   if (nuevo && nuevo.id) {
     cerrar(onCerrar);
-    showToast('success', `Pedido ${nuevo.id.slice(-6)} creado`);
+    mostrarToast('success', `Pedido ${nuevo.id.slice(-6)} creado`);
   } else {
-    showToast('error', 'No se pudo crear el pedido. Intenta de nuevo.');
+    mostrarToast('error', 'No se pudo crear el pedido. Intenta de nuevo.');
   }
 }

@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — Módulo (ES6)
    Archivo: js/modulos/cliente/pantalla-bienvenida.js
-   Versión: 2.2.1
+   Versión: 2.2.2
    Propósito: Panel de control post-validación.
-              _asegurarVista reutiliza contenedor estático de index.html.
+              Migrado a nuevos nombres en español de Store.
    ================================================================ */
 
 import { EventBus } from '../../lib/eventBus.js';
@@ -33,7 +33,6 @@ const PantallaBienvenida = (() => {
 
     _vista = main;
 
-    // Si ya tiene contenido, no reconstruir
     if (_vista.querySelector('.top-bar')) return;
 
     _vista.innerHTML = `
@@ -126,7 +125,7 @@ const PantallaBienvenida = (() => {
     const valor = parseInt(input?.value, 10);
     const estadoEl = document.getElementById('estadoMesa');
     if (!valor || valor < 1) { estadoEl.textContent = 'Ingresá un número válido.'; return; }
-    const state = Store.getState();
+    const state = Store.obtenerEstado();
     const mesas = state.mesas || [];
     const mesaExiste = mesas.some(m => m.numero === valor);
     if (!mesaExiste) { estadoEl.textContent = `La mesa ${valor} no existe. Verificá el número.`; return; }
@@ -142,7 +141,7 @@ const PantallaBienvenida = (() => {
     const cardIngreso = document.getElementById('cardIngresoMesa');
     if (cardIngreso) cardIngreso.style.display = 'none';
 
-    Store.dispatch({ type: 'CLIENTE_MESA_ASIGNADA', payload: _mesa });
+    Store.despachar({ type: 'CLIENTE_MESA_ASIGNADA', payload: _mesa });
 
     const cardEspera = document.getElementById('cardEspera');
     if (cardEspera) {
@@ -162,7 +161,7 @@ const PantallaBienvenida = (() => {
 
   function _verificarPermisoMesa() {
     if (!_mesa) return;
-    const state = Store.getState();
+    const state = Store.obtenerEstado();
     const mesas = state.mesas || [];
     const mesaActual = _mesa === 'barra' ? mesas.find(m => m.numero === 0 || m.nombre === 'barra') : mesas.find(m => m.numero === _mesa);
     const permite = mesaActual && mesaActual.permite_prepedidos === true;
@@ -170,12 +169,12 @@ const PantallaBienvenida = (() => {
     if (permite && !_interfazActivada) {
       _interfazActivada = true;
       _permitePrepedidos = true;
-      Store.dispatch({ type: 'CLIENTE_PERMISO_PREPEDIDOS', payload: true });
+      Store.despachar({ type: 'CLIENTE_PERMISO_PREPEDIDOS', payload: true });
       _construirPanelControl();
     } else if (!permite && _interfazActivada) {
       _interfazActivada = false;
       _permitePrepedidos = false;
-      Store.dispatch({ type: 'CLIENTE_PERMISO_PREPEDIDOS', payload: false });
+      Store.despachar({ type: 'CLIENTE_PERMISO_PREPEDIDOS', payload: false });
       const cardEspera = document.getElementById('cardEspera');
       if (cardEspera) {
         cardEspera.style.display = 'block';
@@ -269,7 +268,7 @@ const PantallaBienvenida = (() => {
   }
 
   function _actualizarVistazoPedido() {
-    const state = Store.getState();
+    const state = Store.obtenerEstado();
     const precargas = state.precargas_cliente || [];
     const misPrecargas = precargas.filter(p => p.id_usuario === (Auth.getAppwriteUserId?.() || ''));
     const texto = document.getElementById('textoEstadoPedido');
@@ -321,7 +320,7 @@ const PantallaBienvenida = (() => {
       }
     };
     _cbEventosActualizada = () => {
-      const state = Store.getState();
+      const state = Store.obtenerEstado();
       const eventos = state.eventos_en_vivo || [];
       const activo = eventos.find(e => e.estado === 'activo');
       const mensaje = document.getElementById('mensajeEvento') || document.getElementById('mensajeEventoInicial');

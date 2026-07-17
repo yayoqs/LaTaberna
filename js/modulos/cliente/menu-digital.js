@@ -1,16 +1,17 @@
 /* ================================================================
    LaTaberna - PubPOS — Módulo (ES6)
    Archivo: js/modulos/cliente/menu-digital.js
-   Versión: 2.0.1
+   Versión: 2.0.3
    Propósito: Menú digital interactivo.
-              _asegurarVista reutiliza contenedor estático de index.html.
+              Migrado a nuevos nombres en español de utils y Store.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
 import { EventBus } from '../../lib/eventBus.js';
 import { Auth } from '../../auth.js';
 import { DBAppwrite } from '../../db-appwrite.js';
-import { showToast, fmtMoney, obtenerColorDesdeNombre } from '../../utils.js';
+import { Logger } from '../../lib/logger.js';
+import { mostrarToast, formatearDinero, obtenerColorDesdeNombre } from '../../utils.js';
 import { Orden } from './orden.js';
 
 const MenuDigital = (() => {
@@ -35,7 +36,6 @@ const MenuDigital = (() => {
 
     _vista = main;
 
-    // Si ya tiene contenido, no reconstruir
     if (_vista.querySelector('.menu-estado')) return;
 
     _vista.innerHTML = `
@@ -93,11 +93,11 @@ const MenuDigital = (() => {
     const container = document.getElementById('ordenItems');
     const totalEl = document.getElementById('ordenTotal');
     const items = Orden.obtenerItems(); const total = Orden.obtenerTotal();
-    if (totalEl) totalEl.textContent = fmtMoney(total);
+    if (totalEl) totalEl.textContent = formatearDinero(total);
     if (!container) return;
     if (!items.length) { container.innerHTML = '<div class="orden-vacia"><i class="fas fa-inbox"></i><p>Tu orden está vacía</p></div>'; return; }
     container.innerHTML = items.map(item => `
-      <div class="orden-item"><div class="orden-item-info"><div class="orden-item-nombre">${item.nombre}</div><div class="orden-item-precio">${fmtMoney(item.precio)} c/u</div><div class="orden-item-cantidad"><button data-id="${item.prodId}" data-accion="restar">−</button><span>${item.qty}</span><button data-id="${item.prodId}" data-accion="sumar">+</button></div><div class="orden-item-obs"><input type="text" placeholder="Observación (ej: sin cebolla)" value="${item.obs || ''}" data-id="${item.prodId}" /></div></div><button class="btn-quitar-item" data-id="${item.prodId}" title="Quitar"><i class="fas fa-trash-alt"></i></button></div>
+      <div class="orden-item"><div class="orden-item-info"><div class="orden-item-nombre">${item.nombre}</div><div class="orden-item-precio">${formatearDinero(item.precio)} c/u</div><div class="orden-item-cantidad"><button data-id="${item.prodId}" data-accion="restar">−</button><span>${item.qty}</span><button data-id="${item.prodId}" data-accion="sumar">+</button></div><div class="orden-item-obs"><input type="text" placeholder="Observación (ej: sin cebolla)" value="${item.obs || ''}" data-id="${item.prodId}" /></div></div><button class="btn-quitar-item" data-id="${item.prodId}" title="Quitar"><i class="fas fa-trash-alt"></i></button></div>
     `).join('');
     container.querySelectorAll('[data-accion]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -116,20 +116,31 @@ const MenuDigital = (() => {
   }
 
   async function _confirmarOrden() {
-    const state = Store.getState(); const permite = state.cliente?.permitePrepedidos || false;
-    if (!permite) { showToast('error', 'Tu mesa ya no admite pedidos. Contactá al garzón.'); return; }
-    const items = Orden.obtenerItems(); if (!items.length) { showToast('error', 'Agregá productos a tu orden antes de confirmar.'); return; }
-    let idUsuario; try { idUsuario = await Auth.getAppwriteUserId(); } catch (e) { idUsuario = null; }
-    if (!idUsuario) { showToast('error', 'No se pudo obtener tu sesión. Intentá de nuevo.'); return; }
-    const mesa = state.cliente?.mesa || 0; if (!mesa) { showToast('error', 'No se pudo obtener el número de mesa.'); return; }
+    const state = Store.obtenerEstado(); const permite = state.cliente?.permitePrepedidos || false;
+    if (!permite) { mostrarToast('error', 'Tu mesa ya no admite pedidos. Contactá al garzón.'); return; }
+    const items = Orden.obtenerItems(); if (!items.length) { mostrarToast('error', 'Agregá productos a tu orden antes de confirmar.'); return; }
+
+    let idUsuario;
+    try {
+      idUsuario = await Auth.getAppwriteUserId();
+    } catch (e) {
+      Logger.error('[MenuDigital] Error al obtener ID de Appwrite:', e);
+      idUsuario = null;
+    }
+    if (!idUsuario) { mostrarToast('error', 'No se pudo obtener tu sesión. Intentá de nuevo.'); return; }
+
+    const mesa = state.cliente?.mesa || 0; if (!mesa) { mostrarToast('error', 'No se pudo obtener el número de mesa.'); return; }
     const nombreComensal = Auth.getNombre() || 'comensal';
     const payload = { mesa, items, clienteId: nombreComensal, id_usuario: idUsuario, nombre_comensal: nombreComensal, observaciones: '', timestamp: Date.now() };
     try {
       const resultado = await DBAppwrite.crear('precargas_cliente', 'unique()', { id_mesa: mesa, id_usuario: idUsuario, nombre_comensal: nombreComensal, productos: JSON.stringify(items), estado: 'por_confirmar', timestamp: payload.timestamp });
-      if (!resultado) { showToast('error', 'Error al enviar tu orden. Intentá de nuevo.'); return; }
+      if (!resultado) { mostrarToast('error', 'Error al enviar tu orden. Intentá de nuevo.'); return; }
       payload.id = resultado.id || 'pre_' + Date.now(); EventBus.emit('cliente:precarga_enviada', payload);
-      Orden.vaciar(); _actualizarContador(); _panelOrden.classList.add('oculto'); showToast('success', '✅ ¡Orden enviada! El garzón la revisará pronto.');
-    } catch (e) { console.error('[MenuDigital] Error al confirmar orden:', e); showToast('error', 'Error de conexión. Revisá tu internet.'); }
+      Orden.vaciar(); _actualizarContador(); _panelOrden.classList.add('oculto'); mostrarToast('success', '✅ ¡Orden enviada! El garzón la revisará pronto.');
+    } catch (e) {
+      Logger.error('[MenuDigital] Error al confirmar orden:', e);
+      mostrarToast('error', 'Error de conexión. Revisá tu internet.');
+    }
   }
 
   function mostrar() {
@@ -142,34 +153,34 @@ const MenuDigital = (() => {
   function ocultar() { if (_vista) _vista.classList.remove('active'); if (_panelOrden) _panelOrden.classList.add('oculto'); }
 
   function _actualizarEstado() {
-    const nombre = Auth.getNombre() || 'comensal'; const state = Store.getState(); const mesa = state.cliente?.mesa || '?';
+    const nombre = Auth.getNombre() || 'comensal'; const state = Store.obtenerEstado(); const mesa = state.cliente?.mesa || '?';
     document.getElementById('menuEstadoCliente').textContent = `👤 ${nombre}`; document.getElementById('menuEstadoMesa').textContent = `🪑 Mesa ${mesa}`;
   }
   function _verificarPermiso() {
-    const state = Store.getState(); const permite = state.cliente?.permitePrepedidos || false;
+    const state = Store.obtenerEstado(); const permite = state.cliente?.permitePrepedidos || false;
     const banner = document.getElementById('menuBannerEspera'); if (banner) banner.style.display = permite ? 'none' : 'flex';
     _renderProductos();
   }
   function _renderCategorias() {
     const container = document.getElementById('menuDigitalCategorias'); if (!container) return;
-    const productos = Store.getState().productos || [];
+    const productos = Store.obtenerEstado().productos || [];
     const categorias = ['Todas', ...new Set(productos.filter(p => p.activo !== false).map(p => p.categoria))].filter(Boolean);
     container.innerHTML = categorias.map(cat => `<button class="menu-cat-btn ${cat === _categoriaActiva ? 'active' : ''}" data-categoria="${cat}">${cat}</button>`).join('');
     container.querySelectorAll('.menu-cat-btn').forEach(btn => { btn.addEventListener('click', () => { _categoriaActiva = btn.dataset.categoria; _renderCategorias(); _renderProductos(); }); });
   }
   function _renderProductos() {
     const grid = document.getElementById('menuDigitalGrid'); if (!grid) return;
-    const state = Store.getState(); const permite = state.cliente?.permitePrepedidos || false;
-    let productos = (Store.getState().productos || []).filter(p => p.activo !== false);
+    const state = Store.obtenerEstado(); const permite = state.cliente?.permitePrepedidos || false;
+    let productos = (Store.obtenerEstado().productos || []).filter(p => p.activo !== false);
     if (_categoriaActiva !== 'Todas') productos = productos.filter(p => p.categoria === _categoriaActiva);
     if (_terminoBusqueda) { const term = _terminoBusqueda.toLowerCase(); productos = productos.filter(p => p.nombre.toLowerCase().includes(term) || (p.descripcion || '').toLowerCase().includes(term)); }
     if (!productos.length) { grid.innerHTML = '<div class="menu-empty"><i class="fas fa-search"></i><p>No se encontraron productos</p></div>'; return; }
     productos.sort((a, b) => a.nombre.localeCompare(b.nombre));
     grid.innerHTML = productos.map(prod => {
       const disponible = prod.disponible !== false; const puedeAgregar = permite && disponible; const desc = prod.descripcion || 'Consulta a nuestro personal.';
-      return `<div class="menu-card ${!disponible ? 'menu-card-atenuado' : ''}"><div class="menu-card-img" style="background-color: ${obtenerColorDesdeNombre(prod.nombre)};"><span class="menu-card-inicial">${prod.nombre.charAt(0).toUpperCase()}</span><span class="menu-card-precio">${fmtMoney(prod.precio)}</span></div><div class="menu-card-body"><h3>${prod.nombre}</h3><p>${desc.length > 60 ? desc.substring(0, 60) + '...' : desc}</p><button class="btn-agregar-orden ${!puedeAgregar ? 'btn-deshabilitado' : ''}" ${!puedeAgregar ? 'disabled' : ''} data-id="${prod.id}" data-nombre="${prod.nombre}" data-precio="${prod.precio}" data-categoria="${prod.categoria}" data-destino="${prod.destino || prod.categoria || 'general'}">🛒 Agregar a mi orden</button></div></div>`;
+      return `<div class="menu-card ${!disponible ? 'menu-card-atenuado' : ''}"><div class="menu-card-img" style="background-color: ${obtenerColorDesdeNombre(prod.nombre)};"><span class="menu-card-inicial">${prod.nombre.charAt(0).toUpperCase()}</span><span class="menu-card-precio">${formatearDinero(prod.precio)}</span></div><div class="menu-card-body"><h3>${prod.nombre}</h3><p>${desc.length > 60 ? desc.substring(0, 60) + '...' : desc}</p><button class="btn-agregar-orden ${!puedeAgregar ? 'btn-deshabilitado' : ''}" ${!puedeAgregar ? 'disabled' : ''} data-id="${prod.id}" data-nombre="${prod.nombre}" data-precio="${prod.precio}" data-categoria="${prod.categoria}" data-destino="${prod.destino || prod.categoria || 'general'}">🛒 Agregar a mi orden</button></div></div>`;
     }).join('');
-    grid.querySelectorAll('.btn-agregar-orden:not(.btn-deshabilitado)').forEach(btn => { btn.addEventListener('click', () => { Orden.agregarItem({ id: btn.dataset.id, nombre: btn.dataset.nombre, precio: parseInt(btn.dataset.precio, 10), categoria: btn.dataset.categoria, destino: btn.dataset.destino }); showToast('success', `${btn.dataset.nombre} agregado a tu orden`); _actualizarContador(); _renderizarItemsOrden(); }); });
+    grid.querySelectorAll('.btn-agregar-orden:not(.btn-deshabilitado)').forEach(btn => { btn.addEventListener('click', () => { Orden.agregarItem({ id: btn.dataset.id, nombre: btn.dataset.nombre, precio: parseInt(btn.dataset.precio, 10), categoria: btn.dataset.categoria, destino: btn.dataset.destino }); mostrarToast('success', `${btn.dataset.nombre} agregado a tu orden`); _actualizarContador(); _renderizarItemsOrden(); }); });
   }
 
   function _initRealtime() {

@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test B2 — Recetario v5.0.0 (ES6)</title>
+  <style>
+    body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
+    h1 { color: #f59e0b; }
+    .suite { margin-bottom: 24px; border-bottom: 1px solid #2e2e42; padding-bottom: 12px; }
+    .test { margin: 4px 0; padding: 4px 8px; border-radius: 4px; }
+    .pass { background: rgba(34,197,94,.2); }
+    .fail { background: rgba(239,68,68,.2); }
+    .summary { margin-top: 20px; font-weight: bold; }
+    .info { color: #94a3b8; font-size: 12px; margin: 2px 0; }
+    .error { color: #ef4444; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test B2 — Recetario v5.0.0 (ES6)</h1>
+  <p class="info">Valida pestañas internas, creación rápida, edición, stock, duplicar, eliminar y modal de detalle.</p>
+  <div id="results"></div>
+
+  <script type="module">
+    import { Store } from '../js/lib/store.js';
+    import { EventBus } from '../js/lib/eventBus.js';
+    import { Auth } from '../js/auth.js';
+    import { DB } from '../js/db.js';
+    import { Logger } from '../js/lib/logger.js';
+    import { Recetas } from '../js/ui/recetas.js';
+
+    Logger.setLevel('ERROR');
+    window.Logger = Logger;
+
+    // ── Mocks ──────────────────────────────────────────
+    Auth.getRol = () => 'cocina';
+    Auth._rol = 'cocina';
+
+    const stateBase = {
+      productos: [],
+      recetas: [],
+      ingredientes: []
+    };
+    Store.getState = () => ({ ...stateBase, productos: DB.productos || [], recetas: DB.recetas || [], ingredientes: DB.ingredientes || [] });
+    Store.subscribe = () => () => {};
+    Store.dispatch = () => {};
+
+    DB.recetas = [];
+    DB.productos = [];
+    DB.ingredientes = [];
+    DB.saveRecetas = () => {};
+    DB.saveIngredientes = () => {};
+
+    const resultsEl = document.getElementById('results');
+    let passed = 0, failed = 0;
+    function assert(condition, msg) {
+      if (condition) { passed++; resultsEl.innerHTML += '<div class="test pass">✔ ' + msg + '</div>'; }
+      else { failed++; resultsEl.innerHTML += '<div class="test fail">✘ ' + msg + '</div>'; }
+    }
+    const esperar = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    function simularClick(selector) {
+      const el = document.querySelector(selector);
+      if (el) el.click();
+    }
+
+    async function runTests() {
+      resultsEl.innerHTML = '';
+
+      if (!document.getElementById('toastContainer')) {
+        const tc = document.createElement('div'); tc.id = 'toastContainer'; document.body.appendChild(tc);
+      }
+
+      // Datos de prueba iniciales
+      DB.productos = [
+        { id: 'prod_1', nombre: 'Hamburguesa', activo: true, destino: 'cocina' },
+        { id: 'prod_2', nombre: 'Salsa BBQ', activo: true, destino: 'cocina' },
+        { id: 'prod_3', nombre: 'Cebolla caramelizada', activo: true, destino: 'cocina' },
+        { id: 'prod_4', nombre: 'Nuggets', activo: true, destino: 'cocina' }
+      ];
+      DB.ingredientes = [
+        { id: 'ing_cebolla', nombre: 'Cebolla', unidad: 'kg', stock: 10, valor_unitario: 0.5 },
+        { id: 'ing_aceite', nombre: 'Aceite', unidad: 'L', stock: 20, valor_unitario: 1.2 }
+      ];
+      DB.recetas = [
+        {
+          id: 'rec_1', productoId: 'prod_1', nivel: 'producto_final', generaStock: false,
+          ingredientes: [
+            { ingredienteId: 'rec_2', cantidad: 0.2, unidad: 'kg' },
+            { ingredienteId: 'rec_3', cantidad: 0.1, unidad: 'kg' }
+          ],
+          instrucciones: 'Armar y servir.', stockActual: 0
+        },
+        {
+          id: 'rec_2', productoId: 'prod_2', nivel: 'salsa', generaStock: true,
+          ingredientes: [ { ingredienteId: 'ing_aceite', cantidad: 0.5, unidad: 'L' } ],
+          instrucciones: 'Mezclar y reducir.', stockActual: 3, unidadStock: 'L'
+        },
+        {
+          id: 'rec_3', productoId: 'prod_3', nivel: 'preparacion', generaStock: true,
+          ingredientes: [ { ingredienteId: 'ing_cebolla', cantidad: 2, unidad: 'kg' } ],
+          instrucciones: 'Cortar en pluma y cocinar.', stockActual: 5, unidadStock: 'kg'
+        }
+      ];
+
+      // ── Suite 1: Pestañas internas ──────────────────
+      resultsEl.innerHTML += '<div class="suite"><h2>1. Pestañas internas</h2></div>';
+      Recetas.render('produccion');
+      await esperar(50);
+
+      const pestanas = document.querySelectorAll('#recetas-pestanas .recetas-pestana');
+      assert(pestanas.length === 3, 'Existen 3 pestañas');
+      assert(pestanas[0].classList.contains('activo'), 'Pestaña Recetario activa por defecto');
+
+      simularClick('#recetas-pestanas .recetas-pestana[data-pestana="stock"]');
+      await esperar(50);
+      assert(document.querySelector('#recetas-pestanas .recetas-pestana[data-pestana="stock"]').classList.contains('activo'), 'Pestaña Mi Stock se activa');
+      assert(!!document.querySelector('.recetas-tabla-stock'), 'Aparece tabla de stock');
+
+      simularClick('#recetas-pestanas .recetas-pestana[data-pestana="planificacion"]');
+      await esperar(50);
+      assert(document.querySelector('#recetas-pestanas .recetas-pestana[data-pestana="planificacion"]').classList.contains('activo'), 'Pestaña Planificación se activa');
+      assert(document.querySelector('.recetas-planificacion-placeholder') !== null, 'Muestra placeholder de planificación');
+
+      simularClick('#recetas-pestanas .recetas-pestana[data-pestana="recetario"]');
+      await esperar(50);
+      assert(document.querySelector('#recetas-cuadricula') !== null, 'Cuadrícula visible en Recetario');
+
+      // ── Suite 2: Creación rápida (CORREGIDA) ─────────
+      resultsEl.innerHTML += '<div class="suite"><h2>2. Creación rápida de receta</h2></div>';
+      const btnNueva = document.querySelector('#recetas-boton-nueva');
+      assert(!!btnNueva, 'Botón Nueva Receta presente');
+      btnNueva.click();
+      await esperar(100);
+      const modalCrear = document.getElementById('modalRecetaCrear');
+      assert(modalCrear && modalCrear.style.display === 'flex', 'Modal de creación abierto');
+
+      const selectProd = document.getElementById('recProductoId');
+      assert(!!selectProd, 'Selector de producto existe');
+      // Seleccionar prod_4 (Nuggets) que no tiene receta
+      selectProd.value = 'prod_4';
+      const inputNivel = document.getElementById('recNivel');
+      inputNivel.value = 'preparacion';
+
+      const btnCrear = document.getElementById('btnCrearReceta');
+      assert(!!btnCrear, 'Botón Crear existe');
+      btnCrear.click();
+      await esperar(200);
+
+      assert(modalCrear.style.display === 'none', 'Modal de creación cerrado');
+      // Verificar que se creó la receta en DB
+      const nuevaReceta = DB.recetas.find(r => r.productoId === 'prod_4' && r.nivel === 'preparacion');
+      assert(!!nuevaReceta, 'Nueva receta añadida a DB');
+      assert(!!document.querySelector('.recetas-edicion'), 'Vista de edición abierta');
+      // Volver al recetario
+      simularClick('#recetas-volver');
+      await esperar(50);
+
+      // ── Suite 3: Edición completa ───────────────────
+      resultsEl.innerHTML += '<div class="suite"><h2>3. Edición de receta</h2></div>';
+      const tarjetaSalsa = document.querySelector('.recetas-tarjeta[data-receta="rec_2"]');
+      assert(!!tarjetaSalsa, 'Tarjeta de Salsa BBQ visible');
+      tarjetaSalsa.click();
+      await esperar(100);
+      assert(!!document.querySelector('.recetas-edicion'), 'Vista de edición de Salsa BBQ abierta');
+
+      const inputNivelEdicion = document.getElementById('rec-nivel');
+      assert(!!inputNivelEdicion, 'Campo nivel en edición');
+      inputNivelEdicion.value = 'aderezo';
+      inputNivelEdicion.dispatchEvent(new Event('input', { bubbles: true }));
+      await esperar(50);
+      const nota = document.querySelector('.recetas-nota');
+      assert(nota && nota.textContent.includes('genera stock'), 'Nota de stock se actualiza al cambiar nivel');
+
+      const selectIng = document.getElementById('rec-nuevo-ingrediente');
+      assert(!!selectIng, 'Selector de nuevo ingrediente existe');
+      selectIng.value = 'ing_cebolla';
+      const inputCantidad = document.getElementById('rec-nueva-cantidad');
+      inputCantidad.value = '0.3';
+      simularClick('#rec-agregar-ing');
+      await esperar(50);
+      let itemsIng = document.querySelectorAll('#recetas-ingredientes-actuales .recetas-ingrediente-item');
+      assert(itemsIng.length === 2, 'Se agregó un ingrediente, ahora hay 2');
+
+      const btnQuitar = document.querySelector('.recetas-quitar-ing');
+      if (btnQuitar) {
+        btnQuitar.click();
+        await esperar(50);
+        itemsIng = document.querySelectorAll('#recetas-ingredientes-actuales .recetas-ingrediente-item');
+        assert(itemsIng.length === 1, 'Ingrediente eliminado');
+      }
+
+      simularClick('#recetas-guardar');
+      await esperar(200);
+      assert(!!document.querySelector('.recetas-cuadricula'), 'Vuelve al recetario tras guardar');
+      const salsaMod = DB.recetas.find(r => r.id === 'rec_2');
+      assert(salsaMod && salsaMod.nivel === 'aderezo', 'Nivel cambiado a aderezo en DB');
+
+      // ── Suite 4: Duplicar receta ────────────────────
+      resultsEl.innerHTML += '<div class="suite"><h2>4. Duplicar receta</h2></div>';
+      const tarjetaCebolla = document.querySelector('.recetas-tarjeta[data-receta="rec_3"]');
+      assert(!!tarjetaCebolla, 'Tarjeta de Cebolla caramelizada visible');
+      tarjetaCebolla.click();
+      await esperar(100);
+      simularClick('#recetas-duplicar');
+      await esperar(200);
+      const duplicadas = DB.recetas.filter(r => r.productoId === 'prod_3');
+      assert(duplicadas.length === 2, 'Se duplicó la receta, ahora hay 2 para el mismo producto');
+      simularClick('#recetas-volver');
+      await esperar(50);
+
+      // ── Suite 5: Eliminar receta (CORREGIDA) ─────────
+      resultsEl.innerHTML += '<div class="suite"><h2>5. Eliminar receta</h2></div>';
+      const ultimaReceta = DB.recetas.find(r => r.productoId === 'prod_3' && r.id !== 'rec_3');
+      assert(!!ultimaReceta, 'Receta duplicada encontrada en DB');
+      Recetas.render('produccion');
+      await esperar(50);
+      const tarjetaDuplicada = document.querySelector(`.recetas-tarjeta[data-receta="${ultimaReceta.id}"]`);
+      assert(!!tarjetaDuplicada, 'Tarjeta duplicada visible en el DOM');
+      tarjetaDuplicada.click();
+      await esperar(100);
+      assert(!!document.querySelector('.recetas-edicion'), 'Vista de edición de la duplicada abierta');
+      simularClick('#recetas-eliminar');
+      await esperar(100);
+      // Ahora debe aparecer el modal de confirmación. Hacemos clic en el botón de confirmar.
+      const confirmBtn = document.querySelector('.modal-confirm-card .confirmar-btn');
+      assert(!!confirmBtn, 'Botón de confirmación visible');
+      confirmBtn.click();
+      await esperar(300);
+      assert(!DB.recetas.find(r => r.id === ultimaReceta.id), 'Receta eliminada de DB');
+      assert(!!document.querySelector('.recetas-cuadricula'), 'Vuelve al recetario tras eliminar');
+
+      // ── Suite 6: Ejecutar preparación ────────────────
+      resultsEl.innerHTML += '<div class="suite"><h2>6. Ejecutar preparación</h2></div>';
+      simularClick('#recetas-pestanas .recetas-pestana[data-pestana="stock"]');
+      await esperar(50);
+      const stockInicial = DB.recetas.find(r => r.id === 'rec_3').stockActual;
+      assert(stockInicial === 5, 'Stock inicial de Cebolla caramelizada es 5');
+      const btnPreparar = document.querySelector('.recetas-accion-preparar[data-receta="rec_3"]');
+      assert(!!btnPreparar, 'Botón Preparar visible');
+      btnPreparar.click();
+      await esperar(200);
+      const inputCant = document.getElementById('rec-cantidad-preparar');
+      assert(!!inputCant, 'Modal de cantidad abierto');
+      inputCant.value = '2';
+      simularClick('#rec-aceptar-cantidad');
+      await esperar(300);
+      const nuevoStock = DB.recetas.find(r => r.id === 'rec_3').stockActual;
+      assert(nuevoStock === 7, 'Stock aumentó en 2 (5+2=7)');
+      const cebolla = DB.ingredientes.find(i => i.id === 'ing_cebolla');
+      assert(cebolla.stock === 6, 'Cebolla descontada: 10 - (2*2kg) = 6');
+
+      // ── Suite 7: Modal de detalle ────────────────────
+      resultsEl.innerHTML += '<div class="suite"><h2>7. Modal de detalle</h2></div>';
+      Recetas.mostrarDetalle('rec_1');
+      await esperar(100);
+      const modalDetalle = document.getElementById('modalRecetaDetalle');
+      assert(modalDetalle && modalDetalle.style.display === 'flex', 'Modal de detalle abierto');
+      assert(modalDetalle.textContent.includes('Hamburguesa'), 'Muestra nombre del producto');
+      assert(modalDetalle.textContent.includes('Salsa BBQ'), 'Muestra ingrediente Salsa BBQ (receta)');
+      assert(modalDetalle.textContent.includes('Cebolla caramelizada'), 'Muestra ingrediente Cebolla caramelizada (receta)');
+      simularClick('#btnCerrarDetalle');
+      await esperar(50);
+      assert(modalDetalle.style.display === 'none', 'Modal de detalle cerrado');
+
+      // ── Suite 8: Vista vacía ──────────────────────────
+      resultsEl.innerHTML += '<div class="suite"><h2>8. Vista vacía</h2></div>';
+      DB.recetas = [];
+      Recetas.render('produccion');
+      await esperar(50);
+      assert(document.querySelector('.recetas-vacia') !== null, 'Muestra mensaje de vacío');
+
+      // Limpiar
+      document.getElementById('view-recetas')?.remove();
+      document.querySelectorAll('.modal-overlay').forEach(o => o.remove());
+
+      resultsEl.innerHTML += `<div class="summary">${passed} pasaron, ${failed} fallaron</div>`;
+      if (failed === 0) resultsEl.innerHTML += '<div class="test pass">✔ Todos los tests del Recetario v5.0.0 pasaron.</div>';
+    }
+
+    window.addEventListener('load', () => runTests().catch(e => {
+      resultsEl.innerHTML += `<div class="error">Error en tests: ${e.message}</div>`;
+      console.error(e);
+    }));
+  </script>
+</body>
+</html>

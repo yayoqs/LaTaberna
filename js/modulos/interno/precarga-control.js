@@ -1,10 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO INTERNO (ES6)
    Archivo: js/modulos/interno/precarga-control.js
-   Versión: 2.1.4
+   Versión: 2.1.6
    Propósito: Recepción de precargas, insignia, carga en comanda.
-              Row Security. Desacoplado de Mesas y Comanda.
-   Dependencias: EventBus, Logger, Auth, CommandBus, DBAppwrite, showToast
+              Log de inicialización movido a función activar().
    ================================================================ */
 
 import { EventBus } from '../../lib/eventBus.js';
@@ -12,10 +11,11 @@ import { Logger } from '../../lib/logger.js';
 import { Auth } from '../../auth.js';
 import { CommandBus } from '../../lib/command-bus.js';
 import { DBAppwrite } from '../../db-appwrite.js';
-import { showToast } from '../../utils.js';
+import { mostrarToast } from '../../utils.js';
 
 const PrecargaControl = (() => {
   const _precargas = new Map();
+  let _activado = false;
 
   function _onPrecargaEnviada(data) {
     if (!data || !data.id || !data.mesa || !Array.isArray(data.items)) {
@@ -25,7 +25,6 @@ const PrecargaControl = (() => {
     const { id, mesa, items } = data;
     _precargas.set(id, { mesa, items, data });
 
-    // Emitir evento para que Mesas muestre el badge
     EventBus.emit('precarga:nueva', {
       mesa: data.mesa,
       cantidad: data.items.length,
@@ -43,59 +42,64 @@ const PrecargaControl = (() => {
       return;
     }
 
-    // Emitir evento para que Comanda procese los ítems
     EventBus.emit('precarga:items_listos', {
       mesa: payload.mesa,
       items: precarga.items,
       precargaId: payload.precargaId
     });
 
-    const mozo = 'Garzón'; // Se podría obtener desde otro lado si es necesario
+    const mozo = 'Garzón';
     const resultado = await CommandBus.ejecutar({
       type: 'precarga:revisar',
       datos: { precargaId, revisadoPor: mozo }
     });
 
     if (resultado.exito) {
-      showToast('success', `Precarga cargada en mesa ${mesa}.`);
+      mostrarToast('success', `Precarga cargada en mesa ${mesa}.`);
       _precargas.delete(precargaId);
       Logger.info(`[PrecargaControl] Precarga ${precargaId} marcada como revisada.`);
     } else {
-      showToast('error', 'No se pudo actualizar la precarga. Reintentá.');
+      mostrarToast('error', 'No se pudo actualizar la precarga. Reintentá.');
       Logger.error('[PrecargaControl] Error al revisar precarga:', resultado.error);
     }
   }
 
-  // ── Registrar comando con Row Security ──
-  CommandBus.registrar('precarga:revisar', async (datos) => {
-    const { precargaId, revisadoPor } = datos;
-    try {
-      const userId = await Auth.getAppwriteUserId();
-      const permisos = userId ? [
-        `read("user:${userId}")`,
-        `update("user:${userId}")`,
-        `delete("user:${userId}")`,
-        `read("team:garzones")`,
-        `update("team:garzones")`
-      ] : null;
-      await DBAppwrite.actualizar('precargas_cliente', precargaId, {
-        estado: 'revisado',
-        revisadoPor
-      }, permisos);
-      EventBus.emit('precarga:revisada', { precargaId, revisadoPor, timestamp: Date.now() });
-      return { exito: true };
-    } catch (error) {
-      Logger.error('[PrecargaControl] Error al ejecutar precarga:revisar:', error);
-      return { exito: false, error: error.message };
-    }
-  });
+  function activar() {
+    if (_activado) return;
+    _activado = true;
 
-  EventBus.on('cliente:precarga_enviada', _onPrecargaEnviada);
-  EventBus.on('mesa:badge_click', _onBadgeClick);
+    CommandBus.registrar('precarga:revisar', async (datos) => {
+      const { precargaId, revisadoPor } = datos;
+      try {
+        const userId = await Auth.getAppwriteUserId();
+        const permisos = userId ? [
+          `read("user:${userId}")`,
+          `update("user:${userId}")`,
+          `delete("user:${userId}")`,
+          `read("team:garzones")`,
+          `update("team:garzones")`
+        ] : null;
+        await DBAppwrite.actualizar('precargas_cliente', precargaId, {
+          estado: 'revisado',
+          revisadoPor
+        }, permisos);
+        EventBus.emit('precarga:revisada', { precargaId, revisadoPor, timestamp: Date.now() });
+        return { exito: true };
+      } catch (error) {
+        Logger.error('[PrecargaControl] Error al ejecutar precarga:revisar:', error);
+        return { exito: false, error: error.message };
+      }
+    });
 
-  Logger.info('[PrecargaControl] Módulo inicializado (ES6 v2.1.4 — desacoplado).');
+    EventBus.on('cliente:precarga_enviada', _onPrecargaEnviada);
+    EventBus.on('mesa:badge_click', _onBadgeClick);
 
-  return { _precargas };
+    Logger.info('[PrecargaControl] Módulo inicializado (ES6 v2.1.6).');
+  }
+
+  activar();
+
+  return { _precargas, activar };
 })();
 
 export { PrecargaControl };

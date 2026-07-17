@@ -1,10 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MESAS SUBMÓDULO (ES6)
    Archivo: js/ui/mesas/renderer.js
-   Versión: 1.1.0
-   Propósito: Renderizado de la grilla, tarjetas, popover
-              y botones de zona. Con callbacks para el toolbar.
-              Refactor: asegurarVista soporta contenedores estáticos.
+   Versión: 1.1.1
+   Propósito: Renderizado de la grilla, tarjetas, popover.
+              Migración a Store.obtenerEstado.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -16,11 +15,8 @@ import { getEstadoComandas, colorEstado } from './estado-comandas.js';
 let _modoSeleccion = false;
 let _mesasSeleccionadas = new Set();
 let _zonaActiva = 'todas';
-
 let _longPressTimer = null;
 let _longPressMesa = null;
-
-// Funciones de limpieza del popover
 let _popoverCloseListeners = [];
 
 function _limpiarPopoverListeners() {
@@ -36,7 +32,7 @@ export function setZonaActiva(zona) { _zonaActiva = zona; }
 export function getZonaActiva() { return _zonaActiva; }
 
 function _getZonaColor(zonaNombre) {
-  const zonas = (Store.getState().config && Store.getState().config.zonas) || [];
+  const zonas = (Store.obtenerEstado().config && Store.obtenerEstado().config.zonas) || [];
   const idx = zonas.findIndex(z => z.nombre === zonaNombre);
   return ZONA_COLORS[idx >= 0 ? idx % ZONA_COLORS.length : 0];
 }
@@ -45,7 +41,7 @@ export function renderZoneButtons() {
   const container = document.getElementById('zonaButtonsContainer');
   if (!container) return;
 
-  const zonas = (Store.getState().config && Store.getState().config.zonas) || [];
+  const zonas = (Store.obtenerEstado().config && Store.obtenerEstado().config.zonas) || [];
   container.innerHTML = '';
 
   const btnTodas = document.createElement('button');
@@ -75,7 +71,7 @@ export function renderGrid() {
   const grid = document.getElementById('mesasGrid');
   if (!grid) return;
 
-  let mesas = Store.getState().mesas || [];
+  let mesas = Store.obtenerEstado().mesas || [];
   mesas = mesas.filter(m => m.estado !== 'fusionada');
   if (_zonaActiva !== 'todas') {
     mesas = mesas.filter(m => m.zona === _zonaActiva);
@@ -94,7 +90,6 @@ export function renderGrid() {
 
   mesas.forEach(mesa => {
     const card = document.createElement('article');
-    
     let clases = `mesa-card ${mesa.estado}`;
     if (mesa.esVirtual) clases += ' mesa-virtual';
     card.className = clases;
@@ -243,12 +238,11 @@ export function mostrarPopover(mesa, card) {
   const cont = document.getElementById('popoverContainer');
   if (!cont) return;
 
-  // Limpiar listeners anteriores
   _limpiarPopoverListeners();
 
   const rect = card.getBoundingClientRect();
   const estados = getEstadoComandas(mesa.numero);
-  const comandas = Store.getState().comandas || [];
+  const comandas = Store.obtenerEstado().comandas || [];
   const mesaComandas = comandas.filter(c => c.mesa == mesa.numero);
 
   let itemsHTML = '';
@@ -269,13 +263,11 @@ export function mostrarPopover(mesa, card) {
       <button style="margin-top:8px;background:#ef4444;color:#fff;border:none;border-radius:4px;padding:4px 8px;font-size:11px;cursor:pointer;float:right;" id="popoverCerrarBtn">Cerrar</button>
     </div>`;
 
-  // Cerrar con botón
   document.getElementById('popoverCerrarBtn')?.addEventListener('click', () => {
     cont.innerHTML = '';
     _limpiarPopoverListeners();
   });
 
-  // Cerrar al hacer clic fuera
   const clickFuera = (e) => {
     const popover = document.getElementById('popoverContent');
     if (popover && !popover.contains(e.target)) {
@@ -288,7 +280,6 @@ export function mostrarPopover(mesa, card) {
     _popoverCloseListeners.push(() => document.removeEventListener('click', clickFuera));
   }, 0);
 
-  // Cerrar al hacer scroll en la grilla
   const grid = document.getElementById('mesasGrid');
   if (grid) {
     const scrollCierre = () => {
@@ -302,11 +293,8 @@ export function mostrarPopover(mesa, card) {
 
 export function asegurarVista(callbacks = {}) {
   const main = document.getElementById('view-mesas');
-  
-  // Si ya está completo, no hacemos nada
   if (main && main.querySelector('.mesas-grid')) return;
 
-  // Si no existe el contenedor, lo creamos
   if (!main) {
     const nuevoMain = document.createElement('main');
     nuevoMain.id = 'view-mesas';
@@ -317,7 +305,6 @@ export function asegurarVista(callbacks = {}) {
     return;
   }
 
-  // Si existe pero está vacío (contenedor estático), lo llenamos
   _construirContenido(main, callbacks);
 }
 
@@ -348,7 +335,6 @@ function _construirContenido(contenedor, callbacks) {
     <div id="popoverContainer" style="position:fixed;z-index:9999;pointer-events:none;"></div>
   `;
 
-  // Vincular botones del toolbar mediante callbacks
   document.getElementById('btnAgregarMesa')?.addEventListener('click', () => {
     if (callbacks.onAgregarMesa) callbacks.onAgregarMesa();
   });

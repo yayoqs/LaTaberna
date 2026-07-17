@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — SERVICIO JS (ES6)
    Archivo: js/servicios/pedido-service.js
-   Versión: 1.0.4
+   Versión: 1.0.5
    Propósito: Servicio de casos de uso para pedidos de mesa.
-              Corregido _reconstruirPedido para usar qty o cantidad.
+              Corrección: Logger en todos los catch.
    ================================================================ */
 
 import { PedidoAgregado } from '../dominio/pedido.js';
@@ -26,11 +26,13 @@ const PedidoService = (() => {
     try {
       pedido = new PedidoAgregado('ped_' + Date.now(), numeroMesa, mozo || 'Sin mozo', cantComensales);
     } catch (e) {
+      Logger.error('[PedidoService] Error al crear PedidoAgregado:', e);
       return Resultado.fallo(`Error al crear pedido: ${e.message}`);
     }
     try {
       await _pedidoRepo.crearPedidoMesa(pedido.toJSON());
     } catch (e) {
+      Logger.error('[PedidoService] Error al guardar pedido en repositorio:', e);
       return Resultado.fallo(`Error al guardar pedido: ${e.message}`);
     }
     EventBus.emit('pedido:creado', pedido.toJSON());
@@ -42,12 +44,27 @@ const PedidoService = (() => {
     const datos = await _pedidoRepo.obtenerPorId(pedidoId);
     if (!datos) return Resultado.fallo('Pedido no encontrado');
     let pedido;
-    try { pedido = _reconstruirPedido(datos); } catch (e) { return Resultado.fallo(`Error al reconstruir pedido: ${e.message}`); }
+    try {
+      pedido = _reconstruirPedido(datos);
+    } catch (e) {
+      Logger.error('[PedidoService] Error al reconstruir pedido:', e);
+      return Resultado.fallo(`Error al reconstruir pedido: ${e.message}`);
+    }
     const dineroPrecio = crearDinero(precio);
     const cant = crearCantidad(cantidad);
     if (!dineroPrecio || !cant) return Resultado.fallo('Datos de ítem inválidos');
-    try { pedido.agregarItem(nombre, dineroPrecio, cant); } catch (e) { return Resultado.fallo(`No se pudo agregar el ítem: ${e.message}`); }
-    try { await _pedidoRepo.guardarPedido(pedido.toJSON()); } catch (e) { return Resultado.fallo(`Error al guardar pedido: ${e.message}`); }
+    try {
+      pedido.agregarItem(nombre, dineroPrecio, cant);
+    } catch (e) {
+      Logger.error('[PedidoService] Error al agregar ítem:', e);
+      return Resultado.fallo(`No se pudo agregar el ítem: ${e.message}`);
+    }
+    try {
+      await _pedidoRepo.guardarPedido(pedido.toJSON());
+    } catch (e) {
+      Logger.error('[PedidoService] Error al guardar pedido:', e);
+      return Resultado.fallo(`Error al guardar pedido: ${e.message}`);
+    }
     EventBus.emit('pedido:item_agregado', { pedidoId, nombre, cantidad });
     return Resultado.ok(pedido);
   }
@@ -57,9 +74,25 @@ const PedidoService = (() => {
     const datos = await _pedidoRepo.obtenerPorId(pedidoId);
     if (!datos) return Resultado.fallo('Pedido no encontrado');
     let pedido;
-    try { pedido = _reconstruirPedido(datos); } catch (e) { return Resultado.fallo(`Error al reconstruir pedido: ${e.message}`); }
-    try { if (descuento > 0) pedido.aplicarDescuento(descuento); pedido.cerrar(); } catch (e) { return Resultado.fallo(`No se pudo cerrar el pedido: ${e.message}`); }
-    try { await _pedidoRepo.cerrarPedido(pedidoId, { formaPago, total: totalFinal, descuento, pedido: pedido.toJSON() }); } catch (e) { return Resultado.fallo(`Error al guardar cierre: ${e.message}`); }
+    try {
+      pedido = _reconstruirPedido(datos);
+    } catch (e) {
+      Logger.error('[PedidoService] Error al reconstruir pedido:', e);
+      return Resultado.fallo(`Error al reconstruir pedido: ${e.message}`);
+    }
+    try {
+      if (descuento > 0) pedido.aplicarDescuento(descuento);
+      pedido.cerrar();
+    } catch (e) {
+      Logger.error('[PedidoService] Error al cerrar pedido:', e);
+      return Resultado.fallo(`No se pudo cerrar el pedido: ${e.message}`);
+    }
+    try {
+      await _pedidoRepo.cerrarPedido(pedidoId, { formaPago, total: totalFinal, descuento, pedido: pedido.toJSON() });
+    } catch (e) {
+      Logger.error('[PedidoService] Error al guardar cierre en repositorio:', e);
+      return Resultado.fallo(`Error al guardar cierre: ${e.message}`);
+    }
     EventBus.emit('pedido:cerrado', { mesa: pedido.mesa, pedidoId, total: totalFinal, formaPago });
     return Resultado.ok(pedido);
   }
@@ -69,9 +102,25 @@ const PedidoService = (() => {
     const datos = await _pedidoRepo.obtenerPorId(pedidoId);
     if (!datos) return Resultado.fallo('Pedido no encontrado');
     let pedido;
-    try { pedido = _reconstruirPedido(datos); } catch (e) { return Resultado.fallo(`Error al reconstruir pedido: ${e.message}`); }
-    try { if (descuento > 0) pedido.aplicarDescuento(descuento); pedido.cerrar(); } catch (e) { return Resultado.fallo(`No se pudo cerrar el pedido: ${e.message}`); }
-    try { await _pedidoRepo.cerrarPedidoSinLiberar(pedidoId, { formaPago, total: totalFinal, descuento, pedido: pedido.toJSON() }); } catch (e) { return Resultado.fallo(`Error al guardar cierre: ${e.message}`); }
+    try {
+      pedido = _reconstruirPedido(datos);
+    } catch (e) {
+      Logger.error('[PedidoService] Error al reconstruir pedido:', e);
+      return Resultado.fallo(`Error al reconstruir pedido: ${e.message}`);
+    }
+    try {
+      if (descuento > 0) pedido.aplicarDescuento(descuento);
+      pedido.cerrar();
+    } catch (e) {
+      Logger.error('[PedidoService] Error al cerrar pedido:', e);
+      return Resultado.fallo(`No se pudo cerrar el pedido: ${e.message}`);
+    }
+    try {
+      await _pedidoRepo.cerrarPedidoSinLiberar(pedidoId, { formaPago, total: totalFinal, descuento, pedido: pedido.toJSON() });
+    } catch (e) {
+      Logger.error('[PedidoService] Error al guardar cierre sin liberar en repositorio:', e);
+      return Resultado.fallo(`Error al guardar cierre: ${e.message}`);
+    }
     EventBus.emit('pedido:cerrado', { mesa: pedido.mesa, pedidoId, total: totalFinal, formaPago });
     return Resultado.ok(pedido);
   }
@@ -80,7 +129,13 @@ const PedidoService = (() => {
     if (!_pedidoRepo) return Resultado.fallo('Repositorio no configurado');
     if (!monto || monto <= 0) return Resultado.fallo('El monto debe ser mayor a cero');
 
-    const datos = await _pedidoRepo.obtenerPorId(pedidoId);
+    let datos;
+    try {
+      datos = await _pedidoRepo.obtenerPorId(pedidoId);
+    } catch (e) {
+      Logger.error('[PedidoService] Error al obtener pedido por ID:', e);
+      return Resultado.fallo('Error al obtener el pedido');
+    }
     if (!datos) return Resultado.fallo('Pedido no encontrado');
 
     try {
@@ -119,6 +174,7 @@ const PedidoService = (() => {
         pedidoCerrado: resultado.pedidoCerrado
       });
     } catch (e) {
+      Logger.error('[PedidoService] Error al agregar transacción:', e);
       return Resultado.fallo(`Error al agregar transacción: ${e.message}`);
     }
   }
@@ -130,7 +186,6 @@ const PedidoService = (() => {
       datos.mozo,
       crearCantidad(datos.comensales)
     );
-    // CORRECCIÓN: usar it.cantidad || it.qty para aceptar ambos nombres de campo
     (datos.items || []).forEach(it => {
       pedido.agregarItem(
         it.nombre,

@@ -1,28 +1,27 @@
 /* ================================================================
    LaTaberna - PubPOS — REPARTO SUBMÓDULO (ES6)
    Archivo: js/ui/reparto/modal-editar.js
-   Versión: 1.0.0
+   Versión: 1.0.1
    Propósito: Modal para editar los ítems de un pedido de delivery existente.
-              Precarga los ítems actuales y permite modificar cantidades.
+              v1.0.1: migra a nombres en español (utils, store).
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
 import { DB } from '../../db.js';
 import { DeliveryService } from '../../servicios/delivery-service.js';
-import { fmtMoney, showToast } from '../../utils.js';
+import { formatearDinero, mostrarToast } from '../../utils.js';
 import { getItemsTemporales, setItemsTemporales } from './modal-nuevo.js';
 
 let _productoSeleccionado = null;
 let _onCerrar = null;
 
 export function mostrar(deliveryId, onCerrar) {
-  const ped = (Store.getState().pedidosDelivery || []).find(p => p.id === deliveryId);
+  const ped = (Store.obtenerEstado().pedidosDelivery || []).find(p => p.id === deliveryId);
   if (!ped || ped.estado !== 'pendiente') {
-    showToast('error', 'Solo se pueden editar pedidos pendientes');
+    mostrarToast('error', 'Solo se pueden editar pedidos pendientes');
     return;
   }
 
-  // Precargar ítems actuales en el estado temporal
   const items = (ped.items || []).map(it => ({
     prodId: it.prodId || '',
     nombre: it.nombre,
@@ -53,7 +52,6 @@ export function mostrar(deliveryId, onCerrar) {
       </div>`;
     document.body.appendChild(modal);
 
-    // Eventos del modal
     modal.querySelectorAll('.btn-cerrar-editar-items').forEach(b => b.addEventListener('click', () => cerrar()));
     modal.querySelector('.btn-guardar-edicion-items').addEventListener('click', () => guardar(deliveryId));
     modal.querySelector('.btn-agregar-item-edicion').addEventListener('click', _agregarItemEdicion);
@@ -91,8 +89,6 @@ export function cerrar() {
   }
 }
 
-// ── Funciones internas ──
-
 function _filtrarProductosEdicion() {
   const input = document.getElementById('editBusquedaProducto');
   const res = document.getElementById('editResultadosBusqueda');
@@ -105,7 +101,7 @@ function _filtrarProductosEdicion() {
     res.style.display = 'block';
     _productoSeleccionado = null;
   } else {
-    res.innerHTML = prod.map(p => `<div class="resultado-item" data-id="${p.id}" data-nombre="${p.nombre}" data-precio="${p.precio}" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--color-border);" onmouseover="this.style.background='var(--color-hover)'" onmouseout="this.style.background=''"><strong>${p.nombre}</strong> <span style="float:right;color:var(--color-accent);">${fmtMoney(p.precio)}</span></div>`).join('');
+    res.innerHTML = prod.map(p => `<div class="resultado-item" data-id="${p.id}" data-nombre="${p.nombre}" data-precio="${p.precio}" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--color-border);" onmouseover="this.style.background='var(--color-hover)'" onmouseout="this.style.background=''"><strong>${p.nombre}</strong> <span style="float:right;color:var(--color-accent);">${formatearDinero(p.precio)}</span></div>`).join('');
     res.style.display = 'block';
   }
 }
@@ -122,9 +118,9 @@ function _seleccionarProductoEdicion(el) {
 }
 
 function _agregarItemEdicion() {
-  if (!_productoSeleccionado) { showToast('warning', 'Selecciona un producto'); return; }
+  if (!_productoSeleccionado) { mostrarToast('warning', 'Selecciona un producto'); return; }
   const cant = parseInt(document.getElementById('editCantidad')?.value) || 1;
-  if (cant <= 0) { showToast('warning', 'Cantidad inválida'); return; }
+  if (cant <= 0) { mostrarToast('warning', 'Cantidad inválida'); return; }
   const prod = DB.productos.find(p => p.id === _productoSeleccionado.id);
   if (!prod) return;
   const items = getItemsTemporales();
@@ -159,14 +155,14 @@ function _renderItemsEdicion() {
   container.innerHTML = items.map((it, idx) => `
     <div style="display:flex;align-items:center;gap:8px;padding:6px 8px;background:var(--color-panel);border-radius:var(--radius-xs);font-size:12px;">
       <span style="flex:1;"><strong>${it.qty || 1}x</strong> ${it.nombre}</span>
-      <span style="font-weight:600;">${fmtMoney(it.precio * (it.qty || 1))}</span>
+      <span style="font-weight:600;">${formatearDinero(it.precio * (it.qty || 1))}</span>
       <button class="btn-icon-sm del btn-quitar-item-edicion" data-idx="${idx}"><i class="fas fa-times"></i></button>
     </div>`).join('');
 }
 
 async function guardar(deliveryId) {
   const items = getItemsTemporales();
-  if (!items.length) { showToast('error', 'Agrega al menos un producto'); return; }
+  if (!items.length) { mostrarToast('error', 'Agrega al menos un producto'); return; }
   const nuevosItems = items.map(it => ({
     nombre: it.nombre,
     precio: it.precio,
@@ -179,14 +175,14 @@ async function guardar(deliveryId) {
       const res = await DeliveryService.actualizarItems(deliveryId, nuevosItems, total);
       if (res.exito) {
         cerrar();
-        showToast('success', 'Ítems actualizados');
+        mostrarToast('success', 'Ítems actualizados');
         return;
       }
     }
     DB.actualizarPedidoDelivery(deliveryId, { items: nuevosItems, total });
     cerrar();
-    showToast('success', 'Ítems actualizados');
+    mostrarToast('success', 'Ítems actualizados');
   } catch (e) {
-    showToast('error', 'Error al actualizar ítems');
+    mostrarToast('error', 'Error al actualizar ítems');
   }
 }

@@ -1,16 +1,15 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/perfil.js
-   Versión: 1.0.6
-   Propósito: Vista de perfil de usuario: avatar, datos y documentos.
-              v1.0.6: implementa ciclo de vida activar/limpiar.
+   Versión: 1.0.8
+   Propósito: Vista de perfil de usuario: avatar, datos.
+              v1.0.8: elimina sección de documentos (DB.llamar roto).
    ================================================================ */
 
 import { Auth } from '../auth.js';
-import { DB } from '../db.js';
 import { Logger } from '../lib/logger.js';
 import { EventBus } from '../lib/eventBus.js';
-import { showToast } from '../utils.js';
+import { mostrarToast } from '../utils.js';
 
 const Perfil = (() => {
 
@@ -51,12 +50,6 @@ const Perfil = (() => {
           </div>
           <div class="perfil-detalles" id="perfilDetalles" style="width:100%; margin-top:12px;"></div>
         </section>
-        <section class="perfil-documentos">
-          <h4><i class="fas fa-folder-open"></i> Mis Documentos</h4>
-          <div id="perfilDocsLista" class="perfil-docs-lista">
-            <p style="color:var(--color-text-muted);">Cargando...</p>
-          </div>
-        </section>
       </div>
     `;
 
@@ -85,7 +78,6 @@ const Perfil = (() => {
 
     _renderAvatar(usuario.nombre, extras.foto);
     _renderDetalles(extras);
-    await _cargarDocumentos();
   }
 
   function _renderAvatar(nombre, fotoUrl) {
@@ -160,21 +152,21 @@ const Perfil = (() => {
 
   async function guardarPerfil() {
     const usuario = Auth.getUsuarioActual();
-    if (!usuario) { showToast('error', 'No hay sesión activa'); return; }
+    if (!usuario) { mostrarToast('error', 'No hay sesión activa'); return; }
 
     const nuevoNombre = document.getElementById('editarPerfilNombre').value.trim();
     const telefono = document.getElementById('editarPerfilTelefono').value.trim();
     const email = document.getElementById('editarPerfilEmail').value.trim();
     const foto = document.getElementById('editarPerfilFoto').value.trim();
 
-    if (!nuevoNombre) { showToast('error', 'El nombre no puede estar vacío'); return; }
+    if (!nuevoNombre) { mostrarToast('error', 'El nombre no puede estar vacío'); return; }
 
     Auth.actualizarNombre(nuevoNombre);
 
     _guardarExtras(nuevoNombre, { telefono, email, foto });
     cerrarModalEditar();
     render();
-    showToast('success', 'Perfil actualizado');
+    mostrarToast('success', 'Perfil actualizado');
   }
 
   function _cargarExtras(usuario) {
@@ -184,28 +176,6 @@ const Perfil = (() => {
 
   function _guardarExtras(usuario, datos) {
     localStorage.setItem(_storageKey(usuario), JSON.stringify(datos));
-  }
-
-  async function _cargarDocumentos() {
-    const docsContainer = document.getElementById('perfilDocsLista');
-    if (!docsContainer) return;
-    try {
-      const respuesta = await DB.llamar('getDocumentosUsuario', { usuario: Auth.getNombre() });
-      const documentos = respuesta.documentos || [];
-      if (!documentos.length) {
-        docsContainer.innerHTML = '<p style="color:var(--color-text-muted);">No tienes documentos cargados.</p>';
-        return;
-      }
-      docsContainer.innerHTML = documentos.map(doc => `
-        <div class="perfil-doc-item">
-          <i class="fas fa-file-pdf"></i>
-          <span>${doc.nombre || 'Documento'}</span>
-          <a href="${doc.url}" target="_blank" class="btn-ajuste"><i class="fas fa-download"></i> Ver</a>
-        </div>`).join('');
-    } catch (e) {
-      Logger.warn('[Perfil] No se pudieron cargar documentos:', e);
-      docsContainer.innerHTML = '<p style="color:var(--color-text-muted);">Error al cargar documentos.</p>';
-    }
   }
 
   function activar() {
@@ -228,7 +198,6 @@ const Perfil = (() => {
     _desuscripciones = [];
   }
 
-  // ── Inicialización ──
   activar();
 
   return { activar, limpiar, render, mostrarModalEditar, cerrarModalEditar, guardarPerfil };
