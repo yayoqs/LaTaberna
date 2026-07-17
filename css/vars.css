@@ -1,8 +1,9 @@
 /* ==============================================
    LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/vars.css
-   Versión: 1.0.1
+   Versión: 1.0.2
    Propósito: Variables globales de diseño (colores, tipografía, layout).
+              Agregadas --font-body y --font-display.
    ============================================== */
 
 :root {
@@ -38,8 +39,10 @@
   --color-text-muted:  #64748b;
 
   /* ── TIPOGRAFÍA ────────────────────────────────────────── */
-  --font-ui:   system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "Courier New", Courier, monospace;
+  --font-ui:      system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-body:    system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: 'Monoton', cursive;
+  --font-mono:    "Courier New", Courier, monospace;
 
   /* ── ESPACIADO / FORMA ─────────────────────────────────── */
   --radius:    12px;
