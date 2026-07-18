@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/app.js
-   Versión: 1.2.8
+   Versión: 1.2.9
    Propósito: Punto de entrada modular. Control de vistas con ciclo
-              de vida (limpiar/activar). Corrección en vista config.
+              de vida (limpiar/activar). Ruta 'carta-editor' restaurada.
    ================================================================ */
 
 // ── Utilidades y librerías ────────────────────────────────
@@ -66,7 +66,7 @@ import { Cuenta } from './ui/cuenta.js';
 import { Despensa } from './ui/despensa.js';
 import { Eventos } from './ui/eventos.js';
 import { KDS } from './ui/kds.js';
-import { Menu } from './ui/menu.js';
+import { Menu } from './ui/menu.js';                        // ← verificado
 import { MesaDetalles } from './ui/mesa-detalles.js';
 import { Mesas } from './ui/mesas.js';
 import { Pedido } from './ui/pedido-ui.js';
@@ -97,7 +97,7 @@ const modulosVista = {
   eventos: Eventos,
   'eventos-en-vivo': EventosEnVivo,
   perfil: Perfil,
-  'carta-editor': Menu
+  'carta-editor': Menu   // ← RESTAURADO
   // Las vistas 'inicio' y 'bienvenida' se gestionan internamente
 };
 
@@ -272,7 +272,7 @@ export const App = {
       if (nombre === 'mesas' && typeof Mesas !== 'undefined') Mesas.render();
       if (nombre === 'cocina' && typeof KDS !== 'undefined') KDS.refresh();
       if (nombre === 'caja' && typeof Caja !== 'undefined') Caja.render();
-      if (nombre === 'config' && typeof Config !== 'undefined') Config.cargar();  // ← CORREGIDO: cargar() en lugar de renderProductos()
+      if (nombre === 'config' && typeof Config !== 'undefined') Config.cargar();
       if (nombre === 'despensa' && typeof Despensa !== 'undefined') Despensa.render();
       if (nombre === 'recetas' && typeof Recetas !== 'undefined') Recetas.render();
       if (nombre === 'reparto' && typeof Reparto !== 'undefined') Reparto.render();

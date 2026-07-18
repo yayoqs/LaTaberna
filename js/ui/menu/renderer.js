@@ -1,8 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MENÚ SUBMÓDULO (ES6)
    Archivo: js/ui/menu/renderer.js
-   Versión: 1.0.0
+   Versión: 1.0.1
    Propósito: Construcción del DOM y renderizado de la vista de menú.
+              v1.0.1: usa view-carta-editor como id de contenedor.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -11,12 +12,12 @@ import { formatearDinero } from '../../utils.js';
 // ── CONSTRUCCIÓN DEL DOM ──────────────────────────────────
 
 export function asegurarVista() {
-  let main = document.getElementById('view-menu');
+  let main = document.getElementById('view-carta-editor');
   if (main && main.querySelector('.canvas-wrap')) return;
 
   if (!main) {
     main = document.createElement('main');
-    main.id = 'view-menu';
+    main.id = 'view-carta-editor';
     main.className = 'view';
     const referencia = document.getElementById('toastContainer') || document.body.lastChild;
     document.body.insertBefore(main, referencia);
@@ -113,7 +114,7 @@ export function asegurarVista() {
     </div>
   `;
 
-  // Vincular estilos mínimos si no existen (inline para no depender de CSS externo en pruebas)
+  // Vincular estilos mínimos si no existen
   if (!document.getElementById('menu-inline-styles')) {
     const style = document.createElement('style');
     style.id = 'menu-inline-styles';

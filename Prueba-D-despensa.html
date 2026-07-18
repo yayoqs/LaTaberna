@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Despensa — Previsualización</title>
+  <style>
+    :root {
+      --bg: #0f0f14; --panel: #1a1a24; --border: #2e2e42;
+      --text: #f1f5f9; --text-sec: #a0a0b0; --accent: #f59e0b;
+      --danger: #ef4444; --success: #22c55e; --info: #3b82f6;
+      --radius: 12px; --radius-sm: 8px;
+      font-family: system-ui, sans-serif; background: var(--bg); color: var(--text);
+    }
+    body { margin: 0; display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; }
+    
+    /* ── Header ── */
+    .header {
+      display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+      background: var(--panel); border-bottom: 1px solid var(--border); z-index: 20; flex-shrink: 0;
+    }
+    .header h2 { font-size: 16px; margin: 0; flex: 1; }
+    .header .icon-btn {
+      background: transparent; border: 1px solid var(--border); color: var(--text-sec);
+      border-radius: 8px; width: 36px; height: 36px; display: flex; align-items: center;
+      justify-content: center; cursor: pointer; font-size: 16px;
+    }
+    .header .icon-btn.activo { background: var(--accent); color: #000; border-color: var(--accent); }
+
+    /* ── Layout principal (3 columnas en desktop, paneles laterales ocultos en móvil) ── */
+    .main-layout {
+      display: flex; flex: 1; overflow: hidden; position: relative;
+    }
+
+    /* ── Panel izquierdo (Proveedores / Productos) ── */
+    .panel-izquierdo {
+      width: 300px; flex-shrink: 0; background: var(--panel); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; transition: transform .3s; z-index: 30;
+    }
+    .panel-tabs { display: flex; border-bottom: 1px solid var(--border); }
+    .panel-tab {
+      flex: 1; padding: 10px; text-align: center; font-weight: 600; font-size: 13px;
+      cursor: pointer; background: transparent; border: none; color: var(--text-sec);
+      border-bottom: 2px solid transparent; transition: .2s;
+    }
+    .panel-tab.activo { color: var(--accent); border-bottom-color: var(--accent); }
+    .panel-tab-content { flex: 1; overflow-y: auto; padding: 8px; display: none; }
+    .panel-tab-content.activo { display: block; }
+
+    .item-card {
+      background: #252535; border-radius: var(--radius-sm); padding: 10px; margin-bottom: 8px;
+      cursor: pointer; display: flex; align-items: center; gap: 10px;
+    }
+    .item-card:active { background: #2e2e42; }
+    .item-card .avatar {
+      width: 40px; height: 40px; border-radius: 50%; background: var(--accent);
+      display: flex; align-items: center; justify-content: center; color: #000; font-weight: 700; font-size: 18px;
+    }
+    .item-card .info { flex: 1; }
+    .item-card .info strong { font-size: 13px; display: block; }
+    .item-card .info span { font-size: 11px; color: var(--text-sec); }
+    .item-card .precio { font-weight: 700; color: var(--success); font-size: 13px; }
+
+    /* ── Panel central (Inventario por espacios) ── */
+    .panel-central {
+      flex: 1; overflow-y: auto; padding: 12px; background: var(--bg);
+    }
+    .resumen-bar {
+      display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap;
+    }
+    .resumen-card {
+      flex: 1; min-width: 100px; background: var(--panel); border-radius: var(--radius-sm);
+      padding: 12px; text-align: center; border: 1px solid var(--border);
+    }
+    .resumen-card .valor { font-size: 20px; font-weight: 700; color: var(--accent); }
+    .resumen-card .etiqueta { font-size: 11px; color: var(--text-sec); margin-top: 2px; }
+
+    .search-box {
+      display: flex; align-items: center; gap: 8px; background: var(--panel);
+      border: 1px solid var(--border); border-radius: 24px; padding: 8px 14px; margin-bottom: 12px;
+    }
+    .search-box input { flex: 1; background: transparent; border: none; color: var(--text); font-size: 14px; outline: none; }
+    .search-box i { color: var(--text-sec); }
+
+    /* Espacio (estante/cajón) */
+    .espacio {
+      background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+      margin-bottom: 10px; overflow: hidden;
+    }
+    .espacio-header {
+      padding: 12px 16px; display: flex; align-items: center; gap: 10px;
+      cursor: pointer; font-weight: 600; font-size: 14px;
+    }
+    .espacio-header .indicador {
+      width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+    }
+    .espacio-header .nombre { flex: 1; }
+    .espacio-header .contador { font-size: 12px; color: var(--text-sec); }
+    .espacio-body { display: none; padding: 0 16px 12px; }
+    .espacio.abierto .espacio-body { display: block; }
+
+    .producto-item {
+      display: flex; align-items: center; gap: 8px; padding: 8px 0;
+      border-bottom: 1px dashed var(--border); font-size: 13px;
+    }
+    .producto-item:last-child { border-bottom: none; }
+    .producto-item .stock-bajo { color: var(--danger); font-weight: 600; }
+    .producto-item .nombre { flex: 1; }
+
+    /* ── Panel derecho (Lista de compras) ── */
+    .panel-derecho {
+      width: 280px; flex-shrink: 0; background: var(--panel); border-left: 1px solid var(--border);
+      display: flex; flex-direction: column; transition: transform .3s; z-index: 30;
+    }
+    .panel-derecho-header {
+      padding: 12px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .panel-derecho-header h3 { margin: 0; font-size: 14px; }
+    .lista-compras { flex: 1; overflow-y: auto; padding: 8px; }
+    .compra-item {
+      display: flex; align-items: center; gap: 8px; padding: 8px;
+      background: #252535; border-radius: var(--radius-sm); margin-bottom: 6px;
+      font-size: 13px;
+    }
+    .compra-item .nombre { flex: 1; }
+    .compra-item .btn-quitar {
+      background: transparent; border: none; color: var(--danger); cursor: pointer; font-size: 16px;
+    }
+    .add-compra {
+      display: flex; gap: 8px; padding: 8px;
+    }
+    .add-compra input {
+      flex: 1; background: #252535; border: 1px solid var(--border);
+      color: var(--text); padding: 8px 12px; border-radius: 20px; font-size: 13px; outline: none;
+    }
+    .add-compra button {
+      background: var(--accent); border: none; color: #000; border-radius: 20px;
+      padding: 8px 14px; font-weight: 600; cursor: pointer; font-size: 13px;
+    }
+
+    /* ── Overlays y botones móviles ── */
+    .overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 25; display: none;
+    }
+    .overlay.activo { display: block; }
+    .fab-izquierdo, .fab-derecho {
+      position: fixed; bottom: 24px; width: 48px; height: 48px; border-radius: 50%;
+      display: none; align-items: center; justify-content: center; cursor: pointer;
+      z-index: 35; border: none; font-size: 20px; box-shadow: 0 4px 12px rgba(0,0,0,.4);
+    }
+    .fab-izquierdo { left: 24px; background: var(--info); color: #fff; }
+    .fab-derecho { right: 24px; background: var(--accent); color: #000; }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .panel-izquierdo {
+        position: fixed; top: 0; left: 0; bottom: 0; transform: translateX(-100%);
+      }
+      .panel-izquierdo.abierto { transform: translateX(0); }
+      .panel-derecho {
+        position: fixed; top: 0; right: 0; bottom: 0; transform: translateX(100%);
+      }
+      .panel-derecho.abierto { transform: translateX(0); }
+      .fab-izquierdo, .fab-derecho { display: flex; }
+      .header .icon-btn.pc-only { display: none; }
+    }
+    @media (min-width: 769px) {
+      .fab-izquierdo, .fab-derecho { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <div class="header">
+    <button class="icon-btn pc-only" id="btnToggleIzq" title="Proveedores">📦</button>
+    <h2>🧺 Despensa</h2>
+    <button class="icon-btn pc-only" id="btnToggleDer" title="Lista de compras">🛒</button>
+  </div>
+
+  <!-- Layout principal -->
+  <div class="main-layout">
+    <!-- Panel izquierdo -->
+    <div class="panel-izquierdo" id="panelIzquierdo">
+      <div class="panel-tabs">
+        <button class="panel-tab activo" data-tab="proveedores">🏭 Proveedores</button>
+        <button class="panel-tab" data-tab="productos">📦 Productos</button>
+      </div>
+      <div class="panel-tab-content activo" id="tab-proveedores">
+        <div class="item-card"><div class="avatar">D</div><div class="info"><strong>Distribuidora Norte</strong><span>3 productos</span></div></div>
+        <div class="item-card"><div class="avatar">M</div><div class="info"><strong>Mayorista Central</strong><span>5 productos</span></div></div>
+        <div class="item-card"><div class="avatar">L</div><div class="info"><strong>La Bodega</strong><span>2 productos</span></div></div>
+      </div>
+      <div class="panel-tab-content" id="tab-productos">
+        <div class="item-card"><div class="avatar">🍺</div><div class="info"><strong>Cerveza Corona</strong><span>2 proveedores</span></div><div class="precio">$1.200</div></div>
+        <div class="item-card"><div class="avatar">🧀</div><div class="info"><strong>Queso Cheddar</strong><span>3 proveedores</span></div><div class="precio">$800</div></div>
+        <div class="item-card"><div class="avatar">🍷</div><div class="info"><strong>Vino Tinto</strong><span>1 proveedor</span></div><div class="precio">$3.500</div></div>
+      </div>
+    </div>
+
+    <!-- Panel central -->
+    <div class="panel-central">
+      <div class="resumen-bar">
+        <div class="resumen-card"><div class="valor">47</div><div class="etiqueta">Total ítems</div></div>
+        <div class="resumen-card"><div class="valor">$1.250.000</div><div class="etiqueta">Valor inventario</div></div>
+        <div class="resumen-card" style="border-color: var(--danger);"><div class="valor" style="color:var(--danger);">3</div><div class="etiqueta">Bajo mínimo</div></div>
+      </div>
+      <div class="search-box"><i>🔍</i><input type="text" placeholder="Buscar en el inventario..."></div>
+
+      <!-- Espacios -->
+      <div class="espacio abierto">
+        <div class="espacio-header" onclick="this.parentElement.classList.toggle('abierto')">
+          <span class="indicador" style="background:var(--success);"></span>
+          <span class="nombre">Estante 1 — Lácteos</span>
+          <span class="contador">4 productos</span>
+        </div>
+        <div class="espacio-body">
+          <div class="producto-item"><span class="nombre">🧀 Queso Cheddar</span><span>2 kg</span><span class="stock-bajo">⚠ Bajo</span></div>
+          <div class="producto-item"><span class="nombre">🧈 Mantequilla</span><span>5 kg</span></div>
+          <div class="producto-item"><span class="nombre">🥛 Leche</span><span>12 L</span></div>
+          <div class="producto-item"><span class="nombre">🍦 Crema</span><span>3 L</span></div>
+        </div>
+      </div>
+      <div class="espacio">
+        <div class="espacio-header" onclick="this.parentElement.classList.toggle('abierto')">
+          <span class="indicador" style="background:var(--danger);"></span>
+          <span class="nombre">Estante 2 — Bebidas</span>
+          <span class="contador">6 productos</span>
+        </div>
+        <div class="espacio-body">
+          <div class="producto-item"><span class="nombre">🍺 Cerveza Corona</span><span>24 un.</span></div>
+          <div class="producto-item"><span class="nombre">🍷 Vino Tinto</span><span>8 bot.</span><span class="stock-bajo">⚠ Bajo</span></div>
+          <div class="producto-item"><span class="nombre">🥤 Coca-Cola</span><span>30 un.</span></div>
+          <div class="producto-item"><span class="nombre">💧 Agua mineral</span><span>50 un.</span></div>
+          <div class="producto-item"><span class="nombre">🧃 Jugo natural</span><span>15 un.</span></div>
+          <div class="producto-item"><span class="nombre">🍸 Vodka</span><span>4 bot.</span><span class="stock-bajo">⚠ Bajo</span></div>
+        </div>
+      </div>
+      <div class="espacio">
+        <div class="espacio-header" onclick="this.parentElement.classList.toggle('abierto')">
+          <span class="indicador" style="background:var(--success);"></span>
+          <span class="nombre">Cajón 3 — Limpieza</span>
+          <span class="contador">3 productos</span>
+        </div>
+        <div class="espacio-body">
+          <div class="producto-item"><span class="nombre">🧴 Detergente</span><span>5 L</span></div>
+          <div class="producto-item"><span class="nombre">🧽 Esponjas</span><span>20 un.</span></div>
+          <div class="producto-item"><span class="nombre">🧤 Guantes</span><span>10 pares</span></div>
+        </div>
+      </div>
+      <div class="espacio">
+        <div class="espacio-header" onclick="this.parentElement.classList.toggle('abierto')">
+          <span class="indicador" style="background:var(--warning, #f59e0b);"></span>
+          <span class="nombre">Estante 4 — Insumos cocina</span>
+          <span class="contador">5 productos</span>
+        </div>
+        <div class="espacio-body">
+          <div class="producto-item"><span class="nombre">🍚 Arroz</span><span>10 kg</span></div>
+          <div class="producto-item"><span class="nombre">🍝 Tallarines</span><span>6 paq.</span><span class="stock-bajo">⚠ Bajo</span></div>
+          <div class="producto-item"><span class="nombre">🧂 Sal</span><span>3 kg</span></div>
+          <div class="producto-item"><span class="nombre">🌶️ Pimienta</span><span>500 g</span></div>
+          <div class="producto-item"><span class="nombre">🫒 Aceite oliva</span><span>4 L</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel derecho -->
+    <div class="panel-derecho" id="panelDerecho">
+      <div class="panel-derecho-header">
+        <h3>🛒 Lista de compras</h3>
+        <button class="icon-btn" id="btnCerrarDer" style="border-radius:8px;">✕</button>
+      </div>
+      <div class="lista-compras" id="listaCompras">
+        <div class="compra-item"><span class="nombre">🍝 Tallarines</span><button class="btn-quitar">✕</button></div>
+        <div class="compra-item"><span class="nombre">🧀 Queso Cheddar</span><button class="btn-quitar">✕</button></div>
+        <div class="compra-item"><span class="nombre">🧴 Detergente</span><button class="btn-quitar">✕</button></div>
+      </div>
+      <div class="add-compra">
+        <input type="text" id="inputCompra" placeholder="Agregar producto...">
+        <button id="btnAddCompra">+</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Overlay -->
+  <div class="overlay" id="overlay"></div>
+
+  <!-- Botones flotantes (móvil) -->
+  <button class="fab-izquierdo" id="fabIzquierdo">📦</button>
+  <button class="fab-derecho" id="fabDerecho">🛒</button>
+
+  <script>
+    const panelIzq = document.getElementById('panelIzquierdo');
+    const panelDer = document.getElementById('panelDerecho');
+    const overlay = document.getElementById('overlay');
+    const fabIzq = document.getElementById('fabIzquierdo');
+    const fabDer = document.getElementById('fabDerecho');
+
+    function abrirPanel(panel) {
+      panel.classList.add('abierto');
+      overlay.classList.add('activo');
+    }
+    function cerrarPaneles() {
+      panelIzq.classList.remove('abierto');
+      panelDer.classList.remove('abierto');
+      overlay.classList.remove('activo');
+    }
+
+    fabIzq.addEventListener('click', () => abrirPanel(panelIzq));
+    fabDer.addEventListener('click', () => abrirPanel(panelDer));
+    overlay.addEventListener('click', cerrarPaneles);
+    document.getElementById('btnCerrarDer').addEventListener('click', cerrarPaneles);
+
+    // Desktop toggles
+    document.getElementById('btnToggleIzq')?.addEventListener('click', () => {
+      panelIzq.style.display = panelIzq.style.display === 'none' ? 'flex' : 'none';
+    });
+    document.getElementById('btnToggleDer')?.addEventListener('click', () => {
+      panelDer.style.display = panelDer.style.display === 'none' ? 'flex' : 'none';
+    });
+
+    // Tabs
+    document.querySelectorAll('.panel-tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('activo'));
+        document.querySelectorAll('.panel-tab-content').forEach(c => c.classList.remove('activo'));
+        tab.classList.add('activo');
+        document.getElementById('tab-' + tab.dataset.tab).classList.add('activo');
+      });
+    });
+
+    // Agregar a lista de compras
+    document.getElementById('btnAddCompra').addEventListener('click', () => {
+      const input = document.getElementById('inputCompra');
+      const nombre = input.value.trim();
+      if (!nombre) return;
+      const lista = document.getElementById('listaCompras');
+      const item = document.createElement('div');
+      item.className = 'compra-item';
+      item.innerHTML = `<span class="nombre">${nombre}</span><button class="btn-quitar">✕</button>`;
+      item.querySelector('.btn-quitar').addEventListener('click', () => item.remove());
+      lista.appendChild(item);
+      input.value = '';
+    });
+  </script>
+</body>
+</html>
