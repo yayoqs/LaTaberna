@@ -1,12 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — SERVICIO JS (ES6)
    Archivo: js/servicios/inventario-service.js
-   Versión: 1.0.1
+   Versión: 1.1.2
    Propósito: Servicio de casos de uso para inventario e ingredientes.
-              Sin asignaciones window.
-   Dependencias: js/dominio/ingrediente.js, js/dominio/cantidad.js,
-                 js/dominio/dinero.js, js/dominio/resultado.js,
-                 js/lib/eventBus.js, js/db.js, js/lib/logger.js
+              v1.1.2: guarda en Appwrite y actualiza Store local.
    ================================================================ */
 
 import { Ingrediente, reconstruirIngrediente } from '../dominio/ingrediente.js';
@@ -16,6 +13,8 @@ import { Resultado } from '../dominio/resultado.js';
 import { EventBus } from '../lib/eventBus.js';
 import { DB } from '../db.js';
 import { Logger } from '../lib/logger.js';
+import { DBInventario } from '../db-inventario.js';
+import { Store } from '../lib/store.js';
 
 const InventarioService = (() => {
   let _inventarioRepo = null;
@@ -55,6 +54,13 @@ const InventarioService = (() => {
       await _inventarioRepo.guardarIngrediente(ingrediente.toJSON());
     } catch (e) {
       return Resultado.fallo(`Error al guardar ingrediente: ${e.message}`);
+    }
+
+    // Actualizar Store local para reflejar el cambio en tiempo real
+    try {
+      Store.despachar({ type: 'INGREDIENTE_GUARDADO', payload: datos });
+    } catch (e) {
+      Logger.warn('[InventarioService] No se pudo actualizar Store:', e);
     }
 
     EventBus.emit('ingredientes:actualizados');
@@ -104,29 +110,38 @@ const InventarioService = (() => {
     return Resultado.ok(ingredienteNuevo);
   }
 
-  function validarStockParaItems(items) {
+  function validarStockParaArticulos(items) {
     const faltantes = [];
     const totalNecesario = new Map();
+    const ingredientesState = DB.ingredientes || [];
 
     for (const item of items) {
       const receta = DB.recetas.find(r => r.productoId == item.prodId);
       if (!receta) continue;
 
-      for (const ingReceta of receta.ingredientes) {
-        const ingData = DB.ingredientes.find(i => i.id === ingReceta.ingredienteId);
-        if (!ingData) continue;
+      const ingredientesPlanos = DBInventario.getIngredientesDeProducto(
+        item.prodId,
+        item.qty,
+        DB.recetas,
+        DB.ingredientes
+      );
 
-        const cantidadNecesaria = ingReceta.cantidad * item.qty;
+      for (const datos of ingredientesPlanos) {
+        const ingData = ingredientesState.find(i => i.id === datos.ingredienteId);
+        const nombre = ingData ? ingData.nombre : datos.ingredienteId;
+        const stockActual = ingData ? ingData.stock : 0;
+        const unidad = ingData ? ingData.unidad : 'u';
+        const cantidadNecesaria = datos.cantidadNecesaria;
 
-        if (!totalNecesario.has(ingReceta.ingredienteId)) {
-          totalNecesario.set(ingReceta.ingredienteId, {
-            nombre: ingData.nombre,
-            unidad: ingData.unidad,
-            stockActual: ingData.stock,
+        if (!totalNecesario.has(datos.ingredienteId)) {
+          totalNecesario.set(datos.ingredienteId, {
+            nombre: nombre,
+            unidad: unidad,
+            stockActual: stockActual,
             cantidadNecesaria: 0
           });
         }
-        totalNecesario.get(ingReceta.ingredienteId).cantidadNecesaria += cantidadNecesaria;
+        totalNecesario.get(datos.ingredienteId).cantidadNecesaria += cantidadNecesaria;
       }
     }
 
@@ -144,7 +159,7 @@ const InventarioService = (() => {
     return { ok: faltantes.length === 0, faltantes };
   }
 
-  return { configurar, guardarIngrediente, ajustarStock, validarStockParaItems };
+  return { configurar, guardarIngrediente, ajustarStock, validarStockParaArticulos };
 })();
 
 export { InventarioService };

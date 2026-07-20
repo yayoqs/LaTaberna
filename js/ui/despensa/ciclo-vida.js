@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — DESPENSA SUBMÓDULO (ES6)
    Archivo: js/ui/despensa/ciclo-vida.js
-   Versión: 2.0.0
+   Versión: 2.0.4
    Propósito: Ciclo de vida de la nueva vista de despensa con tres paneles.
-              Vincula eventos del DOM y suscribe al Store y EventBus.
+              v2.0.4: sin workaround, con exportación, revisión completa.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -19,6 +19,7 @@ import {
   abrirPanelDerecho,
   cerrarPaneles
 } from './renderer.js';
+import { exportarCSV, exportarPDF } from './exportacion.js';
 import {
   getListaCompras,
   agregarAListaCompras,
@@ -34,7 +35,6 @@ function _refresh() {
   const state = Store.obtenerEstado();
   let ingredientes = state.ingredientes || [];
 
-  // Aplicar búsqueda
   const termino = getTerminoBusqueda();
   if (termino) {
     ingredientes = ingredientes.filter(i =>
@@ -46,7 +46,6 @@ function _refresh() {
   renderEspacios(ingredientes);
   renderListaCompras(getListaCompras());
 
-  // Proveedores y productos del panel izquierdo (mock por ahora)
   const proveedoresUnicos = [...new Set(ingredientes.map(i => i.proveedor).filter(Boolean))];
   renderProveedores(proveedoresUnicos.map(nombre => ({ nombre, productos: 0 })));
 
@@ -55,11 +54,7 @@ function _refresh() {
   ingredientes.forEach(i => {
     if (!visto.has(i.nombre)) {
       visto.add(i.nombre);
-      productosUnicos.push({
-        nombre: i.nombre,
-        proveedores: 1,
-        precio: i.valor_unitario || 0
-      });
+      productosUnicos.push({ nombre: i.nombre, proveedores: 1, precio: i.valor_unitario || 0 });
     }
   });
   renderProductosDisponibles(productosUnicos);
@@ -72,9 +67,7 @@ export function activar() {
 
   asegurarVista();
 
-  // ── Eventos del DOM ──
-
-  // Tabs del panel izquierdo
+  // Tabs
   document.querySelectorAll('.panel-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('activo'));
@@ -85,19 +78,27 @@ export function activar() {
     }, { signal });
   });
 
-  // Búsqueda en panel central
+  // Búsqueda
   document.getElementById('inventarioSearch')?.addEventListener('input', function() {
     setTerminoBusqueda(this.value);
     _refresh();
   }, { signal });
 
-  // Paneles laterales (móvil)
+  // Nuevo Insumo
+  document.getElementById('btnNuevoInsumo')?.addEventListener('click', () => {
+    import('./modal-ingrediente.js').then(mod => mod.mostrar(null, _refresh));
+  }, { signal });
+
+  // Exportación
+  document.getElementById('btnExportarCSV')?.addEventListener('click', exportarCSV, { signal });
+  document.getElementById('btnExportarPDF')?.addEventListener('click', exportarPDF, { signal });
+
+  // Paneles laterales
   document.getElementById('fabIzquierdo')?.addEventListener('click', abrirPanelIzquierdo, { signal });
   document.getElementById('fabDerecho')?.addEventListener('click', abrirPanelDerecho, { signal });
   document.getElementById('despensaOverlay')?.addEventListener('click', cerrarPaneles, { signal });
   document.getElementById('btnCerrarDer')?.addEventListener('click', cerrarPaneles, { signal });
 
-  // Desktop toggles
   document.getElementById('btnToggleIzq')?.addEventListener('click', () => {
     const panel = document.getElementById('panelIzquierdo');
     if (panel) panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
@@ -121,37 +122,25 @@ export function activar() {
   document.getElementById('listaCompras')?.addEventListener('click', (e) => {
     const btn = e.target.closest('.btn-quitar');
     if (btn) {
-      const item = btn.dataset.item;
-      quitarDeListaCompras(item);
+      quitarDeListaCompras(btn.dataset.item);
       renderListaCompras(getListaCompras());
     }
   }, { signal });
 
-  // ── Suscripciones al Store y EventBus ──
-
-  const unsubscribeStore = Store.suscribir((state, action) => {
-    if (action.type.startsWith('INGREDIENTE') || action.type.startsWith('MOVIMIENTO')) {
-      _refresh();
-    }
-  });
-  _desuscripciones.push(unsubscribeStore);
-
-  _desuscripciones.push(EventBus.on('db:inicializada', () => {
-    setTimeout(_refresh, 100);
+  // Suscripciones
+  _desuscripciones.push(Store.suscribir((state, action) => {
+    if (action.type.startsWith('INGREDIENTE') || action.type.startsWith('MOVIMIENTO')) _refresh();
   }));
+  _desuscripciones.push(EventBus.on('db:inicializada', () => setTimeout(_refresh, 100)));
   _desuscripciones.push(EventBus.on('vista:cambiada', (vista) => {
-    if (vista === 'despensa') _refresh();
+    if (vista === 'despensa') setTimeout(_refresh, 150);
   }));
 
-  // Render inicial
-  _refresh();
+  setTimeout(_refresh, 150);
 }
 
 export function limpiar() {
-  if (_abortController) {
-    _abortController.abort();
-    _abortController = null;
-  }
+  if (_abortController) { _abortController.abort(); _abortController = null; }
   _desuscripciones.forEach(fn => fn());
   _desuscripciones = [];
 }

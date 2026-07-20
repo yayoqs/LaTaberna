@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — Módulo (ES6)
    Archivo: js/modulos/cliente/pantalla-bienvenida.js
-   Versión: 2.2.2
+   Versión: 2.2.3
    Propósito: Panel de control post-validación.
-              Migrado a nuevos nombres en español de Store.
+              Corregida la limpieza de listeners y la recuperación
+              del estado en mostrar().
    ================================================================ */
 
 import { EventBus } from '../../lib/eventBus.js';
@@ -103,7 +104,7 @@ const PantallaBienvenida = (() => {
     if (!_activada) return;
     _activada = false;
 
-    if (EventBus.off) {
+    if (typeof EventBus.off === 'function') {
       if (_cbMesasActualizada) EventBus.off('mesas:actualizada', _cbMesasActualizada);
       if (_cbMesaActualizada) EventBus.off('mesa:actualizada', _cbMesaActualizada);
       if (_cbEventosActualizada) EventBus.off('eventos_en_vivo:actualizada', _cbEventosActualizada);

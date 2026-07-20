@@ -1,14 +1,13 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/recetas.js
-   Versión: 5.0.1
+   Versión: 6.0.1
    Propósito: Centro de creación de Cocina/Barra. Gestión de recetas
-              con niveles libres, stock interno, preparación de mise
-              en place y acceso rápido desde KDS.
+              con niveles libres, stock interno (es_intermedio),
+              ingredientes tipados (insumo / subreceta) y anidamiento.
               Pestañas internas: Recetario | Mi Stock | Planificación.
               Ciclo de vida con activar()/limpiar().
-              Corrección: eliminada autoactivación; _pintar() ahora
-              verifica si el módulo está activo.
+              Corrección: migradas referencias de ingredienteId a id.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -16,11 +15,7 @@ import { EventBus } from '../lib/eventBus.js';
 import { Auth } from '../auth.js';
 import { DB } from '../db.js';
 import { Logger } from '../lib/logger.js';
-import { mostrarToast, mostrarConfirmacion, formatearDinero, obtenerColorDesdeNombre } from '../utils.js';
-
-/* ─── Configuración ─────────────────────────── */
-const NIVELES_GENERAN_STOCK = ['insumo', 'preparacion', 'salsa', 'guarnicion', 'masa', 'base', 'relleno', 'aderezo', 'mise_en_place'];
-const NIVELES_POR_DEFECTO = ['insumo', 'preparacion', 'salsa', 'guarnicion', 'masa', 'base', 'relleno', 'aderezo', 'mise_en_place', 'producto_final', 'bebida', 'postre'];
+import { mostrarToast, mostrarConfirmacion, obtenerColorDesdeNombre } from '../utils.js';
 
 /* ─── Estado interno ────────────────────────── */
 let _modo = null;
@@ -67,7 +62,6 @@ function _construirVista(main) {
 /* ─── Pintado principal ─────────────────────── */
 
 function _pintar(modo) {
-  // CORRECCIÓN: Si el módulo no está activo, lo activamos automáticamente
   if (!_activada) {
     activar();
   }
@@ -93,7 +87,6 @@ function _pintarRecetario(contenedor) {
   const state = Store.getState();
   let recetas = state.recetas || [];
   const productos = state.productos || [];
-  const ingredientes = state.ingredientes || [];
 
   recetas = recetas.map(r => {
     const prod = productos.find(p => p.id == r.productoId);
@@ -106,10 +99,10 @@ function _pintarRecetario(contenedor) {
   }
 
   if (_filtroNivel !== 'todos') {
-    recetas = recetas.filter(r => r.nivel === _filtroNivel);
+    recetas = recetas.filter(r => (r.nivel || 'sin_nivel') === _filtroNivel);
   }
 
-  const nivelesUnicos = [...new Set(recetas.map(r => r.nivel).filter(Boolean))].sort();
+  const nivelesUnicos = [...new Set(recetas.map(r => r.nivel || 'sin_nivel').filter(Boolean))].sort();
   const esProduccion = _modo === 'produccion';
 
   contenedor.innerHTML = `
@@ -150,8 +143,11 @@ function _pintarRecetario(contenedor) {
   cuadricula.innerHTML = recetas.map(r => {
     const color = obtenerColorDesdeNombre(r._productoNombre);
     const nivel = r.nivel || 'sin_nivel';
+    const tipoBadge = r.es_intermedio
+      ? '<span class="recetas-badge-intermedio">Preparación</span>'
+      : '<span class="recetas-badge-final">Producto final</span>';
     const numIng = r.ingredientes ? r.ingredientes.length : 0;
-    const stockInfo = r.generaStock ? `<span class="recetas-badge-stock">${r.stockActual || 0} ${r.unidadStock || ''}</span>` : '';
+    const stockInfo = r.es_intermedio ? `<span class="recetas-badge-stock">${r.stockActual || 0} ${r.unidadStock || ''}</span>` : '';
     return `
       <div class="recetas-tarjeta" data-receta="${r.id}">
         <div class="recetas-tarjeta-img" style="background-color:${color}">
@@ -159,7 +155,7 @@ function _pintarRecetario(contenedor) {
           <span class="recetas-tarjeta-badge">${numIng} <i class="fas fa-boxes"></i></span>
         </div>
         <div class="recetas-tarjeta-nombre">${r._productoNombre}</div>
-        <div class="recetas-tarjeta-nivel">${nivel} ${stockInfo}</div>
+        <div class="recetas-tarjeta-nivel">${nivel} ${stockInfo} ${tipoBadge}</div>
       </div>
     `;
   }).join('');
@@ -176,7 +172,7 @@ function _pintarRecetario(contenedor) {
 
 function _pintarStock(contenedor) {
   const state = Store.getState();
-  const recetas = (state.recetas || []).filter(r => r.generaStock);
+  const recetas = (state.recetas || []).filter(r => r.es_intermedio);
   const productos = state.productos || [];
 
   const stockItems = recetas.map(r => {
@@ -269,28 +265,59 @@ function _mostrarDetalle(idReceta) {
     document.getElementById('btnExportarPDF').addEventListener('click', () => _exportarPDF(receta.id));
   }
 
-  document.getElementById('detalleTitulo').innerHTML = `<i class="fas fa-utensils"></i> ${nombre} <span class="recetas-chip-nivel">${receta.nivel || 'sin_nivel'}</span>`;
-  if (receta.generaStock) {
+  const tipoReceta = receta.es_intermedio ? 'Preparación intermedia' : 'Producto final';
+  document.getElementById('detalleTitulo').innerHTML = `<i class="fas fa-utensils"></i> ${nombre} <span class="recetas-chip-nivel">${receta.nivel || 'sin_nivel'}</span> <span class="recetas-tipo-badge">${tipoReceta}</span>`;
+  if (receta.es_intermedio) {
     document.getElementById('detalleTitulo').innerHTML += ` <span class="recetas-stock-info">Stock: ${receta.stockActual || 0} ${receta.unidadStock || ''}</span>`;
   }
 
-  const ingredientesState = state.ingredientes || [];
-  const recetasState = state.recetas || [];
-  let html = '<h4><i class="fas fa-list-ul"></i> Ingredientes</h4><ul class="recetas-lista-ingredientes">';
-  (receta.ingredientes || []).forEach(ing => {
-    const ingData = ingredientesState.find(i => i.id == ing.ingredienteId);
-    const recData = !ingData ? recetasState.find(r => r.id == ing.ingredienteId || r.productoId == ing.ingredienteId) : null;
-    const nombre = ingData ? ingData.nombre : (recData ? (state.productos || []).find(p => p.id == recData.productoId)?.nombre || recData.productoId : ing.ingredienteId);
-    const origen = ingData ? 'Despensa' : 'Preparación';
-    html += `<li><span class="recetas-ing-nombre">${nombre}</span><span class="recetas-ing-cantidad">${ing.cantidad} ${ingData?.unidad || ing.unidad || ''}</span><span class="recetas-ing-origen">${origen}</span></li>`;
-  });
-  html += '</ul>';
-  document.getElementById('detalleIngredientes').innerHTML = html;
+  // Construir árbol de ingredientes
+  const htmlIngredientes = _construirArbolIngredientes(receta.ingredientes || [], state, 0);
+  document.getElementById('detalleIngredientes').innerHTML = `<h4><i class="fas fa-list-ul"></i> Ingredientes</h4>${htmlIngredientes}`;
   document.getElementById('detalleCosto').innerHTML = '';
   document.getElementById('detalleInstrucciones').innerHTML = `<h4><i class="fas fa-tasks"></i> Preparación</h4><div class="recetas-pasos">${(receta.instrucciones || 'Sin instrucciones').split('\n').filter(l => l.trim()).map((l, i) => `<div class="recetas-paso"><span class="recetas-paso-num">${i+1}</span><span class="recetas-paso-texto">${l}</span></div>`).join('') || '<p>Sin instrucciones.</p>'}</div>`;
 
   modal.dataset.recetaId = idReceta;
   modal.style.display = 'flex';
+}
+
+function _construirArbolIngredientes(ingredientes, state, profundidad) {
+  if (!ingredientes.length) return '<p class="recetas-sin-ingredientes">Sin ingredientes</p>';
+
+  const ingredientesState = state.ingredientes || [];
+  const recetasState = state.recetas || [];
+  const productosState = state.productos || [];
+
+  let html = '<ul class="recetas-arbol-ingredientes">';
+  ingredientes.forEach(ing => {
+    const tipo = ing.tipo || 'insumo';
+    if (tipo === 'insumo') {
+      const ingData = ingredientesState.find(i => i.id == ing.id);
+      const nombre = ingData ? ingData.nombre : ing.id;
+      html += `
+        <li class="recetas-nodo-insumo">
+          <span class="recetas-ing-nombre">🧄 ${nombre}</span>
+          <span class="recetas-ing-cantidad">${ing.cantidad} ${ingData?.unidad || ing.unidad || ''}</span>
+        </li>`;
+    } else if (tipo === 'subreceta') {
+      const subReceta = recetasState.find(r => r.id == ing.id);
+      const prod = subReceta ? productosState.find(p => p.id == subReceta.productoId) : null;
+      const nombreSub = prod ? prod.nombre : (subReceta ? subReceta.productoId : ing.id);
+      html += `
+        <li class="recetas-nodo-subreceta">
+          <details ${profundidad === 0 ? 'open' : ''}>
+            <summary>
+              <span class="recetas-ing-nombre">📦 ${nombreSub}</span>
+              <span class="recetas-ing-cantidad">${ing.cantidad} ${subReceta?.unidadStock || ''}</span>
+              ${subReceta?.es_intermedio ? `<span class="recetas-stock-info">Stock: ${subReceta.stockActual || 0} ${subReceta.unidadStock || ''}</span>` : ''}
+            </summary>
+            ${subReceta ? _construirArbolIngredientes(subReceta.ingredientes || [], state, profundidad + 1) : '<p class="recetas-sin-ingredientes">Receta no encontrada</p>'}
+          </details>
+        </li>`;
+    }
+  });
+  html += '</ul>';
+  return html;
 }
 
 function _cerrarDetalle() {
@@ -315,17 +342,18 @@ function _mostrarVistaCompleta(idReceta) {
   const recetasState = state.recetas || [];
   const productosState = state.productos || [];
 
-  const opcionesIngredientes = [
-    ...ingredientesState.map(i => ({ id: i.id, nombre: i.nombre + ' (Despensa)', unidad: i.unidad, origen: 'despensa' })),
-    ...recetasState.filter(r => r.generaStock).map(r => {
-      const p = productosState.find(p => p.id == r.productoId);
-      return { id: r.id, nombre: (p ? p.nombre : r.productoId) + ' (Preparación)', unidad: r.unidadStock || '', origen: 'receta' };
-    })
-  ];
-
   const ingredientesActuales = (receta.ingredientes || []).map(ing => {
-    const ingData = opcionesIngredientes.find(o => o.id == ing.ingredienteId);
-    return { ...ing, _nombre: ingData ? ingData.nombre : ing.ingredienteId };
+    const tipo = ing.tipo || 'insumo';
+    let nombreMostrar = ing.id;
+    if (tipo === 'insumo') {
+      const ingData = ingredientesState.find(i => i.id == ing.id);
+      nombreMostrar = ingData ? ingData.nombre : ing.id;
+    } else {
+      const sub = recetasState.find(r => r.id == ing.id);
+      const p = sub ? productosState.find(p => p.id == sub.productoId) : null;
+      nombreMostrar = p ? p.nombre : (sub ? sub.productoId : ing.id);
+    }
+    return { ...ing, tipo, _nombre: nombreMostrar };
   });
 
   contenedor.innerHTML = `
@@ -340,12 +368,15 @@ function _mostrarVistaCompleta(idReceta) {
       </div>
       <div class="recetas-edicion-cuerpo">
         <div class="recetas-campo">
-          <label>Nivel</label>
-          <div class="recetas-nivel-input">
-            <input type="text" id="rec-nivel" value="${receta.nivel || ''}" placeholder="Ej: preparacion, salsa..." list="lista-niveles">
-            <datalist id="lista-niveles">${NIVELES_POR_DEFECTO.map(n => `<option value="${n}">`).join('')}</datalist>
-          </div>
-          <span class="recetas-nota">${NIVELES_GENERAN_STOCK.includes(receta.nivel) ? '✅ Este nivel genera stock interno' : 'ℹ️ Este nivel no genera stock'}</span>
+          <label>Nivel (etiqueta)</label>
+          <input type="text" id="rec-nivel" value="${receta.nivel || ''}" placeholder="Ej: salsa, guarnicion...">
+        </div>
+        <div class="recetas-campo">
+          <label>
+            <input type="checkbox" id="rec-es-intermedio" ${receta.es_intermedio ? 'checked' : ''}>
+            ¿Es una preparación intermedia? (genera stock interno)
+          </label>
+          ${receta.es_intermedio ? `<div class="recetas-campo"><label>Unidad de stock</label><input type="text" id="rec-unidad-stock" value="${receta.unidadStock || ''}" placeholder="Ej: kg, L, unidades"></div>` : ''}
         </div>
         <div class="recetas-campo">
           <label>Instrucciones</label>
@@ -356,16 +387,20 @@ function _mostrarVistaCompleta(idReceta) {
           <div class="recetas-ingredientes-lista" id="recetas-ingredientes-actuales">
             ${ingredientesActuales.map((ing, idx) => `
               <div class="recetas-ingrediente-item">
+                <span class="recetas-tipo-badge ${ing.tipo === 'subreceta' ? 'recetas-tipo-subreceta' : 'recetas-tipo-insumo'}">${ing.tipo === 'subreceta' ? 'Sub-receta' : 'Insumo'}</span>
                 <span>${ing._nombre}</span>
-                <input type="number" value="${ing.cantidad}" step="0.01" data-idx="${idx}" data-id="${ing.ingredienteId}" class="recetas-ing-cantidad-input" placeholder="Cantidad">
+                <input type="number" value="${ing.cantidad}" step="0.01" data-idx="${idx}" data-id="${ing.id}" data-tipo="${ing.tipo}" class="recetas-ing-cantidad-input" placeholder="Cantidad">
                 <button class="recetas-quitar-ing" data-idx="${idx}"><i class="fas fa-trash"></i></button>
               </div>
             `).join('')}
           </div>
           <div class="recetas-agregar-ingrediente">
+            <select id="rec-tipo-ingrediente" class="recetas-select">
+              <option value="insumo">Insumo (Despensa)</option>
+              <option value="subreceta">Sub-receta (Preparación)</option>
+            </select>
             <select id="rec-nuevo-ingrediente" class="recetas-select">
-              <option value="">— Agregar ingrediente —</option>
-              ${opcionesIngredientes.map(o => `<option value="${o.id}" data-unidad="${o.unidad}" data-origen="${o.origen}">${o.nombre}</option>`).join('')}
+              <option value="">— Seleccionar —</option>
             </select>
             <input type="number" id="rec-nueva-cantidad" step="0.01" placeholder="Cant." class="recetas-cantidad-input">
             <button class="btn-secondary" id="rec-agregar-ing"><i class="fas fa-plus"></i> Agregar</button>
@@ -379,25 +414,66 @@ function _mostrarVistaCompleta(idReceta) {
     </div>
   `;
 
+  // Rellenar opciones según tipo
+  _actualizarSelectorIngrediente('insumo', ingredientesState, recetasState, productosState);
+
+  document.getElementById('rec-tipo-ingrediente').addEventListener('change', e => {
+    _actualizarSelectorIngrediente(e.target.value, ingredientesState, recetasState, productosState);
+  });
+
+  document.getElementById('rec-es-intermedio').addEventListener('change', e => {
+    const unidadDiv = document.getElementById('rec-unidad-stock')?.closest('.recetas-campo');
+    if (e.target.checked) {
+      if (!document.getElementById('rec-unidad-stock')) {
+        const campoUnidad = document.createElement('div');
+        campoUnidad.className = 'recetas-campo';
+        campoUnidad.innerHTML = '<label>Unidad de stock</label><input type="text" id="rec-unidad-stock" value="" placeholder="Ej: kg, L, unidades">';
+        e.target.closest('.recetas-campo').after(campoUnidad);
+      }
+    } else {
+      const campo = document.getElementById('rec-unidad-stock')?.closest('.recetas-campo');
+      if (campo) campo.remove();
+    }
+  });
+
   document.getElementById('recetas-volver').addEventListener('click', () => _pintar());
   document.getElementById('recetas-cancelar').addEventListener('click', () => _pintar());
   document.getElementById('recetas-guardar').addEventListener('click', () => _guardarEdicionReceta(receta.id));
   document.getElementById('recetas-duplicar').addEventListener('click', () => _duplicarReceta(receta.id));
   document.getElementById('recetas-eliminar').addEventListener('click', () => _eliminarReceta(receta.id));
-
-  document.getElementById('rec-nivel').addEventListener('input', e => {
-    const niv = e.target.value.trim().toLowerCase();
-    const nota = document.querySelector('.recetas-nota');
-    if (nota) nota.innerHTML = NIVELES_GENERAN_STOCK.includes(niv) ? '✅ Este nivel genera stock interno' : 'ℹ️ Este nivel no genera stock';
-  });
-
   document.getElementById('rec-agregar-ing').addEventListener('click', () => _agregarIngredienteEnEdicion());
   document.querySelectorAll('.recetas-quitar-ing').forEach(btn => {
     btn.addEventListener('click', () => _quitarIngredienteEnEdicion(btn.dataset.idx));
   });
 }
 
+function _actualizarSelectorIngrediente(tipo, ingredientesState, recetasState, productosState) {
+  const select = document.getElementById('rec-nuevo-ingrediente');
+  if (!select) return;
+  select.innerHTML = '<option value="">— Seleccionar —</option>';
+  if (tipo === 'insumo') {
+    ingredientesState.forEach(i => {
+      const option = document.createElement('option');
+      option.value = i.id;
+      option.textContent = `${i.nombre} (${i.unidad})`;
+      option.dataset.unidad = i.unidad;
+      select.appendChild(option);
+    });
+  } else {
+    recetasState.filter(r => r.es_intermedio).forEach(r => {
+      const prod = productosState.find(p => p.id == r.productoId);
+      const nombre = prod ? prod.nombre : r.productoId;
+      const option = document.createElement('option');
+      option.value = r.id;
+      option.textContent = `${nombre} (${r.unidadStock || ''})`;
+      option.dataset.unidad = r.unidadStock || '';
+      select.appendChild(option);
+    });
+  }
+}
+
 function _agregarIngredienteEnEdicion() {
+  const tipo = document.getElementById('rec-tipo-ingrediente').value;
   const select = document.getElementById('rec-nuevo-ingrediente');
   const cantidad = parseFloat(document.getElementById('rec-nueva-cantidad').value);
   if (!select.value || isNaN(cantidad) || cantidad <= 0) {
@@ -407,9 +483,12 @@ function _agregarIngredienteEnEdicion() {
   const lista = document.getElementById('recetas-ingredientes-actuales');
   const item = document.createElement('div');
   item.className = 'recetas-ingrediente-item';
+  const tipoLabel = tipo === 'subreceta' ? 'Sub-receta' : 'Insumo';
+  const tipoClass = tipo === 'subreceta' ? 'recetas-tipo-subreceta' : 'recetas-tipo-insumo';
   item.innerHTML = `
+    <span class="recetas-tipo-badge ${tipoClass}">${tipoLabel}</span>
     <span>${select.options[select.selectedIndex].text}</span>
-    <input type="number" value="${cantidad}" step="0.01" class="recetas-ing-cantidad-input" data-id="${select.value}">
+    <input type="number" value="${cantidad}" step="0.01" class="recetas-ing-cantidad-input" data-id="${select.value}" data-tipo="${tipo}">
     <button class="recetas-quitar-ing"><i class="fas fa-trash"></i></button>
   `;
   item.querySelector('.recetas-quitar-ing').addEventListener('click', () => item.remove());
@@ -425,23 +504,30 @@ function _quitarIngredienteEnEdicion(idx) {
 
 async function _guardarEdicionReceta(idReceta) {
   const nivel = document.getElementById('rec-nivel').value.trim().toLowerCase();
+  const esIntermedio = document.getElementById('rec-es-intermedio').checked;
+  const unidadStock = esIntermedio ? (document.getElementById('rec-unidad-stock')?.value?.trim() || '') : '';
   const instrucciones = document.getElementById('rec-instrucciones').value.trim();
   const ingredientes = [];
   document.querySelectorAll('#recetas-ingredientes-actuales .recetas-ingrediente-item').forEach(item => {
     const input = item.querySelector('input');
     const id = input.dataset.id;
+    const tipo = input.dataset.tipo || 'insumo';
     const cantidad = parseFloat(input.value);
     if (id && !isNaN(cantidad) && cantidad > 0) {
-      ingredientes.push({ ingredienteId: id, cantidad, unidad: '' });
+      ingredientes.push({ id, cantidad, tipo, unidad: '' });
     }
   });
-
-  if (!nivel) { mostrarToast('error', 'El nivel es obligatorio'); return; }
 
   const receta = DB.recetas.find(r => r.id === idReceta);
   if (receta) {
     receta.nivel = nivel;
-    receta.generaStock = NIVELES_GENERAN_STOCK.includes(nivel);
+    receta.es_intermedio = esIntermedio;
+    if (esIntermedio) {
+      receta.unidadStock = unidadStock;
+    } else {
+      receta.stockActual = 0;
+      receta.unidadStock = '';
+    }
     receta.instrucciones = instrucciones;
     receta.ingredientes = ingredientes;
     DB.saveRecetas();
@@ -458,7 +544,8 @@ async function _duplicarReceta(idReceta) {
     ...original,
     id: 'rec_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
     productoId: original.productoId,
-    stockActual: 0
+    stockActual: 0,
+    ingredientes: (original.ingredientes || []).map(ing => ({ ...ing }))
   };
   DB.recetas.push(nueva);
   DB.saveRecetas();
@@ -495,9 +582,12 @@ function _mostrarModalReceta() {
         <div class="modal-header"><h3>Nueva Receta</h3><button class="modal-close" id="btnCerrarModalCrear"><i class="fas fa-times"></i></button></div>
         <div class="recetas-form-cuerpo">
           <label>Producto</label><select id="recProductoId"></select>
-          <label>Nivel</label>
-          <input type="text" id="recNivel" placeholder="Ej: preparacion, salsa..." list="lista-niveles-crear">
-          <datalist id="lista-niveles-crear">${NIVELES_POR_DEFECTO.map(n => `<option value="${n}">`).join('')}</datalist>
+          <label>Nivel (etiqueta)</label>
+          <input type="text" id="recNivel" placeholder="Ej: salsa, guarnicion...">
+          <label>
+            <input type="checkbox" id="recEsIntermedio">
+            ¿Es una preparación intermedia?
+          </label>
           <div class="recetas-form-botones">
             <button class="btn-secondary" id="btnCancelarCrear">Cancelar</button>
             <button class="btn-primary" id="btnCrearReceta">Crear</button>
@@ -512,6 +602,7 @@ function _mostrarModalReceta() {
 
   document.getElementById('recProductoId').innerHTML = productos.map(p => `<option value="${p.id}">${p.nombre}</option>`).join('');
   document.getElementById('recNivel').value = '';
+  document.getElementById('recEsIntermedio').checked = false;
   modal.style.display = 'flex';
 }
 
@@ -520,7 +611,8 @@ function _cerrarModalCrear() { const m = document.getElementById('modalRecetaCre
 async function _crearRecetaRapida() {
   const productoId = document.getElementById('recProductoId').value;
   const nivel = document.getElementById('recNivel').value.trim().toLowerCase();
-  if (!productoId || !nivel) { mostrarToast('error', 'Completa todos los campos'); return; }
+  const esIntermedio = document.getElementById('recEsIntermedio').checked;
+  if (!productoId) { mostrarToast('error', 'Selecciona un producto'); return; }
 
   const existe = DB.recetas.find(r => r.productoId == productoId);
   if (existe) { mostrarToast('warning', 'Ya existe una receta para este producto'); return; }
@@ -529,7 +621,7 @@ async function _crearRecetaRapida() {
     id: 'rec_' + Date.now() + '_' + Math.random().toString(36).substr(2, 4),
     productoId,
     nivel,
-    generaStock: NIVELES_GENERAN_STOCK.includes(nivel),
+    es_intermedio: esIntermedio,
     ingredientes: [],
     instrucciones: '',
     stockActual: 0,
@@ -549,7 +641,7 @@ async function _crearRecetaRapida() {
 
 async function _ejecutarPreparacion(idReceta) {
   const receta = DB.recetas.find(r => r.id === idReceta);
-  if (!receta || !receta.generaStock) { mostrarToast('error', 'Esta receta no genera stock'); return; }
+  if (!receta || !receta.es_intermedio) { mostrarToast('error', 'Esta receta no es una preparación intermedia'); return; }
 
   const cantidad = await _pedirCantidad('Preparar ' + receta.productoId, '¿Cuánto vas a preparar?', receta.unidadStock || 'unidades');
   if (!cantidad || cantidad <= 0) return;
@@ -559,35 +651,40 @@ async function _ejecutarPreparacion(idReceta) {
   const recetas = state.recetas || [];
 
   for (const ing of (receta.ingredientes || [])) {
-    const ingData = ingredientes.find(i => i.id == ing.ingredienteId);
-    const recData = !ingData ? recetas.find(r => r.id == ing.ingredienteId) : null;
-    if (ingData) {
+    const tipo = ing.tipo || 'insumo';
+    if (tipo === 'insumo') {
+      const ingData = ingredientes.find(i => i.id == ing.id);
+      if (!ingData) { mostrarToast('error', `Insumo ${ing.id} no encontrado`); return; }
       if ((ingData.stock || 0) < ing.cantidad * cantidad) {
         mostrarToast('error', `Stock insuficiente de ${ingData.nombre}. Necesitas ${ing.cantidad * cantidad} ${ingData.unidad}, hay ${ingData.stock || 0}.`);
         return;
       }
-    } else if (recData && recData.generaStock) {
-      if ((recData.stockActual || 0) < ing.cantidad * cantidad) {
-        const prod = (state.productos || []).find(p => p.id == recData.productoId);
-        mostrarToast('error', `Stock insuficiente de ${prod?.nombre || recData.productoId}. Necesitas ${ing.cantidad * cantidad} ${recData.unidadStock}, hay ${recData.stockActual || 0}.`);
+    } else if (tipo === 'subreceta') {
+      const sub = recetas.find(r => r.id == ing.id);
+      if (!sub || !sub.es_intermedio) { mostrarToast('error', `Sub-receta ${ing.id} no válida`); return; }
+      if ((sub.stockActual || 0) < ing.cantidad * cantidad) {
+        const prod = (state.productos || []).find(p => p.id == sub.productoId);
+        mostrarToast('error', `Stock insuficiente de ${prod?.nombre || sub.productoId}. Necesitas ${ing.cantidad * cantidad} ${sub.unidadStock}, hay ${sub.stockActual || 0}.`);
         return;
       }
-    } else {
-      mostrarToast('error', `Ingrediente ${ing.ingredienteId} no encontrado`);
-      return;
     }
   }
 
   for (const ing of (receta.ingredientes || [])) {
-    const ingData = ingredientes.find(i => i.id == ing.ingredienteId);
-    const recData = !ingData ? recetas.find(r => r.id == ing.ingredienteId) : null;
-    if (ingData) {
-      ingData.stock = (ingData.stock || 0) - ing.cantidad * cantidad;
-      Store.dispatch({ type: 'INGREDIENTE_GUARDADO', payload: ingData });
-    } else if (recData) {
-      recData.stockActual = (recData.stockActual || 0) - ing.cantidad * cantidad;
-      const idx = DB.recetas.findIndex(r => r.id === recData.id);
-      if (idx >= 0) DB.recetas[idx] = recData;
+    const tipo = ing.tipo || 'insumo';
+    if (tipo === 'insumo') {
+      const ingData = ingredientes.find(i => i.id == ing.id);
+      if (ingData) {
+        ingData.stock = (ingData.stock || 0) - ing.cantidad * cantidad;
+        Store.dispatch({ type: 'INGREDIENTE_GUARDADO', payload: ingData });
+      }
+    } else if (tipo === 'subreceta') {
+      const sub = recetas.find(r => r.id == ing.id);
+      if (sub) {
+        sub.stockActual = (sub.stockActual || 0) - ing.cantidad * cantidad;
+        const idx = DB.recetas.findIndex(r => r.id === sub.id);
+        if (idx >= 0) DB.recetas[idx] = sub;
+      }
     }
   }
 
@@ -642,10 +739,17 @@ function _exportarPDF(idReceta) {
   const recetasState = state.recetas || [];
   let filas = '';
   (receta.ingredientes || []).forEach(ing => {
-    const ingData = ingredientesState.find(i => i.id == ing.ingredienteId);
-    const recData = !ingData ? recetasState.find(r => r.id == ing.ingredienteId || r.productoId == ing.ingredienteId) : null;
-    const nombreIng = ingData ? ingData.nombre : (recData ? (state.productos || []).find(p => p.id == recData.productoId)?.nombre || recData.productoId : ing.ingredienteId);
-    filas += `<tr><td>${nombreIng}</td><td>${ing.cantidad} ${ingData?.unidad || ing.unidad || ''}</td></tr>`;
+    const tipo = ing.tipo || 'insumo';
+    let nombreIng = ing.id;
+    if (tipo === 'insumo') {
+      const ingData = ingredientesState.find(i => i.id == ing.id);
+      nombreIng = ingData ? ingData.nombre : ing.id;
+    } else {
+      const sub = recetasState.find(r => r.id == ing.id);
+      const p = sub ? (state.productos || []).find(p => p.id == sub.productoId) : null;
+      nombreIng = p ? p.nombre : (sub ? sub.productoId : ing.id);
+    }
+    filas += `<tr><td>${nombreIng} (${tipo})</td><td>${ing.cantidad} ${ing.unidad || ''}</td></tr>`;
   });
   const html = `<html><head><title>Receta: ${nombre}</title><style>body{font-family:sans-serif;padding:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px}th{background:#f5f5f5}</style></head><body><h1>${nombre}</h1><h2>Ingredientes</h2><table><thead><tr><th>Ingrediente</th><th>Cantidad</th></tr></thead><tbody>${filas}</tbody></table><h2>Preparación</h2><p>${(receta.instrucciones||'').replace(/\n/g,'<br>')}</p></body></html>`;
   const w = window.open('', '_blank', 'width=800,height=600');

@@ -2,79 +2,91 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Test D – Recetas Unificado (Diagnóstico final)</title>
+  <title>Test Verificar Colección Menus</title>
   <style>
-    body { font-family: system-ui, sans-serif; background: #1a1a1a; color: #e0e0e0; padding: 30px; max-width: 700px; margin: auto; }
+    body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
     h1 { color: #f59e0b; }
-    .resultado { background: #2a2a2a; border-radius: 8px; padding: 12px 16px; margin: 8px 0; display: flex; align-items: center; gap: 12px; }
-    .ok { border-left: 4px solid #22c55e; }
-    .fallo { border-left: 4px solid #ef4444; }
-    .seccion { color: #f59e0b; font-size: 13px; min-width: 120px; }
+    .pass { color: #22c55e; }
+    .fail { color: #ef4444; }
+    .info { color: #94a3b8; }
+    pre { background: #111; padding: 10px; white-space: pre-wrap; word-wrap: break-word; font-size: 11px; }
   </style>
 </head>
 <body>
-  <h1>Test D – Recetas (v2.0.2) — Diagnóstico final</h1>
-  <p style="color:#a0a0a0; font-size:13px;">Prueba directa de la lógica de filtrado de recetas.</p>
-  <div id="resultados"></div>
+  <h1>🧪 Test de verificación – Colección menus</h1>
+  <div id="resultado"></div>
 
-  <script>
-    // ─── Mocks globales mínimos ───
-    const Logger = { info: console.log, warn: console.warn, error: console.error };
-    const EventBus = { events: {}, on(ev, cb) { (this.events[ev] = this.events[ev] || []).push(cb); }, emit(ev, data) { (this.events[ev] || []).forEach(cb => cb(data)); } };
-    const Auth = { getRol() { return 'cocina'; }, getNombre() { return 'Test'; } };
-    let toastMessages = [];
-    function showToast(tipo, msg) { toastMessages.push({tipo, msg}); }
-    window.fmtMoney = (val) => `$${val.toFixed(0)}`;
+  <!-- Cargar SDK de Appwrite y scripts necesarios -->
+  <script src="/js/appwrite.min.js"></script>
 
-    // ─── Estado de prueba (igual que en el mock-store) ───
-    const state = {
-      productos: [
-        { id: 'prod1', nombre: 'Hamburguesa', precio: 1500, categoria: 'Comidas', destino: 'cocina', activo: true }
-      ],
-      ingredientes: [
-        { id: 'ing1', nombre: 'Pan', stock: 50, stock_minimo: 5, unidad: 'u', categoria: 'cocina', valor_unitario: 100 }
-      ],
-      recetas: [
-        { productoId: 'prod1', ingredientes: [{ ingredienteId: 'ing1', cantidad: 1 }], instrucciones: 'Paso 1' }
-      ]
-    };
+  <script type="module">
+    import { Logger } from './js/lib/logger.js';
+    import { DBAppwrite } from './js/db-appwrite.js';
+    
+    const resultado = document.getElementById('resultado');
+    Logger.setLevel('ERROR');
 
-    // ─── Implementación exacta del filtro de recetas.js ───
-    function filtrarProductos(productos, recetas, ingredientes, rol) {
-      // 1. Filtrar por destino según rol
-      if (rol === 'cocina') {
-        productos = productos.filter(p => p.destino === 'cocina' || p.destino === 'ambos');
-      } else if (rol === 'barra') {
-        productos = productos.filter(p => p.destino === 'barra' || p.destino === 'ambos');
+    function log(msg, tipo = 'info') {
+      const clase = tipo === 'pass' ? 'pass' : tipo === 'fail' ? 'fail' : 'info';
+      resultado.innerHTML += `<div class="${clase}">${msg}</div>`;
+    }
+
+    async function runTest() {
+      log('🧪 Iniciando verificación de la colección menus...');
+
+      // 1. Verificar que la colección existe en COLECCIONES
+      const existeEnModulo = DBAppwrite.COLECCIONES.menus === 'Menus';
+      log(`1. ¿Está en COLECCIONES?: ${existeEnModulo ? '✅' : '❌'} (${DBAppwrite.COLECCIONES.menus})`, existeEnModulo ? 'pass' : 'fail');
+
+      // 2. Inicializar Appwrite (sesión anónima)
+      try {
+        const ok = await DBAppwrite.iniciar();
+        log(`2. ¿DBAppwrite.iniciar() exitoso?: ${ok ? '✅' : '❌'}`, ok ? 'pass' : 'fail');
+        if (!ok) {
+          log('No se pudo iniciar Appwrite. Revisa la conexión.', 'fail');
+          return;
+        }
+      } catch (e) {
+        log(`2. Error al iniciar: ${e.message}`, 'fail');
+        return;
       }
 
-      // 2. Solo productos con receta e ingredientes
-      productos = productos.filter(prod => {
-        const receta = recetas.find(r => r.productoId == prod.id);
-        return receta && receta.ingredientes && receta.ingredientes.length > 0;
-      });
+      // 3. Intentar listar
+      try {
+        const lista = await DBAppwrite.listar('menus');
+        const esArray = Array.isArray(lista);
+        log(`3. ¿listar() retorna array?: ${esArray ? '✅' : '❌'}`, esArray ? 'pass' : 'fail');
+        log(`   Documentos: ${lista.length}`, 'info');
+        if (lista.length > 0) {
+          log(`   <pre>${JSON.stringify(lista.slice(0, 2), null, 2)}</pre>`, 'info');
+        }
+      } catch (e) {
+        log(`3. ❌ Error al listar menus: ${e.message} (código: ${e.code}, tipo: ${e.type})`, 'fail');
+      }
 
-      return productos;
+      // 4. Intentar crear un documento de prueba y luego eliminarlo
+      try {
+        const creado = await DBAppwrite.crear('menus', 'unique()', {
+          nombre: 'Test de verificación',
+          activo: true,
+          productos: '[]',
+          creadoPor: 'Sistema'
+        });
+        const crearOk = creado && creado.id;
+        log(`4. ¿crear() exitoso?: ${crearOk ? '✅' : '❌'} ${creado?.id || ''}`, crearOk ? 'pass' : 'fail');
+
+        if (creado && creado.id) {
+          const eliminado = await DBAppwrite.eliminar('menus', creado.id);
+          log(`   ¿eliminar() exitoso?: ${eliminado ? '✅' : '❌'}`, eliminado ? 'pass' : 'fail');
+        }
+      } catch (e) {
+        log(`4. ❌ Error en CRUD de menus: ${e.message}`, 'fail');
+      }
+
+      log('🧪 Test finalizado.');
     }
 
-    function resultado(ok, seccion, mensaje) {
-      const div = document.createElement('div');
-      div.className = 'resultado ' + (ok ? 'ok' : 'fallo');
-      div.innerHTML = `<span>${ok ? '✔' : '✘'}</span><span class="seccion">[${seccion}]</span><span>${mensaje}</span>`;
-      document.getElementById('resultados').appendChild(div);
-    }
-
-    // ─── Ejecutar prueba ───
-    const productosFiltrados = filtrarProductos(
-      state.productos,
-      state.recetas,
-      state.ingredientes,
-      'cocina'
-    );
-
-    console.log('Productos después del filtro:', productosFiltrados);
-    resultado(productosFiltrados.length === 1, 'Filtro', 'Se encuentra 1 producto (Hamburguesa)');
-    resultado(productosFiltrados[0].nombre === 'Hamburguesa', 'Filtro', 'El producto es Hamburguesa');
+    runTest();
   </script>
 </body>
 </html>

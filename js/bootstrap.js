@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/bootstrap.js
-   Versión: 1.0.5
+   Versión: 1.0.7
    Propósito: Secuencia de arranque: Auth, DB, Store, dependencias.
-              Incluye imports de TurnoManager y App. 
-              Código muerto de Config eliminado.
+              Incluye import de InventarioService y configuración
+              de su repositorio.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -13,7 +13,8 @@ import { Store } from './lib/store.js';
 import { Deps } from './lib/deps.js';
 import { Auth } from './auth.js';
 import { DB } from './db.js';
-import { showToast } from './utils.js';
+import { InventarioService } from './servicios/inventario-service.js';
+import { mostrarToast } from './utils.js';
 import { TurnoManager } from './managers/turno-manager.js';
 import { App } from './app.js';
 
@@ -29,7 +30,7 @@ const Bootstrap = (() => {
       Logger.info('[Bootstrap] Auth listo.');
     } catch (e) {
       Logger.error('[Bootstrap] Error en Auth:', e);
-      showToast('error', 'Error crítico al iniciar autenticación');
+      mostrarToast('error', 'Error crítico al iniciar autenticación');
       return;
     }
 
@@ -39,7 +40,7 @@ const Bootstrap = (() => {
       Logger.info('[Bootstrap] DB lista.');
     } catch (e) {
       Logger.error('[Bootstrap] Error en DB:', e);
-      showToast('error', 'Error crítico al cargar los datos');
+      mostrarToast('error', 'Error crítico al cargar los datos');
       return;
     }
 
@@ -103,7 +104,9 @@ const Bootstrap = (() => {
     if (typeof InventarioService !== 'undefined') {
       InventarioService.configurar(inventarioRepo);
       if (typeof Deps !== 'undefined') Deps.registrar('inventarioService', InventarioService);
-      Logger.info('[Bootstrap] InventarioService configurado.');
+      Logger.info('[Bootstrap] InventarioService configurado y registrado.');
+    } else {
+      Logger.warn('[Bootstrap] InventarioService no está disponible. La configuración de inventario fallará.');
     }
 
     // 5. Inicializar gestor de turnos y pedidos

@@ -1,13 +1,15 @@
 /* ================================================================
    LaTaberna - PubPOS — DESPENSA SUBMÓDULO (ES6)
    Archivo: js/ui/despensa/modal-ingrediente.js
-   Versión: 1.0.1
+   Versión: 2.0.1
    Propósito: Modal para crear y editar ingredientes del inventario.
-              v1.0.1: migra a nombres en español (utils).
+              v2.0.1: Mantiene fallback local con aviso y logs de diagnóstico.
    ================================================================ */
 
-import { DB } from '../../db.js';
 import { InventarioService } from '../../servicios/inventario-service.js';
+import { DB } from '../../db.js';
+import { Store } from '../../lib/store.js';
+import { Logger } from '../../lib/logger.js';
 import { mostrarToast } from '../../utils.js';
 
 export function mostrar(ingrediente = null, onGuardado = null) {
@@ -76,25 +78,42 @@ export async function guardar(onGuardado) {
     valor_unitario: parseFloat(document.getElementById('ingValorUnitario').value) || 0
   };
 
-  if (typeof InventarioService !== 'undefined' && InventarioService.guardarIngrediente) {
+  // 1. Intento con Appwrite (InventarioService configurado por bootstrap)
+  try {
     const resultado = await InventarioService.guardarIngrediente(datos);
-    if (resultado.exito) {
+    console.log('[modal-ingrediente] Resultado de Appwrite:', resultado);
+    if (resultado && resultado.exito) {
       cerrar(onGuardado);
       mostrarToast('success', 'Ingrediente guardado');
+      if (typeof onGuardado === 'function') setTimeout(() => onGuardado(), 100);
       return;
     } else {
-      mostrarToast('error', resultado.error);
+      Logger.warn('[modal-ingrediente] Appwrite falló:', resultado?.error || 'Error desconocido');
+    }
+  } catch (e) {
+    Logger.error('[modal-ingrediente] Excepción en Appwrite:', e);
+  }
+
+  // 2. Fallback local (DB)
+  if (DB.ingredientes && Array.isArray(DB.ingredientes)) {
+    try {
+      const idx = DB.ingredientes.findIndex(i => i.id === datos.id);
+      if (idx >= 0) {
+        DB.ingredientes[idx] = datos;
+      } else {
+        DB.ingredientes.push(datos);
+      }
+      Store.despachar({ type: 'INGREDIENTE_GUARDADO', payload: datos });
+      cerrar(onGuardado);
+      mostrarToast('success', 'Ingrediente guardado (local)');
+      if (typeof onGuardado === 'function') setTimeout(() => onGuardado(), 100);
       return;
+    } catch (e) {
+      Logger.error('[modal-ingrediente] Error en fallback local:', e);
     }
   }
 
-  try {
-    await DB.syncGuardarIngrediente(datos);
-    cerrar(onGuardado);
-    mostrarToast('success', 'Ingrediente guardado');
-  } catch (e) {
-    mostrarToast('error', 'Error al guardar ingrediente');
-  }
+  mostrarToast('error', 'Error al guardar ingrediente. Revisa la consola.');
 }
 
 export function editarIngrediente(id) {

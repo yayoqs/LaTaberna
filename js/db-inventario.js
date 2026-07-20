@@ -1,11 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-inventario.js
-   Versión: 1.0.8
+   Versión: 1.0.9
    Propósito: Gestión de ingredientes, recetas, stock y movimientos.
-              Métodos auxiliares de validación ahora son privados.
+              Soporte para recetas anidadas (sub-recetas).
               Auth importado explícitamente.
-              Eliminada función duplicada validarStockParaArticulos.
               Todos los catch registran error.
    ================================================================ */
 
@@ -21,7 +20,7 @@ export const DBInventario = (function() {
   module.recetas = [];
   module.movimientos = [];
 
-  // ══ FUNCIONES AUXILIARES PRIVADAS (no expuestas) ══
+  // ══ FUNCIONES AUXILIARES PRIVADAS ══
 
   function _validarId(val, prefijo) {
     if (typeof val === 'string' && val.length > 0) return val;
@@ -35,6 +34,60 @@ export const DBInventario = (function() {
   function _validarNumero(val, defecto) {
     const num = Number(val);
     return isNaN(num) ? defecto : num;
+  }
+
+  function _validarBooleano(val, defecto) {
+    if (typeof val === 'boolean') return val;
+    if (typeof val === 'string') return val.toLowerCase() === 'true' || val === '1';
+    return defecto;
+  }
+
+  /**
+   * Resuelve recursivamente todos los ingredientes de una receta,
+   * incluyendo los de sus sub-recetas.
+   * @param {string} recetaId - ID de la receta a resolver.
+   * @param {number} cantidad - Cantidad de veces que se usa la receta.
+   * @param {Array} recetas - Array completo de recetas disponibles.
+   * @param {Array} ingredientes - Array completo de ingredientes disponibles.
+   * @returns {Array} Array de { ingredienteId, nombre, cantidadNecesaria, unidad }.
+   */
+  function _resolverIngredientes(recetaId, cantidad, recetas, ingredientes) {
+    const receta = recetas.find(r => r.id === recetaId);
+    if (!receta) {
+      Logger.warn(`[DBInventario] Sub-receta ${recetaId} no encontrada.`);
+      return [];
+    }
+
+    const resultado = [];
+
+    for (const ing of receta.ingredientes) {
+      const cantidadTotal = ing.cantidad * cantidad;
+
+      if (ing.tipo === 'insumo') {
+        const insumo = ingredientes.find(i => i.id === ing.id);
+        resultado.push({
+          ingredienteId: ing.id,
+          nombre: insumo ? insumo.nombre : ing.id,
+          cantidadNecesaria: cantidadTotal,
+          unidad: insumo ? insumo.unidad : 'u'
+        });
+      } else if (ing.tipo === 'subreceta') {
+        const subIngredientes = _resolverIngredientes(ing.id, cantidadTotal, recetas, ingredientes);
+        resultado.push(...subIngredientes);
+      }
+    }
+
+    // Consolidar ingredientes repetidos
+    const consolidado = new Map();
+    for (const r of resultado) {
+      if (consolidado.has(r.ingredienteId)) {
+        consolidado.get(r.ingredienteId).cantidadNecesaria += r.cantidadNecesaria;
+      } else {
+        consolidado.set(r.ingredienteId, { ...r });
+      }
+    }
+
+    return Array.from(consolidado.values());
   }
 
   /* ── NORMALIZACIONES ─────────────────────────────────────── */
@@ -54,12 +107,15 @@ export const DBInventario = (function() {
   module._normalizarReceta = function(r) {
     return {
       id: _validarId(r.id, 'rec'),
-      productoId: _validarId(r.productoId, 'prod'),
+      productoId: r.productoId || null,
+      nombre: _validarString(r.nombre, 'Sin nombre'),
       ingredientes: Array.isArray(r.ingredientes) ? r.ingredientes.map(ing => ({
-        ingredienteId: _validarId(ing.ingredienteId, 'ins'),
+        tipo: ['insumo', 'subreceta'].includes(ing.tipo) ? ing.tipo : 'insumo',
+        id: _validarId(ing.id, ing.tipo === 'subreceta' ? 'rec' : 'ins'),
         cantidad: _validarNumero(ing.cantidad, 0)
       })) : [],
-      instrucciones: _validarString(r.instrucciones, '')
+      instrucciones: _validarString(r.instrucciones, ''),
+      esIntermedio: _validarBooleano(r.es_intermedio || r.esIntermedio, false)
     };
   };
 
@@ -135,24 +191,20 @@ export const DBInventario = (function() {
   module.getIngredientesDeProducto = function(productoId) {
     const receta = this.recetas.find(r => r.productoId === productoId);
     if (!receta) return [];
-    return receta.ingredientes.map(ing => {
-      const ingrediente = this.ingredientes.find(i => i.id === ing.ingredienteId);
-      return {
-        ...ingrediente,
-        cantidadUsada: ing.cantidad
-      };
-    }).filter(i => i !== undefined);
+    return _resolverIngredientes(receta.id, 1, this.recetas, this.ingredientes);
   };
 
   module.consumirIngredientesDeProducto = async function(productoId, cantidad, motivo = 'Consumo') {
     const receta = this.recetas.find(r => r.productoId === productoId);
     if (!receta) return false;
 
-    for (const ingReceta of receta.ingredientes) {
-      const ingrediente = this.ingredientes.find(i => i.id === ingReceta.ingredienteId);
+    const ingredientesNecesarios = _resolverIngredientes(receta.id, cantidad, this.recetas, this.ingredientes);
+
+    for (const necesario of ingredientesNecesarios) {
+      const ingrediente = this.ingredientes.find(i => i.id === necesario.ingredienteId);
       if (!ingrediente) continue;
 
-      const cantidadADescontar = ingReceta.cantidad * cantidad;
+      const cantidadADescontar = necesario.cantidadNecesaria;
 
       if (typeof DBAppwrite !== 'undefined' && DBAppwrite.habilitado) {
         try {
