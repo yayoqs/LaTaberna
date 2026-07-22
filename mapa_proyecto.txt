@@ -150,6 +150,12 @@
             🔹 function _limpiarFila(fila) {
         📄 db-core.js
             🔹 export const DBCore = (function() {
+            🔹 function _validarId(val, prefijo) {
+            🔹 function _validarString(val, defecto) {
+            🔹 function _validarNumero(val, defecto) {
+            🔹 function _validarBooleano(val, defecto) {
+            🔹 function _validarDestino(val) {
+            🔹 function _validarEstadoMesa(val) {
             🔹 const mesasReales = this.mesas.filter(m => !m.esVirtual);
             🔹 const idx = this.pedidos.findIndex(p => p.id === id);
             🔹 const idx = this.pedidosDelivery.findIndex(p => p.id === id);
@@ -164,13 +170,17 @@
             🔹 const idxVirtual = this.mesas.findIndex(m => m.numero === mesaVirtual.numero);
         📄 db-inventario.js
             🔹 export const DBInventario = (function() {
+            🔹 function _validarId(val, prefijo) {
+            🔹 function _validarString(val, defecto) {
+            🔹 function _validarNumero(val, defecto) {
+            🔹 function _validarBooleano(val, defecto) {
+            🔹 function _resolverIngredientes(recetaId, cantidad, recetas, ingredientes) {
+            🔹 const receta = recetas.find(r => r.id === recetaId);
+            🔹 const insumo = ingredientes.find(i => i.id === ing.id);
             🔹 const receta = this.recetas.find(r => r.productoId === productoId);
-            🔹 const ingrediente = this.ingredientes.find(i => i.id === ing.ingredienteId);
             🔹 const receta = this.recetas.find(r => r.productoId === productoId);
-            🔹 const ingrediente = this.ingredientes.find(i => i.id === ingReceta.ingredienteId);
+            🔹 const ingrediente = this.ingredientes.find(i => i.id === necesario.ingredienteId);
             🔹 const ingrediente = this.ingredientes.find(i => i.id === ingredienteId);
-            🔹 const receta = this.recetas.find(r => r.productoId == item.prodId);
-            🔹 const ingData = this.ingredientes.find(i => i.id === ingReceta.ingredienteId);
         📄 db-shim.js
             🔹 export const DBShim = (function() {
         📄 db.js
@@ -247,6 +257,8 @@
                 🔹 function configReducer(config, action) {
                 🔹 function espaciosReducer(espacios, action) {
                 🔹 function espacioActivoReducer(espacioActivo, action) {
+                🔹 function menusReducer(menus, action) {
+                🔹 function precargasClienteReducer(precargas, action) {   // ← nuevo reducer
                 🔹 function clienteReducer(cliente, action) {
     📁 managers/
             📄 pedido-manager.js
@@ -371,9 +383,11 @@
                     🔹 function _mostrarPaso() {
                     🔹 function _siguientePaso() {
                     🔹 function _finalizar() {
+                    🔹 function activar() {
                 📄 precarga-control.js
                     🔹 const PrecargaControl = (() => {
                     🔹 function _onPrecargaEnviada(data) {
+                    🔹 function activar() {
     📁 repositorios/
             📄 pedido-repository.js
                 🔹 const PedidoRepositoryLocal = (() => {
@@ -405,9 +419,9 @@
             📄 inventario-service.js
                 🔹 const InventarioService = (() => {
                 🔹 function configurar(repo) {
-                🔹 function validarStockParaItems(items) {
+                🔹 function validarStockParaArticulos(items) {
                 🔹 const receta = DB.recetas.find(r => r.productoId == item.prodId);
-                🔹 const ingData = DB.ingredientes.find(i => i.id === ingReceta.ingredienteId);
+                🔹 const ingData = ingredientesState.find(i => i.id === datos.ingredienteId);
             📄 pedido-service.js
                 🔹 const PedidoService = (() => {
                 🔹 function configurar(repo) { _pedidoRepo = repo; }
@@ -420,6 +434,7 @@
                 🔹 function activar() {
                 🔹 const unsubscribeStore = Store.suscribir((state, action) => {
                 🔹 const onDbInicializada = () => { if (_estaActiva) render(); };
+                🔹 const onVistaCambiada = (vista) => {
                 🔹 function limpiar() {
                 🔹 function render() {
                 🔹 const cerrados = pedidos.filter(p => p.estado === 'cerrada');
@@ -501,13 +516,6 @@
                 🔹 function _renderZonas() {
                 🔹 function _actualizarZona(idx, campo, valor) {
                 🔹 const zonasNuevas = Array.from(filas).map(fila => {
-                🔹 function renderProductos() {
-                🔹 function _htmlProdConfigItem(p) {
-                🔹 function abrirModalProducto(prod = null) {
-                🔹 function cerrarModalProducto() {
-                🔹 function _autoajustarPrecio() {
-                🔹 function _vistaPreviaImagen() {
-                🔹 const prod = (Store.obtenerEstado().productos || []).find(p => p.id === id);
                 🔹 function renderMozos() {
                 🔹 function agregarMozo() {
             📄 cuenta.js
@@ -519,46 +527,47 @@
                     🔹 const ing = DB.ingredientes.find(i => i.id === ingredienteId);
                 📄 ciclo-vida.js
                     🔹 function _refresh() {
+                    🔹 const proveedoresUnicos = [...new Set(ingredientes.map(i => i.proveedor).filter(Boolean))];
                     🔹 export function activar() {
-                    🔹 const unsubscribeStore = Store.suscribir((state, action) => {
                     🔹 export function limpiar() {
                 📄 estado.js
-                    🔹 export function getCategoriaFiltro() {
-                    🔹 export function setCategoriaFiltro(categoria) {
-                    🔹 export function getOrdenColumnas() {
-                    🔹 export function setOrdenColumnas(orden) {
-                    🔹 export function toggleOrdenColumna(columna, shiftKey) {
-                    🔹 const existente = _ordenColumnas.findIndex(o => o.columna === columna);
-                    🔹 export function resetearOrden() {
-                    🔹 export function getPaginaMovimientos() {
-                    🔹 export function incrementarPaginaMovimientos() {
-                    🔹 export function resetearPaginaMovimientos() {
-                    🔹 export function getMovsPorPagina() {
+                    🔹 export function getListaCompras() {
+                    🔹 export function agregarAListaCompras(item) {
+                    🔹 export function quitarDeListaCompras(item) {
+                    🔹 export function limpiarListaCompras() {
+                    🔹 export function getTerminoBusqueda() {
+                    🔹 export function setTerminoBusqueda(termino) {
+                    🔹 export function getEspacioAbierto() {
+                    🔹 export function setEspacioAbierto(espacio) {
                 📄 exportacion.js
                     🔹 export function exportarCSV() {
                     🔹 export function exportarPDF() {
                 📄 modal-ingrediente.js
                     🔹 export function mostrar(ingrediente = null, onGuardado = null) {
                     🔹 export function cerrar(onCerrar) {
+                    🔹 const idx = DB.ingredientes.findIndex(i => i.id === datos.id);
                     🔹 export function editarIngrediente(id) {
                     🔹 const ing = DB.ingredientes.find(i => i.id == id);
                 📄 renderer.js
+                    🔹 function _inyectarEstilosCriticos() {
                     🔹 export function asegurarVista() {
-                    🔹 export function renderTabla() {
-                    🔹 export function renderResumen() {
-                    🔹 const bajoMin = ingredientes.filter(i => i.stock <= i.stock_minimo).length;
-                    🔹 const valorTotal = ingredientes.reduce((sum, i) => sum + (i.stock * (i.valor_unitario || 0)), 0);
-                    🔹 export function renderAlertas() {
-                    🔹 const criticos = ingredientes.filter(i => i.stock <= i.stock_minimo);
-                    🔹 export function renderMovimientos() {
-                    🔹 const ing = (Store.obtenerEstado().ingredientes || []).find(i => i.id === mov.ingredienteId);
-                    🔹 export function renderCompleto() {
+                    🔹 function _normalizarIngredientes(ingredientes) {
+                    🔹 export function renderResumen(ingredientes) {
+                    🔹 const bajoMin = validos.filter(i => i.stock <= i.stock_minimo).length;
+                    🔹 const valorTotal = validos.reduce((sum, i) => sum + (i.stock * (i.valor_unitario || 0)), 0);
+                    🔹 export function renderEspacios(ingredientes) {
+                    🔹 const algunBajo = items.some(i => i.stock <= i.stock_minimo);
+                    🔹 export function renderListaCompras(items) {
+                    🔹 export function renderProveedores(proveedores) {
+                    🔹 export function renderProductosDisponibles(productos) {
+                    🔹 export function abrirPanelIzquierdo() {
+                    🔹 export function abrirPanelDerecho() {
+                    🔹 export function cerrarPaneles() {
             📄 despensa.js
             📄 eventos.js
                 🔹 const Eventos = (() => {
                 🔹 function _asegurarVista() {
-                🔹 function mostrarFormulario() {
-                🔹 function cerrarFormulario() {
+                🔹 function render() {
                 🔹 function activar() {
                 🔹 function limpiar() {
             📄 kds.js
@@ -567,27 +576,78 @@
                 🔹 const i = _comandas.findIndex(c => c.id === id);
                 🔹 function _asegurarVista() {
                 🔹 function _construirVista(main) {
+                🔹 function _activarPestana(estado) {
                 🔹 function _clasificarTiempo(ms) {
                 🔹 function _formatearTiempo(ms) {
                 🔹 function _reproducirAlerta() {
                 🔹 function _crearTicket(c) {
                 🔹 const listos = (c.items || []).filter(i => i.listo).length;
+                🔹 const startLongPress = (e) => {
+                🔹 const cancelLongPress = () => {
+                🔹 const handleClick = (ev) => {
                 🔹 function _pintar() {
                 🔹 function recargar() {
                 🔹 const itemsCocina = c.items.filter(it => it.destino === 'cocina' || it.destino === 'ambos');
                 🔹 const itemsBarra = c.items.filter(it => it.destino === 'barra' || it.destino === 'ambos');
                 🔹 function activar() {
                 🔹 function limpiar() {
-                🔹 export const KDS = { refresh: recargar, activar, limpiar, _setEstado: _cambiarEstado, _panico };
+                🔹 export const KDS = { refresh: recargar, activar, limpiar };
+        📁 menu/
+                📄 acciones.js
+                    🔹 const idx = menus.findIndex(m => m.id === menu.id);
+                📄 barra-lateral.js
+                    🔹 export function refrescarLista() {
+                    🔹 export function seleccionarMenu(id) {
+                    🔹 const menu = menus.find(m => m.id === id);
+                    🔹 export function toggle() {
+                📄 biblioteca.js
+                    🔹 export function inicializar(onProductoAgregado) {
+                    🔹 export function refrescar() {
+                    🔹 const receta = (state.recetas || []).find(r => r.productoId === p.id);
+                    🔹 const receta = (state.recetas || []).find(r => r.productoId === p.id);
+                    🔹 export function toggle() {
+                    🔹 function obtenerProductoPorId(id) {
+                    🔹 const producto = (state.productos || []).find(p => p.id === id);
+                    🔹 const receta = (state.recetas || []).find(r => r.productoId === id);
+                    🔹 function calcularCostoReceta(receta, ingredientes) {
+                    🔹 const ingData = ingredientes.find(i => i.id === ing.ingredienteId);
+                📄 ciclo-vida.js
+                    🔹 export function activar() {
+                    🔹 const unsubscribeStore = Store.suscribir((state, action) => {
+                    🔹 export function limpiar() {
+                    🔹 function onMenuSeleccionado(menu) {
+                    🔹 function onProductoAgregado(producto, x, y) {
+                    🔹 function _vincularEventosDOM(signal) {
+                    🔹 function agregarFichaNoProducto(tipo, data) {
+                    🔹 function _serializarLienzo() {
+                📄 estado.js
+                    🔹 export function getMenuActivo() {
+                    🔹 export function setMenuActivo(menu) {
+                    🔹 export function getCategoriaFiltro() {
+                    🔹 export function setCategoriaFiltro(categoria) {
+                    🔹 export function getTerminoBusqueda() {
+                    🔹 export function setTerminoBusqueda(termino) {
+                    🔹 export function getProductosMenuActivo() {
+                    🔹 export function agregarProductoAlMenu(producto) {
+                    🔹 export function quitarProductoDelMenu(productoId) {
+                📄 modal-propiedades.js
+                    🔹 export function abrir(ficha, onCambio) {
+                    🔹 export function cerrar() {
+                    🔹 export function guardarCambios() {
+                    🔹 export function eliminarFicha() {
+                    🔹 function formatearDineroLocal(val) {
+                    🔹 function actualizarMargenLocal() {
+                📄 renderer.js
+                    🔹 export function asegurarVista() {
+                    🔹 export function renderSidebar(menus, menuActivo) {
+                    🔹 export function renderBiblioteca(productos) {
+                    🔹 export function renderLienzo(productos) {
+                    🔹 export function abrirSidebar() {
+                    🔹 export function cerrarSidebar() {
+                    🔹 export function toggleFabMenu() {
+                    🔹 export function abrirBiblioteca() {
+                    🔹 export function cerrarBiblioteca() {
             📄 menu.js
-                🔹 const Menu = (() => {
-                🔹 function _asegurarVista() {
-                🔹 function activar() {
-                🔹 const unsubscribeStore = Store.suscribir((state, action) => {
-                🔹 function limpiar() {
-                🔹 function render() {
-                🔹 function _renderCategorias() {
-                🔹 function filtrar(categoria) {
             📄 mesa-detalles.js
                 🔹 const MesaDetalles = (() => {
                 🔹 function _onTouchStart(e) {
@@ -719,25 +779,53 @@
                 🔹 function _asegurarVista() {
                 🔹 function _construirVista(main) {
                 🔹 function _pintar(modo) {
-                🔹 const rec = recetas.find(r => r.productoId == prod.id);
-                🔹 const ingData = ingredientes.find(i => i.id == ing.ingredienteId);
-                🔹 const receta = recetas.find(r => r.productoId == prod.id);
-                🔹 function _iconoPorCategoria(cat) {
-                🔹 function _mostrarDetalle(idProducto) {
-                🔹 const prod = (state.productos || []).find(p => p.id == idProducto);
-                🔹 const receta = (state.recetas || []).find(r => r.productoId == idProducto);
-                🔹 const ingData = ingredientesState.find(i => i.id == ing.ingredienteId);
-                🔹 function _exportarPDF(idProducto) {
-                🔹 const prod = (state.productos || []).find(p => p.id == idProducto);
-                🔹 const receta = (state.recetas || []).find(r => r.productoId == idProducto);
-                🔹 const ingData = ingredientesState.find(i => i.id == ing.ingredienteId);
-                🔹 function _asegurarModalReceta() {
-                🔹 function _mostrarModalReceta(productoId = null) {
-                🔹 const receta = (state.recetas || []).find(r => r.productoId == productoId);
-                🔹 function _mostrarRecetaActual() {
-                🔹 const receta = (state.recetas || []).find(r => r.productoId == id);
-                🔹 const local = DB.recetas.find(r => r.productoId == id);
-                🔹 const receta = DB.recetas.find(r => r.productoId == idProducto);
+                🔹 function _pintarRecetario(contenedor) {
+                🔹 const prod = productos.find(p => p.id == r.productoId);
+                🔹 function _pintarStock(contenedor) {
+                🔹 const recetas = (state.recetas || []).filter(r => r.es_intermedio);
+                🔹 const stockItems = recetas.map(r => {
+                🔹 const prod = productos.find(p => p.id == r.productoId);
+                🔹 const alertaBaja = stockItems.filter(r => (r.stockActual || 0) <= 1);
+                🔹 function _pintarPlanificacion(contenedor) {
+                🔹 function _mostrarDetalle(idReceta) {
+                🔹 const receta = (state.recetas || []).find(r => r.id === idReceta || r.productoId == idReceta);
+                🔹 const prod = (state.productos || []).find(p => p.id == receta.productoId);
+                🔹 function _construirArbolIngredientes(ingredientes, state, profundidad) {
+                🔹 const ingData = ingredientesState.find(i => i.id == ing.id);
+                🔹 const subReceta = recetasState.find(r => r.id == ing.id);
+                🔹 const prod = subReceta ? productosState.find(p => p.id == subReceta.productoId) : null;
+                🔹 function _cerrarDetalle() {
+                🔹 function _mostrarVistaCompleta(idReceta) {
+                🔹 const receta = (state.recetas || []).find(r => r.id === idReceta);
+                🔹 const prod = (state.productos || []).find(p => p.id == receta.productoId);
+                🔹 const ingredientesActuales = (receta.ingredientes || []).map(ing => {
+                🔹 const ingData = ingredientesState.find(i => i.id == ing.id);
+                🔹 const sub = recetasState.find(r => r.id == ing.id);
+                🔹 const p = sub ? productosState.find(p => p.id == sub.productoId) : null;
+                🔹 function _actualizarSelectorIngrediente(tipo, ingredientesState, recetasState, productosState) {
+                🔹 const prod = productosState.find(p => p.id == r.productoId);
+                🔹 function _agregarIngredienteEnEdicion() {
+                🔹 function _quitarIngredienteEnEdicion(idx) {
+                🔹 const receta = DB.recetas.find(r => r.id === idReceta);
+                🔹 const original = DB.recetas.find(r => r.id === idReceta);
+                🔹 function _mostrarModalReceta() {
+                🔹 const productos = (state.productos || []).filter(p => p.activo !== false);
+                🔹 const existe = DB.recetas.find(r => r.productoId == productoId);
+                🔹 const receta = DB.recetas.find(r => r.id === idReceta);
+                🔹 const ingData = ingredientes.find(i => i.id == ing.id);
+                🔹 const sub = recetas.find(r => r.id == ing.id);
+                🔹 const prod = (state.productos || []).find(p => p.id == sub.productoId);
+                🔹 const ingData = ingredientes.find(i => i.id == ing.id);
+                🔹 const sub = recetas.find(r => r.id == ing.id);
+                🔹 const idx = DB.recetas.findIndex(r => r.id === sub.id);
+                🔹 const idx = DB.recetas.findIndex(r => r.id === idReceta);
+                🔹 function _pedirCantidad(titulo, mensaje, unidad) {
+                🔹 function _exportarPDF(idReceta) {
+                🔹 const receta = (state.recetas || []).find(r => r.id === idReceta || r.productoId == idReceta);
+                🔹 const prod = (state.productos || []).find(p => p.id == receta.productoId);
+                🔹 const ingData = ingredientesState.find(i => i.id == ing.id);
+                🔹 const sub = recetasState.find(r => r.id == ing.id);
+                🔹 const p = sub ? (state.productos || []).find(p => p.id == sub.productoId) : null;
                 🔹 function activar() {
                 🔹 function limpiar() {
                 🔹 export const Recetas = {
@@ -791,8 +879,8 @@
                     🔹 const total = _itemsTemporales.reduce((sum, it) => sum + it.precio * (it.qty || 1), 0);
                     🔹 const total = itemsListos.reduce((s, i) => s + i.precio * i.qty, 0);
                 📄 tabla.js
-                    🔹 export function getEstadoFiltro() {
-                    🔹 export function establecerEstadoFiltro(estado) {
+                    🔹 export function getEstadoFiltro() { return _estadoFiltro; }
+                    🔹 export function establecerEstadoFiltro(estado) { _estadoFiltro = estado; }
                     🔹 export function renderTabla(pedidos) {
                     🔹 const ordenados = [...pedidos].sort((a, b) => {
                     🔹 const resumen = items.map(i => `${i.qty}x ${i.nombre}`).join(', ') || '—';
@@ -834,5 +922,5 @@
 
 
 === MAPEO COMPLETADO ===
-Total de funciones/declaraciones capturadas: 726
-Fecha de generación: 7/8/2026, 2:00:14 AM
+Total de funciones/declaraciones capturadas: 806
+Fecha de generación: 7/21/2026, 3:37:02 AM

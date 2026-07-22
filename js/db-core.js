@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-core.js
-   Versión: 1.0.8
-   Propósito: Núcleo de datos: mesas, pedidos, productos, persistencia local.
-              Métodos auxiliares de validación ahora son privados del módulo.
-              Incluye imports de Logger, EventBus.
+   Versión: 1.0.9
+   Propósito: Núcleo de datos: mesas, pedidos, productos, proveedores,
+              persistencia local. Métodos auxiliares de validación
+              ahora son privados del módulo.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -20,6 +20,7 @@ export const DBCore = (function() {
   module.config = {};
   module.mozos = [];
   module.pedidosDelivery = [];
+  module.proveedores = [];
 
   // ══ FUNCIONES AUXILIARES PRIVADAS (no expuestas) ══
 
@@ -244,6 +245,20 @@ export const DBCore = (function() {
     }
   };
 
+  module._cargarProveedoresLocal = function() {
+    const raw = localStorage.getItem('pubpos_proveedores');
+    if (raw) {
+      try {
+        this.proveedores = JSON.parse(raw);
+      } catch (e) {
+        Logger.error('[DBCore] Error al parsear proveedores locales:', e);
+        this.proveedores = [];
+      }
+    } else {
+      this.proveedores = [];
+    }
+  };
+
   /* ── GUARDADO ────────────────────────────────────────────── */
   module.saveConfig = function() {
     localStorage.setItem('pubpos_config', JSON.stringify(this.config));
@@ -271,6 +286,11 @@ export const DBCore = (function() {
   module.savePedidosDelivery = function() {
     localStorage.setItem('pubpos_pedidos_delivery', JSON.stringify(this.pedidosDelivery));
     EventBus.emit('pedidosDelivery:guardados', this.pedidosDelivery);
+  };
+
+  module.saveProveedores = function() {
+    localStorage.setItem('pubpos_proveedores', JSON.stringify(this.proveedores));
+    EventBus.emit('proveedores:guardados', this.proveedores);
   };
 
   /* ── GESTIÓN DE PEDIDOS (mesa) ───────────────────────────── */

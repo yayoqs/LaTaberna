@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/menu.js
-   Versión: 1.0.0
+   Versión: 1.0.1
    Propósito: Fachada del diseñador de menú. Reexporta funciones
               de los submódulos. Delega inicialización a ciclo-vida.
+              v1.0.1: elimina autoactivación en scope de módulo.
    ================================================================ */
 
 import { activar, limpiar } from './menu/ciclo-vida.js';
@@ -71,7 +72,6 @@ const Menu = {
   cargarMenus
 };
 
-// ── Inicialización ──
-activar();
+// ❌ Eliminada autoactivación: activar();
 
 export { Menu };

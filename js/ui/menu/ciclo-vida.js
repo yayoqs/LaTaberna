@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MENÚ SUBMÓDULO (ES6)
    Archivo: js/ui/menu/ciclo-vida.js
-   Versión: 1.0.1
+   Versión: 1.0.2
    Propósito: Ciclo de vida de la vista de menú.
-              v1.0.1: escucha 'carta-editor' en lugar de 'menu'.
+              v1.0.2: elimina suscripción redundante a 'vista:cambiada'
+                      que provocaba doble activación.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -48,13 +49,6 @@ export function activar() {
         renderLienzo(getProductosMenuActivo());
       }
     }, 100);
-  }));
-
-  // Escuchar la ruta 'carta-editor' en lugar de 'menu'
-  _desuscripciones.push(EventBus.on('vista:cambiada', (vista) => {
-    if (vista === 'carta-editor') {
-      activar();
-    }
   }));
 }
 

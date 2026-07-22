@@ -1,9 +1,12 @@
 /* ================================================================
    LaTaberna - PubPOS — MENÚ SUBMÓDULO (ES6)
    Archivo: js/ui/menu/modal-propiedades.js
-   Versión: 1.0.0
+   Versión: 1.0.1
    Propósito: Panel de propiedades para editar fichas del lienzo.
+              v1.0.1: reemplaza formatearDineroLocal por formatearDinero de utils (locale unificado).
    ================================================================ */
+
+import { formatearDinero } from '../../utils.js';
 
 let _fichaActual = null;
 let _onCambio = null;
@@ -30,7 +33,7 @@ export function abrir(ficha, onCambio) {
     document.getElementById('menuPropShape').value = ficha.dataset.shape || 'rect';
     document.getElementById('menuPropDisplay').value = ficha.dataset.display || 'both';
     document.getElementById('menuPropPrice').value = ficha.dataset.price || 0;
-    document.getElementById('menuPropCost').textContent = formatearDineroLocal(ficha.dataset.cost || 0);
+    document.getElementById('menuPropCost').textContent = formatearDinero(ficha.dataset.cost || 0);
     actualizarMargenLocal();
   }
   if (tipo === 'titulo' || tipo === 'descripcion') {
@@ -62,7 +65,7 @@ export function guardarCambios() {
     const precioEl = _fichaActual.querySelector('.precio');
     if (nombreEl) nombreEl.style.display = (_fichaActual.dataset.display === 'both' || _fichaActual.dataset.display === 'name') ? '' : 'none';
     if (imgEl) imgEl.style.display = (_fichaActual.dataset.display === 'both' || _fichaActual.dataset.display === 'img') ? '' : 'none';
-    if (precioEl) precioEl.textContent = formatearDineroLocal(parseFloat(_fichaActual.dataset.price) || 0);
+    if (precioEl) precioEl.textContent = formatearDinero(parseFloat(_fichaActual.dataset.price) || 0);
   }
   if (tipo === 'titulo' || tipo === 'descripcion') {
     _fichaActual.dataset.content = document.getElementById('menuPropContent').value;
@@ -79,12 +82,9 @@ export function eliminarFicha() {
   cerrar();
 }
 
-function formatearDineroLocal(val) {
-  return '$' + (val || 0).toLocaleString('es-AR', { minimumFractionDigits: 0 });
-}
-
 function actualizarMargenLocal() {
-  const costo = parseFloat((document.getElementById('menuPropCost').textContent || '').replace('$','')) || 0;
+  const costoText = document.getElementById('menuPropCost').textContent || '';
+  const costo = parseFloat(costoText.replace(/[^0-9.-]+/g, '')) || 0;
   const precio = parseFloat(document.getElementById('menuPropPrice').value) || 0;
   const margen = costo > 0 ? Math.round((precio - costo) / costo * 100) : 0;
   const spanMargen = document.getElementById('menuPropMargin');

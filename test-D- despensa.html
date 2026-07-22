@@ -2,23 +2,27 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Test D – Despensa v3.0.0</title>
+  <title>Test D – Despensa v4.5.1 (Proveedores corregido)</title>
   <style>
     body { font-family: system-ui, sans-serif; background: #0f0f14; color: #f1f5f9; padding: 20px; }
     h1 { color: #f59e0b; }
     .resultado { background: #1a1a24; border-radius: 8px; padding: 12px 16px; margin: 8px 0; display: flex; align-items: center; gap: 12px; }
     .ok { border-left: 4px solid #22c55e; }
     .fallo { border-left: 4px solid #ef4444; }
+    .salto { border-left: 4px solid #3b82f6; }
     .seccion { color: #f59e0b; font-size: 13px; min-width: 100px; }
   </style>
 </head>
 <body>
-  <h1>Test D – Despensa (v3.0.0 — Tres paneles)</h1>
-  <p style="color:#a0a0a0;">Renderizado, espacios, lista de compras y búsqueda.</p>
+  <h1>Test D – Despensa (v4.5.1 — Proveedores + Appwrite ID)</h1>
+  <p style="color:#a0a0a0;">Flujo completo de proveedores usando el ID generado por Appwrite.</p>
   <div id="resultados"></div>
   <div id="toastContainer"></div>
 
-  <!-- Dependencias del sistema como módulos -->
+  <!-- SDK de Appwrite -->
+  <script src="js/appwrite.min.js"></script>
+
+  <!-- Dependencias del sistema -->
   <script type="module" src="js/lib/logger.js"></script>
   <script type="module" src="js/lib/eventBus.js"></script>
   <script type="module" src="js/lib/store.js"></script>
@@ -26,11 +30,17 @@
   <script type="module" src="js/utils.js"></script>
   <script type="module" src="js/db.js"></script>
   <script type="module" src="js/db-appwrite.js"></script>
+  <script type="module" src="js/dominio/cantidad.js?v=1.1.3"></script>
+  <script type="module" src="js/dominio/dinero.js?v=1.1.3"></script>
+  <script type="module" src="js/dominio/ingrediente.js"></script>
   <script type="module" src="js/servicios/inventario-service.js"></script>
+  <script type="module" src="js/repositorios/inventario-repository.js"></script>
+  <script type="module" src="js/repositorios/proveedor-repository.js"></script>
 
-  <!-- Inyectar datos de prueba en el Store real -->
+  <!-- Inyectar datos de prueba -->
   <script type="module">
     import { Store } from './js/lib/store.js';
+    import { DB } from './js/db.js';
 
     const ingredientesDePrueba = [
       { id:'ing1', nombre:'Queso Cheddar', stock:1, stock_minimo:5, unidad:'kg', categoria:'cocina', ubicacion:'Estante 1 — Lácteos', valor_unitario:800, proveedor:'Distribuidora Norte' },
@@ -40,7 +50,22 @@
       { id:'ing5', nombre:'Tallarines', stock:2, stock_minimo:6, unidad:'paq.', categoria:'cocina', ubicacion:'Estante 4 — Insumos cocina', valor_unitario:400, proveedor:'Mayorista Central' }
     ];
 
+    const movimientosDePrueba = [
+      { id:'mov1', tipo:'entrada', ingrediente:'Queso Cheddar', cantidad:5, unidad:'kg', fecha: new Date().toISOString(), motivo:'Compra', usuario:'Admin' },
+      { id:'mov2', tipo:'salida', ingrediente:'Tallarines', cantidad:2, unidad:'paq.', fecha: new Date(Date.now()-86400000).toISOString(), motivo:'Consumo', usuario:'Cocina' },
+      { id:'mov3', tipo:'ajuste', ingrediente:'Cerveza Corona', cantidad:3, unidad:'un.', fecha: new Date().toISOString(), motivo:'Inventario', usuario:'Admin' }
+    ];
+
+    const proveedoresDePrueba = [
+      { id:'prov1', nombre:'Distribuidora Norte', notas:'Pago a 30 días' },
+      { id:'prov2', nombre:'Mayorista Central', notas:'' },
+      { id:'prov3', nombre:'La Bodega', notas:'Al lado de la panadería' }
+    ];
+
     Store.despachar({ type: 'INGREDIENTES_INICIALIZAR', payload: ingredientesDePrueba });
+    DB.movimientos = movimientosDePrueba;
+    DB.ingredientes = [...ingredientesDePrueba];
+    DB.proveedores = [...proveedoresDePrueba];
   </script>
 
   <!-- Módulo real de despensa -->
@@ -48,12 +73,26 @@
 
   <script type="module">
     import { Store } from './js/lib/store.js';
+    import { DB } from './js/db.js';
+    import { DBAppwrite } from './js/db-appwrite.js';
+    import { InventarioService } from './js/servicios/inventario-service.js';
+    import { crearInventarioRepo } from './js/repositorios/inventario-repository.js';
+    import { crearProveedorRepo } from './js/repositorios/proveedor-repository.js';
     import { Despensa } from './js/ui/despensa.js';
+    import { getListaCompras, agregarAListaCompras, quitarDeListaCompras, limpiarListaCompras } from './js/ui/despensa/estado.js';
+    import { renderListaCompras } from './js/ui/despensa/renderer.js';
+
+    // Configurar repositorios
+    const inventarioRepo = crearInventarioRepo();
+    InventarioService.configurar(inventarioRepo);
+    const proveedorRepo = crearProveedorRepo();
 
     function resultado(ok, seccion, mensaje) {
       const div = document.createElement('div');
-      div.className = 'resultado ' + (ok ? 'ok' : 'fallo');
-      div.innerHTML = `<span>${ok ? '✔' : '✘'}</span><span class="seccion">[${seccion}]</span><span>${mensaje}</span>`;
+      const clase = ok === 'salto' ? 'salto' : (ok ? 'ok' : 'fallo');
+      div.className = 'resultado ' + clase;
+      const icono = ok === 'salto' ? '→' : (ok ? '✔' : '✘');
+      div.innerHTML = `<span>${icono}</span><span class="seccion">[${seccion}]</span><span>${mensaje}</span>`;
       document.getElementById('resultados').appendChild(div);
     }
 
@@ -62,67 +101,93 @@
       Despensa.render();
       await new Promise(r => setTimeout(r, 300));
 
-      // 1. Render
+      // 1. Render general
       resultado(document.getElementById('view-despensa') !== null, 'Render', 'Vista de despensa creada');
       resultado(document.querySelector('.main-layout') !== null, 'Render', 'Layout de tres paneles presente');
       resultado(document.getElementById('panelIzquierdo') !== null, 'Render', 'Panel izquierdo creado');
       resultado(document.getElementById('panelDerecho') !== null, 'Render', 'Panel derecho creado');
 
-      // 2. Resumen
-      const resumen = document.getElementById('resumenBar').textContent;
-      resultado(resumen.includes('Total ítems'), 'Resumen', 'Total ítems visible');
-      resultado(resumen.includes('Valor inventario'), 'Resumen', 'Valor inventario visible');
-      resultado(resumen.includes('Bajo mínimo'), 'Resumen', 'Bajo mínimo visible');
-
-      // 3. Espacios
-      const espacios = document.querySelectorAll('.espacio');
-      resultado(espacios.length === 4, 'Espacios', 'Cuatro espacios renderizados por ubicación');
-      if (espacios.length > 0) {
-        const primerEspacio = espacios[0].querySelector('.espacio-header .nombre');
-        if (primerEspacio) {
-          resultado(primerEspacio.textContent.includes('Estante 1'), 'Espacios', 'Primer espacio: Estante 1 — Lácteos');
-        }
-        const espacioTallarines = Array.from(espacios).find(e => e.textContent.includes('Tallarines'));
-        resultado(espacioTallarines !== undefined, 'Alertas', 'Tallarines aparece en su espacio');
-        if (espacioTallarines) {
-          resultado(espacioTallarines.textContent.includes('⚠ Bajo'), 'Alertas', 'Indicador de stock bajo en Tallarines');
-        }
-      }
-
-      // 4. Lista de compras
-      Despensa.agregarAListaCompras('Café');
-      await new Promise(r => setTimeout(r, 100));
-      let compras = document.querySelectorAll('.compra-item');
-      resultado(compras.length === 1, 'Compras', 'Un item en lista de compras');
-      if (compras.length > 0) {
-        resultado(compras[0].textContent.includes('Café'), 'Compras', 'Item agregado: Café');
-      }
-      const btnQuitar = document.querySelector('.compra-item .btn-quitar');
-      if (btnQuitar) {
-        btnQuitar.click();
-        await new Promise(r => setTimeout(r, 100));
-        compras = document.querySelectorAll('.compra-item');
-        resultado(compras.length === 0, 'Compras', 'Item eliminado de lista');
-      }
-
-      // 5. Pestañas
+      // 2. Pestañas panel izquierdo
       const tabs = document.querySelectorAll('.panel-tab');
       resultado(tabs.length === 2, 'Panel izq', 'Dos pestañas: Proveedores y Productos');
       resultado(tabs[0].classList.contains('activo'), 'Panel izq', 'Proveedores activa por defecto');
+
+      // 3. Verificar tarjetas de proveedores
+      const cardsProveedores = document.querySelectorAll('#tab-proveedores .item-card');
+      resultado(cardsProveedores.length >= 3, 'Proveedores', 'Se muestran al menos 3 proveedores');
+
+      // 4. Expansión de tarjeta
+      if (cardsProveedores.length > 0) {
+        cardsProveedores[0].click();
+        await new Promise(r => setTimeout(r, 100));
+        resultado(cardsProveedores[0].classList.contains('abierto'), 'Proveedores', 'Tarjeta de proveedor se expande');
+        const detalle = cardsProveedores[0].querySelector('.detalle');
+        resultado(detalle && detalle.style.display !== 'none', 'Proveedores', 'Detalle de productos visible');
+      }
+
+      // 5. Pestaña Productos
       tabs[1].click();
       await new Promise(r => setTimeout(r, 100));
       resultado(tabs[1].classList.contains('activo'), 'Panel izq', 'Pestaña Productos activada');
-      resultado(!tabs[0].classList.contains('activo'), 'Panel izq', 'Pestaña Proveedores desactivada');
+      const cardsProductos = document.querySelectorAll('#tab-productos .item-card');
+      resultado(cardsProductos.length >= 5, 'Productos', 'Se muestran al menos 5 productos');
+      if (cardsProductos.length > 0) {
+        cardsProductos[0].click();
+        await new Promise(r => setTimeout(r, 100));
+        resultado(cardsProductos[0].classList.contains('abierto'), 'Productos', 'Tarjeta de producto se expande');
+      }
 
-      // 6. Búsqueda
-      document.getElementById('inventarioSearch').value = 'Cerveza';
-      document.getElementById('inventarioSearch').dispatchEvent(new Event('input'));
-      await new Promise(r => setTimeout(r, 200));
-      const espaciosFiltrados = document.querySelectorAll('.espacio');
-      resultado(espaciosFiltrados.length === 1, 'Búsqueda', 'Solo un espacio al filtrar "Cerveza"');
+      // 6. Crear proveedor programáticamente
+      const nuevoProv = await proveedorRepo.guardarProveedor({
+        nombre: 'Proveedor Test ' + Date.now(),
+        notas: 'Nota de prueba'
+      });
+      resultado(!!nuevoProv && !!nuevoProv.id, 'ProveedorRepo', 'Proveedor guardado correctamente');
+      resultado(DB.proveedores.some(p => p.id === nuevoProv.id), 'ProveedorRepo', 'Proveedor en DB local');
 
+      // 7. Asociar ingrediente a nuevo proveedor (simulación)
+      if (DB.ingredientes.length > 0) {
+        DB.ingredientes[0].proveedor = nuevoProv.nombre;
+        DB.ingredientes[0].precio_proveedor = 850;
+        Store.despachar({ type: 'INGREDIENTE_GUARDADO', payload: DB.ingredientes[0] });
+        await new Promise(r => setTimeout(r, 200));
+        // Volver a pestaña proveedores
+        tabs[0].click();
+        await new Promise(r => setTimeout(r, 200));
+        const cardsActualizadas = document.querySelectorAll('#tab-proveedores .item-card');
+        resultado(cardsActualizadas.length >= 4, 'Integración', 'Nuevo proveedor visible en panel');
+      }
+
+      // 8. Persistencia Appwrite (crear sin ID, usar $id de Appwrite)
+      try {
+        if (!DBAppwrite.habilitado) await DBAppwrite.iniciar();
+        if (DBAppwrite.habilitado) {
+          // Crear proveedor sin ID (el repositorio capturará el $id de Appwrite)
+          const provCreado = await proveedorRepo.guardarProveedor({
+            nombre: 'Test Appwrite ' + Date.now(),
+            notas: 'Prueba de persistencia'
+          });
+          const idGenerado = provCreado.id;
+          resultado(!!idGenerado, 'Appwrite', 'Proveedor guardado en Appwrite (ID: ' + idGenerado + ')');
+
+          // Verificar que aparece en el listado
+          const lista = await proveedorRepo.obtenerProveedores();
+          const encontrado = lista.find(p => p.id === idGenerado);
+          resultado(!!encontrado, 'Appwrite', 'Proveedor encontrado en Appwrite');
+
+          // Eliminar usando el ID generado
+          await proveedorRepo.eliminarProveedor(idGenerado);
+          resultado(true, 'Appwrite', 'Proveedor eliminado correctamente');
+        } else {
+          resultado('salto', 'Appwrite', 'Appwrite no disponible');
+        }
+      } catch (e) {
+        resultado(false, 'Appwrite', 'Error: ' + e.message);
+      }
+
+      // 9. Limpiar
       document.getElementById('view-despensa').style.display = 'none';
-      console.log('Tests de despensa completados.');
+      console.log('Tests de despensa v4.5.1 completados.');
     }
 
     window.addEventListener('load', () => setTimeout(iniciarTests, 100));

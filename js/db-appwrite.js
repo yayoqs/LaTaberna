@@ -1,12 +1,12 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-appwrite.js
-   Versión: 1.1.1
+   Versión: 1.1.2
    Propósito: Cliente de Appwrite (API TablesDB), Realtime y operadores.
               Soporte para Row Security (permisos por fila),
               operadores atómicos y transacciones.
               Configuración de conexión delegada a config-appwrite.js.
-              Colección menus agregada.
+              Colecciones menus y proveedores agregadas.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -34,7 +34,8 @@ export const DBAppwrite = (function() {
     configuracion: 'Configuracion',
     precargas_cliente: 'Precargas_cliente',
     eventos_en_vivo: 'Eventos_en_vivo',
-    menus: 'Menus'
+    menus: 'Menus',
+    proveedores: 'Proveedores'
   };
 
   /**

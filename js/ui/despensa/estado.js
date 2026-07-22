@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — DESPENSA SUBMÓDULO (ES6)
    Archivo: js/ui/despensa/estado.js
-   Versión: 2.0.0
+   Versión: 2.0.2
    Propósito: Estado centralizado de la nueva vista de despensa.
-              Lista de compras, filtros por espacio y búsqueda.
+              v2.0.2: normaliza tipos en lista de compras (solo objetos).
    ================================================================ */
 
 let _listaCompras = [];
@@ -17,13 +17,18 @@ export function getListaCompras() {
 }
 
 export function agregarAListaCompras(item) {
-  if (!_listaCompras.includes(item)) {
-    _listaCompras.push(item);
+  // Solo acepta objetos { nombre, stock }
+  if (typeof item !== 'object' || !item.nombre) return;
+  if (!_listaCompras.some(i => i.nombre === item.nombre)) {
+    _listaCompras.push({ nombre: item.nombre, stock: item.stock || '' });
   }
 }
 
 export function quitarDeListaCompras(item) {
-  _listaCompras = _listaCompras.filter(i => i !== item);
+  // Solo acepta objetos con nombre
+  const nombre = item?.nombre;
+  if (!nombre) return;
+  _listaCompras = _listaCompras.filter(i => i.nombre !== nombre);
 }
 
 export function limpiarListaCompras() {

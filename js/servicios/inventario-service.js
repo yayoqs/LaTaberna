@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — SERVICIO JS (ES6)
    Archivo: js/servicios/inventario-service.js
-   Versión: 1.1.2
+   Versión: 1.1.5
    Propósito: Servicio de casos de uso para inventario e ingredientes.
-              v1.1.2: guarda en Appwrite y actualiza Store local.
+              v1.1.5: Store recibe el objeto retornado por el repo
+                      (con ID correcto).
    ================================================================ */
 
 import { Ingrediente, reconstruirIngrediente } from '../dominio/ingrediente.js';
@@ -50,21 +51,23 @@ const InventarioService = (() => {
       return Resultado.fallo(`Error al crear ingrediente: ${e.message}`);
     }
 
+    // Guardar en repositorio y obtener el objeto definitivo (con ID)
+    let ingredienteGuardado;
     try {
-      await _inventarioRepo.guardarIngrediente(ingrediente.toJSON());
+      ingredienteGuardado = await _inventarioRepo.guardarIngrediente(ingrediente.toJSON());
     } catch (e) {
       return Resultado.fallo(`Error al guardar ingrediente: ${e.message}`);
     }
 
-    // Actualizar Store local para reflejar el cambio en tiempo real
+    // Actualizar Store con el objeto que tiene el ID correcto
     try {
-      Store.despachar({ type: 'INGREDIENTE_GUARDADO', payload: datos });
+      Store.despachar({ type: 'INGREDIENTE_GUARDADO', payload: ingredienteGuardado });
     } catch (e) {
       Logger.warn('[InventarioService] No se pudo actualizar Store:', e);
     }
 
     EventBus.emit('ingredientes:actualizados');
-    return Resultado.ok(ingrediente);
+    return Resultado.ok(ingredienteGuardado);
   }
 
   async function ajustarStock(id, delta, motivo = 'Ajuste manual') {

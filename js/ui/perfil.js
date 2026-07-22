@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/perfil.js
-   Versión: 1.0.8
+   Versión: 1.0.9
    Propósito: Vista de perfil de usuario: avatar, datos.
-              v1.0.8: elimina sección de documentos (DB.llamar roto).
+              v1.0.9: elimina autoactivación en scope de módulo.
    ================================================================ */
 
 import { Auth } from '../auth.js';
@@ -198,7 +198,7 @@ const Perfil = (() => {
     _desuscripciones = [];
   }
 
-  activar();
+  // ❌ Eliminada autoactivación: activar();
 
   return { activar, limpiar, render, mostrarModalEditar, cerrarModalEditar, guardarPerfil };
 })();

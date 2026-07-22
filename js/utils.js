@@ -1,41 +1,40 @@
 /* ================================================================
    LaTaberna - PubPOS — UTILIDADES COMPARTIDAS (ES6)
    Archivo: js/utils.js
-   Versión: 1.4.0
+   Versión: 1.5.0
    Propósito: Utilidades compartidas entre todas las células.
-              Nombres migrados al español. Se mantienen alias en
-              inglés por una iteración.
+              v1.5.0: locale cambiado de 'es-AR' a 'es-CL'.
    ================================================================ */
 
 export function formatearDinero(n) {
-  return '$' + (n || 0).toLocaleString('es-AR', { minimumFractionDigits: 0 });
+  return '$' + (n || 0).toLocaleString('es-CL', { minimumFractionDigits: 0 });
 }
 
 export function formatearDineroTicket(n) {
-  return '$' + (n || 0).toLocaleString('es-AR', { minimumFractionDigits: 0 });
+  return '$' + (n || 0).toLocaleString('es-CL', { minimumFractionDigits: 0 });
 }
 
 export function formatearFechaLarga() {
   const now = new Date();
-  const s = now.toLocaleDateString('es-AR', {
+  const s = now.toLocaleDateString('es-CL', {
     weekday: 'long', day: '2-digit', month: 'long', year: 'numeric'
   });
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 export function formatearHoraCompleta() {
-  return new Date().toLocaleTimeString('es-AR', {
+  return new Date().toLocaleTimeString('es-CL', {
     hour: '2-digit', minute: '2-digit', second: '2-digit'
   });
 }
 
 export function formatearHoraCorta(ts) {
   if (!ts) return '—';
-  return new Date(ts).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+  return new Date(ts).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
 }
 
 export function formatearFechaCorta() {
-  return new Date().toLocaleDateString('es-AR', {
+  return new Date().toLocaleDateString('es-CL', {
     day: '2-digit', month: '2-digit', year: 'numeric'
   });
 }

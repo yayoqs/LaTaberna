@@ -1,10 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/bootstrap.js
-   Versión: 1.0.7
+   Versión: 1.0.10
    Propósito: Secuencia de arranque: Auth, DB, Store, dependencias.
-              Incluye import de InventarioService y configuración
-              de su repositorio.
+              Usa crearInventarioRepo() en lugar de definición inline.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -17,6 +16,7 @@ import { InventarioService } from './servicios/inventario-service.js';
 import { mostrarToast } from './utils.js';
 import { TurnoManager } from './managers/turno-manager.js';
 import { App } from './app.js';
+import { crearInventarioRepo } from './repositorios/inventario-repository.js';
 
 const Bootstrap = (() => {
 
@@ -46,14 +46,14 @@ const Bootstrap = (() => {
 
     // 3. Poblar Store con los datos iniciales
     if (typeof Store !== 'undefined') {
-      Store.dispatch({ type: 'MESAS_INICIALIZAR',       payload: DB.mesas || [] });
-      Store.dispatch({ type: 'PEDIDOS_INICIALIZAR',     payload: DB.pedidos || [] });
-      Store.dispatch({ type: 'PRODUCTOS_INICIALIZAR',   payload: DB.productos || [] });
-      Store.dispatch({ type: 'INGREDIENTES_INICIALIZAR', payload: DB.ingredientes || [] });
-      Store.dispatch({ type: 'RECETAS_INICIALIZAR',      payload: DB.recetas || [] });
-      Store.dispatch({ type: 'MOZOS_INICIALIZAR',        payload: DB.mozos || [] });
-      Store.dispatch({ type: 'CONFIG_INICIALIZAR',       payload: DB.config || {} });
-      Store.dispatch({ type: 'PEDIDOSDELIVERY_INICIALIZAR', payload: DB.pedidosDelivery || [] });
+      Store.despachar({ type: 'MESAS_INICIALIZAR',       payload: DB.mesas || [] });
+      Store.despachar({ type: 'PEDIDOS_INICIALIZAR',     payload: DB.pedidos || [] });
+      Store.despachar({ type: 'PRODUCTOS_INICIALIZAR',   payload: DB.productos || [] });
+      Store.despachar({ type: 'INGREDIENTES_INICIALIZAR', payload: DB.ingredientes || [] });
+      Store.despachar({ type: 'RECETAS_INICIALIZAR',      payload: DB.recetas || [] });
+      Store.despachar({ type: 'MOZOS_INICIALIZAR',        payload: DB.mozos || [] });
+      Store.despachar({ type: 'CONFIG_INICIALIZAR',       payload: DB.config || {} });
+      Store.despachar({ type: 'PEDIDOSDELIVERY_INICIALIZAR', payload: DB.pedidosDelivery || [] });
       Logger.info('[Bootstrap] Store poblado con datos iniciales.');
     }
 
@@ -69,20 +69,7 @@ const Bootstrap = (() => {
       }
     };
 
-    const inventarioRepo = {
-      async guardarIngrediente(datos) {
-        if (typeof DBAppwrite !== 'undefined' && DBAppwrite.habilitado) {
-          await DBAppwrite.crear('ingredientes', datos);
-        }
-        return datos;
-      },
-      async obtenerPorId(id) { return (DB.ingredientes || []).find(i => i.id == id) || null; },
-      async registrarMovimiento(movimiento) {
-        if (typeof DB.ajustarStock === 'function') {
-          DB.ajustarStock(movimiento.ingredienteId, movimiento.cantidad, movimiento.motivo);
-        }
-      }
-    };
+    const inventarioRepo = crearInventarioRepo();  // ← Usa el módulo unificado de Célula D
 
     if (typeof Deps !== 'undefined') {
       if (pedidoRepo) Deps.registrar('pedidoRepo', pedidoRepo);

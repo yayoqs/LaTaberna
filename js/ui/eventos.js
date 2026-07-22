@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/eventos.js
-   Versión: 1.0.8
+   Versión: 1.0.9
    Propósito: Vista de gestión de eventos administrativos.
-              v1.0.8: elimina autoactivación.
+              v1.0.9: elimina autoactivación en scope de módulo.
    ================================================================ */
 
 import { EventBus } from '../lib/eventBus.js';

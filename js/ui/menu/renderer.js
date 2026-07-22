@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MENÚ SUBMÓDULO (ES6)
    Archivo: js/ui/menu/renderer.js
-   Versión: 1.0.1
+   Versión: 1.0.2
    Propósito: Construcción del DOM y renderizado de la vista de menú.
-              v1.0.1: usa view-carta-editor como id de contenedor.
+              v1.0.2: encapsula todos los estilos inyectados bajo
+                      #view-carta-editor.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -114,70 +115,70 @@ export function asegurarVista() {
     </div>
   `;
 
-  // Vincular estilos mínimos si no existen
+  // Vincular estilos encapsulados si no existen
   if (!document.getElementById('menu-inline-styles')) {
     const style = document.createElement('style');
     style.id = 'menu-inline-styles';
     style.textContent = `
-      .menu-header { display: flex; align-items: center; gap: 12px; padding: 12px 20px; background: var(--color-card); border-bottom: 1px solid var(--color-border); }
-      .menu-header h2 { font-size: 18px; margin: 0; display: flex; align-items: center; gap: 8px; flex: 1; }
-      .menu-header h2 input { background: transparent; border: none; color: var(--color-text); font-size: 18px; font-weight: 600; outline: none; border-bottom: 1px dashed transparent; width: 160px; }
-      .menu-header h2 input:focus { border-bottom-color: var(--color-accent); }
-      .canvas-wrap { flex: 1; overflow: auto; position: relative; padding: 16px; display: flex; align-items: center; justify-content: center; }
-      .canvas { width: 100%; max-width: 600px; min-height: 400px; height: 70vh; position: relative; border-radius: 12px; box-shadow: 0 0 0 1px var(--color-border); }
-      .canvas.grid { background-image: linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px); background-size: 40px 40px; }
-      .ficha { position: absolute; min-width: 90px; background: rgba(0,0,0,.7); border: 2px solid transparent; border-radius: 8px; display: flex; flex-direction: column; align-items: center; padding: 8px; cursor: move; touch-action: none; }
-      .ficha img { width: 60px; height: 60px; object-fit: cover; border-radius: 6px; pointer-events: none; }
-      .ficha .nombre { font-weight: 600; font-size: 12px; margin-top: 4px; text-align: center; }
-      .ficha .precio { font-size: 11px; color: var(--color-accent); margin-top: 2px; }
-      .ficha.titulo { background: transparent; font-size: 24px; font-weight: 800; padding: 12px; border: none; }
-      .ficha.descripcion { background: rgba(255,255,255,.05); font-size: 14px; padding: 12px; max-width: 300px; }
-      .ficha.imagen-decorativa { background: transparent; padding: 0; border-radius: 8px; }
-      .ficha.fondo-seccion { background: rgba(255,255,255,.03); border-radius: 12px; min-width: 200px; min-height: 80px; z-index: -1; }
-      .ficha.circulo { border-radius: 50%; min-width: 80px; min-height: 80px; }
-      .fab { position: fixed; bottom: 24px; right: 24px; width: 56px; height: 56px; background: var(--color-accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; color: #000; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,.4); z-index: 40; border: none; }
-      .radial-menu { position: fixed; bottom: 90px; right: 30px; z-index: 50; display: none; flex-direction: column-reverse; align-items: flex-end; gap: 8px; }
-      .radial-menu.active { display: flex; }
-      .radial-btn { background: var(--color-card); border: 1px solid var(--color-border); color: var(--color-text); border-radius: 24px; padding: 10px 16px; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,.3); }
-      .fab-overlay { position: fixed; inset: 0; z-index: 39; display: none; background: rgba(0,0,0,.4); }
-      .fab-overlay.active { display: block; }
-      .sidebar-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 30; display: none; }
-      .sidebar-overlay.active { display: block; }
-      .sidebar { position: fixed; top: 0; left: 0; bottom: 0; z-index: 40; width: 280px; max-width: 85vw; background: var(--color-card); border-right: 1px solid var(--color-border); transform: translateX(-100%); transition: transform .3s; display: flex; flex-direction: column; box-shadow: 4px 0 20px rgba(0,0,0,.3); }
-      .sidebar.active { transform: translateX(0); }
-      .sidebar-header { padding: 16px; border-bottom: 1px solid var(--color-border); display: flex; align-items: center; justify-content: space-between; }
-      .sidebar-header h3 { margin: 0; font-size: 16px; }
-      .sidebar-list { flex: 1; overflow-y: auto; padding: 8px; }
-      .menu-item { padding: 12px 16px; border-radius: 8px; cursor: pointer; margin-bottom: 4px; display: flex; align-items: center; gap: 10px; }
-      .menu-item:hover, .menu-item:active { background: #252535; }
-      .menu-item.activo { background: rgba(245,158,11,.15); border-left: 3px solid var(--color-accent); }
-      .menu-item .menu-icon { font-size: 20px; }
-      .menu-item .menu-info { flex: 1; }
-      .menu-item .menu-info strong { font-size: 14px; display: block; }
-      .menu-item .menu-info span { font-size: 11px; color: var(--color-text-muted); }
-      .sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 50; display: none; }
-      .sheet-overlay.active { display: block; }
-      .bottom-sheet { position: fixed; bottom: 0; left: 0; right: 0; z-index: 60; background: var(--color-card); border-radius: 16px 16px 0 0; max-height: 60vh; transform: translateY(100%); transition: transform .3s; display: flex; flex-direction: column; box-shadow: 0 -8px 30px rgba(0,0,0,.5); }
-      .bottom-sheet.active { transform: translateY(0); }
-      .sheet-handle { padding: 12px; text-align: center; font-weight: 700; font-size: 14px; border-bottom: 1px solid var(--color-border); color: var(--color-text-muted); }
-      .sheet-list { flex: 1; overflow-y: auto; padding: 8px; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
-      .product-card { background: #252535; border-radius: 8px; padding: 8px; cursor: grab; display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; touch-action: none; }
-      .product-card img { width: 60px; height: 60px; object-fit: cover; border-radius: 6px; pointer-events: none; }
-      .product-card .info strong { font-size: 12px; }
-      .product-card .info span { font-size: 10px; color: var(--color-text-muted); }
-      .props-panel { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); background: var(--color-card); border: 1px solid var(--color-border); border-radius: 12px; padding: 20px; width: calc(100% - 40px); max-width: 360px; z-index: 100; display: none; flex-direction: column; gap: 10px; }
-      .props-panel.active { display: flex; }
-      .props-panel label { font-size: 12px; color: var(--color-text-muted); }
-      .props-panel input, .props-panel select, .props-panel textarea { background: #252535; border: 1px solid var(--color-border); color: var(--color-text); padding: 8px 12px; border-radius: 6px; width: 100%; resize: vertical; }
-      .preview-modal { position: fixed; inset: 0; background: rgba(0,0,0,.85); z-index: 200; display: none; align-items: center; justify-content: center; }
-      .preview-modal.active { display: flex; }
-      .preview-content { width: 90vw; max-height: 80vh; background: var(--color-card); border-radius: 12px; overflow: auto; padding: 20px; position: relative; }
-      .preview-content .close-btn { position: absolute; top: 10px; right: 20px; background: var(--color-danger); color: #fff; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
-      .context-menu { position: absolute; top: 50px; right: 20px; background: var(--color-card); border: 1px solid var(--color-border); border-radius: 8px; padding: 8px; z-index: 80; display: none; flex-direction: column; gap: 6px; box-shadow: 0 8px 20px rgba(0,0,0,.5); min-width: 200px; }
-      .context-menu.active { display: flex; }
-      .context-menu label { font-size: 12px; color: var(--color-text-muted); }
-      .context-menu select, .context-menu input { background: #252535; border: 1px solid var(--color-border); color: var(--color-text); padding: 6px 10px; border-radius: 6px; width: 100%; }
-      .context-menu button { margin-top: 4px; background: var(--color-accent); border: none; color: #000; padding: 8px; border-radius: 6px; font-weight: 600; cursor: pointer; }
+      #view-carta-editor .menu-header { display: flex; align-items: center; gap: 12px; padding: 12px 20px; background: var(--color-card); border-bottom: 1px solid var(--color-border); }
+      #view-carta-editor .menu-header h2 { font-size: 18px; margin: 0; display: flex; align-items: center; gap: 8px; flex: 1; }
+      #view-carta-editor .menu-header h2 input { background: transparent; border: none; color: var(--color-text); font-size: 18px; font-weight: 600; outline: none; border-bottom: 1px dashed transparent; width: 160px; }
+      #view-carta-editor .menu-header h2 input:focus { border-bottom-color: var(--color-accent); }
+      #view-carta-editor .canvas-wrap { flex: 1; overflow: auto; position: relative; padding: 16px; display: flex; align-items: center; justify-content: center; }
+      #view-carta-editor .canvas { width: 100%; max-width: 600px; min-height: 400px; height: 70vh; position: relative; border-radius: 12px; box-shadow: 0 0 0 1px var(--color-border); }
+      #view-carta-editor .canvas.grid { background-image: linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px); background-size: 40px 40px; }
+      #view-carta-editor .ficha { position: absolute; min-width: 90px; background: rgba(0,0,0,.7); border: 2px solid transparent; border-radius: 8px; display: flex; flex-direction: column; align-items: center; padding: 8px; cursor: move; touch-action: none; }
+      #view-carta-editor .ficha img { width: 60px; height: 60px; object-fit: cover; border-radius: 6px; pointer-events: none; }
+      #view-carta-editor .ficha .nombre { font-weight: 600; font-size: 12px; margin-top: 4px; text-align: center; }
+      #view-carta-editor .ficha .precio { font-size: 11px; color: var(--color-accent); margin-top: 2px; }
+      #view-carta-editor .ficha.titulo { background: transparent; font-size: 24px; font-weight: 800; padding: 12px; border: none; }
+      #view-carta-editor .ficha.descripcion { background: rgba(255,255,255,.05); font-size: 14px; padding: 12px; max-width: 300px; }
+      #view-carta-editor .ficha.imagen-decorativa { background: transparent; padding: 0; border-radius: 8px; }
+      #view-carta-editor .ficha.fondo-seccion { background: rgba(255,255,255,.03); border-radius: 12px; min-width: 200px; min-height: 80px; z-index: -1; }
+      #view-carta-editor .ficha.circulo { border-radius: 50%; min-width: 80px; min-height: 80px; }
+      #view-carta-editor .fab { position: fixed; bottom: 24px; right: 24px; width: 56px; height: 56px; background: var(--color-accent); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 28px; color: #000; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,.4); z-index: 40; border: none; }
+      #view-carta-editor .radial-menu { position: fixed; bottom: 90px; right: 30px; z-index: 50; display: none; flex-direction: column-reverse; align-items: flex-end; gap: 8px; }
+      #view-carta-editor .radial-menu.active { display: flex; }
+      #view-carta-editor .radial-btn { background: var(--color-card); border: 1px solid var(--color-border); color: var(--color-text); border-radius: 24px; padding: 10px 16px; display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; box-shadow: 0 4px 12px rgba(0,0,0,.3); }
+      #view-carta-editor .fab-overlay { position: fixed; inset: 0; z-index: 39; display: none; background: rgba(0,0,0,.4); }
+      #view-carta-editor .fab-overlay.active { display: block; }
+      #view-carta-editor .sidebar-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 30; display: none; }
+      #view-carta-editor .sidebar-overlay.active { display: block; }
+      #view-carta-editor .sidebar { position: fixed; top: 0; left: 0; bottom: 0; z-index: 40; width: 280px; max-width: 85vw; background: var(--color-card); border-right: 1px solid var(--color-border); transform: translateX(-100%); transition: transform .3s; display: flex; flex-direction: column; box-shadow: 4px 0 20px rgba(0,0,0,.3); }
+      #view-carta-editor .sidebar.active { transform: translateX(0); }
+      #view-carta-editor .sidebar-header { padding: 16px; border-bottom: 1px solid var(--color-border); display: flex; align-items: center; justify-content: space-between; }
+      #view-carta-editor .sidebar-header h3 { margin: 0; font-size: 16px; }
+      #view-carta-editor .sidebar-list { flex: 1; overflow-y: auto; padding: 8px; }
+      #view-carta-editor .menu-item { padding: 12px 16px; border-radius: 8px; cursor: pointer; margin-bottom: 4px; display: flex; align-items: center; gap: 10px; }
+      #view-carta-editor .menu-item:hover, #view-carta-editor .menu-item:active { background: #252535; }
+      #view-carta-editor .menu-item.activo { background: rgba(245,158,11,.15); border-left: 3px solid var(--color-accent); }
+      #view-carta-editor .menu-item .menu-icon { font-size: 20px; }
+      #view-carta-editor .menu-item .menu-info { flex: 1; }
+      #view-carta-editor .menu-item .menu-info strong { font-size: 14px; display: block; }
+      #view-carta-editor .menu-item .menu-info span { font-size: 11px; color: var(--color-text-muted); }
+      #view-carta-editor .sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 50; display: none; }
+      #view-carta-editor .sheet-overlay.active { display: block; }
+      #view-carta-editor .bottom-sheet { position: fixed; bottom: 0; left: 0; right: 0; z-index: 60; background: var(--color-card); border-radius: 16px 16px 0 0; max-height: 60vh; transform: translateY(100%); transition: transform .3s; display: flex; flex-direction: column; box-shadow: 0 -8px 30px rgba(0,0,0,.5); }
+      #view-carta-editor .bottom-sheet.active { transform: translateY(0); }
+      #view-carta-editor .sheet-handle { padding: 12px; text-align: center; font-weight: 700; font-size: 14px; border-bottom: 1px solid var(--color-border); color: var(--color-text-muted); }
+      #view-carta-editor .sheet-list { flex: 1; overflow-y: auto; padding: 8px; display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+      #view-carta-editor .product-card { background: #252535; border-radius: 8px; padding: 8px; cursor: grab; display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; touch-action: none; }
+      #view-carta-editor .product-card img { width: 60px; height: 60px; object-fit: cover; border-radius: 6px; pointer-events: none; }
+      #view-carta-editor .product-card .info strong { font-size: 12px; }
+      #view-carta-editor .product-card .info span { font-size: 10px; color: var(--color-text-muted); }
+      #view-carta-editor .props-panel { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); background: var(--color-card); border: 1px solid var(--color-border); border-radius: 12px; padding: 20px; width: calc(100% - 40px); max-width: 360px; z-index: 100; display: none; flex-direction: column; gap: 10px; }
+      #view-carta-editor .props-panel.active { display: flex; }
+      #view-carta-editor .props-panel label { font-size: 12px; color: var(--color-text-muted); }
+      #view-carta-editor .props-panel input, #view-carta-editor .props-panel select, #view-carta-editor .props-panel textarea { background: #252535; border: 1px solid var(--color-border); color: var(--color-text); padding: 8px 12px; border-radius: 6px; width: 100%; resize: vertical; }
+      #view-carta-editor .preview-modal { position: fixed; inset: 0; background: rgba(0,0,0,.85); z-index: 200; display: none; align-items: center; justify-content: center; }
+      #view-carta-editor .preview-modal.active { display: flex; }
+      #view-carta-editor .preview-content { width: 90vw; max-height: 80vh; background: var(--color-card); border-radius: 12px; overflow: auto; padding: 20px; position: relative; }
+      #view-carta-editor .preview-content .close-btn { position: absolute; top: 10px; right: 20px; background: var(--color-danger); color: #fff; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+      #view-carta-editor .context-menu { position: absolute; top: 50px; right: 20px; background: var(--color-card); border: 1px solid var(--color-border); border-radius: 8px; padding: 8px; z-index: 80; display: none; flex-direction: column; gap: 6px; box-shadow: 0 8px 20px rgba(0,0,0,.5); min-width: 200px; }
+      #view-carta-editor .context-menu.active { display: flex; }
+      #view-carta-editor .context-menu label { font-size: 12px; color: var(--color-text-muted); }
+      #view-carta-editor .context-menu select, #view-carta-editor .context-menu input { background: #252535; border: 1px solid var(--color-border); color: var(--color-text); padding: 6px 10px; border-radius: 6px; width: 100%; }
+      #view-carta-editor .context-menu button { margin-top: 4px; background: var(--color-accent); border: none; color: #000; padding: 8px; border-radius: 6px; font-weight: 600; cursor: pointer; }
     `;
     document.head.appendChild(style);
   }
@@ -205,7 +206,7 @@ export function renderBiblioteca(productos) {
   lista.innerHTML = productos.map(p => `
     <div class="product-card" draggable="true" data-id="${p.id}" data-nombre="${p.nombre}" data-costo="${p.costo || 0}" data-imagen="${p.imagen || ''}">
       ${p.imagen ? `<img src="${p.imagen}" alt="${p.nombre}" onerror="this.style.display='none'">` : ''}
-      <div class="info"><strong>${p.nombre}</strong><span>Costo $${p.costo || 0}</span></div>
+      <div class="info"><strong>${p.nombre}</strong><span>Costo ${formatearDinero(p.costo)}</span></div>
     </div>
   `).join('');
 }

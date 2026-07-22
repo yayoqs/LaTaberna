@@ -1,14 +1,14 @@
 /* ================================================================
    LaTaberna - PubPOS — DOMINIO JS (ES6)
    Archivo: js/dominio/cantidad.js
-   Versión: 1.1.2
-   Propósito: Objeto de Valor Cantidad: entero positivo inmutable.
-              Sin asignaciones window.
+   Versión: 1.1.3
+   Propósito: Objeto de Valor Cantidad: número positivo inmutable.
+              Acepta tanto enteros como decimales.
    ================================================================ */
 
 export class Cantidad {
   constructor(valor) {
-    if (!Number.isInteger(valor) || valor <= 0) {
+    if (typeof valor !== 'number' || isNaN(valor) || valor <= 0) {
       throw new Error(`Cantidad inválida: ${valor}`);
     }
     this._valor = valor;

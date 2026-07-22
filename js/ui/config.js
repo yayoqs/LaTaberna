@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/config.js
-   Versión: 2.0.0
-   Propósito: Vista de configuración del local: datos, zonas, impresoras,
-              mozos y contraseñas. Eliminada la sección de Productos/Carta.
+   Versión: 2.0.1
+   Propósito: Vista de configuración del local: datos, zonas, impresoras, mozos y contraseñas. Eliminada la sección de Productos/Carta.
+              v2.0.1: elimina autoactivación en scope de módulo.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -373,7 +373,7 @@ const Config = (() => {
     }
   }
 
-  activar();
+  // ❌ Eliminada autoactivación: activar();
 
   return {
     activar, limpiar, cargar, guardar,
