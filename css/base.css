@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/base.css
-   Versión: 1.0.1
+   Versión: 1.0.2
    Propósito: Reset, body, scrollbars, utilidades globales y botones
-              genéricos. Suavizado de fuentes movido a badges.
+              genéricos. Previene conflicto de gestos del navegador.
    ================================================================ */
 
 /* ── RESET ─────────────────────────────────────────────────── */
@@ -16,6 +16,10 @@ html, body {
   font-size: 14px;
   background: var(--color-bg);
   color: var(--color-text);
+}
+
+html {
+  overscroll-behavior-x: none;
 }
 
 /* ── SCROLLBAR GLOBAL ──────────────────────────────────────── */
