@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — SERVICIO JS (ES6)
    Archivo: js/servicios/inventario-service.js
-   Versión: 1.1.5
+   Versión: 1.1.6
    Propósito: Servicio de casos de uso para inventario e ingredientes.
-              v1.1.5: Store recibe el objeto retornado por el repo
-                      (con ID correcto).
+              v1.1.6: preserva proveedor y precio_proveedor en el JSON
+                      que se envía al repositorio.
    ================================================================ */
 
 import { Ingrediente, reconstruirIngrediente } from '../dominio/ingrediente.js';
@@ -51,10 +51,15 @@ const InventarioService = (() => {
       return Resultado.fallo(`Error al crear ingrediente: ${e.message}`);
     }
 
+    // Construir JSON completo incluyendo campos que el modelo no contempla
+    const jsonIngrediente = ingrediente.toJSON();
+    jsonIngrediente.proveedor = datos.proveedor || '';
+    jsonIngrediente.precio_proveedor = datos.precio_proveedor || 0;
+
     // Guardar en repositorio y obtener el objeto definitivo (con ID)
     let ingredienteGuardado;
     try {
-      ingredienteGuardado = await _inventarioRepo.guardarIngrediente(ingrediente.toJSON());
+      ingredienteGuardado = await _inventarioRepo.guardarIngrediente(jsonIngrediente);
     } catch (e) {
       return Resultado.fallo(`Error al guardar ingrediente: ${e.message}`);
     }

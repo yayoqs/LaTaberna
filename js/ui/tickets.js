@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/tickets.js
-   Versión: 1.1.0
+   Versión: 1.1.1
    Propósito: Generación y visualización de tickets de comanda, cuenta y cierre.
-              Migración a nombres en español (utils).
+              Migración de var a let/const.
    ================================================================ */
 
 import { formatearDinero, formatearDineroTicket, formatearHoraCorta, formatearFechaCorta, calcularTotal, mostrarToast } from '../utils.js';

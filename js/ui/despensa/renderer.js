@@ -1,15 +1,14 @@
 /* ================================================================
    LaTaberna - PubPOS — DESPENSA SUBMÓDULO (ES6)
    Archivo: js/ui/despensa/renderer.js
-   Versión: 4.2.0
+   Versión: 4.2.1
    Propósito: Renderizado de la vista de despensa con panel izquierdo
               tipo acordeón (Proveedores/Productos) como la maqueta.
+              v4.2.1: renderMovimientos solo lee del Store.
    ================================================================ */
 
 import { formatearDinero, formatearHoraCorta } from '../../utils.js';
 import { Store } from '../../lib/store.js';
-import { DB } from '../../db.js';
-import { getListaCompras } from './estado.js';
 
 export function asegurarVista() {
   let main = document.getElementById('view-despensa');
@@ -85,7 +84,6 @@ export function asegurarVista() {
   main.classList.add('active');
 }
 
-// ── HELPERS ──────────────────────────────────────────────
 function _normalizarIngredientes(ingredientes) {
   return ingredientes.map(ing => {
     if (!ing) return null;
@@ -96,7 +94,6 @@ function _normalizarIngredientes(ingredientes) {
   }).filter(Boolean);
 }
 
-// ── PANEL CENTRAL (inventario) ──────────────────────────
 export function renderResumen(ingredientes) {
   const bar = document.getElementById('resumenBar');
   if (!bar) return;
@@ -148,11 +145,10 @@ export function renderEspacios(ingredientes) {
   container.querySelectorAll('.espacio-header').forEach(h => h.addEventListener('click', () => h.parentElement.classList.toggle('abierto')));
 }
 
-// ── MOVIMIENTOS ──────────────────────────────────────────
 export function renderMovimientos(filtro = 'todos') {
   const cont = document.getElementById('movimientosContainer');
   if (!cont) return;
-  const movs = (Store.obtenerEstado().movimientos || DB.movimientos || []);
+  const movs = Store.obtenerEstado().movimientos || [];
   const filtrados = filtro === 'todos' ? movs : movs.filter(m => m.tipo === filtro);
   if (!filtrados.length) {
     cont.innerHTML = '<p style="color:var(--color-text-muted); padding:20px; text-align:center;">Sin movimientos registrados.</p>';
@@ -181,7 +177,6 @@ export function renderMovimientos(filtro = 'todos') {
   `).join('');
 }
 
-// ── LISTA DE COMPRAS ────────────────────────────────────
 export function renderListaCompras(items) {
   const lista = document.getElementById('listaCompras');
   if (!lista) return;
@@ -193,7 +188,6 @@ export function renderListaCompras(items) {
   `).join('');
 }
 
-// ── PANEL IZQUIERDO (PROVEEDORES) ──────────────────────
 export function renderProveedores(proveedores) {
   const tab = document.getElementById('tab-proveedores');
   if (!tab) return;
@@ -218,7 +212,6 @@ export function renderProveedores(proveedores) {
   tab.querySelectorAll('.item-card').forEach(card => card.addEventListener('click', () => card.classList.toggle('abierto')));
 }
 
-// ── PANEL IZQUIERDO (PRODUCTOS) ─────────────────────────
 export function renderProductosDisponibles(productos) {
   const tab = document.getElementById('tab-productos');
   if (!tab) return;
@@ -243,7 +236,6 @@ export function renderProductosDisponibles(productos) {
   tab.querySelectorAll('.item-card').forEach(card => card.addEventListener('click', () => card.classList.toggle('abierto')));
 }
 
-// ── GESTIÓN DE PANELES ─────────────────────────────────
 function _calcularTopPanel() {
   const appHeader = document.querySelector('.app-header');
   if (!appHeader) return '0';

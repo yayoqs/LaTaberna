@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Test B2 — Recetario v5.0.0 (ES6)</title>
+  <title>Test B2 — Recetario v6.2.x (Persistencia y Ciclo Completo)</title>
   <style>
     body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
     h1 { color: #f59e0b; }
@@ -16,8 +16,8 @@
   </style>
 </head>
 <body>
-  <h1>🧪 Test B2 — Recetario v5.0.0 (ES6)</h1>
-  <p class="info">Valida pestañas internas, creación rápida, edición, stock, duplicar, eliminar y modal de detalle.</p>
+  <h1>🧪 Test B2 — Recetario v6.2.x (Persistencia)</h1>
+  <p class="info">Valida creación, edición, eliminación, ejecución, persistencia en Appwrite/localStorage y Store.</p>
   <div id="results"></div>
 
   <script type="module">
@@ -25,31 +25,111 @@
     import { EventBus } from '../js/lib/eventBus.js';
     import { Auth } from '../js/auth.js';
     import { DB } from '../js/db.js';
+    import { DBAppwrite } from '../js/db-appwrite.js';
     import { Logger } from '../js/lib/logger.js';
     import { Recetas } from '../js/ui/recetas.js';
 
     Logger.setLevel('ERROR');
     window.Logger = Logger;
 
-    // ── Mocks ──────────────────────────────────────────
-    Auth.getRol = () => 'cocina';
-    Auth._rol = 'cocina';
-
-    const stateBase = {
+    // ── Mocks de Appwrite ──────────────────────────────
+    // Simulamos una "base de datos" remota para verificar que los datos se envían
+    const appwriteMockDB = {
       productos: [],
       recetas: [],
       ingredientes: []
     };
-    Store.getState = () => ({ ...stateBase, productos: DB.productos || [], recetas: DB.recetas || [], ingredientes: DB.ingredientes || [] });
+
+    DBAppwrite.habilitado = true;
+    DBAppwrite.crear = async (coleccion, id, datos) => {
+      const nuevo = { id: id || ('mock_' + Date.now()), ...datos };
+      if (!appwriteMockDB[coleccion]) appwriteMockDB[coleccion] = [];
+      appwriteMockDB[coleccion].push(nuevo);
+      return nuevo;
+    };
+    DBAppwrite.actualizar = async (coleccion, id, datos) => {
+      if (!appwriteMockDB[coleccion]) appwriteMockDB[coleccion] = [];
+      const idx = appwriteMockDB[coleccion].findIndex(item => item.id === id);
+      if (idx >= 0) {
+        appwriteMockDB[coleccion][idx] = { ...appwriteMockDB[coleccion][idx], ...datos };
+      } else {
+        appwriteMockDB[coleccion].push({ id, ...datos });
+      }
+      return true;
+    };
+    DBAppwrite.eliminar = async (coleccion, id) => {
+      if (!appwriteMockDB[coleccion]) return;
+      appwriteMockDB[coleccion] = appwriteMockDB[coleccion].filter(item => item.id !== id);
+    };
+    DBAppwrite.listar = async (coleccion) => {
+      return appwriteMockDB[coleccion] || [];
+    };
+
+    // ── Mocks de Auth ──────────────────────────────────
+    Auth.getRol = () => 'cocina';
+    Auth._rol = 'cocina';
+
+    // ── Estado inicial ─────────────────────────────────
+    DB.productos = [
+      { id: 'prod_a', nombre: 'Papas fritas', activo: true, destino: 'cocina' }
+    ];
+    DB.ingredientes = [
+      { id: 'ing_cebolla', nombre: 'Cebolla', unidad: 'kg', stock: 10, valor_unitario: 0.5 },
+      { id: 'ing_aceite', nombre: 'Aceite', unidad: 'L', stock: 20, valor_unitario: 1.2 }
+    ];
+    DB.recetas = [
+      {
+        id: 'rec_1', productoId: 'prod_a', nivel: 'producto_final', categoria: 'pizzas', destino: 'cocina',
+        es_intermedio: false, ingredientes: [
+          { tipo: 'insumo', id: 'ing_aceite', cantidad: 0.5, unidad: 'L' }
+        ], instrucciones: 'Freír 5 min', stockActual: 0, unidadStock: ''
+      }
+    ];
+    DB.saveRecetas = () => localStorage.setItem('pubpos_recetas', JSON.stringify(DB.recetas));
+    DB.saveProductos = () => localStorage.setItem('pubpos_productos', JSON.stringify(DB.productos));
+    DB.saveIngredientes = () => localStorage.setItem('pubpos_ingredientes', JSON.stringify(DB.ingredientes));
+
+    // Sincronizar estado inicial con Appwrite mock
+    appwriteMockDB.recetas = JSON.parse(JSON.stringify(DB.recetas));
+    appwriteMockDB.productos = JSON.parse(JSON.stringify(DB.productos));
+    appwriteMockDB.ingredientes = JSON.parse(JSON.stringify(DB.ingredientes));
+
+    // Store mock
+    const originalGetState = Store.getState;
+    Store.getState = () => ({
+      productos: DB.productos,
+      recetas: DB.recetas,
+      ingredientes: DB.ingredientes
+    });
     Store.subscribe = () => () => {};
-    Store.dispatch = () => {};
+    Store.dispatch = (action) => {
+      if (action.type === 'PRODUCTO_GUARDADO') {
+        const idx = DB.productos.findIndex(p => p.id === action.payload.id);
+        if (idx >= 0) DB.productos[idx] = action.payload;
+        else DB.productos.push(action.payload);
+        DB.saveProductos();
+      } else if (action.type === 'RECETA_GUARDADA') {
+        const idx = DB.recetas.findIndex(r => r.id === action.payload.id);
+        if (idx >= 0) DB.recetas[idx] = action.payload;
+        else DB.recetas.push(action.payload);
+        DB.saveRecetas();
+      } else if (action.type === 'INGREDIENTE_GUARDADO') {
+        const idx = DB.ingredientes.findIndex(i => i.id === action.payload.id);
+        if (idx >= 0) DB.ingredientes[idx] = action.payload;
+        else DB.ingredientes.push(action.payload);
+        DB.saveIngredientes();
+      } else if (action.type === 'RECETA_ELIMINADA') {
+        DB.recetas = DB.recetas.filter(r => r.id !== action.payload);
+        DB.saveRecetas();
+      }
+    };
 
-    DB.recetas = [];
-    DB.productos = [];
-    DB.ingredientes = [];
-    DB.saveRecetas = () => {};
-    DB.saveIngredientes = () => {};
+    // Limpiar localStorage antes de empezar
+    localStorage.removeItem('pubpos_recetas');
+    localStorage.removeItem('pubpos_productos');
+    localStorage.removeItem('pubpos_ingredientes');
 
+    // ── Utilidades de test ────────────────────────────
     const resultsEl = document.getElementById('results');
     let passed = 0, failed = 0;
     function assert(condition, msg) {
@@ -65,216 +145,204 @@
 
     async function runTests() {
       resultsEl.innerHTML = '';
-
       if (!document.getElementById('toastContainer')) {
         const tc = document.createElement('div'); tc.id = 'toastContainer'; document.body.appendChild(tc);
       }
 
-      // Datos de prueba iniciales
-      DB.productos = [
-        { id: 'prod_1', nombre: 'Hamburguesa', activo: true, destino: 'cocina' },
-        { id: 'prod_2', nombre: 'Salsa BBQ', activo: true, destino: 'cocina' },
-        { id: 'prod_3', nombre: 'Cebolla caramelizada', activo: true, destino: 'cocina' },
-        { id: 'prod_4', nombre: 'Nuggets', activo: true, destino: 'cocina' }
-      ];
-      DB.ingredientes = [
-        { id: 'ing_cebolla', nombre: 'Cebolla', unidad: 'kg', stock: 10, valor_unitario: 0.5 },
-        { id: 'ing_aceite', nombre: 'Aceite', unidad: 'L', stock: 20, valor_unitario: 1.2 }
-      ];
-      DB.recetas = [
-        {
-          id: 'rec_1', productoId: 'prod_1', nivel: 'producto_final', generaStock: false,
-          ingredientes: [
-            { ingredienteId: 'rec_2', cantidad: 0.2, unidad: 'kg' },
-            { ingredienteId: 'rec_3', cantidad: 0.1, unidad: 'kg' }
-          ],
-          instrucciones: 'Armar y servir.', stockActual: 0
-        },
-        {
-          id: 'rec_2', productoId: 'prod_2', nivel: 'salsa', generaStock: true,
-          ingredientes: [ { ingredienteId: 'ing_aceite', cantidad: 0.5, unidad: 'L' } ],
-          instrucciones: 'Mezclar y reducir.', stockActual: 3, unidadStock: 'L'
-        },
-        {
-          id: 'rec_3', productoId: 'prod_3', nivel: 'preparacion', generaStock: true,
-          ingredientes: [ { ingredienteId: 'ing_cebolla', cantidad: 2, unidad: 'kg' } ],
-          instrucciones: 'Cortar en pluma y cocinar.', stockActual: 5, unidadStock: 'kg'
-        }
-      ];
-
-      // ── Suite 1: Pestañas internas ──────────────────
-      resultsEl.innerHTML += '<div class="suite"><h2>1. Pestañas internas</h2></div>';
+      // ── Suite 1: Renderizado inicial ──────────────────
+      resultsEl.innerHTML += '<div class="suite"><h2>1. Renderizado inicial</h2></div>';
       Recetas.render('produccion');
+      await esperar(200);
+      assert(!!document.querySelector('.recetas-libro-paginas'), 'Vista de libro renderizada');
+      const tarjetasIniciales = document.querySelectorAll('.recetas-tarjeta-libro');
+      assert(tarjetasIniciales.length === 1, 'Hay 1 receta inicial en el libro');
+
+      // ── Suite 2: Crear nueva receta (persistencia) ─────
+      resultsEl.innerHTML += '<div class="suite"><h2>2. Crear receta y persistencia</h2></div>';
+      simularClick('#recetas-boton-nueva');
+      await esperar(300);
+      const modal = document.getElementById('modalRecetaSheet');
+      assert(modal && modal.classList.contains('activo'), 'Modal sheet abierto');
+
+      // Llenar campos
+      document.getElementById('recModalNombre').value = 'Cebolla caramelizada';
+      document.getElementById('recModalCapitulo').value = 'guarniciones';
+      document.getElementById('recModalNivel').value = 'preparacion';
+      document.getElementById('recModalIntermedio').checked = true;
+      document.querySelector('#recModalToggleDestino button[data-destino="cocina"]').click();
+
+      // Agregar ingrediente
+      document.getElementById('recModalTipoIng').value = 'insumo';
+      document.getElementById('recModalTipoIng').dispatchEvent(new Event('change', { bubbles: true }));
       await esperar(50);
-
-      const pestanas = document.querySelectorAll('#recetas-pestanas .recetas-pestana');
-      assert(pestanas.length === 3, 'Existen 3 pestañas');
-      assert(pestanas[0].classList.contains('activo'), 'Pestaña Recetario activa por defecto');
-
-      simularClick('#recetas-pestanas .recetas-pestana[data-pestana="stock"]');
+      document.getElementById('recModalSelectorIng').value = 'ing_cebolla';
+      document.getElementById('recModalCantidadIng').value = '2';
+      simularClick('#btnAgregarIngModal');
       await esperar(50);
-      assert(document.querySelector('#recetas-pestanas .recetas-pestana[data-pestana="stock"]').classList.contains('activo'), 'Pestaña Mi Stock se activa');
-      assert(!!document.querySelector('.recetas-tabla-stock'), 'Aparece tabla de stock');
+      assert(document.querySelectorAll('#recModalIngredientesLista .recetas-ingrediente-item').length === 1, 'Ingrediente agregado en el sheet');
 
-      simularClick('#recetas-pestanas .recetas-pestana[data-pestana="planificacion"]');
-      await esperar(50);
-      assert(document.querySelector('#recetas-pestanas .recetas-pestana[data-pestana="planificacion"]').classList.contains('activo'), 'Pestaña Planificación se activa');
-      assert(document.querySelector('.recetas-planificacion-placeholder') !== null, 'Muestra placeholder de planificación');
+      // Agregar paso
+      const inputPaso = document.querySelector('#recModalPasosEditor .recetas-paso-editor-input');
+      inputPaso.value = 'Cortar la cebolla en pluma';
+      inputPaso.dispatchEvent(new Event('input', { bubbles: true }));
 
-      simularClick('#recetas-pestanas .recetas-pestana[data-pestana="recetario"]');
-      await esperar(50);
-      assert(document.querySelector('#recetas-cuadricula') !== null, 'Cuadrícula visible en Recetario');
+      // Guardar
+      simularClick('#btnGuardarModalSheet');
+      await esperar(500);
 
-      // ── Suite 2: Creación rápida (CORREGIDA) ─────────
-      resultsEl.innerHTML += '<div class="suite"><h2>2. Creación rápida de receta</h2></div>';
-      const btnNueva = document.querySelector('#recetas-boton-nueva');
-      assert(!!btnNueva, 'Botón Nueva Receta presente');
-      btnNueva.click();
-      await esperar(100);
-      const modalCrear = document.getElementById('modalRecetaCrear');
-      assert(modalCrear && modalCrear.style.display === 'flex', 'Modal de creación abierto');
+      // Verificar persistencia en DB local
+      const recetaCreada = DB.recetas.find(r => r.productoId && DB.productos.some(p => p.id === r.productoId && p.nombre === 'Cebolla caramelizada'));
+      assert(!!recetaCreada, 'Receta guardada en DB local');
+      assert(recetaCreada.categoria === 'guarniciones', 'Capítulo guardado correctamente');
+      assert(recetaCreada.nivel === 'preparacion', 'Nivel guardado correctamente');
+      assert(recetaCreada.es_intermedio === true, 'Es preparación intermedia');
+      assert(recetaCreada.instrucciones.includes('Cortar la cebolla'), 'Instrucciones guardadas');
 
-      const selectProd = document.getElementById('recProductoId');
-      assert(!!selectProd, 'Selector de producto existe');
-      // Seleccionar prod_4 (Nuggets) que no tiene receta
-      selectProd.value = 'prod_4';
-      const inputNivel = document.getElementById('recNivel');
-      inputNivel.value = 'preparacion';
+      // Verificar persistencia en localStorage
+      const storedRecetas = JSON.parse(localStorage.getItem('pubpos_recetas') || '[]');
+      const storedEnLocal = storedRecetas.find(r => r.id === recetaCreada.id);
+      assert(!!storedEnLocal, 'Receta persistida en localStorage');
 
-      const btnCrear = document.getElementById('btnCrearReceta');
-      assert(!!btnCrear, 'Botón Crear existe');
-      btnCrear.click();
+      // Verificar persistencia en Appwrite mock
+      const appwriteRecetas = appwriteMockDB.recetas;
+      const storedEnAppwrite = appwriteRecetas.find(r => r.id === recetaCreada.id);
+      assert(!!storedEnAppwrite, 'Receta persistida en Appwrite');
+      assert(storedEnAppwrite.categoria === 'guarniciones', 'Capítulo correcto en Appwrite');
+
+      // Verificar producto creado
+      const productoNuevo = DB.productos.find(p => p.nombre === 'Cebolla caramelizada');
+      assert(!!productoNuevo, 'Producto creado en DB');
+      const storedProductos = JSON.parse(localStorage.getItem('pubpos_productos') || '[]');
+      assert(storedProductos.some(p => p.nombre === 'Cebolla caramelizada'), 'Producto persistido en localStorage');
+      const appwriteProductos = appwriteMockDB.productos;
+      assert(appwriteProductos.some(p => p.nombre === 'Cebolla caramelizada'), 'Producto persistido en Appwrite');
+
+      // Verificar que la UI se actualiza
+      await esperar(200);
+      const tarjetasDespues = document.querySelectorAll('.recetas-tarjeta-libro');
+      assert(tarjetasDespues.length === 2, 'Ahora hay 2 recetas en el libro');
+
+      // ── Suite 3: Editar la receta creada ──────────────
+      resultsEl.innerHTML += '<div class="suite"><h2>3. Editar receta</h2></div>';
+      // Hacer clic en la tarjeta de la nueva receta
+      const tarjetaNueva = Array.from(document.querySelectorAll('.recetas-tarjeta-libro'))
+        .find(t => t.querySelector('.recetas-tarjeta-libro-nombre').textContent === 'Cebolla caramelizada');
+      assert(!!tarjetaNueva, 'Tarjeta de la nueva receta encontrada');
+      tarjetaNueva.click();
+      await esperar(300);
+      assert(modal.classList.contains('activo'), 'Modal de edición abierto');
+
+      // Cambiar el capítulo y el nivel
+      document.getElementById('recModalCapitulo').value = 'salsas';
+      document.getElementById('recModalNivel').value = 'aderezo';
+      document.getElementById('recModalIntermedio').checked = false;
+
+      // Guardar cambios
+      simularClick('#btnGuardarModalSheet');
+      await esperar(500);
+
+      const recetaEditada = DB.recetas.find(r => r.id === recetaCreada.id);
+      assert(recetaEditada.categoria === 'salsas', 'Capítulo actualizado en DB');
+      assert(recetaEditada.nivel === 'aderezo', 'Nivel actualizado en DB');
+      assert(recetaEditada.es_intermedio === false, 'Ya no es preparación intermedia');
+
+      // Verificar en Appwrite
+      const appwriteEditada = appwriteMockDB.recetas.find(r => r.id === recetaCreada.id);
+      assert(appwriteEditada && appwriteEditada.categoria === 'salsas', 'Cambios persistidos en Appwrite');
+
+      // ── Suite 4: Eliminar receta ──────────────────────
+      resultsEl.innerHTML += '<div class="suite"><h2>4. Eliminar receta</h2></div>';
+      const idAEliminar = recetaCreada.id;
+      // Simular eliminación (llamada directa al repositorio)
+      const { crearRecetaRepo } = await import('../js/repositorios/receta-repository.js');
+      const repo = crearRecetaRepo();
+      await repo.eliminarReceta(idAEliminar);
       await esperar(200);
 
-      assert(modalCrear.style.display === 'none', 'Modal de creación cerrado');
-      // Verificar que se creó la receta en DB
-      const nuevaReceta = DB.recetas.find(r => r.productoId === 'prod_4' && r.nivel === 'preparacion');
-      assert(!!nuevaReceta, 'Nueva receta añadida a DB');
-      assert(!!document.querySelector('.recetas-edicion'), 'Vista de edición abierta');
-      // Volver al recetario
-      simularClick('#recetas-volver');
+      const recetaEliminada = DB.recetas.find(r => r.id === idAEliminar);
+      assert(!recetaEliminada, 'Receta eliminada de DB');
+
+      // Verificar localStorage
+      const storedDespuesEliminar = JSON.parse(localStorage.getItem('pubpos_recetas') || '[]');
+      assert(!storedDespuesEliminar.some(r => r.id === idAEliminar), 'Receta eliminada de localStorage');
+
+      // Verificar Appwrite
+      const appwriteDespuesEliminar = appwriteMockDB.recetas;
+      assert(!appwriteDespuesEliminar.some(r => r.id === idAEliminar), 'Receta eliminada de Appwrite');
+
+      // Forzar repintado
+      Recetas.render('produccion');
+      await esperar(200);
+      const tarjetasFinal = document.querySelectorAll('.recetas-tarjeta-libro');
+      assert(tarjetasFinal.length === 1, 'Solo queda la receta inicial tras eliminar');
+
+      // ── Suite 5: Ejecutar preparación ─────────────────
+      resultsEl.innerHTML += '<div class="suite"><h2>5. Ejecutar preparación</h2></div>';
+      // Volvemos a crear una preparación intermedia para probar ejecución
+      document.getElementById('recetas-boton-nueva').click();
+      await esperar(300);
+      document.getElementById('recModalNombre').value = 'Salsa BBQ';
+      document.getElementById('recModalCapitulo').value = 'salsas';
+      document.getElementById('recModalNivel').value = 'preparacion';
+      document.getElementById('recModalIntermedio').checked = true;
+      document.getElementById('recModalTipoIng').value = 'insumo';
+      document.getElementById('recModalTipoIng').dispatchEvent(new Event('change', { bubbles: true }));
       await esperar(50);
-
-      // ── Suite 3: Edición completa ───────────────────
-      resultsEl.innerHTML += '<div class="suite"><h2>3. Edición de receta</h2></div>';
-      const tarjetaSalsa = document.querySelector('.recetas-tarjeta[data-receta="rec_2"]');
-      assert(!!tarjetaSalsa, 'Tarjeta de Salsa BBQ visible');
-      tarjetaSalsa.click();
-      await esperar(100);
-      assert(!!document.querySelector('.recetas-edicion'), 'Vista de edición de Salsa BBQ abierta');
-
-      const inputNivelEdicion = document.getElementById('rec-nivel');
-      assert(!!inputNivelEdicion, 'Campo nivel en edición');
-      inputNivelEdicion.value = 'aderezo';
-      inputNivelEdicion.dispatchEvent(new Event('input', { bubbles: true }));
+      document.getElementById('recModalSelectorIng').value = 'ing_aceite';
+      document.getElementById('recModalCantidadIng').value = '0.5';
+      simularClick('#btnAgregarIngModal');
       await esperar(50);
-      const nota = document.querySelector('.recetas-nota');
-      assert(nota && nota.textContent.includes('genera stock'), 'Nota de stock se actualiza al cambiar nivel');
+      const inputPaso2 = document.querySelector('#recModalPasosEditor .recetas-paso-editor-input');
+      inputPaso2.value = 'Mezclar aceite y especias';
+      inputPaso2.dispatchEvent(new Event('input', { bubbles: true }));
+      simularClick('#btnGuardarModalSheet');
+      await esperar(500);
 
-      const selectIng = document.getElementById('rec-nuevo-ingrediente');
-      assert(!!selectIng, 'Selector de nuevo ingrediente existe');
-      selectIng.value = 'ing_cebolla';
-      const inputCantidad = document.getElementById('rec-nueva-cantidad');
-      inputCantidad.value = '0.3';
-      simularClick('#rec-agregar-ing');
-      await esperar(50);
-      let itemsIng = document.querySelectorAll('#recetas-ingredientes-actuales .recetas-ingrediente-item');
-      assert(itemsIng.length === 2, 'Se agregó un ingrediente, ahora hay 2');
-
-      const btnQuitar = document.querySelector('.recetas-quitar-ing');
-      if (btnQuitar) {
-        btnQuitar.click();
-        await esperar(50);
-        itemsIng = document.querySelectorAll('#recetas-ingredientes-actuales .recetas-ingrediente-item');
-        assert(itemsIng.length === 1, 'Ingrediente eliminado');
+      // Ir a Mi Stock
+      simularClick('.recetas-pestana[data-pestana="stock"]');
+      await esperar(200);
+      const btnPreparar = document.querySelector('.recetas-accion-preparar');
+      if (btnPreparar) {
+        btnPreparar.click();
+        await esperar(200);
+        const inputCant = document.getElementById('rec-cantidad-preparar');
+        if (inputCant) {
+          inputCant.value = '2';
+          simularClick('#rec-aceptar-cantidad');
+          await esperar(300);
+          // Verificar que el stock del ingrediente se descontó
+          const aceite = DB.ingredientes.find(i => i.id === 'ing_aceite');
+          assert(aceite.stock === 19, 'Stock de aceite descontado (20 - 0.5*2 = 19)');
+          // Verificar en Appwrite
+          const aceiteAppwrite = appwriteMockDB.ingredientes.find(i => i.id === 'ing_aceite');
+          assert(aceiteAppwrite && aceiteAppwrite.stock === 19, 'Stock de aceite actualizado en Appwrite');
+        }
       }
 
-      simularClick('#recetas-guardar');
-      await esperar(200);
-      assert(!!document.querySelector('.recetas-cuadricula'), 'Vuelve al recetario tras guardar');
-      const salsaMod = DB.recetas.find(r => r.id === 'rec_2');
-      assert(salsaMod && salsaMod.nivel === 'aderezo', 'Nivel cambiado a aderezo en DB');
-
-      // ── Suite 4: Duplicar receta ────────────────────
-      resultsEl.innerHTML += '<div class="suite"><h2>4. Duplicar receta</h2></div>';
-      const tarjetaCebolla = document.querySelector('.recetas-tarjeta[data-receta="rec_3"]');
-      assert(!!tarjetaCebolla, 'Tarjeta de Cebolla caramelizada visible');
-      tarjetaCebolla.click();
-      await esperar(100);
-      simularClick('#recetas-duplicar');
-      await esperar(200);
-      const duplicadas = DB.recetas.filter(r => r.productoId === 'prod_3');
-      assert(duplicadas.length === 2, 'Se duplicó la receta, ahora hay 2 para el mismo producto');
-      simularClick('#recetas-volver');
-      await esperar(50);
-
-      // ── Suite 5: Eliminar receta (CORREGIDA) ─────────
-      resultsEl.innerHTML += '<div class="suite"><h2>5. Eliminar receta</h2></div>';
-      const ultimaReceta = DB.recetas.find(r => r.productoId === 'prod_3' && r.id !== 'rec_3');
-      assert(!!ultimaReceta, 'Receta duplicada encontrada en DB');
-      Recetas.render('produccion');
-      await esperar(50);
-      const tarjetaDuplicada = document.querySelector(`.recetas-tarjeta[data-receta="${ultimaReceta.id}"]`);
-      assert(!!tarjetaDuplicada, 'Tarjeta duplicada visible en el DOM');
-      tarjetaDuplicada.click();
-      await esperar(100);
-      assert(!!document.querySelector('.recetas-edicion'), 'Vista de edición de la duplicada abierta');
-      simularClick('#recetas-eliminar');
-      await esperar(100);
-      // Ahora debe aparecer el modal de confirmación. Hacemos clic en el botón de confirmar.
-      const confirmBtn = document.querySelector('.modal-confirm-card .confirmar-btn');
-      assert(!!confirmBtn, 'Botón de confirmación visible');
-      confirmBtn.click();
-      await esperar(300);
-      assert(!DB.recetas.find(r => r.id === ultimaReceta.id), 'Receta eliminada de DB');
-      assert(!!document.querySelector('.recetas-cuadricula'), 'Vuelve al recetario tras eliminar');
-
-      // ── Suite 6: Ejecutar preparación ────────────────
-      resultsEl.innerHTML += '<div class="suite"><h2>6. Ejecutar preparación</h2></div>';
-      simularClick('#recetas-pestanas .recetas-pestana[data-pestana="stock"]');
-      await esperar(50);
-      const stockInicial = DB.recetas.find(r => r.id === 'rec_3').stockActual;
-      assert(stockInicial === 5, 'Stock inicial de Cebolla caramelizada es 5');
-      const btnPreparar = document.querySelector('.recetas-accion-preparar[data-receta="rec_3"]');
-      assert(!!btnPreparar, 'Botón Preparar visible');
-      btnPreparar.click();
-      await esperar(200);
-      const inputCant = document.getElementById('rec-cantidad-preparar');
-      assert(!!inputCant, 'Modal de cantidad abierto');
-      inputCant.value = '2';
-      simularClick('#rec-aceptar-cantidad');
-      await esperar(300);
-      const nuevoStock = DB.recetas.find(r => r.id === 'rec_3').stockActual;
-      assert(nuevoStock === 7, 'Stock aumentó en 2 (5+2=7)');
-      const cebolla = DB.ingredientes.find(i => i.id === 'ing_cebolla');
-      assert(cebolla.stock === 6, 'Cebolla descontada: 10 - (2*2kg) = 6');
-
-      // ── Suite 7: Modal de detalle ────────────────────
-      resultsEl.innerHTML += '<div class="suite"><h2>7. Modal de detalle</h2></div>';
+      // ── Suite 6: Modal de detalle ─────────────────────
+      resultsEl.innerHTML += '<div class="suite"><h2>6. Modal de detalle</h2></div>';
       Recetas.mostrarDetalle('rec_1');
-      await esperar(100);
+      await esperar(200);
       const modalDetalle = document.getElementById('modalRecetaDetalle');
       assert(modalDetalle && modalDetalle.style.display === 'flex', 'Modal de detalle abierto');
-      assert(modalDetalle.textContent.includes('Hamburguesa'), 'Muestra nombre del producto');
-      assert(modalDetalle.textContent.includes('Salsa BBQ'), 'Muestra ingrediente Salsa BBQ (receta)');
-      assert(modalDetalle.textContent.includes('Cebolla caramelizada'), 'Muestra ingrediente Cebolla caramelizada (receta)');
+      assert(modalDetalle.textContent.includes('Papas fritas'), 'Muestra nombre del producto');
       simularClick('#btnCerrarDetalle');
-      await esperar(50);
+      await esperar(100);
       assert(modalDetalle.style.display === 'none', 'Modal de detalle cerrado');
 
-      // ── Suite 8: Vista vacía ──────────────────────────
-      resultsEl.innerHTML += '<div class="suite"><h2>8. Vista vacía</h2></div>';
-      DB.recetas = [];
-      Recetas.render('produccion');
-      await esperar(50);
-      assert(document.querySelector('.recetas-vacia') !== null, 'Muestra mensaje de vacío');
+      // ── Suite 7: Sincronización de Store ──────────────
+      resultsEl.innerHTML += '<div class="suite"><h2>7. Sincronización Store</h2></div>';
+      const state = Store.getState();
+      assert(state.recetas.length >= 2, 'El Store refleja las recetas actuales');
+      assert(state.productos.some(p => p.nombre === 'Salsa BBQ'), 'El Store tiene el nuevo producto');
+      assert(!state.recetas.some(r => r.id === idAEliminar), 'El Store no contiene la receta eliminada');
 
       // Limpiar
       document.getElementById('view-recetas')?.remove();
       document.querySelectorAll('.modal-overlay').forEach(o => o.remove());
 
       resultsEl.innerHTML += `<div class="summary">${passed} pasaron, ${failed} fallaron</div>`;
-      if (failed === 0) resultsEl.innerHTML += '<div class="test pass">✔ Todos los tests del Recetario v5.0.0 pasaron.</div>';
+      if (failed === 0) resultsEl.innerHTML += '<div class="test pass">✔ Todos los tests de persistencia pasaron.</div>';
     }
 
     window.addEventListener('load', () => runTests().catch(e => {

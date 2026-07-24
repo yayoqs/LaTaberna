@@ -1,16 +1,18 @@
 /* ================================================================
    LaTaberna - PubPOS — DESPENSA SUBMÓDULO (ES6)
    Archivo: js/ui/despensa/acciones.js
-   Versión: 1.1.1
+   Versión: 1.1.2
    Propósito: Ajuste rápido de stock de ingredientes.
-              v1.1.1: migra a nombres en español (utils).
+              v1.1.2: usa Store en lugar de DB.
    ================================================================ */
 
-import { DB } from '../../db.js';
+import { Store } from '../../lib/store.js';
 import { InventarioService } from '../../servicios/inventario-service.js';
 import { mostrarToast, mostrarEntrada } from '../../utils.js';
 
 export async function ajusteRapido(ingredienteId = null, onAjustado = null) {
+  const ingredientes = Store.obtenerEstado().ingredientes || [];
+
   if (!ingredienteId) {
     const nombre = await mostrarEntrada(
       'Ajuste rápido',
@@ -18,11 +20,11 @@ export async function ajusteRapido(ingredienteId = null, onAjustado = null) {
       { placeholder: 'Ej: Harina 000' }
     );
     if (!nombre) return;
-    const ing = DB.ingredientes.find(i => i.nombre.toLowerCase() === nombre.toLowerCase());
+    const ing = ingredientes.find(i => i.nombre.toLowerCase() === nombre.toLowerCase());
     if (!ing) { mostrarToast('error', 'Ingrediente no encontrado'); return; }
     ingredienteId = ing.id;
   }
-  const ing = DB.ingredientes.find(i => i.id === ingredienteId);
+  const ing = ingredientes.find(i => i.id === ingredienteId);
   if (!ing) return;
 
   const deltaStr = await mostrarEntrada(
@@ -50,8 +52,4 @@ export async function ajusteRapido(ingredienteId = null, onAjustado = null) {
       return;
     }
   }
-
-  DB.ajustarStock(ingredienteId, cantidad, motivo);
-  mostrarToast('success', `Stock de ${ing.nombre} actualizado`);
-  if (typeof onAjustado === 'function') onAjustado();
 }

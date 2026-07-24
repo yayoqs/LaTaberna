@@ -1,10 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-inventario.js
-   Versión: 1.0.9
+   Versión: 1.0.10
    Propósito: Gestión de ingredientes, recetas, stock y movimientos.
               Soporte para recetas anidadas (sub-recetas).
               Auth importado explícitamente.
+              Normalización de ingredientes conserva todos los campos.
               Todos los catch registran error.
    ================================================================ */
 
@@ -92,16 +93,20 @@ export const DBInventario = (function() {
 
   /* ── NORMALIZACIONES ─────────────────────────────────────── */
   module._normalizarIngrediente = function(i) {
-    return {
-      id: _validarId(i.id, 'ins'),
-      nombre: _validarString(i.nombre, 'Sin nombre'),
-      stock: _validarNumero(i.stock, 0),
-      unidad: _validarString(i.unidad, 'u'),
-      stock_minimo: _validarNumero(i.stock_minimo, 0),
-      categoria: _validarString(i.categoria, 'general'),
-      ubicacion: _validarString(i.ubicacion, ''),
-      valor_unitario: _validarNumero(i.valor_unitario, 0)
-    };
+    // Partir del objeto original para conservar campos desconocidos
+    var datos = Object.assign({}, i);
+    
+    // Sobrescribir solo los campos que normalizamos
+    datos.id = _validarId(i.id, 'ins');
+    datos.nombre = _validarString(i.nombre, 'Sin nombre');
+    datos.stock = _validarNumero(i.stock, 0);
+    datos.unidad = _validarString(i.unidad, 'u');
+    datos.stock_minimo = _validarNumero(i.stock_minimo, 0);
+    datos.categoria = _validarString(i.categoria, 'general');
+    datos.ubicacion = _validarString(i.ubicacion, '');
+    datos.valor_unitario = _validarNumero(i.valor_unitario, 0);
+    
+    return datos;
   };
 
   module._normalizarReceta = function(r) {

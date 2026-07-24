@@ -1,15 +1,14 @@
 /* ================================================================
    LaTaberna - PubPOS — DESPENSA SUBMÓDULO (ES6)
    Archivo: js/ui/despensa/ciclo-vida.js
-   Versión: 3.3.1
+   Versión: 3.4.0
    Propósito: Ciclo de vida de la despensa con panel izquierdo acordeón,
               proveedores reales y conexión Ingrediente ↔ Proveedor.
-              v3.3.1: corrige eventos de botones con delegación.
+              v3.4.0: migrado al estándar Store (sin lectura directa de DB).
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
 import { EventBus } from '../../lib/eventBus.js';
-import { DB } from '../../db.js';
 import {
   asegurarVista,
   renderResumen,
@@ -39,7 +38,7 @@ let _filtroMovimientos = 'todos';
 
 async function _refresh() {
   const state = Store.obtenerEstado();
-  const ingredientes = (state.ingredientes || DB.ingredientes || []).filter(i => {
+  const ingredientes = (state.ingredientes || []).filter(i => {
     const t = getTerminoBusqueda();
     return !t || i.nombre.toLowerCase().includes(t.toLowerCase());
   });
@@ -129,26 +128,24 @@ export function activar() {
     _refresh();
   }, { signal });
 
-  // ── Delegación de eventos en el panel izquierdo (soluciona pérdida de listeners) ──
+  // Delegación de eventos en el panel izquierdo
   const panelIzq = document.getElementById('panelIzquierdo');
   if (panelIzq) {
     panelIzq.addEventListener('click', (e) => {
-      // Botón Nuevo Producto
       if (e.target.closest('#btnNuevoProducto')) {
         import('./modal-ingrediente.js').then(mod => mod.mostrar(null, _refresh));
       }
-      // Botón Nuevo Proveedor
       if (e.target.closest('#btnNuevoProveedor')) {
         mostrarModalProveedor(null, _refresh);
       }
     }, { signal });
   }
 
-  // Editar insumo desde los espacios (delegación en el contenedor de espacios)
+  // Editar insumo desde los espacios (con callback)
   document.getElementById('espaciosContainer')?.addEventListener('click', (e) => {
     const btn = e.target.closest('.btn-editar-insumo');
     if (btn) {
-      import('./modal-ingrediente.js').then(mod => mod.editarIngrediente(btn.dataset.id));
+      import('./modal-ingrediente.js').then(mod => mod.editarIngrediente(btn.dataset.id, _refresh));
     }
   }, { signal });
 
@@ -198,7 +195,7 @@ export function activar() {
     }
   }, { signal });
   document.getElementById('btnSugerirCompras')?.addEventListener('click', () => {
-    const ingredientes = Store.obtenerEstado().ingredientes || DB.ingredientes || [];
+    const ingredientes = Store.obtenerEstado().ingredientes || [];
     const actuales = getListaCompras().map(i => i.nombre);
     ingredientes.forEach(ing => {
       if (ing.stock <= ing.stock_minimo && !actuales.includes(ing.nombre)) {

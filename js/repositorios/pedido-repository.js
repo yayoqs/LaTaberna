@@ -1,11 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — REPOSITORIO JS (ES6)
    Archivo: js/repositorios/pedido-repository.js
-   Versión: 1.0.8
+   Versión: 1.0.9
    Propósito: Implementación local del repositorio de pedidos con
               sincronización directa a Appwrite.
-              Uso de nuevos nombres en español de utils y Store.
-              Todos los catch registran error.
+              Despacha acciones al Store tras cada escritura.
    ================================================================ */
 
 import { DB } from '../db.js';
@@ -208,6 +207,7 @@ const PedidoRepositoryLocal = (() => {
 
     if (pedidoCerrado) {
       await _syncPedido(pedidoCerrado, false);
+      Store.despachar({ type: 'PEDIDO_CERRADO', payload: { id, total: datosCierre.total, actualizadoEn: pedidoCerrado.actualizadoEn } });
       const mesa = DB.mesas.find(m => m.pedidoId === id);
       if (mesa && !mesa.esVirtual) {
         mesa.estado = 'libre'; mesa.pedidoId = ''; mesa.items = []; mesa.mozo = ''; mesa.comensales = 1; mesa.observaciones = '';
@@ -232,6 +232,7 @@ const PedidoRepositoryLocal = (() => {
         pedidoCerrado.transacciones = datosCierre.transacciones;
       }
       await _syncPedido(pedidoCerrado, false);
+      Store.despachar({ type: 'PEDIDO_CERRADO', payload: { id, total: datosCierre.total, actualizadoEn: pedidoCerrado.actualizadoEn } });
       const mesa = DB.mesas.find(m => m.pedidoId === id);
       if (mesa && !mesa.esVirtual) {
         mesa.estado = 'pagada';
@@ -291,6 +292,7 @@ const PedidoRepositoryLocal = (() => {
       pedidoCerrado = true;
       DB.savePedidos();
       await _syncPedido(pedido, false);
+      Store.despachar({ type: 'PEDIDO_CERRADO', payload: { id: pedidoId, total: totalPedido, actualizadoEn: new Date().toISOString() } });
 
       var mesa = DB.mesas.find(function(m) { return m.pedidoId === pedidoId; });
       if (mesa && !mesa.esVirtual) {
@@ -302,6 +304,7 @@ const PedidoRepositoryLocal = (() => {
     } else {
       DB.savePedidos();
       await _syncPedido(pedido, false);
+      Store.despachar({ type: 'PEDIDO_ACTUALIZADO', payload: { id: pedidoId, cambios: { transacciones: pedido.transacciones } } });
     }
 
     return {

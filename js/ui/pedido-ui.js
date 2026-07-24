@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/pedido-ui.js
-   Versión: 2.1.6
+   Versión: 2.1.7
    Propósito: Modal de pedido, revisar comandas, validación de stock.
-              Controla el ciclo de vida de Carta (activar/limpiar).
+              Migración a Store como fuente de verdad y
+              reemplazo de prompt por mostrarEntrada.
    ================================================================ */
 
 import { CommandBus } from '../lib/command-bus.js';
@@ -142,7 +143,8 @@ const Pedido = (() => {
   function abrirMesa(num) {
     if (_panelDetalleAbierto) return;
 
-    const mesa = DB.mesas.find(m => m.numero == num);
+    const mesas = Store.obtenerEstado().mesas || [];
+    const mesa = mesas.find(m => m.numero == num);
     if (!mesa) { Logger.error('[Pedido] Mesa ' + num + ' no encontrada.'); return; }
 
     _abrirModalPedido(mesa);
@@ -193,7 +195,8 @@ const Pedido = (() => {
       return;
     }
 
-    const comandasMesa = DB.comandas.filter(c => {
+    const comandas = Store.obtenerEstado().comandas || [];
+    const comandasMesa = comandas.filter(c => {
       return c.mesa == mesa.numero || c.mesa == String(mesa.numero);
     });
     if (comandasMesa.length > 0) {
@@ -395,27 +398,43 @@ const Pedido = (() => {
 
   function transferirMesa(mesaOrigenNum, mesaDestinoNum) {
     if (!Auth.esAdmin()) { mostrarToast('error', 'Solo administradores pueden transferir pedidos entre mesas'); return false; }
-    const mesaOrigen = DB.getMesa(mesaOrigenNum), mesaDestino = DB.getMesa(mesaDestinoNum);
+    const mesas = Store.obtenerEstado().mesas || [];
+    const mesaOrigen = mesas.find(m => m.numero == mesaOrigenNum);
+    const mesaDestino = mesas.find(m => m.numero == mesaDestinoNum);
     if (!mesaOrigen || !mesaDestino) { mostrarToast('error', 'Una de las mesas no existe.'); return false; }
     if (mesaDestino.estado !== 'libre') { mostrarToast('error', 'La mesa ' + mesaDestinoNum + ' no está libre.'); return false; }
     if (mesaOrigen.esVirtual || mesaDestino.esVirtual) { mostrarToast('error', 'No se puede transferir desde/hacia una mesa fusionada.'); return false; }
 
-    mesaDestino.estado = mesaOrigen.estado; mesaDestino.pedidoId = mesaOrigen.pedidoId;
-    mesaDestino.items = mesaOrigen.items; mesaDestino.mozo = mesaOrigen.mozo;
-    mesaDestino.comensales = mesaOrigen.comensales; mesaDestino.abiertaEn = mesaOrigen.abiertaEn;
-    mesaDestino.observaciones = mesaOrigen.observaciones; mesaDestino.total = mesaOrigen.total;
+    // Persistir en DB
+    const mesaDestinoDB = DB.mesas.find(m => m.numero == mesaDestinoNum);
+    const mesaOrigenDB = DB.mesas.find(m => m.numero == mesaOrigenNum);
+    if (mesaDestinoDB && mesaOrigenDB) {
+      mesaDestinoDB.estado = mesaOrigenDB.estado;
+      mesaDestinoDB.pedidoId = mesaOrigenDB.pedidoId;
+      mesaDestinoDB.items = mesaOrigenDB.items;
+      mesaDestinoDB.mozo = mesaOrigenDB.mozo;
+      mesaDestinoDB.comensales = mesaOrigenDB.comensales;
+      mesaDestinoDB.abiertaEn = mesaOrigenDB.abiertaEn;
+      mesaDestinoDB.observaciones = mesaOrigenDB.observaciones;
+      mesaDestinoDB.total = mesaOrigenDB.total;
 
-    if (mesaDestino.pedidoId) {
-      const pedido = DB.pedidos.find(p => p.id === mesaDestino.pedidoId);
-      if (pedido) { pedido.mesa = mesaDestinoNum; DB.savePedidos(); }
+      if (mesaDestinoDB.pedidoId) {
+        const pedido = DB.pedidos.find(p => p.id === mesaDestinoDB.pedidoId);
+        if (pedido) { pedido.mesa = mesaDestinoNum; DB.savePedidos(); }
+      }
+      const idxOrigen = DB.mesas.findIndex(m => m.numero === mesaOrigenNum);
+      if (idxOrigen >= 0) DB.mesas[idxOrigen] = mesaVacia(mesaOrigenNum);
+      try {
+        DB.saveMesas();
+      } catch (e) {
+        Logger.error('[Pedido] Error al guardar mesas al transferir:', e);
+      }
     }
-    const idxOrigen = DB.mesas.findIndex(m => m.numero === mesaOrigenNum);
-    if (idxOrigen >= 0) DB.mesas[idxOrigen] = mesaVacia(mesaOrigenNum);
-    try {
-      DB.saveMesas();
-    } catch (e) {
-      Logger.error('[Pedido] Error al guardar mesas al transferir:', e);
-    }
+
+    // Despachar al Store
+    Store.despachar({ type: 'MESA_ACTUALIZAR', payload: { numero: mesaDestinoNum, cambios: { estado: mesaOrigen.estado, pedidoId: mesaOrigen.pedidoId, items: mesaOrigen.items, mozo: mesaOrigen.mozo, comensales: mesaOrigen.comensales, abiertaEn: mesaOrigen.abiertaEn, observaciones: mesaOrigen.observaciones, total: mesaOrigen.total } } });
+    Store.despachar({ type: 'MESA_ACTUALIZAR', payload: { numero: mesaOrigenNum, cambios: { estado: 'libre', pedidoId: null, items: [], mozo: '', comensales: 0, abiertaEn: null, observaciones: '', total: 0 } } });
+
     EventBus.emit('mesa:actualizada', { mesa: mesaOrigenNum, estado: 'libre' });
     EventBus.emit('mesa:actualizada', { mesa: mesaDestinoNum, estado: mesaDestino.estado });
     Mesas.render();
@@ -425,17 +444,25 @@ const Pedido = (() => {
     return true;
   }
 
-  function mostrarSelectorTransferencia() {
+  async function mostrarSelectorTransferencia() {
     const mesaActual = Comanda.getMesaActiva();
     if (!mesaActual) { mostrarToast('warning', 'No hay mesa activa.'); return; }
     if (!Auth.esAdmin()) { mostrarToast('error', 'Solo administradores pueden transferir mesas.'); return; }
     if (mesaActual.esVirtual) { mostrarToast('info', 'No se puede transferir una mesa fusionada.'); return; }
-    const mesasLibres = DB.mesas.filter(m => m.estado === 'libre' && !m.esVirtual && m.numero !== mesaActual.numero);
+
+    const mesas = Store.obtenerEstado().mesas || [];
+    const mesasLibres = mesas.filter(m => m.estado === 'libre' && !m.esVirtual && m.numero !== mesaActual.numero);
     if (!mesasLibres.length) { mostrarToast('info', 'No hay mesas libres para transferir.'); return; }
     const opciones = mesasLibres.map(m => m.numero).join(', ');
-    const destino = prompt('Mesas libres: ' + opciones + '\nIngresa el número de mesa destino:');
-    if (destino) {
-      const numDestino = parseInt(destino);
+
+    const destinoStr = await mostrarEntrada(
+      'Transferir Mesa',
+      `Mesas libres: ${opciones}\nIngresa el número de mesa destino:`,
+      { placeholder: 'Número de mesa' }
+    );
+
+    if (destinoStr) {
+      const numDestino = parseInt(destinoStr);
       if (!isNaN(numDestino)) transferirMesa(mesaActual.numero, numDestino);
       else mostrarToast('error', 'Número de mesa inválido.');
     }

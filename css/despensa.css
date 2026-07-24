@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/despensa.css
-   Versión: 3.1.0
+   Versión: 3.1.1
    Propósito: Estilos para la nueva vista de Despensa con panel izquierdo
               tipo acordeón (Proveedores/Productos) y resto de secciones.
+              v3.1.1: agrega estilo para botón eliminar (btn-danger).
    ================================================================ */
 
 /* ── Contenedor principal ─────────────────────────────────── */
@@ -278,6 +279,26 @@
 .btn-sugerir {
   background: transparent; border: 1px solid var(--color-accent); color: var(--color-accent);
   border-radius: 20px; padding: 6px 12px; font-size: 12px; cursor: pointer; width: 100%;
+}
+
+/* ── BOTÓN ELIMINAR (modal) ───────────────────────────────── */
+.btn-danger {
+  background: var(--color-danger);
+  border: none;
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all .2s;
+}
+.btn-danger:hover {
+  background: #dc2626;
+  color: #fff;
 }
 
 /* ── OVERLAY ───────────────────────────────────────────────── */

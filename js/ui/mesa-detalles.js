@@ -1,11 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/mesa-detalles.js
-   Versión: 3.0.5
-   Propósito: Centro de operaciones de mesa. Panel unificado con
-              columna colapsable (swipe), apertura inline, precargas,
-              resumen de comanda. Corrección: eliminada dependencia
-              de mesa.total, usando solo cálculo desde ítems.
+   Versión: 3.0.6
+   Propósito: Centro de operaciones de mesa. Migración a Store como
+              única fuente de verdad para lecturas de UI.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -423,13 +421,24 @@ const MesaDetalles = (() => {
   function cerrarMesa() { cerrar(); if (Cobro && Cobro.abrirModalCierre) Cobro.abrirModalCierre(); }
 
   function aceptarVinculacion(numMesa) {
-    const mesa = DB.mesas.find(m => m.numero == numMesa);
-    if (mesa) {
-      mesa.estado = 'ocupada';
-      mesa.permite_prepedidos = true;
-      DB.saveMesas();
+    // 1. Leer mesa actual desde el Store (fuente de verdad para UI)
+    const mesas = Store.obtenerEstado().mesas || [];
+    const mesa = mesas.find(m => m.numero == numMesa);
+    if (!mesa) return;
+
+    // 2. Persistir en DB (repositorio)
+    const mesaDB = DB.mesas.find(m => m.numero == numMesa);
+    if (mesaDB) {
+      mesaDB.estado = 'ocupada';
+      mesaDB.permite_prepedidos = true;
+      try {
+        DB.saveMesas();
+      } catch (e) {
+        Logger.error('[MesaDetalles] Error al persistir vinculación:', e);
+      }
     }
 
+    // 3. Despachar al Store para mantener coherencia
     Store.despachar({
       type: 'MESA_ACTUALIZAR',
       payload: {
@@ -438,15 +447,18 @@ const MesaDetalles = (() => {
       }
     });
 
+    // 4. Emitir evento para el cliente (Célula C)
     EventBus.emit('mesas:actualizada', {
       numero: numMesa,
       estado: 'ocupada',
       permite_prepedidos: true
     });
 
+    // 5. Limpiar badge
     Mesas.clearBadgeAtencion(numMesa);
 
-    _mesaActual = DB.mesas.find(m => m.numero == numMesa) || _mesaActual;
+    // 6. Refrescar panel con la mesa actualizada desde el Store
+    _mesaActual = Store.obtenerEstado().mesas.find(m => m.numero == numMesa) || _mesaActual;
     if (_mesaActual) {
       _renderizarEstado(_mesaActual);
     }
@@ -465,7 +477,7 @@ const MesaDetalles = (() => {
     abrir(numMesa);
   });
 
-  Logger.info('[MesaDetalles] Módulo inicializado (ES6 v3.0.5).');
+  Logger.info('[MesaDetalles] Módulo inicializado (ES6 v3.0.6).');
 
   return {
     abrir,

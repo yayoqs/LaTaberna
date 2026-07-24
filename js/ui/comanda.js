@@ -1,12 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/comanda.js
-   Versión: 2.0.8
-   Propósito: Gestión de la comanda actual (ítems, cantidades,
-              observaciones, split bill). Sin onclick. Usa delegación.
-              Migración a Store y utils español.
-              Corrección: eliminada dependencia oculta de actualizarTotalCierre,
-              reemplazada por evento 'comanda:total_actualizado'.
+   Versión: 2.0.9
+   Propósito: Gestión de la comanda actual.
+              Migración a Store como fuente de verdad para UI.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -95,12 +92,11 @@ const Comanda = (() => {
 
     if (selMozo) {
       let opcionesHTML = '';
-      const mozos = DB.mozos || [];
+      const mozos = Store.obtenerEstado().mozos || [];
       if (mozos.length) {
-        const esObjeto = typeof mozos[0] === 'object' && mozos[0] !== null;
         opcionesHTML = mozos.map(m => {
-          const nombre = esObjeto ? m.nombre : m;
-          const activo = esObjeto ? (m.activo !== false) : true;
+          const nombre = m.nombre || m;
+          const activo = m.activo !== false;
           if (!activo) return '';
           return `<option value="${nombre}" ${nombre === _mesaActiva.mozo ? 'selected' : ''}>${nombre}</option>`;
         }).join('');

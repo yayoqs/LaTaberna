@@ -1,16 +1,15 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-shim.js
-   Versión: 1.0.5
+   Versión: 1.0.6
    Propósito: Compatibilidad con Google Apps Script.
-              Solo expone el método llamar para respaldo de cierre
-              de turno. Stubs vacíos eliminados.
+              Uso de let/const en lugar de var.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
 
 export const DBShim = (function() {
-  var module = {};
+  const module = {};
 
   // URL del Google Apps Script para respaldo de cierre de turno
   module.urlSheets = 'https://script.google.com/macros/s/AKfycbyApBQuGK7vBpwNVQAbvpQqqQd8xfrd_Hunwtb8hdjyeewlYQAyZpolUOWYYqPNN3MUTw/exec';
@@ -23,12 +22,12 @@ export const DBShim = (function() {
    * @returns {Promise<object>}
    */
   module.llamar = async function(action, payload) {
-    var controller = new AbortController();
-    var timeoutId = setTimeout(function() { controller.abort(); }, 10000);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(function() { controller.abort(); }, 10000);
     try {
-      var data = Object.assign({}, payload, { action: action });
-      var url = module.urlSheets;
-      var res = await fetch(url, {
+      const data = Object.assign({}, payload, { action: action });
+      const url = module.urlSheets;
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify(data),
@@ -37,7 +36,7 @@ export const DBShim = (function() {
       });
       clearTimeout(timeoutId);
       if (!res.ok) throw new Error('Error del servidor: ' + res.status);
-      var respData = await res.json();
+      const respData = await res.json();
       if (respData.error) throw new Error(respData.error);
       return respData;
     } catch (e) {
@@ -47,7 +46,6 @@ export const DBShim = (function() {
     }
   };
 
-  // Métodos auxiliares requeridos por db.js (no-op, mantenidos para compatibilidad)
   module._encolarOperacion = function() {};
   module._procesarSyncQueue = async function() {};
   module._saveSyncQueue = function() {};

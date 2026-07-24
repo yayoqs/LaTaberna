@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — REPOSITORIO JS (ES6)
    Archivo: js/repositorios/inventario-repository.js
-   Versión: 1.0.4
+   Versión: 1.0.5
    Propósito: Repositorio de inventario reutilizable (Appwrite + localStorage).
-              v1.0.4: soporte para editar ingredientes existentes (upsert).
+              v1.0.5: conserva proveedor y precio_proveedor.
    ================================================================ */
 
 import { Logger } from '../lib/logger.js';
@@ -11,36 +11,32 @@ import { DBAppwrite } from '../db-appwrite.js';
 import { DB } from '../db.js';
 import { Store } from '../lib/store.js';
 
-/**
- * Crea y devuelve un repositorio de inventario.
- * @returns {object} Repositorio con métodos guardarIngrediente, obtenerPorId, registrarMovimiento.
- */
 export function crearInventarioRepo() {
   return {
     async guardarIngrediente(datos) {
       const ingrediente = { ...datos };
       let guardadoRemoto = false;
 
-      // Preparar documento normalizado para Appwrite (snake_case)
-      const docAppwrite = {
-        nombre: ingrediente.nombre,
-        stock: ingrediente.stock,
-        unidad: ingrediente.unidad,
-        stock_minimo: ingrediente.stock_minimo ?? ingrediente.stockMinimo ?? 0,
-        categoria: ingrediente.categoria || 'general',
-        ubicacion: ingrediente.ubicacion || '',
-        valor_unitario: ingrediente.valor_unitario ?? ingrediente.valorUnitario ?? 0
-      };
-
-      // 1. Intentar guardar en Appwrite (crear o actualizar)
       if (DBAppwrite && DBAppwrite.habilitado) {
         try {
-          // Verificar si existe localmente para decidir si crear o actualizar
-          const existeLocal = DB.ingredientes.some(i => i.id == ingrediente.id);
-          if (existeLocal) {
-            await DBAppwrite.actualizar('ingredientes', ingrediente.id, docAppwrite);
+          const docParaAppwrite = {
+            nombre: ingrediente.nombre,
+            stock: ingrediente.stock,
+            unidad: ingrediente.unidad,
+            stock_minimo: ingrediente.stock_minimo ?? ingrediente.stockMinimo ?? 0,
+            categoria: ingrediente.categoria || 'general',
+            ubicacion: ingrediente.ubicacion || '',
+            valor_unitario: ingrediente.valor_unitario ?? ingrediente.valorUnitario ?? 0,
+            proveedor: ingrediente.proveedor || '',
+            precio_proveedor: ingrediente.precio_proveedor || 0
+          };
+          if (ingrediente.id) {
+            await DBAppwrite.actualizar('ingredientes', ingrediente.id, docParaAppwrite);
           } else {
-            await DBAppwrite.crear('ingredientes', ingrediente.id, docAppwrite);
+            const docRemoto = await DBAppwrite.crear('ingredientes', null, docParaAppwrite);
+            if (docRemoto && docRemoto.id) {
+              ingrediente.id = docRemoto.id;
+            }
           }
           guardadoRemoto = true;
           Logger.debug('[InventarioRepo] Ingrediente guardado en Appwrite:', ingrediente.id);
@@ -49,7 +45,6 @@ export function crearInventarioRepo() {
         }
       }
 
-      // 2. Si no se guardó remoto, marcar como pendiente
       if (!guardadoRemoto) {
         ingrediente._pendiente_sync = true;
         Logger.info('[InventarioRepo] Ingrediente marcado para sincronización futura.');
@@ -58,12 +53,10 @@ export function crearInventarioRepo() {
         }
       }
 
-      // 3. Generar ID local corto si es necesario
       if (!ingrediente.id) {
         ingrediente.id = 'l' + Date.now().toString(36) + Math.random().toString(36).substr(2, 5);
       }
 
-      // 4. Actualizar array local y persistir en localStorage
       const idx = DB.ingredientes.findIndex(i => i.id == ingrediente.id);
       if (idx >= 0) {
         DB.ingredientes[idx] = ingrediente;
@@ -72,7 +65,6 @@ export function crearInventarioRepo() {
       }
       localStorage.setItem('pubpos_ingredientes', JSON.stringify(DB.ingredientes));
 
-      // 5. Actualizar Store para reflejar en UI
       if (Store) {
         Store.despachar({ type: 'INGREDIENTE_GUARDADO', payload: ingrediente });
       }

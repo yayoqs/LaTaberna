@@ -1,14 +1,15 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/cuenta.js
-   Versión: 1.0.2
+   Versión: 1.0.3
    Propósito: Solicitud de cuenta (pre-cierre).
-              Migración a mostrarToast.
+              Migración a Store como fuente de verdad.
    ================================================================ */
 
 import { Auth } from '../auth.js';
 import { mostrarToast } from '../utils.js';
 import { EventBus } from '../lib/eventBus.js';
+import { Store } from '../lib/store.js';
 import { DB } from '../db.js';
 import { Comanda } from './comanda.js';
 import { Tickets } from './tickets.js';
@@ -37,7 +38,19 @@ const Cuenta = (() => {
     const obsInput = document.getElementById('comandaObs');
     if (obsInput) mesa.observaciones = obsInput.value;
 
-    DB.saveMesas();
+    // Persistir en DB
+    try {
+      DB.saveMesas();
+    } catch (e) {
+      Logger.error('[Cuenta] Error al persistir estado cuenta:', e);
+    }
+
+    // Despachar al Store
+    Store.despachar({
+      type: 'MESA_ACTUALIZAR',
+      payload: { numero: mesa.numero, cambios: { estado: 'cuenta' } }
+    });
+
     EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: 'cuenta' });
 
     const badge = document.getElementById('modalEstadoBadge');

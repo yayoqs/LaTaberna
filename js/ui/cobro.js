@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/cobro.js
-   Versión: 2.0.4
+   Versión: 2.0.5
    Propósito: Modal de cierre de mesa, split bill con pagos por persona,
               pago total y liberación controlada por caja.
-              Migración a nombres en español (utils/store).
+              Corrección: lectura de pedidos desde Store en lugar de DB.
    ================================================================ */
 
 import { Auth } from '../auth.js';
@@ -404,7 +404,8 @@ const Cobro = (() => {
       return;
     }
 
-    const pedidoCerrado = DB.pedidos.find(p => p.id === _mesaACerrar.pedidoId);
+    // Lectura del pedido cerrado desde el Store, no desde DB
+    const pedidoCerrado = Store.obtenerEstado().pedidos.find(p => p.id === _mesaACerrar.pedidoId);
     if (pedidoCerrado && typeof DB.syncGuardarPedido === 'function') {
       const pedidoParaSync = {
         id:          pedidoCerrado.id,
