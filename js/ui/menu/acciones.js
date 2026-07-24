@@ -1,21 +1,18 @@
 /* ================================================================
    LaTaberna - PubPOS — MENÚ SUBMÓDULO (ES6)
    Archivo: js/ui/menu/acciones.js
-   Versión: 1.0.0
+   Versión: 1.2.0
    Propósito: Persistencia de menús en Appwrite y sincronización con Store.
+              v1.2.0: incluye estilos visuales (fondo, tipografía, grilla).
    ================================================================ */
 
 import { DBAppwrite } from '../../db-appwrite.js';
 import { Store } from '../../lib/store.js';
+import { EventBus } from '../../lib/eventBus.js';
 import { Logger } from '../../lib/logger.js';
 import { mostrarToast } from '../../utils.js';
 import { getMenuActivo, setMenuActivo } from './estado.js';
 
-/**
- * Guarda un menú (crea o actualiza) en Appwrite y lo refleja en el Store.
- * @param {object} menu - El menú a guardar { id, nombre, productos, estado }
- * @returns {Promise<object>} El menú guardado con su id definitivo.
- */
 export async function guardarMenu(menu) {
   if (!menu || !menu.nombre) {
     mostrarToast('error', 'El menú necesita un nombre');
@@ -23,39 +20,37 @@ export async function guardarMenu(menu) {
   }
 
   try {
-    let doc;
+    const datosMenu = {
+      nombre: menu.nombre,
+      productos: menu.productos || [],
+      estado: menu.estado || 'borrador',
+      fondo: menu.fondo || '#1a1a2e',
+      tipografia: menu.tipografia || "'Inter', sans-serif",
+      grilla: menu.grilla || false,
+      actualizadoEn: Date.now()
+    };
+
     if (menu.id) {
-      // Actualizar existente
-      doc = await DBAppwrite.actualizar('menus', menu.id, {
-        nombre: menu.nombre,
-        productos: menu.productos || [],
-        estado: menu.estado || 'borrador',
-        actualizadoEn: Date.now()
-      });
+      await DBAppwrite.actualizar('menus', menu.id, datosMenu);
       mostrarToast('success', 'Menú actualizado');
       Logger.info('[Menú] Menú actualizado:', menu.id);
     } else {
-      // Crear nuevo
       menu.id = 'menu_' + Date.now();
-      doc = await DBAppwrite.crear('menus', menu.id, {
-        nombre: menu.nombre,
-        productos: menu.productos || [],
-        estado: menu.estado || 'borrador',
-        creadoPor: 'Admin',
-        actualizadoEn: Date.now()
+      await DBAppwrite.crear('menus', menu.id, {
+        ...datosMenu,
+        creadoPor: 'Admin'
       });
       mostrarToast('success', 'Menú creado');
       Logger.info('[Menú] Menú creado:', menu.id);
     }
 
-    // Sincronizar con el Store local
     const state = Store.obtenerEstado();
     const menus = [...(state.menus || [])];
     const idx = menus.findIndex(m => m.id === menu.id);
     if (idx >= 0) {
-      menus[idx] = { ...menus[idx], ...menu };
+      menus[idx] = { ...menus[idx], ...menu, ...datosMenu };
     } else {
-      menus.push(menu);
+      menus.push({ ...menu, ...datosMenu });
     }
     Store.despachar({ type: 'MENUS_INICIALIZAR', payload: menus });
 
@@ -68,10 +63,6 @@ export async function guardarMenu(menu) {
   }
 }
 
-/**
- * Publica el menú activo (cambia su estado a 'publicado').
- * @returns {Promise<object>} El menú publicado.
- */
 export async function publicarMenu() {
   const menu = getMenuActivo();
   if (!menu) {
@@ -79,13 +70,13 @@ export async function publicarMenu() {
     return null;
   }
   menu.estado = 'publicado';
-  return guardarMenu(menu);
+  const resultado = await guardarMenu(menu);
+  if (resultado) {
+    EventBus.emit('menus:actualizados', resultado);
+  }
+  return resultado;
 }
 
-/**
- * Obtiene todos los menús desde Appwrite y los carga en el Store.
- * @returns {Promise<Array>} Lista de menús.
- */
 export async function cargarMenus() {
   try {
     const menus = await DBAppwrite.listar('menus');

@@ -1,10 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MENÚ SUBMÓDULO (ES6)
    Archivo: js/ui/menu/ciclo-vida.js
-   Versión: 1.0.2
+   Versión: 1.2.0
    Propósito: Ciclo de vida de la vista de menú.
-              v1.0.2: elimina suscripción redundante a 'vista:cambiada'
-                      que provocaba doble activación.
+              v1.2.0: aplica y persiste configuración visual del lienzo.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -46,7 +45,8 @@ export function activar() {
       const menu = getMenuActivo();
       if (menu) {
         document.getElementById('menuNameInput').value = menu.nombre;
-        renderLienzo(getProductosMenuActivo());
+        _aplicarEstilos(menu);
+        renderLienzo(menu.productos || []);
       }
     }, 100);
   }));
@@ -61,23 +61,58 @@ export function limpiar() {
   _desuscripciones = [];
 }
 
+function _aplicarEstilos(menu) {
+  const canvas = document.getElementById('menuCanvas');
+  if (!canvas) return;
+
+  canvas.style.backgroundColor = menu.fondo || '#1a1a2e';
+  canvas.style.fontFamily = menu.tipografia || "'Inter', sans-serif";
+  if (menu.grilla) {
+    canvas.classList.add('grid');
+  } else {
+    canvas.classList.remove('grid');
+  }
+
+  document.getElementById('menuBgSelect').value = menu.fondo || '#1a1a2e';
+  document.getElementById('menuFontSelect').value = menu.tipografia || "'Inter', sans-serif";
+  document.getElementById('menuGridToggle').checked = menu.grilla || false;
+}
+
+function _guardarEstilosEnMenu() {
+  const menu = getMenuActivo();
+  if (!menu) return;
+  menu.fondo = document.getElementById('menuBgSelect').value;
+  menu.tipografia = document.getElementById('menuFontSelect').value;
+  menu.grilla = document.getElementById('menuGridToggle').checked;
+}
+
 // ── CALLBACKS ─────────────────────────────────────────────
 
 function onMenuSeleccionado(menu) {
   setMenuActivo(menu);
   document.getElementById('menuNameInput').value = menu.nombre;
+  _aplicarEstilos(menu);
   renderLienzo(menu.productos || []);
 }
 
 function onProductoAgregado(producto, x, y) {
+  if (producto.tipo === 'producto' || !producto.tipo) {
+    const productosActuales = getProductosMenuActivo();
+    const yaExiste = productosActuales.some(p => p.id === producto.id && (p.tipo === 'producto' || !p.tipo));
+    if (yaExiste) {
+      mostrarToast('warning', `"${producto.nombre}" ya está en el lienzo.`);
+      return;
+    }
+  }
+
   agregarProductoAlMenu({
     ...producto,
     x: x || 100,
     y: y || 100,
-    tipo: 'producto',
+    tipo: producto.tipo || 'producto',
     shape: 'rect',
     display: 'both',
-    price: Math.round((producto.costo || 0) * 1.5)
+    price: producto.precio || Math.round((producto.costo || 0) * 1.5)
   });
   renderLienzo(getProductosMenuActivo());
   cerrarBiblioteca();
@@ -165,22 +200,28 @@ function _vincularEventosDOM(signal) {
   document.getElementById('menuCtxBtn')?.addEventListener('click', () => {
     document.getElementById('menuContextMenu')?.classList.toggle('active');
   }, { signal });
+
+  // Listeners de estilos: aplican en vivo y guardan en el menú activo
   document.getElementById('menuBgSelect')?.addEventListener('change', function() {
     const canvas = document.getElementById('menuCanvas');
     if (canvas) canvas.style.backgroundColor = this.value;
+    _guardarEstilosEnMenu();
   }, { signal });
   document.getElementById('menuFontSelect')?.addEventListener('change', function() {
     const canvas = document.getElementById('menuCanvas');
     if (canvas) canvas.style.fontFamily = this.value;
+    _guardarEstilosEnMenu();
   }, { signal });
   document.getElementById('menuGridToggle')?.addEventListener('change', function() {
     document.getElementById('menuCanvas')?.classList.toggle('grid', this.checked);
+    _guardarEstilosEnMenu();
   }, { signal });
 
   document.getElementById('menuSaveBtn')?.addEventListener('click', async () => {
     const menu = getMenuActivo() || {};
     menu.nombre = document.getElementById('menuNameInput')?.value || 'Sin nombre';
     menu.productos = _serializarLienzo();
+    _guardarEstilosEnMenu();
     await guardarMenu(menu);
     refrescarLista();
   }, { signal });
@@ -193,6 +234,7 @@ function _vincularEventosDOM(signal) {
     }
     menu.nombre = document.getElementById('menuNameInput')?.value || menu.nombre;
     menu.productos = _serializarLienzo();
+    _guardarEstilosEnMenu();
     await publicarMenu();
     refrescarLista();
     document.getElementById('menuContextMenu')?.classList.remove('active');

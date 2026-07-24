@@ -1,16 +1,14 @@
 /* ================================================================
    LaTaberna - PubPOS — MENÚ SUBMÓDULO (ES6)
    Archivo: js/ui/menu/renderer.js
-   Versión: 1.0.2
+   Versión: 1.0.4
    Propósito: Construcción del DOM y renderizado de la vista de menú.
-              v1.0.2: encapsula todos los estilos inyectados bajo
-                      #view-carta-editor.
+              v1.0.4: agrega botón de eliminar en cada ítem de la
+                      barra lateral.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
 import { formatearDinero } from '../../utils.js';
-
-// ── CONSTRUCCIÓN DEL DOM ──────────────────────────────────
 
 export function asegurarVista() {
   let main = document.getElementById('view-carta-editor');
@@ -25,7 +23,6 @@ export function asegurarVista() {
   }
 
   main.innerHTML = `
-    <!-- Header simplificado -->
     <div class="menu-header">
       <button class="hamburger" id="menuHamburgerBtn" title="Menús">☰</button>
       <h2>📋 <input type="text" id="menuNameInput" value="Nuevo Menú"></h2>
@@ -36,12 +33,10 @@ export function asegurarVista() {
       </div>
     </div>
 
-    <!-- Lienzo -->
     <div class="canvas-wrap">
       <div class="canvas" id="menuCanvas" style="background-color:#1a1a2e;"></div>
     </div>
 
-    <!-- Panel lateral de menús (sidebar) -->
     <div class="sidebar-overlay" id="menuSidebarOverlay"></div>
     <div class="sidebar" id="menuSidebar">
       <div class="sidebar-header">
@@ -49,9 +44,11 @@ export function asegurarVista() {
         <button class="icon-btn" id="menuCloseSidebarBtn" style="border-radius:8px;">✕</button>
       </div>
       <div class="sidebar-list" id="menuSidebarList"></div>
+      <div class="sidebar-footer">
+        <button class="btn-accion" id="menuNuevoBtn">+ Nuevo Menú</button>
+      </div>
     </div>
 
-    <!-- Menú contextual (⚙️) -->
     <div class="context-menu" id="menuContextMenu">
       <label>Fondo</label>
       <select id="menuBgSelect">
@@ -70,7 +67,6 @@ export function asegurarVista() {
       <button id="menuPublishBtn">🚀 Publicar</button>
     </div>
 
-    <!-- FAB y menú radial -->
     <div class="fab-overlay" id="menuFabOverlay"></div>
     <div class="radial-menu" id="menuRadialMenu">
       <button class="radial-btn" data-action="producto">🍔 Producto del recetario</button>
@@ -81,14 +77,12 @@ export function asegurarVista() {
     </div>
     <button class="fab" id="menuFabBtn">+</button>
 
-    <!-- Bottom Sheet (Biblioteca) -->
     <div class="sheet-overlay" id="menuSheetOverlay"></div>
     <div class="bottom-sheet" id="menuBottomSheet">
       <div class="sheet-handle">☰ Biblioteca de Productos</div>
       <div class="sheet-list" id="menuSheetList"></div>
     </div>
 
-    <!-- Panel de propiedades (modal) -->
     <div class="overlay" id="menuPropsOverlay"></div>
     <div class="props-panel" id="menuPropsPanel">
       <h3>Propiedades</h3>
@@ -107,7 +101,6 @@ export function asegurarVista() {
       </div>
     </div>
 
-    <!-- Modal de vista previa -->
     <div class="preview-modal" id="menuPreviewModal">
       <div class="preview-content" id="menuPreviewContent">
         <button class="close-btn" id="menuClosePreviewBtn">✕ Cerrar</button>
@@ -115,7 +108,6 @@ export function asegurarVista() {
     </div>
   `;
 
-  // Vincular estilos encapsulados si no existen
   if (!document.getElementById('menu-inline-styles')) {
     const style = document.createElement('style');
     style.id = 'menu-inline-styles';
@@ -149,13 +141,18 @@ export function asegurarVista() {
       #view-carta-editor .sidebar-header { padding: 16px; border-bottom: 1px solid var(--color-border); display: flex; align-items: center; justify-content: space-between; }
       #view-carta-editor .sidebar-header h3 { margin: 0; font-size: 16px; }
       #view-carta-editor .sidebar-list { flex: 1; overflow-y: auto; padding: 8px; }
-      #view-carta-editor .menu-item { padding: 12px 16px; border-radius: 8px; cursor: pointer; margin-bottom: 4px; display: flex; align-items: center; gap: 10px; }
+      #view-carta-editor .sidebar-footer { padding: 12px; border-top: 1px solid var(--color-border); }
+      #view-carta-editor .btn-accion { display: block; width: 100%; padding: 10px; background: var(--color-accent); border: none; color: #000; border-radius: 20px; font-weight: 600; font-size: 14px; cursor: pointer; text-align: center; }
+      #view-carta-editor .menu-item { padding: 12px 16px; border-radius: 8px; cursor: pointer; margin-bottom: 4px; display: flex; align-items: center; gap: 10px; position: relative; }
       #view-carta-editor .menu-item:hover, #view-carta-editor .menu-item:active { background: #252535; }
       #view-carta-editor .menu-item.activo { background: rgba(245,158,11,.15); border-left: 3px solid var(--color-accent); }
       #view-carta-editor .menu-item .menu-icon { font-size: 20px; }
       #view-carta-editor .menu-item .menu-info { flex: 1; }
       #view-carta-editor .menu-item .menu-info strong { font-size: 14px; display: block; }
       #view-carta-editor .menu-item .menu-info span { font-size: 11px; color: var(--color-text-muted); }
+      #view-carta-editor .menu-item .btn-eliminar-menu { background: transparent; border: none; color: var(--color-text-muted); cursor: pointer; font-size: 16px; padding: 4px 8px; border-radius: 4px; opacity: 0; transition: all .2s; }
+      #view-carta-editor .menu-item:hover .btn-eliminar-menu { opacity: 1; }
+      #view-carta-editor .menu-item .btn-eliminar-menu:hover { color: var(--color-danger); background: rgba(239,68,68,.1); }
       #view-carta-editor .sheet-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 50; display: none; }
       #view-carta-editor .sheet-overlay.active { display: block; }
       #view-carta-editor .bottom-sheet { position: fixed; bottom: 0; left: 0; right: 0; z-index: 60; background: var(--color-card); border-radius: 16px 16px 0 0; max-height: 60vh; transform: translateY(100%); transition: transform .3s; display: flex; flex-direction: column; box-shadow: 0 -8px 30px rgba(0,0,0,.5); }
@@ -184,8 +181,6 @@ export function asegurarVista() {
   }
 }
 
-// ── RENDERIZADO DE COMPONENTES ────────────────────────────
-
 export function renderSidebar(menus, menuActivo) {
   const lista = document.getElementById('menuSidebarList');
   if (!lista) return;
@@ -196,6 +191,9 @@ export function renderSidebar(menus, menuActivo) {
         <strong>${m.nombre}</strong>
         <span>${m.estado === 'publicado' ? '🟢 Publicado' : '📝 Borrador'}</span>
       </div>
+      <button class="btn-eliminar-menu" data-id="${m.id}" title="Eliminar menú">
+        <i class="fas fa-trash"></i>
+      </button>
     </div>
   `).join('');
 }

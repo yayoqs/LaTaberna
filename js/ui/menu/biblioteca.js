@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MENÚ SUBMÓDULO (ES6)
    Archivo: js/ui/menu/biblioteca.js
-   Versión: 1.0.0
+   Versión: 1.1.0
    Propósito: Panel inferior de biblioteca de productos (bottom sheet).
-              Carga productos del recetario, filtrado y arrastre al lienzo.
+              Carga todos los productos activos, simples y compuestos.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -93,14 +93,12 @@ export function inicializar(onProductoAgregado) {
 
 /**
  * Refresca la lista de productos de la biblioteca según filtros.
+ * Ahora incluye todos los productos activos (simples y compuestos).
  */
 export function refrescar() {
   const state = Store.obtenerEstado();
-  let productos = (state.productos || []).filter(p => {
-    // Solo productos que sean producto_final del recetario
-    const receta = (state.recetas || []).find(r => r.productoId === p.id);
-    return receta && receta.nivel === 'producto_final';
-  });
+  // Cargar todos los productos activos, sin limitar a producto_final
+  let productos = (state.productos || []).filter(p => p.activo !== false);
 
   // Filtro de categoría
   const catFiltro = getCategoriaFiltro();
@@ -114,7 +112,7 @@ export function refrescar() {
     productos = productos.filter(p => p.nombre.toLowerCase().includes(termino.toLowerCase()));
   }
 
-  // Agregar imagen y costo desde la receta
+  // Agregar imagen y costo (desde receta si existe, sino 0)
   productos = productos.map(p => {
     const receta = (state.recetas || []).find(r => r.productoId === p.id);
     return {
