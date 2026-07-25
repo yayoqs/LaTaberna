@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-appwrite.js
-   Versión: 1.1.3
+   Versión: 1.1.4
    Propósito: Cliente de Appwrite (API TablesDB), Realtime y operadores.
-              Uso de let/const en lugar de var.
+              Uso de let/const. _limpiarFila conserva todos los campos
+              del documento original excepto metadatos internos ($).
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -35,22 +36,33 @@ export const DBAppwrite = (function() {
     proveedores: 'Proveedores'
   };
 
+  /**
+   * Limpia los metadatos internos de Appwrite (claves que comienzan con $)
+   * y expone los timestamps en español (creadoEn, actualizadoEn).
+   * Conserva todos los demás campos del documento original.
+   * @param {Object} fila - Documento/fila crudo desde Appwrite.
+   * @returns {Object} Datos limpios con id, creadoEn, actualizadoEn.
+   */
   function _limpiarFila(fila) {
+    // Partir de una copia del documento original para conservar TODOS los campos
     const datos = Object.assign({}, fila);
+    
+    // Guardar timestamps antes de eliminarlos
     const creado = datos.$createdAt || null;
     const actualizado = datos.$updatedAt || null;
-
-    delete datos.$id;
-    delete datos.$databaseId;
-    delete datos.$tableId;
-    delete datos.$createdAt;
-    delete datos.$updatedAt;
-    delete datos.$permissions;
-
+    
+    // Eliminar ÚNICAMENTE los metadatos internos de Appwrite
+    Object.keys(datos).forEach(function(clave) {
+      if (clave.startsWith('$')) {
+        delete datos[clave];
+      }
+    });
+    
+    // Asignar campos normalizados en español
     datos.id = fila.$id;
     datos.creadoEn = creado;
     datos.actualizadoEn = actualizado;
-
+    
     return datos;
   }
 
@@ -102,6 +114,15 @@ export const DBAppwrite = (function() {
     }
   };
 
+  /**
+   * Crea una fila en una colección.
+   * @param {string} coleccion - Clave de la colección en COLECCIONES.
+   * @param {string} idFila - ID único o 'unique()' para autogenerado.
+   * @param {object} datos - Datos de la fila.
+   * @param {string[]} [permisos] - Array opcional de permisos para Row Security.
+   * @param {string} [idTransaccion] - ID opcional de transacción.
+   * @returns {object|null} Fila creada o null si falla.
+   */
   modulo.crear = async function(coleccion, idFila, datos, permisos, idTransaccion) {
     if (!modulo.habilitado || !modulo.baseDeDatos) return null;
     try {
@@ -137,6 +158,14 @@ export const DBAppwrite = (function() {
     }
   };
 
+  /**
+   * Actualiza una fila existente.
+   * @param {string} coleccion - Clave de la colección.
+   * @param {string} id - ID de la fila a actualizar.
+   * @param {object} cambios - Campos a modificar.
+   * @param {string} [idTransaccion] - ID opcional de transacción.
+   * @returns {object|null} Fila actualizada o null si falla.
+   */
   modulo.actualizar = async function(coleccion, id, cambios, idTransaccion) {
     if (!modulo.habilitado || !modulo.baseDeDatos) return null;
     try {
@@ -168,6 +197,13 @@ export const DBAppwrite = (function() {
     }
   };
 
+  /**
+   * Elimina una fila.
+   * @param {string} coleccion - Clave de la colección.
+   * @param {string} id - ID de la fila a eliminar.
+   * @param {string} [idTransaccion] - ID opcional de transacción.
+   * @returns {boolean} true si se eliminó correctamente.
+   */
   modulo.eliminar = async function(coleccion, id, idTransaccion) {
     if (!modulo.habilitado || !modulo.baseDeDatos) return false;
     try {
@@ -189,6 +225,18 @@ export const DBAppwrite = (function() {
     }
   };
 
+  // ── Operadores atómicos ──────────────────────────────────
+
+  /**
+   * Incrementa un campo numérico atómicamente.
+   * @param {string} coleccion - Clave de la colección.
+   * @param {string} id - ID de la fila.
+   * @param {string} columna - Nombre del campo a incrementar.
+   * @param {number} valor - Cantidad a incrementar.
+   * @param {number} [maximo] - Valor máximo permitido (opcional).
+   * @param {string} [idTransaccion] - ID opcional de transacción.
+   * @returns {object|null} Resultado de la operación.
+   */
   modulo.incrementarCampo = async function(coleccion, id, columna, valor, maximo, idTransaccion) {
     if (!modulo.habilitado || !modulo.baseDeDatos) return null;
     try {
@@ -209,6 +257,16 @@ export const DBAppwrite = (function() {
     }
   };
 
+  /**
+   * Decrementa un campo numérico atómicamente.
+   * @param {string} coleccion - Clave de la colección.
+   * @param {string} id - ID de la fila.
+   * @param {string} columna - Nombre del campo a decrementar.
+   * @param {number} valor - Cantidad a decrementar.
+   * @param {number} [minimo] - Valor mínimo permitido (opcional).
+   * @param {string} [idTransaccion] - ID opcional de transacción.
+   * @returns {object|null} Resultado de la operación.
+   */
   modulo.decrementarCampo = async function(coleccion, id, columna, valor, minimo, idTransaccion) {
     if (!modulo.habilitado || !modulo.baseDeDatos) return null;
     try {
@@ -229,6 +287,14 @@ export const DBAppwrite = (function() {
     }
   };
 
+  /**
+   * Actualiza una fila usando operadores atómicos (Operator.increment, etc.).
+   * @param {string} coleccion - Clave de la colección.
+   * @param {string} id - ID de la fila.
+   * @param {object} datosConOperadores - Objeto con valores y operadores.
+   * @param {string} [idTransaccion] - ID opcional de transacción.
+   * @returns {object|null} Fila actualizada o null si falla.
+   */
   modulo.actualizarConOperadores = async function(coleccion, id, datosConOperadores, idTransaccion) {
     if (!modulo.habilitado || !modulo.baseDeDatos) return null;
     try {
@@ -248,6 +314,7 @@ export const DBAppwrite = (function() {
     }
   };
 
+  // ── Transacciones ────────────────────────────────────────
   modulo.crearTransaccion = async function() {
     if (!modulo.habilitado || !modulo.baseDeDatos) return null;
     try {
@@ -287,6 +354,7 @@ export const DBAppwrite = (function() {
     }
   };
 
+  // ── Realtime ────────────────────────────────────────────
   const _callbacksRealtime = [];
 
   modulo.suscribirRealtime = function(alCambiar) {
