@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>La Taberna — Experimento Visual</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Monoton&family=Caveat:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Space+Grotesk:wght@500;700&family=Cinzel+Decorative:wght@700;900&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Nunito', system-ui, sans-serif;
+      background: #0a0a0f;
+      color: #f1f5f9;
+      overflow: hidden;
+      height: 100vh;
+      width: 100%;
+    }
+
+    .view-container {
+      width: 100%;
+      height: 100vh;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      transition: opacity 0.5s ease;
+    }
+
+    /* Selector de tema */
+    .theme-switcher {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 500;
+      display: flex;
+      gap: 10px;
+    }
+    .theme-btn {
+      background: rgba(0,0,0,0.7);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      transition: all 0.3s ease;
+      backdrop-filter: blur(8px);
+    }
+    .theme-btn:hover { border-color: #f59e0b; color: #f59e0b; }
+    .theme-btn.active { background: #f59e0b; color: #000; border-color: #f59e0b; }
+
+    /* ═══════════════ TEMA 1: NEÓN CIBERPUNK ═══════════════ */
+    .theme-cyberpunk {
+      --color-bg: #050510;
+      --color-card: #0d0d1f;
+      --color-border: #1a1a3a;
+      --neon-amber: #f59e0b;
+      --neon-indigo: #6366f1;
+      --neon-purple: #a855f7;
+      --neon-orange: #f97316;
+      --font-display: 'Orbitron', sans-serif;
+      --font-script: 'Caveat', cursive;
+      --font-ui: 'Space Grotesk', sans-serif;
+      --radius: 12px;
+      --triangulo-ancho: 210px;
+      --triangulo-alto: 210px;
+
+      background:
+        radial-gradient(circle at 80% 10%, rgba(245, 158, 11, 0.15) 0%, transparent 40%),
+        radial-gradient(circle at 15% 85%, rgba(99, 102, 241, 0.12) 0%, transparent 45%),
+        linear-gradient(180deg, #050510 0%, #020208 100%);
+      box-shadow: inset 0 0 120px rgba(0,0,0,0.9);
+    }
+    .theme-cyberpunk .login-corner {
+      background: linear-gradient(135deg, #ff00ff 0%, #00ffff 75%) !important;
+      box-shadow: 0 0 40px rgba(255,0,255,0.6), 0 0 80px rgba(0,255,255,0.3) !important;
+    }
+    .theme-cyberpunk .login-title {
+      color: #00ffff !important;
+      text-shadow: 0 0 12px rgba(0,255,255,0.9), 0 0 30px rgba(0,255,255,0.5) !important;
+      font-family: 'Orbitron', sans-serif !important;
+    }
+    .theme-cyberpunk .login-subtitle { color: #ff00ff !important; text-shadow: 0 0 10px rgba(255,0,255,0.8) !important; }
+    .theme-cyberpunk .nombre {
+      background: linear-gradient(to right, #00ffff, #ff00ff) !important;
+      -webkit-background-clip: text !important;
+      font-family: 'Orbitron', sans-serif !important;
+      font-size: 1.6rem !important;
+      letter-spacing: 3px !important;
+    }
+    .theme-cyberpunk .eslogan { color: #00ffff !important; font-family: 'Caveat', cursive !important; }
+    .theme-cyberpunk .vitrina-card {
+      border: 1px solid rgba(0,255,255,0.3) !important;
+      box-shadow: 0 0 20px rgba(0,255,255,0.1), inset 0 0 20px rgba(0,255,255,0.03) !important;
+    }
+    .theme-cyberpunk .vitrina-card:hover { border-color: #ff00ff !important; box-shadow: 0 0 30px rgba(255,0,255,0.3) !important; }
+    .theme-cyberpunk .vitrina-tag { background: #ff00ff !important; color: #fff !important; }
+
+    /* ═══════════════ TEMA 2: TABERNA CLÁSICA ═══════════════ */
+    .theme-clasica {
+      --color-bg: #1a0f08;
+      --color-card: #2c1a0e;
+      --color-border: #3d2512;
+      --neon-amber: #d4a853;
+      --neon-indigo: #8b6914;
+      --neon-purple: #6b3a2a;
+      --neon-orange: #c67a3d;
+      --font-display: 'Cinzel Decorative', cursive;
+      --font-script: 'Caveat', cursive;
+      --font-ui: 'Nunito', sans-serif;
+      --radius: 6px;
+      --triangulo-ancho: 210px;
+      --triangulo-alto: 210px;
+
+      background:
+        radial-gradient(circle at 80% 10%, rgba(212, 168, 83, 0.1) 0%, transparent 40%),
+        radial-gradient(circle at 15% 85%, rgba(139, 105, 20, 0.08) 0%, transparent 45%),
+        linear-gradient(180deg, #1a0f08 0%, #0d0704 100%),
+        repeating-linear-gradient(90deg, rgba(0,0,0,0.1) 0px, rgba(0,0,0,0.1) 2px, transparent 2px, transparent 4px);
+      background-size: 100% 100%, 100% 100%, 100% 100%, 60px 60px;
+      box-shadow: inset 0 0 140px rgba(0,0,0,0.8);
+    }
+    .theme-clasica .login-corner {
+      background: linear-gradient(135deg, #d4a853 0%, #8b6914 75%) !important;
+      box-shadow: 0 0 30px rgba(212, 168, 83, 0.4) !important;
+    }
+    .theme-clasica .login-title {
+      font-family: 'Cinzel Decorative', cursive !important;
+      color: #d4a853 !important;
+      text-shadow: 0 0 6px rgba(212,168,83,0.6) !important;
+    }
+    .theme-clasica .login-subtitle { color: #c67a3d !important; }
+    .theme-clasica .nombre {
+      background: linear-gradient(to right, #d4a853, #c67a3d) !important;
+      -webkit-background-clip: text !important;
+      font-family: 'Cinzel Decorative', cursive !important;
+      font-size: 1.5rem !important;
+      letter-spacing: 2px !important;
+    }
+    .theme-clasica .eslogan { color: #d4a853 !important; font-family: 'Caveat', cursive !important; }
+    .theme-clasica .vitrina-card {
+      border: 1px solid rgba(212, 168, 83, 0.3) !important;
+      background: linear-gradient(135deg, #2c1a0e, #1a0f08) !important;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.6), inset 0 1px 0 rgba(212,168,83,0.1) !important;
+    }
+    .theme-clasica .vitrina-card:hover { border-color: #d4a853 !important; box-shadow: 0 0 20px rgba(212,168,83,0.2) !important; }
+    .theme-clasica .vitrina-tag { background: #c67a3d !important; color: #1a0f08 !important; }
+
+    /* ═══════════════ ESTILOS COMPARTIDOS ═══════════════ */
+    @keyframes neonPulse {
+      0%, 100% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.2), 0 0 40px rgba(99, 102, 241, 0.1); }
+      50% { box-shadow: 0 0 30px rgba(245, 158, 11, 0.4), 0 0 55px rgba(99, 102, 241, 0.2); }
+    }
+    @keyframes floatIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes emberDrift {
+      0%, 100% { transform: translate(0,0); }
+      50% { transform: translate(4px,-6px); }
+    }
+
+    .view-container::before,
+    .view-container::after {
+      content: '';
+      position: fixed;
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      opacity: 0.5;
+      animation: emberDrift 7s ease-in-out infinite;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .view-container::before { top: 30%; left: 10%; background: var(--neon-orange, #f97316); }
+    .view-container::after { top: 75%; left: 85%; animation-delay: 2.5s; background: var(--neon-indigo, #6366f1); }
+
+    .login-corner {
+      position: absolute;
+      top: 0; right: 0;
+      width: var(--triangulo-ancho);
+      height: var(--triangulo-alto);
+      cursor: pointer;
+      clip-path: polygon(100% 0, 0 0, 100% 100%);
+      padding: 1.5px;
+      animation: neonPulse 3.5s ease-in-out infinite;
+      transition: all 0.3s ease;
+      z-index: 100;
+    }
+    .login-corner:hover { transform: scale(1.02); }
+    .login-corner-inner {
+      background: rgba(10, 10, 15, 0.96);
+      width: 100%; height: 100%;
+      clip-path: polygon(100% 0, 0 0, 100% 100%);
+      display: flex; flex-direction: column;
+      align-items: flex-end; justify-content: flex-start;
+      padding: 24px 20px 0 0;
+    }
+    .login-title {
+      font-family: var(--font-display);
+      font-size: 0.8rem; font-weight: 700; letter-spacing: 1px;
+      margin-bottom: 6px; white-space: nowrap;
+    }
+    .login-subtitle {
+      font-family: var(--font-ui);
+      font-size: 0.65rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 1px;
+      text-decoration: none;
+    }
+
+    .header-block {
+      align-self: flex-start;
+      margin-top: 8px;
+      max-width: calc(100% - 140px);
+      animation: floatIn 0.6s ease both;
+      position: relative;
+      z-index: 2;
+    }
+    .icono-marco {
+      width: 56px; height: 56px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #1e1e2e, #12121a 70%);
+      border: 2px solid rgba(245, 158, 11, 0.4);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 8px;
+      box-shadow: 0 0 16px rgba(245, 158, 11, 0.22), inset 0 2px 4px rgba(0,0,0,0.4);
+    }
+    .icono-marco i { font-size: 26px; color: var(--neon-amber, #f59e0b); filter: drop-shadow(0 0 4px var(--neon-amber, #f59e0b)); }
+    .nombre {
+      font-family: var(--font-display);
+      font-size: 1.5rem; font-weight: 700; letter-spacing: 1px; line-height: 1.1;
+      margin-bottom: 4px;
+      filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.3));
+    }
+    .eslogan {
+      font-family: var(--font-script);
+      font-size: 1.2rem; font-weight: 600;
+      text-shadow: 0 0 6px rgba(245,158,11,0.3);
+      transition: opacity 0.4s ease;
+    }
+
+    .main-wrapper {
+      width: 100%;
+      display: flex; flex-direction: column; gap: 14px;
+      margin-top: 10px; margin-bottom: 10px;
+      flex-grow: 1;
+      justify-content: center;
+      position: relative;
+      z-index: 2;
+    }
+
+    .vitrina-contenedor { width: 100%; animation: floatIn 0.7s ease both; }
+
+    .vitrina-titulo-seccion {
+      font-family: var(--font-ui);
+      font-size: 0.7rem; font-weight: 700;
+      letter-spacing: 1.5px; text-transform: uppercase;
+      margin-bottom: 6px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .vitrina-cocktails .vitrina-titulo-seccion { color: #a855f7; }
+    .vitrina-burgers .vitrina-titulo-seccion { color: #f97316; }
+    .vitrina-karaoke .vitrina-titulo-seccion { color: #6366f1; }
+
+    .vitrina-scroll {
+      display: flex; gap: 10px;
+      overflow-x: auto; scroll-snap-type: x mandatory;
+      scrollbar-width: none; width: 100%;
+    }
+    .vitrina-scroll::-webkit-scrollbar { display: none; }
+
+    .vitrina-card {
+      position: relative;
+      flex: 0 0 76%;
+      scroll-snap-align: center;
+      border-radius: var(--radius);
+      height: 100px;
+      display: flex;
+      align-items: flex-end;
+      padding: 12px;
+      background-size: cover;
+      background-position: center;
+      transition: all 0.25s ease;
+      overflow: hidden; cursor: pointer;
+    }
+    .vitrina-card:hover { transform: translateY(-2px); }
+    .vitrina-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, rgba(10,10,15,0.9) 0%, rgba(10,10,15,0.3) 60%, transparent 100%);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .vitrina-texto { position: relative; z-index: 2; min-width: 0; }
+    .vitrina-titulo {
+      font-family: var(--font-ui);
+      font-size: 0.9rem; font-weight: 700;
+      color: #fff;
+      line-height: 1.2;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+    }
+    .vitrina-desc {
+      font-size: 0.68rem;
+      color: rgba(255,255,255,0.8);
+      text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+      margin-top: 2px;
+    }
+
+    .vitrina-tag {
+      position: absolute;
+      top: 0; right: 0;
+      font-size: 0.52rem; font-weight: 800;
+      letter-spacing: 0.5px; text-transform: uppercase;
+      padding: 3px 8px; border-bottom-left-radius: 6px;
+      color: #000; z-index: 3;
+    }
+    .vitrina-cocktails .vitrina-tag { background: #a855f7; color: #fff; }
+    .vitrina-burgers .vitrina-tag { background: #f97316; }
+    .vitrina-karaoke .vitrina-tag { background: #6366f1; color: #fff; }
+
+    @media (max-width: 400px) {
+      .view-container { padding: 14px; }
+      :root { --triangulo-ancho: 165px; --triangulo-alto: 165px; }
+      .main-wrapper { gap: 10px; }
+      .vitrina-card { flex: 0 0 82%; height: 90px; }
+      .nombre { font-size: 1.2rem; }
+      .eslogan { font-size: 1rem; }
+      .icono-marco { width: 46px; height: 46px; }
+      .icono-marco i { font-size: 22px; }
+    }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <!-- Tema 1: Neón Cyberpunk -->
+  <div class="view-container theme-cyberpunk" id="themeCyberpunk">
+    <div class="login-corner">
+      <div class="login-corner-inner">
+        <div class="login-title">Iniciar Sesión</div>
+        <a href="#" class="login-subtitle">Registrarse</a>
+      </div>
+    </div>
+
+    <header class="header-block">
+      <div class="icono-marco"><i class="fa-solid fa-bolt"></i></div>
+      <div class="nombre">LA TABERNA</div>
+      <div class="eslogan" id="eslogan-cyber">"Conecta con la noche digital"</div>
+    </header>
+
+    <section class="main-wrapper">
+      <div class="vitrina-contenedor vitrina-cocktails">
+        <div class="vitrina-titulo-seccion">🍸 CÓCTELES CUÁNTICOS</div>
+        <div class="vitrina-scroll">
+          <div class="vitrina-card" style="background-image: url('https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=500&q=80');">
+            <span class="vitrina-tag">2x1</span>
+            <div class="vitrina-texto"><div class="vitrina-titulo">Fuego Valirio</div><div class="vitrina-desc">Gin, jalapeño y destello verde</div></div>
+          </div>
+          <div class="vitrina-card" style="background-image: url('https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=500&q=80');">
+            <div class="vitrina-texto"><div class="vitrina-titulo">Abismo Negro</div><div class="vitrina-desc">Whisky ahumado y licor de mora</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="vitrina-contenedor vitrina-burgers">
+        <div class="vitrina-titulo-seccion">🔥 SINTÉTICOS</div>
+        <div class="vitrina-scroll">
+          <div class="vitrina-card" style="background-image: url('https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500&q=80');">
+            <span class="vitrina-tag">Top</span>
+            <div class="vitrina-texto"><div class="vitrina-titulo">La Forja</div><div class="vitrina-desc">Doble carne premium</div></div>
+          </div>
+          <div class="vitrina-card" style="background-image: url('https://images.unsplash.com/photo-1550547660-d9450f859349?w=500&q=80');">
+            <div class="vitrina-texto"><div class="vitrina-titulo">Humo & Acero</div><div class="vitrina-desc">BBQ artesanal</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="vitrina-contenedor vitrina-karaoke">
+        <div class="vitrina-titulo-seccion">🎤 FRECUENCIA MODULADA</div>
+        <div class="vitrina-scroll">
+          <div class="vitrina-card" style="background-image: url('https://images.unsplash.com/photo-1516280440502-861053b92787?w=500&q=80');">
+            <span class="vitrina-tag">Live</span>
+            <div class="vitrina-texto"><div class="vitrina-titulo">Grito de Guerra</div><div class="vitrina-desc">Rock pesado en vivo</div></div>
+          </div>
+          <div class="vitrina-card" style="background-image: url('https://images.unsplash.com/photo-1470229722913-7c092fb1380f?w=500&q=80');">
+            <div class="vitrina-texto"><div class="vitrina-titulo">Torneo de Clanes</div><div class="vitrina-desc">Trivia estratégica</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Tema 2: Taberna Clásica -->
+  <div class="view-container theme-clasica hidden" id="themeClasica">
+    <div class="login-corner">
+      <div class="login-corner-inner">
+        <div class="login-title">Entrar</div>
+        <a href="#" class="login-subtitle">Registrarse</a>
+      </div>
+    </div>
+
+    <header class="header-block">
+      <div class="icono-marco"><i class="fa-solid fa-chess-rook"></i></div>
+      <div class="nombre">La Taberna</div>
+      <div class="eslogan" id="eslogan-clasico">"Donde se forjan las leyendas"</div>
+    </header>
+
+    <section class="main-wrapper">
+      <div class="vitrina-contenedor vitrina-cocktails">
+        <div class="vitrina-titulo-seccion">🍸 Elixires del maestre</div>
+        <div class="vitrina-scroll">
+          <div class="vitrina-card" style="background-image: url('https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=500&q=80');">
+            <span class="vitrina-tag">2x1</span>
+            <div class="vitrina-texto"><div class="vitrina-titulo">Fuego Valirio</div><div class="vitrina-desc">Gin, jalapeño y destello verde</div></div>
+          </div>
+          <div class="vitrina-card" style="background-image: url('https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=500&q=80');">
+            <div class="vitrina-texto"><div class="vitrina-titulo">Abismo Negro</div><div class="vitrina-desc">Whisky ahumado y licor de mora</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="vitrina-contenedor vitrina-burgers">
+        <div class="vitrina-titulo-seccion">🔥 Manjares del asador</div>
+        <div class="vitrina-scroll">
+          <div class="vitrina-card" style="background-image: url('https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500&q=80');">
+            <span class="vitrina-tag">Top</span>
+            <div class="vitrina-texto"><div class="vitrina-titulo">La Forja</div><div class="vitrina-desc">Doble carne premium</div></div>
+          </div>
+          <div class="vitrina-card" style="background-image: url('https://images.unsplash.com/photo-1550547660-d9450f859349?w=500&q=80');">
+            <div class="vitrina-texto"><div class="vitrina-titulo">Humo & Acero</div><div class="vitrina-desc">BBQ artesanal</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="vitrina-contenedor vitrina-karaoke">
+        <div class="vitrina-titulo-seccion">🎤 Cantares de gesta</div>
+        <div class="vitrina-scroll">
+          <div class="vitrina-card" style="background-image: url('https://images.unsplash.com/photo-1516280440502-861053b92787?w=500&q=80');">
+            <span class="vitrina-tag">Viernes</span>
+            <div class="vitrina-texto"><div class="vitrina-titulo">Grito de Guerra</div><div class="vitrina-desc">Rock pesado en vivo</div></div>
+          </div>
+          <div class="vitrina-card" style="background-image: url('https://images.unsplash.com/photo-1470229722913-7c092fb1380f?w=500&q=80');">
+            <div class="vitrina-texto"><div class="vitrina-titulo">Torneo de Clanes</div><div class="vitrina-desc">Trivia estratégica</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Selector de tema -->
+  <div class="theme-switcher">
+    <button class="theme-btn active" id="btnCyber">🤖 Cyberpunk</button>
+    <button class="theme-btn" id="btnClasico">🏰 Taberna Clásica</button>
+  </div>
+
+  <script>
+    const cyber = document.getElementById('themeCyberpunk');
+    const clasico = document.getElementById('themeClasica');
+    const btnCyber = document.getElementById('btnCyber');
+    const btnClasico = document.getElementById('btnClasico');
+
+    const slogansCyber = [
+      "Conecta con la noche digital",
+      "Bebidas frías, reinicios calientes.",
+      "Cócteles que hackean tus sentidos."
+    ];
+    const slogansClasico = [
+      "Donde se forjan las leyendas",
+      "Hidromiel y canciones de gesta.",
+      "El fuego nunca se apaga."
+    ];
+
+    let idxCyber = 0, idxClasico = 0;
+
+    setInterval(() => {
+      idxCyber = (idxCyber + 1) % slogansCyber.length;
+      const el = document.getElementById('eslogan-cyber');
+      if (el) { el.style.opacity = '0'; setTimeout(() => { el.textContent = `"${slogansCyber[idxCyber]}"`; el.style.opacity = '1'; }, 400); }
+    }, 6000);
+
+    setInterval(() => {
+      idxClasico = (idxClasico + 1) % slogansClasico.length;
+      const el = document.getElementById('eslogan-clasico');
+      if (el) { el.style.opacity = '0'; setTimeout(() => { el.textContent = `"${slogansClasico[idxClasico]}"`; el.style.opacity = '1'; }, 400); }
+    }, 6000);
+
+    btnCyber.addEventListener('click', () => {
+      cyber.classList.remove('hidden');
+      clasico.classList.add('hidden');
+      btnCyber.classList.add('active');
+      btnClasico.classList.remove('active');
+    });
+
+    btnClasico.addEventListener('click', () => {
+      clasico.classList.remove('hidden');
+      cyber.classList.add('hidden');
+      btnClasico.classList.add('active');
+      btnCyber.classList.remove('active');
+    });
+  </script>
+</body>
+</html>

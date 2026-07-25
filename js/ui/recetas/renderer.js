@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — RECETAS SUBMÓDULO (ES6)
    Archivo: js/ui/recetas/renderer.js
-   Versión: 2.1.2
+   Versión: 2.1.3
    Propósito: Layout libro con sidebar de capítulos e índice lateral
-              de colores que muestra capítulos (vista general) o
-              niveles (al seleccionar un capítulo).
+              de colores. Al seleccionar un capítulo, los niveles se
+              muestran como subcapítulos con cabeceras y estantes.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -286,7 +286,6 @@ function _pintarLibro(recetas, productos, categorias, esProduccion) {
   // ── Índice lateral de colores ──────────────
   if (indice) {
     if (capActivo === 'todas') {
-      // Vista general: pestañas = capítulos
       const idsPresentes = categorias.map(c => c.id).filter(id => {
         return filtradas.some(r => (r.categoria || 'sin_categoria') === id);
       });
@@ -313,7 +312,7 @@ function _pintarLibro(recetas, productos, categorias, esProduccion) {
         indice.innerHTML = '';
       }
     } else {
-      // Capítulo activo: pestañas = niveles de ese capítulo
+      // Capítulo activo: pestañas de colores = niveles
       const nivelesUnicos = [...new Set(filtradas.map(r => r.nivel || 'sin_nivel'))].sort();
       const nivelActivo = getFiltroNivel();
       if (nivelesUnicos.length > 1) {
@@ -340,6 +339,7 @@ function _pintarLibro(recetas, productos, categorias, esProduccion) {
 
   // ── Contenido principal ─────────────────────
   if (capActivo === 'todas') {
+    // Vista general: agrupado por capítulos
     const grupos = {};
     filtradas.forEach(r => {
       const cat = r.categoria || 'sin_categoria';
@@ -361,9 +361,28 @@ function _pintarLibro(recetas, productos, categorias, esProduccion) {
         </section>`;
     }).join('');
   } else {
+    // Capítulo activo: agrupado por niveles como subcapítulos
     const cat = categorias.find(c => c.id === capActivo) || { color: PALETA_CATEGORIAS[0] };
-    paginas.innerHTML = `
-      <div class="recetas-estante" style="flex-wrap:wrap;gap:12px;">${filtradas.sort((a,b) => a._nombre.localeCompare(b._nombre)).map(r => _tarjetaLibro(r, cat)).join('')}</div>`;
+    const gruposNivel = {};
+    filtradas.forEach(r => {
+      const niv = r.nivel || 'sin_nivel';
+      (gruposNivel[niv] = gruposNivel[niv] || []).push(r);
+    });
+    const nivelesPresentes = Object.keys(gruposNivel).sort();
+
+    paginas.innerHTML = nivelesPresentes.map((niv, i) => {
+      const items = gruposNivel[niv].sort((a, b) => a._nombre.localeCompare(b._nombre));
+      const colorNivel = PALETA_CATEGORIAS[i % PALETA_CATEGORIAS.length];
+      return `
+        <section class="recetas-capitulo" id="nivel-${niv.replace(/\s+/g, '_')}" style="--cap-color:${colorNivel}">
+          <div class="recetas-capitulo-header">
+            <i class="fas fa-tag"></i>
+            <h3 class="recetas-font-libro">${niv}</h3>
+            <span class="recetas-capitulo-count">${items.length}</span>
+          </div>
+          <div class="recetas-estante">${items.map(r => _tarjetaLibro(r, { color: colorNivel })).join('')}</div>
+        </section>`;
+    }).join('');
   }
 
   paginas.querySelectorAll('.recetas-tarjeta-libro').forEach(t => {

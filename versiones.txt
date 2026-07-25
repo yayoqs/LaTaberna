@@ -34,12 +34,12 @@ js/comandos/enviar-comanda.js -> 1.0.2
 js/comandos/liberar-mesa.js -> 1.0.3
 js/comandos/marcar-agotado.js -> 1.0.2
 js/config-appwrite.js -> 1.0.0
-js/db-appwrite.js -> 1.1.2
+js/db-appwrite.js -> 1.1.4
 js/db-core.js -> 1.0.9
 js/db-fusion.js -> 1.0.5
-js/db-inventario.js -> 1.0.10
-js/db-shim.js -> 1.0.5
-js/db.js -> 1.0.12
+js/db-inventario.js -> 1.0.11
+js/db-shim.js -> 1.0.6
+js/db.js -> 1.0.13
 js/dominio/cantidad.js -> 1.1.3
 js/dominio/delivery.js -> 1.1.3
 js/dominio/dinero.js -> 1.1.3
@@ -62,39 +62,39 @@ js/modulos/cliente/pantalla-inicio.js -> 2.1.5
 js/modulos/cliente/principal.js -> 2.0.0
 js/modulos/interno/guia-mesero.js -> 2.0.2
 js/modulos/interno/precarga-control.js -> 2.1.6
-js/repositorios/inventario-repository.js -> 1.0.5
-js/repositorios/pedido-repository.js -> 1.0.8
-js/repositorios/proveedor-repository.js -> 1.0.3
-js/repositorios/receta-repository.js -> 1.0.1
+js/repositorios/inventario-repository.js -> 1.0.7
+js/repositorios/pedido-repository.js -> 1.0.9
+js/repositorios/proveedor-repository.js -> 1.0.4
+js/repositorios/receta-repository.js -> 1.0.5
 js/roles.js -> 1.0.2
 js/servicios/delivery-service.js -> 1.0.1
-js/servicios/inventario-service.js -> 1.1.6
+js/servicios/inventario-service.js -> 1.1.7
 js/servicios/pedido-service.js -> 1.0.5
 js/ui/caja.js -> 1.2.1
 js/ui/carta.js -> 2.1.4
-js/ui/cobro.js -> 2.0.4
-js/ui/comanda.js -> 2.0.8
+js/ui/cobro.js -> 2.0.5
+js/ui/comanda.js -> 2.0.9
 js/ui/config.js -> 2.0.1
-js/ui/cuenta.js -> 1.0.2
+js/ui/cuenta.js -> 1.0.3
 js/ui/despensa.js -> 3.0.1
-js/ui/despensa/acciones.js -> 1.1.1
-js/ui/despensa/ciclo-vida.js -> 3.3.2
-js/ui/despensa/estado.js -> 2.0.2
-js/ui/despensa/exportacion.js -> 1.0.1
-js/ui/despensa/modal-ingrediente.js -> 2.3.1
+js/ui/despensa/acciones.js -> 1.1.2
+js/ui/despensa/ciclo-vida.js -> 3.4.0
+js/ui/despensa/estado.js -> 2.1.0
+js/ui/despensa/exportacion.js -> 1.0.2
+js/ui/despensa/modal-ingrediente.js -> 2.3.3
 js/ui/despensa/modal-proveedor.js -> 1.0.1
-js/ui/despensa/renderer.js -> 4.2.0
+js/ui/despensa/renderer.js -> 4.2.1
 js/ui/eventos.js -> 1.0.9
 js/ui/kds.js -> 5.0.1
 js/ui/menu.js -> 1.0.1
-js/ui/menu/acciones.js -> 1.0.0
-js/ui/menu/barra-lateral.js -> 1.0.1
-js/ui/menu/biblioteca.js -> 1.0.0
-js/ui/menu/ciclo-vida.js -> 1.0.2
+js/ui/menu/acciones.js -> 1.2.0
+js/ui/menu/barra-lateral.js -> 1.2.0
+js/ui/menu/biblioteca.js -> 1.1.0
+js/ui/menu/ciclo-vida.js -> 1.2.0
 js/ui/menu/estado.js -> 1.0.0
 js/ui/menu/modal-propiedades.js -> 1.0.1
-js/ui/menu/renderer.js -> 1.0.2
-js/ui/mesa-detalles.js -> 3.0.5
+js/ui/menu/renderer.js -> 1.0.4
+js/ui/mesa-detalles.js -> 3.0.6
 js/ui/mesas.js -> 2.2.1
 js/ui/mesas/acciones-mesa.js -> 1.0.1
 js/ui/mesas/ciclo-vida.js -> 1.0.9
@@ -103,7 +103,7 @@ js/ui/mesas/estado-comandas.js -> 1.0.1
 js/ui/mesas/fusion.js -> 1.0.3
 js/ui/mesas/notificaciones.js -> 1.0.0
 js/ui/mesas/renderer.js -> 1.1.1
-js/ui/pedido-ui.js -> 2.1.6
+js/ui/pedido-ui.js -> 2.1.7
 js/ui/perfil.js -> 1.0.9
 js/ui/recetas.js -> 6.2.0
 js/ui/recetas/ciclo-vida.js -> 1.0.0
@@ -112,7 +112,7 @@ js/ui/recetas/detalle.js -> 1.0.1
 js/ui/recetas/edicion.js -> 2.0.0
 js/ui/recetas/ejecutar.js -> 1.0.1
 js/ui/recetas/estado.js -> 1.1.0
-js/ui/recetas/renderer.js -> 2.1.0
+js/ui/recetas/renderer.js -> 2.1.3
 js/ui/reparto.js -> 2.1.2
 js/ui/reparto/acciones.js -> 1.0.2
 js/ui/reparto/ciclo-vida.js -> 1.0.2
@@ -120,9 +120,8 @@ js/ui/reparto/constantes.js -> 1.0.0
 js/ui/reparto/modal-editar.js -> 1.0.1
 js/ui/reparto/modal-nuevo.js -> 1.0.1
 js/ui/reparto/tabla.js -> 1.0.5
-js/ui/tickets.js -> 1.1.0
+js/ui/tickets.js -> 1.1.1
 js/utils.js -> 1.5.0
-test-B-precarga.modulo.js -> 1.0.0
 
-Total de archivos con versión: 123
-Fecha de generación: 7/24/2026, 2:58:22 AM
+Total de archivos con versión: 122
+Fecha de generación: 7/25/2026, 7:07:50 AM
