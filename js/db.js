@@ -1,11 +1,12 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db.js
-   Versión: 1.0.12
+   Versión: 1.0.13
    Propósito: Orquestador de base de datos (Appwrite + localStorage).
               Sincronización y reseteo de mesas por configuración de zonas.
               Fallback offline robusto: si Appwrite no responde,
               carga desde localStorage y continúa operando.
+              v1.0.13: Normalización de categoria y nivel en recetas.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -37,7 +38,6 @@ export const DB = (function() {
     try {
       Logger.info("[DB] Iniciando carga de datos...");
 
-      // 1. Intentar inicializar Appwrite
       var appwriteOk = false;
       if (appwrite && appwrite.iniciar) {
         try {
@@ -48,12 +48,10 @@ export const DB = (function() {
         }
       }
 
-      // 2. Cargar configuración (intenta Appwrite, fallback a localStorage)
       await inicializarAuth();
       await this._cargarConfiguracion();
       this._cargarMozosLocal();
 
-      // 3. Si Appwrite está disponible, intentar cargar desde la nube
       if (appwriteOk) {
         Logger.info('[DB] Appwrite disponible. Cargando datos desde la nube (paralelo)...');
         try {
@@ -71,13 +69,12 @@ export const DB = (function() {
               resultados[coleccion] = lista;
             }).catch(function(e) {
               Logger.warn('[DB] Error al cargar ' + coleccion + ' desde Appwrite, usando fallback local:', e.message);
-              resultados[coleccion] = null; // Marcar como fallido para usar local
+              resultados[coleccion] = null;
             });
           });
 
           await Promise.all(promesas);
 
-          // Procesar cada colección: Appwrite si ok, si no localStorage
           this._procesarProductos(resultados.productos);
           this._procesarPedidos(resultados.pedidos);
           this._procesarMesas(resultados.mesas);
@@ -92,7 +89,6 @@ export const DB = (function() {
           this._cargarTodoLocal();
         }
       } else {
-        // 4. Si Appwrite no está disponible, cargar todo desde localStorage
         Logger.info('[DB] Appwrite no disponible. Cargando datos desde localStorage...');
         this._cargarTodoLocal();
       }
@@ -106,8 +102,6 @@ export const DB = (function() {
       return false;
     }
   };
-
-  // ══ MÉTODOS DE CARGA POR COLECCIÓN (Appwrite o localStorage) ══
 
   combined._procesarProductos = function(lista) {
     if (lista && Array.isArray(lista) && lista.length > 0) {
@@ -175,6 +169,9 @@ export const DB = (function() {
         if (typeof r.ingredientes === 'string') {
           try { r.ingredientes = JSON.parse(r.ingredientes); } catch (e) { r.ingredientes = []; }
         }
+        // Normalización de campos requeridos por B2
+        r.categoria = r.categoria || 'sin_categoria';
+        r.nivel     = r.nivel || 'sin_nivel';
         return r;
       });
     } else {
@@ -201,8 +198,6 @@ export const DB = (function() {
     this.saveMesas();
     Logger.info('[DB] Todos los datos cargados desde localStorage.');
   };
-
-  // ══ RESTO DE MÉTODOS (sin cambios desde v1.0.11) ══
 
   combined.sincronizarMesasConConfig = async function() {
     if (!appwrite || !appwrite.habilitado) return;

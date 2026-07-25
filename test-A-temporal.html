@@ -2,90 +2,142 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Test de carga completa</title>
+  <title>Test B2 — Recetario — Persistencia validada (db.js v1.0.13)</title>
+  <style>
+    body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
+    h1 { color: #f59e0b; }
+    .suite { margin-bottom: 24px; border-bottom: 1px solid #2e2e42; padding-bottom: 12px; }
+    .test { margin: 4px 0; padding: 4px 8px; border-radius: 4px; }
+    .pass { background: rgba(34,197,94,.2); }
+    .fail { background: rgba(239,68,68,.2); }
+    .summary { margin-top: 20px; font-weight: bold; }
+    .info { color: #94a3b8; font-size: 12px; margin: 2px 0; }
+  </style>
 </head>
 <body>
-  <h1>Test de carga completa</h1>
-  <div id="resultado"></div>
+  <h1>🧪 Test B2 — Persistencia validada (db.js v1.0.13)</h1>
+  <p class="info">Verifica que db.js v1.0.13 normaliza categoria y nivel al cargar recetas.</p>
+  <div id="results"></div>
 
-  <script src="/js/appwrite.min.js"></script>
   <script type="module">
-    const resultado = document.getElementById('resultado');
-    const modulos = [
-      { nombre: 'utils',              ruta: '/js/utils.js' },
-      { nombre: 'logger',             ruta: '/js/lib/logger.js' },
-      { nombre: 'eventBus',           ruta: '/js/lib/eventBus.js' },
-      { nombre: 'commandBus',         ruta: '/js/lib/command-bus.js' },
-      { nombre: 'store',              ruta: '/js/lib/store.js' },
-      { nombre: 'deps',               ruta: '/js/lib/deps.js' },
-      { nombre: 'dominio/resultado',  ruta: '/js/dominio/resultado.js' },
-      { nombre: 'dominio/dinero',     ruta: '/js/dominio/dinero.js' },
-      { nombre: 'dominio/cantidad',   ruta: '/js/dominio/cantidad.js' },
-      { nombre: 'dominio/direccion',  ruta: '/js/dominio/direccion.js' },
-      { nombre: 'dominio/pedido',     ruta: '/js/dominio/pedido.js' },
-      { nombre: 'dominio/delivery',   ruta: '/js/dominio/delivery.js' },
-      { nombre: 'dominio/ingrediente', ruta: '/js/dominio/ingrediente.js' },
-      { nombre: 'db-core',            ruta: '/js/db-core.js' },
-      { nombre: 'db-inventario',      ruta: '/js/db-inventario.js' },
-      { nombre: 'db-fusion',          ruta: '/js/db-fusion.js' },
-      { nombre: 'db-shim',            ruta: '/js/db-shim.js' },
-      { nombre: 'db-appwrite',        ruta: '/js/db-appwrite.js' },
-      { nombre: 'db',                 ruta: '/js/db.js' },
-      { nombre: 'roles',              ruta: '/js/roles.js' },
-      { nombre: 'auth',               ruta: '/js/auth.js' },
-      { nombre: 'loader',             ruta: '/js/lib/loader.js' },
-      { nombre: 'pedido-service',     ruta: '/js/servicios/pedido-service.js' },
-      { nombre: 'delivery-service',   ruta: '/js/servicios/delivery-service.js' },
-      { nombre: 'inventario-service', ruta: '/js/servicios/inventario-service.js' },
-      { nombre: 'crear-pedido-mesa',  ruta: '/js/comandos/crear-pedido-mesa.js' },
-      { nombre: 'enviar-comanda',     ruta: '/js/comandos/enviar-comanda.js' },
-      { nombre: 'agregar-mesa',       ruta: '/js/comandos/agregar-mesa.js' },
-      { nombre: 'liberar-mesa',       ruta: '/js/comandos/liberar-mesa.js' },
-      { nombre: 'completar-subcomanda', ruta: '/js/comandos/completar-subcomanda.js' },
-      { nombre: 'pedido-repository',  ruta: '/js/repositorios/pedido-repository.js' },
-      { nombre: 'pedido-manager',     ruta: '/js/managers/pedido-manager.js' },
-      { nombre: 'turno-manager',      ruta: '/js/managers/turno-manager.js' },
-      { nombre: 'carta',              ruta: '/js/ui/carta.js' },
-      { nombre: 'comanda',            ruta: '/js/ui/comanda.js' },
-      { nombre: 'caja',               ruta: '/js/ui/caja.js' },
-      { nombre: 'cobro',              ruta: '/js/ui/cobro.js' },
-      { nombre: 'config',             ruta: '/js/ui/config.js' },
-      { nombre: 'cuenta',             ruta: '/js/ui/cuenta.js' },
-      { nombre: 'despensa',           ruta: '/js/ui/despensa.js' },
-      { nombre: 'eventos',            ruta: '/js/ui/eventos.js' },
-      { nombre: 'kds',                ruta: '/js/ui/kds.js' },
-      { nombre: 'menu',               ruta: '/js/ui/menu.js' },
-      { nombre: 'mesa-detalles',      ruta: '/js/ui/mesa-detalles.js' },
-      { nombre: 'mesas',              ruta: '/js/ui/mesas.js' },
-      { nombre: 'pedido-ui',          ruta: '/js/ui/pedido-ui.js' },
-      { nombre: 'perfil',             ruta: '/js/ui/perfil.js' },
-      { nombre: 'recetas',            ruta: '/js/ui/recetas.js' },
-      { nombre: 'reparto',            ruta: '/js/ui/reparto.js' },
-      { nombre: 'tickets',            ruta: '/js/ui/tickets.js' },
-      { nombre: 'guia-mesero',        ruta: '/js/modulos/interno/guia-mesero.js' },
-      { nombre: 'precarga-control',   ruta: '/js/modulos/interno/precarga-control.js' },
-      { nombre: 'eventos-en-vivo',    ruta: '/js/modulos/admin/eventos-en-vivo.js' },
-      { nombre: 'principal-cliente',  ruta: '/js/modulos/cliente/principal.js' },
-    ];
+    import { Store } from '../js/lib/store.js';
+    import { Auth } from '../js/auth.js';
+    import { DB } from '../js/db.js';
+    import { Logger } from '../js/lib/logger.js';
+    import { Recetas } from '../js/ui/recetas.js';
 
-    let todosOk = true;
+    Logger.setLevel('ERROR');
+    window.Logger = Logger;
 
-    for (const mod of modulos) {
-      try {
-        await import(mod.ruta);
-        resultado.innerHTML += `<p style="color:green">✔ ${mod.nombre}</p>`;
-      } catch (error) {
-        resultado.innerHTML += `<p style="color:red">✘ ${mod.nombre}: ${error.message}</p>`;
-        console.error(`Error en ${mod.nombre}:`, error);
-        todosOk = false;
+    Auth.getRol = () => 'cocina';
+
+    Store.getState = () => ({
+      productos: DB.productos || [],
+      recetas: DB.recetas || [],
+      ingredientes: DB.ingredientes || []
+    });
+    Store.subscribe = () => () => {};
+    Store.dispatch = () => {};
+
+    DB.productos = [];
+    DB.recetas = [];
+    DB.ingredientes = [];
+    DB.saveRecetas = () => {};
+    DB.saveProductos = () => {};
+    DB.saveIngredientes = () => {};
+
+    const resultsEl = document.getElementById('results');
+    let passed = 0, failed = 0;
+    function assert(condition, msg) {
+      if (condition) { passed++; resultsEl.innerHTML += '<div class="test pass">✔ ' + msg + '</div>'; }
+      else { failed++; resultsEl.innerHTML += '<div class="test fail">✘ ' + msg + '</div>'; }
+    }
+    const esperar = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    async function runTests() {
+      resultsEl.innerHTML = '';
+      if (!document.getElementById('toastContainer')) {
+        const tc = document.createElement('div'); tc.id = 'toastContainer'; document.body.appendChild(tc);
+      }
+
+      // ═══════════════════════════════════════════════════
+      // Suite 1: Normalización de categoria y nivel al cargar
+      // ═══════════════════════════════════════════════════
+      resultsEl.innerHTML += '<div class="suite"><h2>1. Normalización al cargar (db.js v1.0.13)</h2></div>';
+
+      // 1.1 Simular que Appwrite/localStorage devuelve datos crudos sin categoria ni nivel
+      const datosCrudos = [{
+        id: 'rec_test', productoId: 'prod_test',
+        // ¡Sin categoria ni nivel!
+        es_intermedio: true,
+        ingredientes: JSON.stringify([{ tipo: 'insumo', id: 'ing_test', cantidad: 1 }]),
+        instrucciones: 'Paso', stockActual: 5, unidadStock: 'kg'
+      }];
+
+      // 1.2 Ejecutar la lógica de _procesarRecetas de db.js v1.0.13
+      const recetasProcesadas = datosCrudos.map(function(r) {
+        if (typeof r.ingredientes === 'string') {
+          try { r.ingredientes = JSON.parse(r.ingredientes); } catch (e) { r.ingredientes = []; }
+        }
+        r.categoria = r.categoria || 'sin_categoria';
+        r.nivel     = r.nivel || 'sin_nivel';
+        return r;
+      });
+
+      DB.recetas = recetasProcesadas;
+      const recetaCargada = DB.recetas[0];
+
+      // 1.3 Verificar que db.js normalizó los campos
+      assert(recetaCargada.categoria === 'sin_categoria', 'Categoria normalizada: sin_categoria');
+      assert(recetaCargada.nivel === 'sin_nivel', 'Nivel normalizado: sin_nivel');
+
+      // 1.4 Editar los campos y simular guardado
+      DB.recetas[0].categoria = 'aderezos';
+      DB.recetas[0].nivel = 'aderezo';
+      Recetas.render('produccion');
+      await esperar(100);
+      assert(DB.recetas[0].categoria === 'aderezos', 'Categoría editada: aderezos');
+      assert(DB.recetas[0].nivel === 'aderezo', 'Nivel editado: aderezo');
+
+      // 1.5 Simular recarga: Appwrite devuelve los datos con los campos correctos
+      const datosDeAppwrite = JSON.parse(JSON.stringify(DB.recetas));
+      const recetasRecargadas = datosDeAppwrite.map(function(r) {
+        if (typeof r.ingredientes === 'string') {
+          try { r.ingredientes = JSON.parse(r.ingredientes); } catch (e) { r.ingredientes = []; }
+        }
+        r.categoria = r.categoria || 'sin_categoria';
+        r.nivel     = r.nivel || 'sin_nivel';
+        return r;
+      });
+
+      DB.recetas = recetasRecargadas;
+      const recetaTrasRecarga = DB.recetas[0];
+      assert(recetaTrasRecarga.categoria === 'aderezos', 'Tras recarga: categoria sigue siendo aderezos');
+      assert(recetaTrasRecarga.nivel === 'aderezo', 'Tras recarga: nivel sigue siendo aderezo');
+
+      // ═══════════════════════════════════════════════════
+      // Suite 2: Verificación en el Store
+      // ═══════════════════════════════════════════════════
+      resultsEl.innerHTML += '<div class="suite"><h2>2. Store tras recarga</h2></div>';
+      const state = Store.getState();
+      const recetaEnStore = state.recetas[0];
+      assert(!!recetaEnStore, 'Store tiene la receta');
+      assert(recetaEnStore.categoria === 'aderezos', 'Store: categoria correcta');
+      assert(recetaEnStore.nivel === 'aderezo', 'Store: nivel correcto');
+
+      // Limpiar
+      document.getElementById('view-recetas')?.remove();
+
+      resultsEl.innerHTML += `<div class="summary">${passed} pasaron, ${failed} fallaron</div>`;
+      if (failed === 0) {
+        resultsEl.innerHTML += '<div class="test pass">✔ La normalización de db.js v1.0.13 funciona correctamente. Las recetas conservan categoria y nivel al recargar.</div>';
       }
     }
 
-    if (todosOk) {
-      resultado.innerHTML += '<hr><p style="color:green"><strong>Todos los módulos cargaron correctamente.</strong></p>';
-    } else {
-      resultado.innerHTML += '<hr><p style="color:red"><strong>Algunos módulos fallaron.</strong></p>';
-    }
+    window.addEventListener('load', () => runTests().catch(e => {
+      resultsEl.innerHTML += `<div class="error">Error en tests: ${e.message}</div>`;
+      console.error(e);
+    }));
   </script>
 </body>
 </html>

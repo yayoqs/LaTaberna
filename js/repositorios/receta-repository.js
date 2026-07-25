@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — REPOSITORIO JS (ES6)
    Archivo: js/repositorios/receta-repository.js
-   Versión: 1.0.1
+   Versión: 1.0.2
    Propósito: Repositorio de recetas y productos (Appwrite + localStorage).
-              Corrección: actualizarStockIngrediente ahora sincroniza
-              con Appwrite.
+              Corrección: garantiza que categoria y nivel se envíen
+              explícitamente a Appwrite.
    ================================================================ */
 
 import { Logger } from '../lib/logger.js';
@@ -21,9 +21,10 @@ export function crearRecetaRepo() {
 
       if (DBAppwrite && DBAppwrite.habilitado) {
         try {
+          // Forzar explícitamente los campos para evitar undefined
           const docParaAppwrite = {
-            productoId: receta.productoId,
-            nivel: receta.nivel || '',
+            productoId: receta.productoId || '',
+            nivel: receta.nivel || 'sin_nivel',
             categoria: receta.categoria || 'sin_categoria',
             es_intermedio: receta.es_intermedio || false,
             destino: receta.destino || 'cocina',
@@ -32,16 +33,20 @@ export function crearRecetaRepo() {
             stockActual: receta.stockActual || 0,
             unidadStock: receta.unidadStock || ''
           };
+
+          Logger.debug('[RecetaRepo] Enviando a Appwrite:', JSON.stringify(docParaAppwrite));
+
           if (receta.id) {
             await DBAppwrite.actualizar('recetas', receta.id, docParaAppwrite);
+            Logger.debug('[RecetaRepo] Receta actualizada en Appwrite:', receta.id);
           } else {
             const docRemoto = await DBAppwrite.crear('recetas', null, docParaAppwrite);
             if (docRemoto && docRemoto.id) {
               receta.id = docRemoto.id;
             }
+            Logger.debug('[RecetaRepo] Receta creada en Appwrite:', receta.id);
           }
           guardadoRemoto = true;
-          Logger.debug('[RecetaRepo] Receta guardada en Appwrite:', receta.id);
         } catch (e) {
           Logger.warn('[RecetaRepo] No se pudo guardar en Appwrite, usando fallback local:', e);
         }
@@ -167,7 +172,6 @@ export function crearRecetaRepo() {
       ingrediente.stock = nuevoStock;
       localStorage.setItem('pubpos_ingredientes', JSON.stringify(DB.ingredientes));
 
-      // Sincronizar con Appwrite
       if (DBAppwrite && DBAppwrite.habilitado) {
         try {
           await DBAppwrite.actualizar('ingredientes', id, { stock: nuevoStock });
