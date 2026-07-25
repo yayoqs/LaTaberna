@@ -1,11 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — RECETAS SUBMÓDULO (ES6)
    Archivo: js/ui/recetas/renderer.js
-   Versión: 2.1.0
+   Versión: 2.1.1
    Propósito: Renderizado principal del recetario con layout libro,
               sidebar gestual de capítulos dinámicos y pestañas de
               subcategorías (niveles) que se adaptan al capítulo
-              seleccionado. Sin categorías predefinidas.
+              seleccionado. Corrección: pestañas de nivel estables.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -89,6 +89,7 @@ function _construirVista(main) {
       <div class="recetas-pestana" data-pestana="stock"><i class="fas fa-boxes"></i><span>Mi Stock</span></div>
       <div class="recetas-pestana" data-pestana="planificacion"><i class="fas fa-tasks"></i><span>Planificación</span></div>
     </div>
+    <div id="recetas-subpestanas-container"></div>
     <div id="recetas-contenedor" class="recetas-contenedor"></div>
   `;
 
@@ -272,12 +273,15 @@ export function pintarRecetario(contenedor) {
 function _pintarLibro(recetas, productos, categorias, esProduccion) {
   const paginas = document.getElementById('recetasLibroPaginas');
   const indice = document.getElementById('recetasLibroIndice');
+  const subpestanasContainer = document.getElementById('recetas-subpestanas-container');
   if (!paginas) return;
+
+  // Limpiar subpestañas previas
+  if (subpestanasContainer) subpestanasContainer.innerHTML = '';
 
   const termino = getBusqueda().toLowerCase();
   const capActivo = getCategoriaActiva();
 
-  // Filtrar recetas
   let filtradas = recetas.map(r => {
     const prod = productos.find(p => p.id == r.productoId);
     return { ...r, _nombre: prod ? prod.nombre : (r.productoId || 'Sin nombre'), _activo: prod ? prod.activo !== false : true };
@@ -292,45 +296,31 @@ function _pintarLibro(recetas, productos, categorias, esProduccion) {
     return;
   }
 
-  // Si hay capítulo activo, mostramos pestañas de nivel (subcategorías)
-  if (capActivo !== 'todas') {
-    const nivelesUnicos = [...new Set(filtradas.map(r => r.nivel || 'sin_nivel'))].sort();
-    const nivelActivo = getFiltroNivel();
-    
-    // Inyectar pestañas de nivel antes del libro
-    const toolbar = document.querySelector('.recetas-toolbar');
-    let pestanasHTML = '';
-    if (nivelesUnicos.length > 1) {
-      pestanasHTML = `
-        <div class="recetas-subpestanas" id="recetas-subpestanas" style="display:flex;gap:6px;padding:8px 16px;overflow-x:auto;border-bottom:1px solid var(--color-border);">
-          <button class="recetas-subpestana ${nivelActivo === 'todos' ? 'activo' : ''}" data-nivel="todos">Todos</button>
-          ${nivelesUnicos.map(n => `<button class="recetas-subpestana ${nivelActivo === n ? 'activo' : ''}" data-nivel="${n}">${n}</button>`).join('')}
-        </div>`;
-      paginas.insertAdjacentHTML('beforebegin', pestanasHTML);
-      
-      // Eventos de subpestañas
-      document.querySelectorAll('.recetas-subpestana').forEach(btn => {
-        btn.addEventListener('click', () => {
-          setFiltroNivel(btn.dataset.nivel);
-          _pintarLibro(recetas, productos, categorias, esProduccion);
-        });
-      });
-    } else {
-      // Eliminar subpestañas si las hay
-      const existentes = document.getElementById('recetas-subpestanas');
-      if (existentes) existentes.remove();
-    }
+  // Generar pestañas de nivel (subcategorías) en TODOS los casos
+  const nivelesUnicos = [...new Set(filtradas.map(r => r.nivel || 'sin_nivel'))].sort();
+  const nivelActivo = getFiltroNivel();
 
-    // Aplicar filtro de nivel
-    if (nivelActivo !== 'todos') {
-      filtradas = filtradas.filter(r => (r.nivel || 'sin_nivel') === nivelActivo);
-    }
+  if (subpestanasContainer && nivelesUnicos.length > 1) {
+    subpestanasContainer.innerHTML = `
+      <div class="recetas-subpestanas" id="recetas-subpestanas">
+        <button class="recetas-subpestana ${nivelActivo === 'todos' ? 'activo' : ''}" data-nivel="todos">Todos</button>
+        ${nivelesUnicos.map(n => `<button class="recetas-subpestana ${nivelActivo === n ? 'activo' : ''}" data-nivel="${n}">${n}</button>`).join('')}
+      </div>`;
+    subpestanasContainer.querySelectorAll('.recetas-subpestana').forEach(btn => {
+      btn.addEventListener('click', () => {
+        setFiltroNivel(btn.dataset.nivel);
+        _pintarLibro(recetas, productos, categorias, esProduccion);
+      });
+    });
   }
 
-  // Agrupar por capítulo (si no hay capítulo activo) o por nivel
-  let grupos;
+  if (nivelActivo !== 'todos') {
+    filtradas = filtradas.filter(r => (r.nivel || 'sin_nivel') === nivelActivo);
+  }
+
+  // Agrupar por capítulo si no hay capítulo activo, sino mostrar tarjetas directamente
   if (capActivo === 'todas') {
-    grupos = {};
+    const grupos = {};
     filtradas.forEach(r => {
       const cat = r.categoria || 'sin_categoria';
       (grupos[cat] = grupos[cat] || []).push(r);
@@ -351,7 +341,6 @@ function _pintarLibro(recetas, productos, categorias, esProduccion) {
         </section>`;
     }).join('');
 
-    // Índice lateral de colores
     if (indice && idsPresentes.length > 1 && !termino) {
       indice.innerHTML = idsPresentes.map((id, i) => {
         const cat = categorias.find(c => c.id === id) || { color: PALETA_CATEGORIAS[0], nombre: id };
@@ -375,14 +364,12 @@ function _pintarLibro(recetas, productos, categorias, esProduccion) {
       indice.innerHTML = '';
     }
   } else {
-    // Capítulo activo: las tarjetas se muestran sin agrupación adicional (ya están filtradas por capítulo y nivel)
     const cat = categorias.find(c => c.id === capActivo) || { color: PALETA_CATEGORIAS[0] };
     paginas.innerHTML = `
       <div class="recetas-estante" style="flex-wrap:wrap;gap:12px;">${filtradas.sort((a,b) => a._nombre.localeCompare(b._nombre)).map(r => _tarjetaLibro(r, cat)).join('')}</div>`;
     if (indice) indice.innerHTML = '';
   }
 
-  // Eventos en tarjetas
   paginas.querySelectorAll('.recetas-tarjeta-libro').forEach(t => {
     t.addEventListener('click', () => {
       if (esProduccion) mostrarVistaCompleta(t.dataset.receta);
