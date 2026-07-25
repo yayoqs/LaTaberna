@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — DESPENSA SUBMÓDULO (ES6)
    Archivo: js/ui/despensa/modal-ingrediente.js
-   Versión: 2.3.2
+   Versión: 2.3.3
    Propósito: Modal para crear/editar/eliminar ingredientes con selector
               de proveedor y precio de proveedor.
-              v2.3.2: editarIngrediente lee del Store.
+              v2.3.3: no genera ID local al crear (Appwrite lo asigna).
    ================================================================ */
 
 import { InventarioService } from '../../servicios/inventario-service.js';
@@ -125,7 +125,6 @@ async function eliminar(onEliminado) {
     if (DBAppwrite && DBAppwrite.habilitado) {
       await DBAppwrite.eliminar('ingredientes', id);
     }
-    // La acción en el Store la despacha el repositorio
     const state = Store.obtenerEstado();
     const ingredientesActualizados = (state.ingredientes || []).filter(i => i.id != id);
     Store.despachar({ type: 'INGREDIENTES_INICIALIZAR', payload: ingredientesActualizados });
@@ -147,7 +146,7 @@ export async function guardar(onGuardado) {
   const precioProveedor = parseFloat(document.getElementById('ingPrecioProveedor').value) || 0;
 
   const datos = {
-    id: id || `ins_${Date.now()}_${Math.random().toString(36).substr(2,6)}`,
+    id: id || undefined,
     nombre,
     stock: parseFloat(document.getElementById('ingStock').value) || 0,
     unidad: document.getElementById('ingUnidad').value.trim() || 'u',

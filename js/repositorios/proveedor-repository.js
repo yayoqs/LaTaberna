@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — REPOSITORIO JS (ES6)
    Archivo: js/repositorios/proveedor-repository.js
-   Versión: 1.0.3
+   Versión: 1.0.4
    Propósito: Repositorio de proveedores (Appwrite + localStorage).
-              v1.0.3: corrige llamada a DBAppwrite.crear (faltaba el ID).
+              v1.0.4: deja que Appwrite genere el ID y lo captura.
    ================================================================ */
 
 import { Logger } from '../lib/logger.js';
@@ -25,14 +25,27 @@ export function crearProveedorRepo() {
           };
 
           if (proveedor.id) {
-            // Actualizar existente
-            await DBAppwrite.actualizar('proveedores', proveedor.id, doc);
-            guardadoRemoto = true;
+            // Intentar actualizar si ya tiene ID
+            try {
+              await DBAppwrite.actualizar('proveedores', proveedor.id, doc);
+              guardadoRemoto = true;
+            } catch (e) {
+              // Si falla la actualización (404), crear nuevo
+              if (e.code === 404) {
+                const docRemoto = await DBAppwrite.crear('proveedores', null, doc);
+                if (docRemoto && docRemoto.id) {
+                  proveedor.id = docRemoto.id;
+                  guardadoRemoto = true;
+                }
+              } else {
+                throw e;
+              }
+            }
           } else {
-            // Crear nuevo: pasar null como ID para que Appwrite genere uno
+            // Crear nuevo sin ID
             const docRemoto = await DBAppwrite.crear('proveedores', null, doc);
             if (docRemoto && docRemoto.id) {
-              proveedor.id = docRemoto.id; // usar el ID generado por Appwrite
+              proveedor.id = docRemoto.id;
               guardadoRemoto = true;
             }
           }
@@ -45,18 +58,15 @@ export function crearProveedorRepo() {
         }
       }
 
-      // Si no se guardó remoto, marcar como pendiente
       if (!guardadoRemoto) {
         proveedor._pendiente_sync = true;
         Logger.info('[ProveedorRepo] Proveedor marcado para sincronización futura.');
       }
 
-      // Generar ID local si aún no tiene
       if (!proveedor.id) {
         proveedor.id = 'loc_prov_' + Date.now().toString(36);
       }
 
-      // Actualizar array local y localStorage
       if (!DB.proveedores) DB.proveedores = [];
       const idx = DB.proveedores.findIndex(p => p.id === proveedor.id);
       if (idx >= 0) {

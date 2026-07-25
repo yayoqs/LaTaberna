@@ -1,10 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — REPOSITORIO JS (ES6)
    Archivo: js/repositorios/receta-repository.js
-   Versión: 1.0.2
+   Versión: 1.0.5
    Propósito: Repositorio de recetas y productos (Appwrite + localStorage).
-              Corrección: garantiza que categoria y nivel se envíen
-              explícitamente a Appwrite.
+              v1.0.5: usa 'Compuesto' como valor para el campo 'tipo'
+                      en productos. Omite stockActual en recetas hasta
+                      que la columna exista en Appwrite.
    ================================================================ */
 
 import { Logger } from '../lib/logger.js';
@@ -18,43 +19,76 @@ export function crearRecetaRepo() {
     async guardarReceta(datos) {
       const receta = { ...datos };
       let guardadoRemoto = false;
+      let errorEstructura = false;
+
+      if (!receta.productoId) {
+        const productoCreado = await this.guardarProducto({
+          nombre: receta._nombreProducto || 'Producto ' + Date.now(),
+          activo: true,
+          destino: receta.destino || 'cocina'
+        });
+        receta.productoId = productoCreado.id;
+      }
 
       if (DBAppwrite && DBAppwrite.habilitado) {
         try {
-          // Forzar explícitamente los campos para evitar undefined
           const docParaAppwrite = {
-            productoId: receta.productoId || '',
-            nivel: receta.nivel || 'sin_nivel',
+            productoId: receta.productoId,
+            nivel: receta.nivel || '',
             categoria: receta.categoria || 'sin_categoria',
             es_intermedio: receta.es_intermedio || false,
             destino: receta.destino || 'cocina',
             ingredientes: Array.isArray(receta.ingredientes) ? JSON.stringify(receta.ingredientes) : '[]',
-            instrucciones: receta.instrucciones || '',
-            stockActual: receta.stockActual || 0,
-            unidadStock: receta.unidadStock || ''
+            instrucciones: receta.instrucciones || ''
+            // stockActual se omite hasta que Appwrite tenga la columna
           };
 
-          Logger.debug('[RecetaRepo] Enviando a Appwrite:', JSON.stringify(docParaAppwrite));
-
           if (receta.id) {
-            await DBAppwrite.actualizar('recetas', receta.id, docParaAppwrite);
-            Logger.debug('[RecetaRepo] Receta actualizada en Appwrite:', receta.id);
-          } else {
-            const docRemoto = await DBAppwrite.crear('recetas', null, docParaAppwrite);
-            if (docRemoto && docRemoto.id) {
-              receta.id = docRemoto.id;
+            try {
+              await DBAppwrite.actualizar('recetas', receta.id, docParaAppwrite);
+              guardadoRemoto = true;
+            } catch (e) {
+              if (e.code === 404) {
+                const docRemoto = await DBAppwrite.crear('recetas', null, docParaAppwrite);
+                if (docRemoto && docRemoto.id) {
+                  receta.id = docRemoto.id;
+                  guardadoRemoto = true;
+                }
+              } else if (e.type === 'row_invalid_structure') {
+                errorEstructura = true;
+                Logger.warn('[RecetaRepo] Estructura rechazada por Appwrite:', e.message);
+              } else {
+                throw e;
+              }
             }
-            Logger.debug('[RecetaRepo] Receta creada en Appwrite:', receta.id);
+          } else {
+            try {
+              const docRemoto = await DBAppwrite.crear('recetas', null, docParaAppwrite);
+              if (docRemoto && docRemoto.id) {
+                receta.id = docRemoto.id;
+                guardadoRemoto = true;
+              }
+            } catch (e) {
+              if (e.type === 'row_invalid_structure') {
+                errorEstructura = true;
+                Logger.warn('[RecetaRepo] Estructura rechazada por Appwrite:', e.message);
+              } else {
+                throw e;
+              }
+            }
           }
-          guardadoRemoto = true;
+
+          if (guardadoRemoto) {
+            Logger.debug('[RecetaRepo] Receta guardada en Appwrite:', receta.id);
+          }
         } catch (e) {
-          Logger.warn('[RecetaRepo] No se pudo guardar en Appwrite, usando fallback local:', e);
+          Logger.warn('[RecetaRepo] Error al guardar en Appwrite:', e);
         }
       }
 
       if (!guardadoRemoto) {
         receta._pendiente_sync = true;
-        Logger.info('[RecetaRepo] Receta marcada para sincronización futura.');
+        receta._error_sync = errorEstructura ? 'estructura_invalida' : 'sin_conexion';
         if (typeof DB.colaSync !== 'undefined') {
           DB.colaSync.push({ tipo: 'guardarReceta', datos: receta });
         }
@@ -82,31 +116,61 @@ export function crearRecetaRepo() {
     async guardarProducto(datos) {
       const producto = { ...datos };
       let guardadoRemoto = false;
+      let errorEstructura = false;
 
       if (DBAppwrite && DBAppwrite.habilitado) {
         try {
           const docParaAppwrite = {
             nombre: producto.nombre,
             activo: producto.activo !== false,
+            tipo: 'Compuesto',   // valor requerido por Appwrite (Simple | Compuesto)
             destino: producto.destino || 'cocina'
           };
+
           if (producto.id) {
-            await DBAppwrite.actualizar('productos', producto.id, docParaAppwrite);
+            try {
+              await DBAppwrite.actualizar('productos', producto.id, docParaAppwrite);
+              guardadoRemoto = true;
+            } catch (e) {
+              if (e.code === 404) {
+                const docRemoto = await DBAppwrite.crear('productos', null, docParaAppwrite);
+                if (docRemoto && docRemoto.id) {
+                  producto.id = docRemoto.id;
+                  guardadoRemoto = true;
+                }
+              } else if (e.type === 'row_invalid_structure') {
+                errorEstructura = true;
+              } else {
+                throw e;
+              }
+            }
           } else {
-            const docRemoto = await DBAppwrite.crear('productos', null, docParaAppwrite);
-            if (docRemoto && docRemoto.id) {
-              producto.id = docRemoto.id;
+            try {
+              const docRemoto = await DBAppwrite.crear('productos', null, docParaAppwrite);
+              if (docRemoto && docRemoto.id) {
+                producto.id = docRemoto.id;
+                guardadoRemoto = true;
+              }
+            } catch (e) {
+              if (e.type === 'row_invalid_structure') {
+                errorEstructura = true;
+              } else {
+                throw e;
+              }
             }
           }
-          guardadoRemoto = true;
-          Logger.debug('[RecetaRepo] Producto guardado en Appwrite:', producto.id);
+
+          if (guardadoRemoto) {
+            Logger.debug('[RecetaRepo] Producto guardado en Appwrite:', producto.id);
+          }
         } catch (e) {
-          Logger.warn('[RecetaRepo] No se pudo guardar producto en Appwrite:', e);
+          Logger.warn('[RecetaRepo] Error al guardar producto en Appwrite:', e);
         }
       }
 
       if (!guardadoRemoto) {
         producto._pendiente_sync = true;
+        producto._error_sync = errorEstructura ? 'estructura_invalida' : 'sin_conexion';
         if (typeof DB.colaSync !== 'undefined') {
           DB.colaSync.push({ tipo: 'guardarProducto', datos: producto });
         }
@@ -137,7 +201,7 @@ export function crearRecetaRepo() {
           await DBAppwrite.eliminar('recetas', id);
           Logger.debug('[RecetaRepo] Receta eliminada en Appwrite:', id);
         } catch (e) {
-          Logger.warn('[RecetaRepo] No se pudo eliminar en Appwrite:', e);
+          Logger.warn('[RecetaRepo] Error al eliminar en Appwrite:', e);
         }
       }
 
@@ -175,9 +239,9 @@ export function crearRecetaRepo() {
       if (DBAppwrite && DBAppwrite.habilitado) {
         try {
           await DBAppwrite.actualizar('ingredientes', id, { stock: nuevoStock });
-          Logger.debug('[RecetaRepo] Stock de ingrediente actualizado en Appwrite:', id);
+          Logger.debug('[RecetaRepo] Stock actualizado en Appwrite:', id);
         } catch (e) {
-          Logger.warn('[RecetaRepo] No se pudo actualizar stock en Appwrite:', e);
+          Logger.warn('[RecetaRepo] Error al actualizar stock en Appwrite:', e);
         }
       }
 

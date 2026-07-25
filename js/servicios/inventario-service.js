@@ -1,10 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — SERVICIO JS (ES6)
    Archivo: js/servicios/inventario-service.js
-   Versión: 1.1.6
+   Versión: 1.1.7
    Propósito: Servicio de casos de uso para inventario e ingredientes.
-              v1.1.6: preserva proveedor y precio_proveedor en el JSON
-                      que se envía al repositorio.
+              v1.1.7: no envía ID al crear (deja que Appwrite lo genere).
    ================================================================ */
 
 import { Ingrediente, reconstruirIngrediente } from '../dominio/ingrediente.js';
@@ -35,28 +34,25 @@ const InventarioService = (() => {
       return Resultado.fallo('Datos numéricos inválidos (stock, mínimo o valor unitario)');
     }
 
-    let ingrediente;
-    try {
-      ingrediente = new Ingrediente(
-        datos.id || `ins_${Date.now()}_${Math.random().toString(36).substr(2,6)}`,
-        datos.nombre,
-        stock,
-        datos.unidad || 'u',
-        stockMin,
-        datos.categoria || 'general',
-        datos.ubicacion || '',
-        valorUnit
-      );
-    } catch (e) {
-      return Resultado.fallo(`Error al crear ingrediente: ${e.message}`);
+    // Construir el objeto JSON, sin ID si es creación nueva
+    const esNuevo = !datos.id;
+    const jsonIngrediente = {
+      nombre: datos.nombre,
+      stock: stock.valor,
+      unidad: datos.unidad || 'u',
+      stock_minimo: stockMin.valor,
+      categoria: datos.categoria || 'general',
+      ubicacion: datos.ubicacion || '',
+      valor_unitario: valorUnit.monto,
+      proveedor: datos.proveedor || '',
+      precio_proveedor: datos.precio_proveedor || 0
+    };
+
+    // Solo incluir ID si estamos editando
+    if (!esNuevo) {
+      jsonIngrediente.id = datos.id;
     }
 
-    // Construir JSON completo incluyendo campos que el modelo no contempla
-    const jsonIngrediente = ingrediente.toJSON();
-    jsonIngrediente.proveedor = datos.proveedor || '';
-    jsonIngrediente.precio_proveedor = datos.precio_proveedor || 0;
-
-    // Guardar en repositorio y obtener el objeto definitivo (con ID)
     let ingredienteGuardado;
     try {
       ingredienteGuardado = await _inventarioRepo.guardarIngrediente(jsonIngrediente);
@@ -64,7 +60,6 @@ const InventarioService = (() => {
       return Resultado.fallo(`Error al guardar ingrediente: ${e.message}`);
     }
 
-    // Actualizar Store con el objeto que tiene el ID correcto
     try {
       Store.despachar({ type: 'INGREDIENTE_GUARDADO', payload: ingredienteGuardado });
     } catch (e) {

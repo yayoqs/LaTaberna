@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — REPOSITORIO JS (ES6)
    Archivo: js/repositorios/inventario-repository.js
-   Versión: 1.0.5
+   Versión: 1.0.7
    Propósito: Repositorio de inventario reutilizable (Appwrite + localStorage).
-              v1.0.5: conserva proveedor y precio_proveedor.
+              v1.0.7: si Appwrite rechaza la estructura, persiste localmente
+                      y marca como pendiente de sincronización futura.
    ================================================================ */
 
 import { Logger } from '../lib/logger.js';
@@ -16,6 +17,7 @@ export function crearInventarioRepo() {
     async guardarIngrediente(datos) {
       const ingrediente = { ...datos };
       let guardadoRemoto = false;
+      let errorEstructura = false;
 
       if (DBAppwrite && DBAppwrite.habilitado) {
         try {
@@ -30,16 +32,46 @@ export function crearInventarioRepo() {
             proveedor: ingrediente.proveedor || '',
             precio_proveedor: ingrediente.precio_proveedor || 0
           };
+
           if (ingrediente.id) {
-            await DBAppwrite.actualizar('ingredientes', ingrediente.id, docParaAppwrite);
+            try {
+              await DBAppwrite.actualizar('ingredientes', ingrediente.id, docParaAppwrite);
+              guardadoRemoto = true;
+            } catch (e) {
+              if (e.code === 404) {
+                // No existe, crear nuevo
+                const docRemoto = await DBAppwrite.crear('ingredientes', null, docParaAppwrite);
+                if (docRemoto && docRemoto.id) {
+                  ingrediente.id = docRemoto.id;
+                  guardadoRemoto = true;
+                }
+              } else if (e.type === 'row_invalid_structure') {
+                errorEstructura = true;
+                Logger.warn('[InventarioRepo] Estructura de documento rechazada por Appwrite (campos nuevos pendientes).');
+              } else {
+                throw e;
+              }
+            }
           } else {
-            const docRemoto = await DBAppwrite.crear('ingredientes', null, docParaAppwrite);
-            if (docRemoto && docRemoto.id) {
-              ingrediente.id = docRemoto.id;
+            try {
+              const docRemoto = await DBAppwrite.crear('ingredientes', null, docParaAppwrite);
+              if (docRemoto && docRemoto.id) {
+                ingrediente.id = docRemoto.id;
+                guardadoRemoto = true;
+              }
+            } catch (e) {
+              if (e.type === 'row_invalid_structure') {
+                errorEstructura = true;
+                Logger.warn('[InventarioRepo] Estructura de documento rechazada por Appwrite (campos nuevos pendientes).');
+              } else {
+                throw e;
+              }
             }
           }
-          guardadoRemoto = true;
-          Logger.debug('[InventarioRepo] Ingrediente guardado en Appwrite:', ingrediente.id);
+
+          if (guardadoRemoto) {
+            Logger.debug('[InventarioRepo] Ingrediente guardado en Appwrite:', ingrediente.id);
+          }
         } catch (e) {
           Logger.warn('[InventarioRepo] No se pudo guardar en Appwrite, usando fallback local:', e);
         }
@@ -47,6 +79,7 @@ export function crearInventarioRepo() {
 
       if (!guardadoRemoto) {
         ingrediente._pendiente_sync = true;
+        ingrediente._error_sync = errorEstructura ? 'estructura_invalida' : 'sin_conexion';
         Logger.info('[InventarioRepo] Ingrediente marcado para sincronización futura.');
         if (typeof DB.colaSync !== 'undefined') {
           DB.colaSync.push({ tipo: 'guardarIngrediente', datos: ingrediente });

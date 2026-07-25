@@ -1,11 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-inventario.js
-   Versión: 1.0.10
+   Versión: 1.0.11
    Propósito: Gestión de ingredientes, recetas, stock y movimientos.
               Soporte para recetas anidadas (sub-recetas).
               Auth importado explícitamente.
-              Normalización de ingredientes conserva todos los campos.
+              Normalización de ingredientes y recetas conserva todos los campos.
               Todos los catch registran error.
    ================================================================ */
 
@@ -110,18 +110,22 @@ export const DBInventario = (function() {
   };
 
   module._normalizarReceta = function(r) {
-    return {
-      id: _validarId(r.id, 'rec'),
-      productoId: r.productoId || null,
-      nombre: _validarString(r.nombre, 'Sin nombre'),
-      ingredientes: Array.isArray(r.ingredientes) ? r.ingredientes.map(ing => ({
-        tipo: ['insumo', 'subreceta'].includes(ing.tipo) ? ing.tipo : 'insumo',
-        id: _validarId(ing.id, ing.tipo === 'subreceta' ? 'rec' : 'ins'),
-        cantidad: _validarNumero(ing.cantidad, 0)
-      })) : [],
-      instrucciones: _validarString(r.instrucciones, ''),
-      esIntermedio: _validarBooleano(r.es_intermedio || r.esIntermedio, false)
-    };
+    // Partir del objeto original para conservar campos desconocidos
+    var datos = Object.assign({}, r);
+    
+    // Sobrescribir solo los campos que normalizamos
+    datos.id = _validarId(r.id, 'rec');
+    datos.productoId = r.productoId || null;
+    datos.nombre = _validarString(r.nombre, 'Sin nombre');
+    datos.ingredientes = Array.isArray(r.ingredientes) ? r.ingredientes.map(ing => ({
+      tipo: ['insumo', 'subreceta'].includes(ing.tipo) ? ing.tipo : 'insumo',
+      id: _validarId(ing.id, ing.tipo === 'subreceta' ? 'rec' : 'ins'),
+      cantidad: _validarNumero(ing.cantidad, 0)
+    })) : [];
+    datos.instrucciones = _validarString(r.instrucciones, '');
+    datos.esIntermedio = _validarBooleano(r.es_intermedio || r.esIntermedio, false);
+    
+    return datos;
   };
 
   module._normalizarMovimiento = function(mov) {
