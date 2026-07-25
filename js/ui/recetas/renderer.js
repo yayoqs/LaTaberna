@@ -1,11 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — RECETAS SUBMÓDULO (ES6)
    Archivo: js/ui/recetas/renderer.js
-   Versión: 2.1.1
-   Propósito: Renderizado principal del recetario con layout libro,
-              sidebar gestual de capítulos dinámicos y pestañas de
-              subcategorías (niveles) que se adaptan al capítulo
-              seleccionado. Corrección: pestañas de nivel estables.
+   Versión: 2.1.2
+   Propósito: Layout libro con sidebar de capítulos e índice lateral
+              de colores que muestra capítulos (vista general) o
+              niveles (al seleccionar un capítulo).
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -49,7 +48,6 @@ export function pintar(modo) {
   }
 }
 
-/* ─── Vista base ────────────────────────────── */
 function _asegurarVista() {
   let main = document.getElementById('view-recetas');
   if (!main) {
@@ -89,11 +87,9 @@ function _construirVista(main) {
       <div class="recetas-pestana" data-pestana="stock"><i class="fas fa-boxes"></i><span>Mi Stock</span></div>
       <div class="recetas-pestana" data-pestana="planificacion"><i class="fas fa-tasks"></i><span>Planificación</span></div>
     </div>
-    <div id="recetas-subpestanas-container"></div>
     <div id="recetas-contenedor" class="recetas-contenedor"></div>
   `;
 
-  // Eventos de pestañas principales
   document.querySelectorAll('#recetas-pestanas .recetas-pestana').forEach(tab => {
     tab.addEventListener('click', () => {
       const id = tab.dataset.pestana;
@@ -103,13 +99,11 @@ function _construirVista(main) {
     });
   });
 
-  // Sidebar: botones
   document.getElementById('btnCerrarSidebar').addEventListener('click', cerrarSidebar);
   document.getElementById('recetasSidebarBackdrop').addEventListener('click', cerrarSidebar);
   document.getElementById('recetasBordeAgarre').addEventListener('click', () => abrirSidebar());
   document.getElementById('btnNuevaRecetaSidebar').addEventListener('click', () => { cerrarSidebar(); mostrarModalReceta(); });
 
-  // Gestos swipe para sidebar
   let sbInicioX = null, sbArrastrando = false;
   const sidebarEl = document.getElementById('recetasSidebar');
   const backdropEl = document.getElementById('recetasSidebarBackdrop');
@@ -182,7 +176,6 @@ function cerrarSidebar() {
   if (borde) borde.classList.remove('oculto');
 }
 
-/* ─── Sidebar: lista de capítulos ───────────── */
 function _pintarSidebarCapitulos() {
   const container = document.getElementById('recetasSidebarCapitulos');
   if (!container) return;
@@ -217,7 +210,6 @@ function _pintarSidebarCapitulos() {
   });
 }
 
-/* ─── Categorías dinámicas ──────────────────── */
 function _obtenerCategorias(recetas) {
   const cats = new Map();
   recetas.forEach(r => {
@@ -237,7 +229,6 @@ function _obtenerCategorias(recetas) {
   return arr;
 }
 
-/* ─── Recetario (Libro con subcategorías) ───── */
 export function pintarRecetario(contenedor) {
   const state = Store.getState();
   const recetas = state.recetas || [];
@@ -273,11 +264,7 @@ export function pintarRecetario(contenedor) {
 function _pintarLibro(recetas, productos, categorias, esProduccion) {
   const paginas = document.getElementById('recetasLibroPaginas');
   const indice = document.getElementById('recetasLibroIndice');
-  const subpestanasContainer = document.getElementById('recetas-subpestanas-container');
   if (!paginas) return;
-
-  // Limpiar subpestañas previas
-  if (subpestanasContainer) subpestanasContainer.innerHTML = '';
 
   const termino = getBusqueda().toLowerCase();
   const capActivo = getCategoriaActiva();
@@ -296,29 +283,62 @@ function _pintarLibro(recetas, productos, categorias, esProduccion) {
     return;
   }
 
-  // Generar pestañas de nivel (subcategorías) en TODOS los casos
-  const nivelesUnicos = [...new Set(filtradas.map(r => r.nivel || 'sin_nivel'))].sort();
-  const nivelActivo = getFiltroNivel();
-
-  if (subpestanasContainer && nivelesUnicos.length > 1) {
-    subpestanasContainer.innerHTML = `
-      <div class="recetas-subpestanas" id="recetas-subpestanas">
-        <button class="recetas-subpestana ${nivelActivo === 'todos' ? 'activo' : ''}" data-nivel="todos">Todos</button>
-        ${nivelesUnicos.map(n => `<button class="recetas-subpestana ${nivelActivo === n ? 'activo' : ''}" data-nivel="${n}">${n}</button>`).join('')}
-      </div>`;
-    subpestanasContainer.querySelectorAll('.recetas-subpestana').forEach(btn => {
-      btn.addEventListener('click', () => {
-        setFiltroNivel(btn.dataset.nivel);
-        _pintarLibro(recetas, productos, categorias, esProduccion);
+  // ── Índice lateral de colores ──────────────
+  if (indice) {
+    if (capActivo === 'todas') {
+      // Vista general: pestañas = capítulos
+      const idsPresentes = categorias.map(c => c.id).filter(id => {
+        return filtradas.some(r => (r.categoria || 'sin_categoria') === id);
       });
-    });
+      if (idsPresentes.length > 1 && !termino) {
+        indice.innerHTML = idsPresentes.map((id, i) => {
+          const cat = categorias.find(c => c.id === id) || { color: PALETA_CATEGORIAS[0], nombre: id };
+          return `<button class="recetas-indice-tab ${i === 0 ? 'activo' : ''}" data-cap="${id}" style="background:${cat.color}" title="${cat.nombre}">${cat.nombre.slice(0, 3)}</button>`;
+        }).join('');
+        indice.querySelectorAll('.recetas-indice-tab').forEach(btn => {
+          btn.addEventListener('click', () => {
+            document.getElementById('cap-' + btn.dataset.cap)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          });
+        });
+        const observer = new IntersectionObserver((entries) => {
+          entries.forEach(ent => {
+            if (ent.isIntersecting) {
+              const id = ent.target.id.replace('cap-', '');
+              indice.querySelectorAll('.recetas-indice-tab').forEach(b => b.classList.toggle('activo', b.dataset.cap === id));
+            }
+          });
+        }, { root: document.getElementById('recetasLibroPaginas'), threshold: 0.1 });
+        document.querySelectorAll('.recetas-capitulo').forEach(s => observer.observe(s));
+      } else {
+        indice.innerHTML = '';
+      }
+    } else {
+      // Capítulo activo: pestañas = niveles de ese capítulo
+      const nivelesUnicos = [...new Set(filtradas.map(r => r.nivel || 'sin_nivel'))].sort();
+      const nivelActivo = getFiltroNivel();
+      if (nivelesUnicos.length > 1) {
+        indice.innerHTML = nivelesUnicos.map((n, i) => {
+          const colorNivel = PALETA_CATEGORIAS[i % PALETA_CATEGORIAS.length];
+          return `<button class="recetas-indice-tab ${nivelActivo === n || (nivelActivo === 'todos' && i === 0) ? 'activo' : ''}" data-nivel="${n}" style="background:${colorNivel}" title="${n}">${n.slice(0, 3)}</button>`;
+        }).join('');
+        indice.querySelectorAll('.recetas-indice-tab').forEach(btn => {
+          btn.addEventListener('click', () => {
+            setFiltroNivel(btn.dataset.nivel === getFiltroNivel() ? 'todos' : btn.dataset.nivel);
+            _pintarLibro(recetas, productos, categorias, esProduccion);
+          });
+        });
+      } else {
+        indice.innerHTML = '';
+      }
+
+      // Aplicar filtro de nivel
+      if (getFiltroNivel() !== 'todos') {
+        filtradas = filtradas.filter(r => (r.nivel || 'sin_nivel') === getFiltroNivel());
+      }
+    }
   }
 
-  if (nivelActivo !== 'todos') {
-    filtradas = filtradas.filter(r => (r.nivel || 'sin_nivel') === nivelActivo);
-  }
-
-  // Agrupar por capítulo si no hay capítulo activo, sino mostrar tarjetas directamente
+  // ── Contenido principal ─────────────────────
   if (capActivo === 'todas') {
     const grupos = {};
     filtradas.forEach(r => {
@@ -340,34 +360,10 @@ function _pintarLibro(recetas, productos, categorias, esProduccion) {
           <div class="recetas-estante">${items.map(r => _tarjetaLibro(r, cat)).join('')}</div>
         </section>`;
     }).join('');
-
-    if (indice && idsPresentes.length > 1 && !termino) {
-      indice.innerHTML = idsPresentes.map((id, i) => {
-        const cat = categorias.find(c => c.id === id) || { color: PALETA_CATEGORIAS[0], nombre: id };
-        return `<button class="recetas-indice-tab ${i === 0 ? 'activo' : ''}" data-cap="${id}" style="background:${cat.color}" title="${cat.nombre}">${cat.nombre.slice(0, 3)}</button>`;
-      }).join('');
-      indice.querySelectorAll('.recetas-indice-tab').forEach(btn => {
-        btn.addEventListener('click', () => {
-          document.getElementById('cap-' + btn.dataset.cap)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        });
-      });
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach(ent => {
-          if (ent.isIntersecting) {
-            const id = ent.target.id.replace('cap-', '');
-            indice.querySelectorAll('.recetas-indice-tab').forEach(b => b.classList.toggle('activo', b.dataset.cap === id));
-          }
-        });
-      }, { root: document.getElementById('recetasLibroPaginas'), threshold: 0.1 });
-      document.querySelectorAll('.recetas-capitulo').forEach(s => observer.observe(s));
-    } else if (indice) {
-      indice.innerHTML = '';
-    }
   } else {
     const cat = categorias.find(c => c.id === capActivo) || { color: PALETA_CATEGORIAS[0] };
     paginas.innerHTML = `
       <div class="recetas-estante" style="flex-wrap:wrap;gap:12px;">${filtradas.sort((a,b) => a._nombre.localeCompare(b._nombre)).map(r => _tarjetaLibro(r, cat)).join('')}</div>`;
-    if (indice) indice.innerHTML = '';
   }
 
   paginas.querySelectorAll('.recetas-tarjeta-libro').forEach(t => {
@@ -393,7 +389,6 @@ function _tarjetaLibro(r, cat) {
     </div>`;
 }
 
-/* ─── Mi Stock ──────────────────────────────── */
 export function pintarStock(contenedor) {
   const state = Store.getState();
   const recetas = (state.recetas || []).filter(r => r.es_intermedio);
@@ -444,7 +439,6 @@ export function pintarStock(contenedor) {
   });
 }
 
-/* ─── Planificación ─────────────────────────── */
 export function pintarPlanificacion(contenedor) {
   contenedor.innerHTML = `
     <div class="recetas-planificacion-placeholder">
