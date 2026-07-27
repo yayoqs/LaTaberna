@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Perfil — La Taberna (Fusión Final)</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Nunito:wght@400;600;700;800&display=swap');
+
+    :root {
+      --bg: #0f0f14; --panel: #1a1a24; --border: #2e2e42;
+      --text: #f1f5f9; --text-sec: #94a3b8;
+      --accent: #f59e0b; --accent-dim: rgba(245,158,11,.15);
+      --indigo: #6366f1; --indigo-dim: rgba(99,102,241,.15);
+      --danger: #ef4444; --success: #22c55e;
+      --radius: 12px; --radius-sm: 8px;
+      font-family: 'Nunito', system-ui, sans-serif;
+      background: var(--bg); color: var(--text);
+      --transition: all 0.25s cubic-bezier(0.4,0,0.2,1);
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; }
+
+    .header {
+      display: flex; align-items: center; gap: 12px; padding: 12px 18px;
+      background: var(--panel); border-bottom: 1px solid var(--border); z-index: 20; flex-shrink: 0;
+    }
+    .header h2 { font-size: 15px; margin: 0; flex: 1; font-weight: 800; }
+    .header .icon-btn {
+      background: transparent; border: 1px solid var(--border); color: var(--text-sec);
+      border-radius: 9px; width: 36px; height: 36px; display: flex; align-items: center;
+      justify-content: center; cursor: pointer; font-size: 16px; transition: var(--transition);
+    }
+    .header .icon-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    .preview-bar {
+      display: flex; align-items: center; gap: 8px; padding: 7px 18px;
+      background: var(--panel); border-bottom: 1px solid var(--border);
+      font-size: 11px; color: var(--text-sec); flex-shrink: 0; overflow-x: auto; white-space: nowrap;
+    }
+    .preview-bar strong { color: var(--indigo); font-weight: 800; flex-shrink: 0; }
+    .preview-role-btn {
+      background: transparent; border: 1px solid var(--border); color: var(--text-sec);
+      border-radius: 20px; padding: 4px 13px; font-size: 11px; font-weight: 600; cursor: pointer;
+      transition: var(--transition); flex-shrink: 0;
+    }
+    .preview-role-btn.activo { background: var(--indigo); color: #fff; border-color: var(--indigo); font-weight: 700; }
+
+    .main-layout { display: flex; flex: 1; overflow: hidden; position: relative; }
+
+    /* Panel izquierdo: Identidad */
+    .panel-izquierdo {
+      width: 290px; flex-shrink: 0; background: var(--panel); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow-y: auto; z-index: 30;
+      transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+    }
+    .id-card { padding: 28px 20px 18px; text-align: center; border-bottom: 1px solid var(--border); position: relative; }
+    .avatar-octagon-marco {
+      width: 100px; height: 100px; margin: 0 auto 14px; position: relative;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .avatar-octagon-marco .glow-ring {
+      position: absolute; inset: -10px; border-radius: 50%;
+      background: conic-gradient(from 0deg, var(--accent), var(--indigo), var(--accent));
+      filter: blur(14px); opacity: .25;
+    }
+    .avatar-octagon-marco .marco-octagono {
+      width: 100%; height: 100%; position: relative; z-index: 2;
+      clip-path: polygon(29% 0, 71% 0, 100% 29%, 100% 71%, 71% 100%, 29% 100%, 0 71%, 0 29%);
+      background: linear-gradient(160deg, #23233a, #14141e);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .avatar-octagon-marco .marco-borde {
+      position: absolute; inset: 3px; z-index: 3; pointer-events: none;
+      clip-path: polygon(29% 0, 71% 0, 100% 29%, 100% 71%, 71% 100%, 29% 100%, 0 71%, 0 29%);
+      box-shadow: inset 0 0 0 2.5px var(--accent), inset 0 0 15px rgba(245,158,11,.25);
+    }
+    .avatar-octagon-marco .sprite { font-size: 48px; position: relative; z-index: 4; }
+    .nivel-badge {
+      position: absolute; top: -8px; left: 50%; transform: translateX(-50%); z-index: 5;
+      background: var(--indigo); color: #fff; font-weight: 700; font-size: 10px;
+      padding: 3px 10px; border-radius: 20px; border: 3px solid var(--panel);
+      white-space: nowrap;
+    }
+    .badge-modo {
+      position: absolute; bottom: -5px; right: -5px; z-index: 5;
+      background: var(--panel); border: 2px solid var(--bg); border-radius: 50%;
+      width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 13px;
+    }
+    .id-card .nombre { font-size: 17px; font-weight: 800; margin: 0 0 4px; }
+    .id-card .apodo { font-family: 'Caveat', cursive; font-size: 21px; color: var(--accent); font-weight: 700; }
+    .id-card .desde { font-size: 10.5px; color: var(--text-sec); margin-top: 8px; text-transform: uppercase; letter-spacing: .06em; }
+
+    .modo-switch {
+      margin: 16px 20px; display: flex; background: #252535; border-radius: 24px;
+      padding: 3px; border: 1px solid var(--border);
+    }
+    .modo-switch button {
+      flex: 1; border: none; background: transparent; color: var(--text-sec);
+      padding: 8px 6px; border-radius: 20px; font-size: 12px; font-weight: 700; cursor: pointer;
+      transition: var(--transition);
+    }
+    .modo-switch button.activo { background: var(--accent); color: #0f0f14; }
+    .modo-switch button:disabled { opacity: .3; cursor: not-allowed; }
+
+    .cargos-lista { padding: 0 20px 16px; display: flex; flex-wrap: wrap; gap: 6px; }
+    .cargo-chip {
+      background: var(--indigo-dim); color: var(--indigo); border: 1px solid rgba(99,102,241,.35);
+      border-radius: 20px; padding: 3px 11px; font-size: 10.5px; font-weight: 700;
+    }
+
+    .mini-stats { display: flex; padding: 16px 20px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); gap: 8px; }
+    .mini-stats .stat { flex: 1; text-align: center; }
+    .mini-stats .stat .n { font-size: 17px; font-weight: 800; color: var(--accent); }
+    .mini-stats .stat .l { font-size: 8.5px; color: var(--text-sec); margin-top: 2px; text-transform: uppercase; letter-spacing: .07em; }
+
+    .insignias { padding: 16px 20px; }
+    .insignias h4 { font-size: 10.5px; text-transform: uppercase; letter-spacing: .08em; color: var(--text-sec); margin: 0 0 10px; font-weight: 800; }
+    .insignia-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+    .insignia {
+      aspect-ratio: 1; border-radius: var(--radius-sm); background: #252535; border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center; font-size: 19px;
+    }
+    .insignia.bloqueada { opacity: .25; filter: grayscale(1); }
+
+    .panel-izq-footer { margin-top: auto; padding: 18px 20px; border-top: 1px solid var(--border); }
+    .btn-editar-perfil {
+      width: 100%; background: transparent; border: 1.5px solid var(--accent); color: var(--accent);
+      border-radius: 24px; padding: 11px; font-size: 12.5px; font-weight: 700; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 7px; transition: var(--transition);
+    }
+    .btn-editar-perfil:hover { background: var(--accent); color: #0f0f14; }
+
+    /* Panel central */
+    .panel-central { flex: 1; overflow-y: auto; padding: 20px; background: var(--bg); }
+
+    .modo-vitrina { display: flex; flex-direction: column; gap: 16px; }
+    .modo-edicion { display: none; }
+
+    .taberna-hero {
+      background: linear-gradient(180deg, var(--panel), var(--bg));
+      border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 36px 20px 28px; text-align: center;
+    }
+    .taberna-hero .avatar-rpg-marco {
+      width: 120px; height: 120px; margin: 0 auto 16px; position: relative;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .taberna-hero .avatar-rpg-marco .glow-ring {
+      position: absolute; inset: -10px; border-radius: 50%;
+      background: conic-gradient(from 0deg, var(--accent), var(--indigo), var(--accent));
+      filter: blur(14px); opacity: .25;
+    }
+    .taberna-hero .avatar-rpg-marco .marco-circulo {
+      width: 100%; height: 100%; border-radius: 50%; position: relative; z-index: 2;
+      background: var(--panel); display: flex; align-items: center; justify-content: center;
+      border: 3px solid var(--accent); box-shadow: 0 0 20px rgba(245,158,11,.3);
+    }
+    .taberna-hero .avatar-rpg-marco .sprite { font-size: 52px; position: relative; z-index: 3; }
+
+    .titulo-rango { font-family: 'Caveat', cursive; font-size: 26px; color: var(--accent); font-weight: 700; margin: 12px 0 4px; }
+
+    .racha-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: linear-gradient(160deg, #ff9142, #e0522b);
+      color: #fff; font-weight: 700; font-size: 11px;
+      padding: 4px 12px; border-radius: 20px; margin-top: 8px;
+    }
+
+    .xp-bar-wrap { max-width: 360px; margin: 16px auto 0; }
+    .xp-bar-labels { display: flex; justify-content: space-between; font-size: 10.5px; color: var(--text-sec); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
+    .xp-bar-labels strong { color: var(--text); font-size: 11px; }
+    .xp-bar-track {
+      height: 12px; background: #252535; border-radius: 20px; overflow: hidden; border: 1px solid var(--border);
+    }
+    .xp-bar-fill {
+      height: 100%; width: 68%; border-radius: 20px;
+      background: linear-gradient(90deg, var(--accent), #fbcf6b);
+    }
+    .xp-restante { font-size: 10.5px; color: var(--text-sec); margin-top: 8px; }
+
+    .ficha-preview-fila { display: flex; flex-direction: column; gap: 10px; }
+    .ficha-cola {
+      display: flex; align-items: center; gap: 12px; background: var(--panel); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 10px 14px;
+    }
+    .ficha-cola .num { font-size: 13px; color: var(--text-sec); font-weight: 700; width: 20px; }
+    .ficha-cola .mini-avatar {
+      width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
+      background: linear-gradient(135deg, var(--accent), var(--indigo));
+      display: flex; align-items: center; justify-content: center; font-size: 18px;
+    }
+    .ficha-cola .info { flex: 1; }
+    .ficha-cola .info strong { font-size: 12.5px; display: block; }
+    .ficha-cola .info span { font-size: 10px; color: var(--text-sec); }
+    .ficha-cola .estado-llamado {
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
+      background: rgba(52,211,153,.14); color: var(--success); padding: 4px 10px; border-radius: 12px;
+    }
+
+    .ficha-leaderboard {
+      display: flex; align-items: center; gap: 12px;
+      background: linear-gradient(90deg, var(--accent-dim), transparent);
+      border: 1px solid rgba(245,158,11,.3); border-radius: var(--radius-sm); padding: 10px 14px;
+    }
+    .ficha-leaderboard .puesto { font-size: 15px; font-weight: 800; color: var(--accent); width: 22px; text-align: center; }
+    .ficha-leaderboard .mini-avatar {
+      width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
+      background: linear-gradient(135deg, var(--accent), var(--indigo));
+      display: flex; align-items: center; justify-content: center; font-size: 18px;
+    }
+    .ficha-leaderboard .info { flex: 1; }
+    .ficha-leaderboard .info strong { font-size: 12.5px; display: block; }
+    .ficha-leaderboard .info span { font-size: 10px; color: var(--text-sec); }
+    .ficha-leaderboard .puntos { font-weight: 700; color: var(--accent); font-size: 13px; }
+
+    .seccion {
+      background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 18px; margin-bottom: 0;
+    }
+    .seccion h3 { margin: 0 0 4px; font-size: 15px; font-weight: 800; display: flex; align-items: center; gap: 8px; }
+    .seccion .desc { font-size: 12px; color: var(--text-sec); margin: 0 0 14px; line-height: 1.5; }
+    .insignias-destacadas { display: flex; gap: 10px; }
+    .insignia-destacada {
+      width: 44px; height: 44px; border-radius: 10px; background: #252535;
+      display: flex; align-items: center; justify-content: center; font-size: 20px;
+      border: 1px solid var(--border);
+    }
+    .club-mini { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+    .club-mini:last-child { border-bottom: none; }
+    .actividad-vitrina { display: flex; gap: 8px; padding: 6px 0; font-size: 11px; color: var(--text-sec); }
+    .actividad-vitrina .punto-v { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-top: 5px; flex-shrink: 0; }
+
+    /* Accesorios */
+    .skin-fila { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 8px; }
+    .skin-slot {
+      flex-shrink: 0; width: 56px; height: 56px; border-radius: var(--radius-sm);
+      background: var(--panel); border: 2px solid var(--border); display: flex; align-items: center;
+      justify-content: center; font-size: 24px; position: relative; transition: var(--transition); cursor: pointer;
+    }
+    .skin-slot:not(.bloqueada):hover { border-color: var(--accent); }
+    .skin-slot.equipado { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+    .skin-slot.bloqueado { opacity: .3; filter: grayscale(.7); cursor: not-allowed; }
+    .skin-slot .check {
+      position: absolute; top: -6px; right: -6px; background: var(--accent); color: #0f0f14; border-radius: 50%;
+      width: 19px; height: 19px; font-size: 10px; display: flex; align-items: center; justify-content: center; font-weight: 800;
+    }
+    .accesorio-fila-titulo { font-size: 10.5px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-sec); font-weight: 800; margin: 0 0 8px; }
+
+    /* Edición */
+    .edicion-header { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+    .btn-volver {
+      background: var(--panel); border: 1px solid var(--border); color: var(--text-sec);
+      border-radius: 20px; padding: 8px 15px; font-size: 11.5px; font-weight: 700; cursor: pointer; transition: var(--transition);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .btn-volver:hover { border-color: var(--accent); color: var(--accent); }
+    .edicion-header h3 { margin: 0; font-size: 15px; font-weight: 700; }
+
+    .central-tabs {
+      display: flex; gap: 5px; margin-bottom: 18px; background: var(--panel);
+      padding: 4px; border-radius: 30px; border: 1px solid var(--border); width: fit-content;
+      overflow-x: auto; max-width: 100%;
+    }
+    .central-tab {
+      padding: 8px 15px; border-radius: 24px; border: none; background: transparent;
+      color: var(--text-sec); cursor: pointer; font-size: 11.5px; font-weight: 700; transition: var(--transition);
+      white-space: nowrap; display: none;
+    }
+    .central-tab.visible { display: inline-block; }
+    .central-tab.activo { background: var(--accent); color: #0f0f14; }
+    .central-tab-content { display: none; }
+    .central-tab-content.activo { display: block; }
+
+    .campo { margin-bottom: 15px; }
+    .campo:last-child { margin-bottom: 0; }
+    .campo-label-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 7px; }
+    .campo label { font-size: 11.5px; font-weight: 700; color: var(--text-sec); }
+    .visibilidad-select {
+      background: #252535; border: 1px solid var(--border); color: var(--text-sec);
+      font-size: 10px; border-radius: 12px; padding: 4px 9px; outline: none; cursor: pointer;
+    }
+    .campo input[type=text], .campo textarea {
+      width: 100%; background: #252535; border: 1px solid var(--border); color: var(--text);
+      padding: 11px 13px; border-radius: var(--radius-sm); font-size: 13px; outline: none; font-family: inherit;
+    }
+    .campo textarea { resize: vertical; min-height: 60px; }
+
+    .toggle-fila { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .toggle-fila:last-child { border-bottom: none; }
+    .toggle-fila .txt strong { display: block; font-size: 13px; }
+    .toggle-fila .txt span { font-size: 11px; color: var(--text-sec); }
+    .switch { position: relative; width: 42px; height: 24px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; inset: 0; background: #333; border-radius: 24px; cursor: pointer; transition: var(--transition); }
+    .slider::before { content: ''; position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background: #fff; border-radius: 50%; transition: var(--transition); }
+    .switch input:checked + .slider { background: var(--accent); }
+    .switch input:checked + .slider::before { transform: translateX(18px); }
+
+    .nota-privacidad {
+      display: flex; gap: 9px; align-items: flex-start; background: var(--indigo-dim);
+      border: 1px solid rgba(99,102,241,.3); border-radius: var(--radius-sm); padding: 11px 13px;
+      font-size: 11px; color: #c7d2fe; margin-bottom: 15px; line-height: 1.55;
+    }
+
+    .usuario-row { background: #252535; border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 13px; margin-bottom: 8px; }
+    .usuario-row-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .usuario-row-top .av { width: 33px; height: 33px; border-radius: 50%; background: var(--indigo); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; flex-shrink: 0; }
+    .usuario-row-top strong { font-size: 13px; flex: 1; }
+    .usuario-row-top .rol-actual { font-size: 10px; color: var(--text-sec); }
+    .roles-checks { display: flex; flex-wrap: wrap; gap: 6px; }
+    .rol-check { display: flex; align-items: center; gap: 5px; background: var(--bg); border: 1px solid var(--border); border-radius: 16px; padding: 5px 11px; font-size: 11px; cursor: pointer; }
+    .rol-check input { accent-color: var(--indigo); width: 13px; height: 13px; }
+    .rol-check.bloqueado { opacity: .35; cursor: not-allowed; }
+    .rol-check.bloqueado input { pointer-events: none; }
+
+    /* Panel derecho */
+    .panel-derecho {
+      width: 260px; flex-shrink: 0; background: var(--panel); border-left: 1px solid var(--border);
+      display: flex; flex-direction: column; overflow-y: auto; z-index: 30;
+      transition: transform 0.3s cubic-bezier(0.4,0,0.2,1); padding: 20px;
+    }
+    .panel-derecho h3 { font-size: 12px; margin: 0 0 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+    .resumen-mini { background: #252535; border-radius: var(--radius-sm); padding: 13px; margin-bottom: 10px; border: 1px solid var(--border); }
+    .resumen-mini .titulo { font-size: 10.5px; color: var(--text-sec); margin-bottom: 5px; }
+    .resumen-mini .valor { font-size: 19px; font-weight: 700; color: var(--indigo); }
+
+    .actividad-item { display: flex; gap: 9px; padding: 9px 0; border-bottom: 1px solid var(--border); font-size: 11px; }
+    .actividad-item:last-child { border-bottom: none; }
+    .actividad-item .punto { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-top: 5px; flex-shrink: 0; }
+    .actividad-item .txt-sec { color: var(--text-sec); display: block; margin-top: 2px; }
+
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 25; display: none; opacity: 0; transition: opacity .3s; }
+    .overlay.activo { display: block; opacity: 1; }
+
+    @media (max-width: 900px) {
+      .panel-izquierdo { position: fixed; top: 0; left: 0; bottom: 0; transform: translateX(-100%); box-shadow: 0 0 40px rgba(0,0,0,.5); }
+      .panel-izquierdo.abierto { transform: translateX(0); }
+      .panel-derecho { position: fixed; top: 0; right: 0; bottom: 0; transform: translateX(100%); box-shadow: 0 0 40px rgba(0,0,0,.5); }
+      .panel-derecho.abierto { transform: translateX(0); }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <button class="icon-btn" id="btnToggleIzq">👤</button>
+  <h2>Mi Perfil</h2>
+  <button class="icon-btn" id="btnToggleDer">📊</button>
+</div>
+
+<div class="preview-bar">
+  <strong>👁 Vista previa (demo):</strong>
+  <button class="preview-role-btn activo" data-role="cliente">Cliente</button>
+  <button class="preview-role-btn" data-role="staff">Staff</button>
+  <button class="preview-role-btn" data-role="admin">Admin</button>
+  <button class="preview-role-btn" data-role="master">Master</button>
+</div>
+
+<div class="main-layout" id="mainLayout">
+
+  <!-- Panel izquierdo -->
+  <div class="panel-izquierdo" id="panelIzquierdo">
+    <div class="id-card">
+      <div class="avatar-octagon-marco">
+        <div class="glow-ring"></div>
+        <div class="marco-octagono">
+          <span class="sprite">🧙‍♀️</span>
+        </div>
+        <div class="marco-borde"></div>
+        <span class="nivel-badge">NIVEL 7</span>
+        <span class="badge-modo" id="badgeModo">🧑‍🍳</span>
+      </div>
+      <div class="nombre">Camila Rivas</div>
+      <div class="apodo">"Cami"</div>
+      <div class="desde">Miembro desde marzo 2025</div>
+    </div>
+
+    <div class="modo-switch" id="modoSwitch">
+      <button class="activo" data-modo="cliente">🎟️ Cliente</button>
+      <button data-modo="staff">🛠️ Staff</button>
+    </div>
+
+    <div class="cargos-lista" id="cargosLista">
+      <span class="cargo-chip">🍳 Cocina</span>
+      <span class="cargo-chip">🍸 Barra</span>
+    </div>
+
+    <div class="mini-stats">
+      <div class="stat"><div class="n">14</div><div class="l">Visitas</div></div>
+      <div class="stat"><div class="n">3</div><div class="l">Clubes</div></div>
+      <div class="stat"><div class="n">6</div><div class="l">Insignias</div></div>
+    </div>
+
+    <div class="insignias">
+      <h4>Insignias</h4>
+      <div class="insignia-grid">
+        <div class="insignia" title="Habitué">🏅</div>
+        <div class="insignia" title="Torneo cartas">🃏</div>
+        <div class="insignia" title="Noche trivia">🧠</div>
+        <div class="insignia" title="Fundador">⭐</div>
+        <div class="insignia bloqueada">🔒</div>
+        <div class="insignia bloqueada">🔒</div>
+        <div class="insignia bloqueada">🔒</div>
+        <div class="insignia bloqueada">🔒</div>
+      </div>
+    </div>
+
+    <div class="panel-izq-footer">
+      <button class="btn-editar-perfil" id="btnEditarPerfil">⚙️ Editar perfil</button>
+    </div>
+  </div>
+
+  <!-- Panel central -->
+  <div class="panel-central">
+    <!-- MODO VITRINA -->
+    <div class="modo-vitrina" id="modoVitrina">
+      <div class="taberna-hero">
+        <div class="avatar-rpg-marco">
+          <div class="glow-ring"></div>
+          <div class="marco-circulo">
+            <span class="sprite">🧙‍♀️</span>
+          </div>
+        </div>
+        <div class="titulo-rango">"Fiel Parroquiana"</div>
+        <div class="racha-badge">🔥 5 días de racha</div>
+
+        <div class="xp-bar-wrap">
+          <div class="xp-bar-labels"><span>Experiencia</span><strong>1.360 / 2.000 XP</strong></div>
+          <div class="xp-bar-track"><div class="xp-bar-fill"></div></div>
+          <div class="xp-restante">Te faltan 640 XP para nivel 8</div>
+        </div>
+      </div>
+
+      <div class="seccion">
+        <h3>🎒 Accesorios equipables</h3>
+        <p class="desc">Ganados en eventos y clubes. Toca para equipar.</p>
+        <div class="accesorio-fila-titulo">Objeto en mano</div>
+        <div class="skin-fila" id="filaMano">
+          <div class="skin-slot equipado" data-emoji="🍺">🍺<span class="check">✓</span></div>
+          <div class="skin-slot" data-emoji="🃏">🃏</div>
+          <div class="skin-slot" data-emoji="♟️">♟️</div>
+          <div class="skin-slot" data-emoji="🔮">🔮</div>
+          <div class="skin-slot bloqueado">🎯</div>
+        </div>
+        <div class="accesorio-fila-titulo" style="margin-top:16px;">Aura del marco</div>
+        <div class="skin-fila" id="filaAura">
+          <div class="skin-slot equipado" data-aura="">✨<span class="check">✓</span></div>
+          <div class="skin-slot" data-aura="aura-indigo">🔷</div>
+          <div class="skin-slot bloqueado">🟢</div>
+          <div class="skin-slot bloqueado">🔴</div>
+        </div>
+      </div>
+
+      <div class="seccion">
+        <h3>📣 Así te ven en la taberna</h3>
+        <div class="ficha-preview-fila">
+          <div class="ficha-cola">
+            <span class="num">3</span>
+            <div class="mini-avatar">🧙‍♀️</div>
+            <div class="info"><strong>Cami · Nivel 7</strong><span>Cola para mesa de dardos</span></div>
+            <span class="estado-llamado">Es tu turno</span>
+          </div>
+          <div class="ficha-leaderboard">
+            <span class="puesto">🥈</span>
+            <div class="mini-avatar">🧙‍♀️</div>
+            <div class="info"><strong>Cami · Nivel 7</strong><span>Trivia de los jueves</span></div>
+            <span class="puntos">840 pts</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="seccion">
+        <h3>🏅 Insignias destacadas</h3>
+        <div class="insignias-destacadas">
+          <div class="insignia-destacada">🏅</div>
+          <div class="insignia-destacada">🃏</div>
+          <div class="insignia-destacada">🧠</div>
+          <div class="insignia-destacada">⭐</div>
+        </div>
+      </div>
+
+      <div class="seccion">
+        <h3>🎲 Clubes</h3>
+        <div class="club-mini">🃏 <span>Cartas & Naipes</span><span style="margin-left:auto;font-size:10px;color:var(--accent);">Jue 21:00</span></div>
+        <div class="club-mini">♟️ <span>Ajedrez de barra</span><span style="margin-left:auto;font-size:10px;color:var(--text-sec);">Sin evento</span></div>
+        <div class="club-mini">🔮 <span>Noche de Tarot</span><span style="margin-left:auto;font-size:10px;color:var(--text-sec);">—</span></div>
+      </div>
+
+      <div class="seccion">
+        <h3>🕓 Actividad reciente</h3>
+        <div class="actividad-vitrina"><span class="punto-v"></span><span>Te uniste a <strong>Noche de Tarot</strong> · Hace 2 semanas</span></div>
+        <div class="actividad-vitrina"><span class="punto-v"></span><span>Ganaste la insignia <strong>Torneo de cartas 2025</strong> · Hace 1 mes</span></div>
+        <div class="actividad-vitrina"><span class="punto-v"></span><span>Visita registrada · Hace 1 mes</span></div>
+      </div>
+    </div>
+
+    <!-- MODO EDICIÓN -->
+    <div class="modo-edicion" id="modoEdicion">
+      <div class="edicion-header">
+        <button class="btn-volver" id="btnVolver">← Volver a mi taberna</button>
+        <h3>Editar perfil</h3>
+      </div>
+
+      <div class="central-tabs">
+        <button class="central-tab visible activo" data-tab="publico">🪪 Perfil</button>
+        <button class="central-tab visible" data-tab="preferencias">🍽️ Preferencias</button>
+        <button class="central-tab visible" data-tab="participaciones">🎲 Participaciones</button>
+        <button class="central-tab" data-tab="staff" data-req="staff">🛠️ Staff</button>
+        <button class="central-tab" data-tab="admin" data-req="admin">🔑 Administración</button>
+      </div>
+
+      <div class="central-tab-content activo" id="tab-publico">
+        <div class="seccion">
+          <h3>Información pública</h3>
+          <p class="desc">Esto lo ven otros usuarios del pub. Tú controlas cada dato.</p>
+          <div class="campo">
+            <div class="campo-label-row"><label>Apodo</label>
+              <select class="visibilidad-select"><option>🌍 Público</option><option>🔒 Solo staff</option><option>🙈 Privado</option></select>
+            </div>
+            <input type="text" value="Cami">
+          </div>
+          <div class="campo">
+            <div class="campo-label-row"><label>Frase / vibe</label>
+              <select class="visibilidad-select"><option>🌍 Público</option><option>🔒 Solo staff</option><option>🙈 Privado</option></select>
+            </div>
+            <input type="text" value="Aquí por el pisco sour y el mus, no necesariamente en ese orden">
+          </div>
+          <div class="campo">
+            <div class="campo-label-row"><label>¿Disponible para noches de citas?</label>
+              <select class="visibilidad-select"><option>🌍 Público</option><option>🙈 Privado</option></select>
+            </div>
+            <div class="toggle-fila" style="padding-top:0;border:none;">
+              <div class="txt"><span>Se muestra solo durante eventos de matchmaking</span></div>
+              <label class="switch"><input type="checkbox"><span class="slider"></span></label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="central-tab-content" id="tab-preferencias">
+        <div class="nota-privacidad">
+          ℹ️ Estos datos ajustan la carta y las recomendaciones. Solo visibles para cocina/barra cuando es necesario.
+        </div>
+        <div class="seccion">
+          <h3>🥗 Alimentación</h3>
+          <div class="toggle-fila"><div class="txt"><strong>Vegano</strong></div><label class="switch"><input type="checkbox"><span class="slider"></span></label></div>
+          <div class="toggle-fila"><div class="txt"><strong>Vegetariano</strong></div><label class="switch"><input type="checkbox"><span class="slider"></span></label></div>
+          <div class="toggle-fila"><div class="txt"><strong>Sin gluten</strong></div><label class="switch"><input type="checkbox" checked><span class="slider"></span></label></div>
+          <div class="toggle-fila"><div class="txt"><strong>Consumo alcohol</strong></div><label class="switch"><input type="checkbox" checked><span class="slider"></span></label></div>
+        </div>
+        <div class="seccion">
+          <h3>⚠️ Alergias <span style="font-size:10px;color:var(--danger);">SENSIBLE</span></h3>
+          <p class="desc">Solo visible para cocina al momento de tu pedido.</p>
+          <div class="campo"><label>Alergias / intolerancias</label><input type="text" value="Maní, mariscos"></div>
+          <div class="campo"><label>Notas adicionales</label><textarea placeholder="Cualquier otra cosa..."></textarea></div>
+        </div>
+      </div>
+
+      <div class="central-tab-content" id="tab-participaciones">
+        <div class="nota-privacidad">
+          🎲 Los clubes aparecen aquí cuando te apuntas a un evento real.
+        </div>
+        <div class="seccion">
+          <h3>Mis clubes</h3>
+          <div class="club-mini">🃏 <span>Cartas & Naipes</span><span style="margin-left:auto;font-size:10px;color:var(--accent);">Jue 21:00</span></div>
+          <div class="club-mini">♟️ <span>Ajedrez de barra</span><span style="margin-left:auto;font-size:10px;color:var(--text-sec);">Sin evento</span></div>
+          <div class="club-mini">🔮 <span>Noche de Tarot</span><span style="margin-left:auto;font-size:10px;color:var(--text-sec);">—</span></div>
+          <button class="btn-editar-perfil" style="margin-top:12px; width:100%;">Ver próximos eventos →</button>
+        </div>
+      </div>
+
+      <div class="central-tab-content" id="tab-staff">
+        <div class="seccion">
+          <h3>🗓️ Mis turnos</h3>
+          <div class="turno-item"><span class="turno-dia">Jue 24</span><span class="turno-hora">18:00 — 00:00</span><span class="turno-estado confirmado">Confirmado</span></div>
+          <div class="turno-item"><span class="turno-dia">Vie 25</span><span class="turno-hora">19:00 — 02:00</span><span class="turno-estado confirmado">Confirmado</span></div>
+          <div class="turno-item"><span class="turno-dia">Sáb 26</span><span class="turno-hora">19:00 — 02:00</span><span class="turno-estado pendiente">Por confirmar</span></div>
+        </div>
+        <div class="seccion">
+          <h3>✅ Tareas de hoy</h3>
+          <div class="tarea-item"><input type="checkbox" checked><span>Revisar stock de barra</span></div>
+          <div class="tarea-item"><input type="checkbox"><span>Preparar mise en place</span></div>
+          <div class="tarea-item"><input type="checkbox"><span>Cierre de caja turno tarde</span></div>
+        </div>
+      </div>
+
+      <div class="central-tab-content" id="tab-admin">
+        <div class="nota-privacidad">
+          🔑 Como <strong id="rolAdminTexto">admin</strong>, puedes asignar roles operativos. El rol <strong>Admin</strong> solo puede asignarlo un <strong>Master</strong>.
+        </div>
+        <div class="seccion">
+          <h3>Asignar roles</h3>
+          <div class="usuario-row">
+            <div class="usuario-row-top"><div class="av">P</div><strong>Pedro Soto</strong><span class="rol-actual">Mesero</span></div>
+            <div class="roles-checks">
+              <label class="rol-check"><input type="checkbox" checked>Mesero</label>
+              <label class="rol-check"><input type="checkbox">Barra</label>
+              <label class="rol-check"><input type="checkbox">Cocina</label>
+              <label class="rol-check"><input type="checkbox">DJ</label>
+              <label class="rol-check bloqueado admin-rol"><input type="checkbox">Admin</label>
+            </div>
+          </div>
+          <div class="usuario-row">
+            <div class="usuario-row-top"><div class="av">V</div><strong>Valentina Muñoz</strong><span class="rol-actual">Barra, DJ</span></div>
+            <div class="roles-checks">
+              <label class="rol-check"><input type="checkbox">Mesero</label>
+              <label class="rol-check"><input type="checkbox" checked>Barra</label>
+              <label class="rol-check"><input type="checkbox">Cocina</label>
+              <label class="rol-check"><input type="checkbox" checked>DJ</label>
+              <label class="rol-check bloqueado admin-rol"><input type="checkbox">Admin</label>
+            </div>
+          </div>
+          <button class="btn-editar-perfil" style="width:100%; margin-top:12px;">+ Invitar como personal</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel derecho -->
+  <div class="panel-derecho" id="panelDerecho">
+    <h3>📊 Resumen</h3>
+    <div class="resumen-mini"><div class="titulo">Puntos de fidelización</div><div class="valor">2.340</div></div>
+    <div class="resumen-mini"><div class="titulo">Próxima insignia en</div><div class="valor">3 visitas</div></div>
+    <h3 style="margin-top:20px;">🕓 Actividad reciente</h3>
+    <div class="actividad-item"><div class="punto"></div><div>Te uniste a <strong>Noche de Tarot</strong><span class="txt-sec">Hace 2 semanas</span></div></div>
+    <div class="actividad-item"><div class="punto"></div><div>Ganaste insignia <strong>Torneo cartas</strong><span class="txt-sec">Hace 1 mes</span></div></div>
+    <div class="actividad-item"><div class="punto"></div><div>Visita registrada<span class="txt-sec">Hace 1 mes</span></div></div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay"></div>
+
+<script>
+  const panelIzq = document.getElementById('panelIzquierdo');
+  const panelDer = document.getElementById('panelDerecho');
+  const overlay = document.getElementById('overlay');
+
+  document.getElementById('btnToggleIzq').addEventListener('click', () => {
+    panelIzq.classList.toggle('abierto'); overlay.classList.toggle('activo');
+  });
+  document.getElementById('btnToggleDer').addEventListener('click', () => {
+    panelDer.classList.toggle('abierto'); overlay.classList.toggle('activo');
+  });
+  overlay.addEventListener('click', () => {
+    panelIzq.classList.remove('abierto'); panelDer.classList.remove('abierto'); overlay.classList.remove('activo');
+  });
+
+  // Cambio modo vitrina / edición
+  const modoVitrina = document.getElementById('modoVitrina');
+  const modoEdicion = document.getElementById('modoEdicion');
+  document.getElementById('btnEditarPerfil').addEventListener('click', () => {
+    modoVitrina.style.display = 'none';
+    modoEdicion.style.display = 'block';
+  });
+  document.getElementById('btnVolver').addEventListener('click', () => {
+    modoEdicion.style.display = 'none';
+    modoVitrina.style.display = 'flex';
+  });
+
+  // Tabs edición
+  document.querySelectorAll('.central-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      if (!tab.classList.contains('visible')) return;
+      document.querySelectorAll('.central-tab').forEach(t => t.classList.remove('activo'));
+      document.querySelectorAll('.central-tab-content').forEach(c => c.classList.remove('activo'));
+      tab.classList.add('activo');
+      document.getElementById('tab-' + tab.dataset.tab).classList.add('activo');
+    });
+  });
+
+  // Modo switch
+  document.querySelectorAll('#modoSwitch button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.disabled) return;
+      document.querySelectorAll('#modoSwitch button').forEach(b => b.classList.remove('activo'));
+      btn.classList.add('activo');
+      document.getElementById('badgeModo').textContent = btn.dataset.modo === 'staff' ? '🛠️' : '🎟️';
+    });
+  });
+
+  // Equipar accesorios
+  document.querySelectorAll('.accesorio-fila').forEach(fila => {
+    fila.querySelectorAll('.skin-slot:not(.bloqueada)').forEach(slot => {
+      slot.addEventListener('click', () => {
+        fila.querySelectorAll('.skin-slot').forEach(s => {
+          s.classList.remove('equipado');
+          s.querySelector('.check')?.remove();
+        });
+        slot.classList.add('equipado');
+        const check = document.createElement('span');
+        check.className = 'check';
+        check.textContent = '✓';
+        slot.appendChild(check);
+      });
+    });
+  });
+
+  // Simulación roles
+  const previewBtns = document.querySelectorAll('.preview-role-btn');
+  previewBtns.forEach(btn => btn.addEventListener('click', () => aplicarRol(btn.dataset.role)));
+
+  function aplicarRol(rol) {
+    previewBtns.forEach(b => b.classList.toggle('activo', b.dataset.role === rol));
+    const tabStaff = document.querySelector('.central-tab[data-tab="staff"]');
+    const tabAdmin = document.querySelector('.central-tab[data-tab="admin"]');
+    const modoSwitchStaffBtn = document.querySelector('#modoSwitch button[data-modo="staff"]');
+    const adminRolChecks = document.querySelectorAll('.admin-rol');
+    const rolAdminTexto = document.getElementById('rolAdminTexto');
+
+    const esStaff = rol !== 'cliente';
+    tabStaff.classList.toggle('visible', esStaff);
+    modoSwitchStaffBtn.disabled = !esStaff;
+
+    const esAdmin = rol === 'admin' || rol === 'master';
+    tabAdmin.classList.toggle('visible', esAdmin);
+
+    const esMaster = rol === 'master';
+    adminRolChecks.forEach(chip => chip.classList.toggle('bloqueado', !esMaster));
+    if (rolAdminTexto) rolAdminTexto.textContent = esMaster ? 'master' : 'admin';
+
+    const tabActiva = document.querySelector('.central-tab.activo');
+    if (tabActiva && !tabActiva.classList.contains('visible')) {
+      document.querySelectorAll('.central-tab').forEach(t => t.classList.remove('activo'));
+      document.querySelectorAll('.central-tab-content').forEach(c => c.classList.remove('activo'));
+      document.querySelector('.central-tab[data-tab="publico"]').classList.add('activo');
+      document.getElementById('tab-publico').classList.add('activo');
+    }
+  }
+
+  aplicarRol('cliente');
+</script>
+</body>
+</html>
