@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/perfil.js
-   Versión: 2.0.2
+   Versión: 2.0.4
    Propósito: Vista de perfil de usuario con diseño de taberna.
-              v2.0.2: corrige observer que afectaba otras vistas.
+              v2.0.4: alineación con patrón de ciclo de vida de Despensa.
    ================================================================ */
 
 import { Auth } from '../auth.js';
@@ -22,10 +22,11 @@ const Perfil = (() => {
     return `pubpos_perfil_${usuario}`;
   }
 
+  // ── CONSTRUCCIÓN DEL DOM (igual que Despensa.asegurarVista) ──
   function _asegurarVista() {
     let main = document.getElementById('view-perfil');
     if (main && main.querySelector('.main-layout')) return;
-    
+
     if (!main) {
       main = document.createElement('main');
       main.id = 'view-perfil';
@@ -83,9 +84,8 @@ const Perfil = (() => {
     main.classList.add('active');
   }
 
-  async function render() {
-    _asegurarVista();
-
+  // ── RENDERIZADO PRINCIPAL (llamado después de activar) ──
+  async function _renderContenido() {
     const usuario = Auth.getUsuarioActual();
     if (!usuario) return;
 
@@ -98,11 +98,8 @@ const Perfil = (() => {
     _renderPanelIzquierdo(usuario, extras);
 
     const modoSwitch = document.getElementById('perfilModoSwitch');
-    if (esStaff) {
-      modoSwitch.style.display = 'flex';
-    } else {
-      modoSwitch.style.display = 'none';
-    }
+    if (esStaff) modoSwitch.style.display = 'flex';
+    else modoSwitch.style.display = 'none';
 
     _renderModoVitrina(usuario, extras);
     _renderModoEdicion(usuario, extras, esAdmin, esMaster);
@@ -110,6 +107,7 @@ const Perfil = (() => {
     _aplicarVisibilidadRoles(esStaff, esAdmin);
   }
 
+  // ── SUB-RENDERERS ────────────────────────────────────────
   function _renderPanelIzquierdo(usuario, extras) {
     const idCard = document.getElementById('perfilIdCard');
     const apodo = extras.apodo || usuario.nombre;
@@ -188,17 +186,15 @@ const Perfil = (() => {
       </div>
       <div class="seccion">
         <h3>🏅 Insignias destacadas</h3>
-        <div class="insignias-destacadas">
-          ${insigniasDestacadas.slice(0, 4).map(i => `<div class="insignia-destacada">${i}</div>`).join('')}
-        </div>
+        <div class="insignias-destacadas">${insigniasDestacadas.slice(0,4).map(i => `<div class="insignia-destacada">${i}</div>`).join('')}</div>
       </div>
       <div class="seccion">
         <h3>🎲 Clubes</h3>
-        ${clubes.length > 0 ? clubes.map(c => `<div class="club-mini">${c.icono || '🎲'} <span>${c.nombre}</span><span style="margin-left:auto;font-size:10px;color:var(--color-accent);">${c.evento || ''}</span></div>`).join('') : '<p class="desc">Únete a eventos para aparecer aquí.</p>'}
+        ${clubes.length ? clubes.map(c => `<div class="club-mini">${c.icono||'🎲'} <span>${c.nombre}</span><span style="margin-left:auto;font-size:10px;color:var(--color-accent);">${c.evento||''}</span></div>`).join('') : '<p class="desc">Únete a eventos para aparecer aquí.</p>'}
       </div>
       <div class="seccion">
         <h3>🕓 Actividad reciente</h3>
-        ${actividad.length > 0 ? actividad.map(a => `<div class="actividad-vitrina"><span class="punto-v"></span><span>${a.texto}</span></div>`).join('') : '<p class="desc">Sin actividad reciente.</p>'}
+        ${actividad.length ? actividad.map(a => `<div class="actividad-vitrina"><span class="punto-v"></span><span>${a.texto}</span></div>`).join('') : '<p class="desc">Sin actividad reciente.</p>'}
       </div>
     `;
 
@@ -221,47 +217,35 @@ const Perfil = (() => {
     const tabPublico = document.getElementById('tab-publico');
     tabPublico.innerHTML = `
       <div class="seccion">
-        <h3>Información pública</h3>
-        <p class="desc">Esto lo ven otros usuarios del pub. Tú controlas cada dato.</p>
-        <div class="campo">
-          <div class="campo-label-row"><label>Apodo</label><select class="visibilidad-select"><option>🌍 Público</option><option>🔒 Solo staff</option><option>🙈 Privado</option></select></div>
-          <input type="text" id="editarApodo" value="${extras.apodo || ''}">
-        </div>
-        <div class="campo">
-          <div class="campo-label-row"><label>Frase / vibe</label><select class="visibilidad-select"><option>🌍 Público</option><option>🔒 Solo staff</option><option>🙈 Privado</option></select></div>
-          <input type="text" id="editarFrase" value="${extras.frase || ''}">
-        </div>
+        <h3>Información pública</h3><p class="desc">Esto lo ven otros usuarios del pub.</p>
+        <div class="campo"><div class="campo-label-row"><label>Apodo</label><select class="visibilidad-select"><option>🌍 Público</option><option>🔒 Solo staff</option><option>🙈 Privado</option></select></div><input type="text" id="editarApodo" value="${extras.apodo||''}"></div>
+        <div class="campo"><div class="campo-label-row"><label>Frase</label><select class="visibilidad-select"><option>🌍 Público</option><option>🔒 Solo staff</option><option>🙈 Privado</option></select></div><input type="text" id="editarFrase" value="${extras.frase||''}"></div>
         <button class="btn-editar-perfil" id="btnGuardarPerfilPublico">Guardar cambios</button>
-      </div>
-    `;
+      </div>`;
     document.getElementById('btnGuardarPerfilPublico')?.addEventListener('click', () => {
-      _guardarExtras(usuario.nombre, { ..._cargarExtras(usuario.nombre), apodo: document.getElementById('editarApodo').value, frase: document.getElementById('editarFrase').value });
-      mostrarToast('success', 'Perfil público actualizado');
-      render();
+      _guardarExtras(usuario.nombre, {...extras, apodo: document.getElementById('editarApodo').value, frase: document.getElementById('editarFrase').value});
+      mostrarToast('success','Perfil público actualizado');
+      _renderContenido();
     });
 
-    const tabPreferencias = document.getElementById('tab-preferencias');
+    const tabPrefs = document.getElementById('tab-preferencias');
     const prefs = extras.preferencias || {};
-    tabPreferencias.innerHTML = `
-      <div class="nota-privacidad">ℹ️ Estos datos ajustan la carta y las recomendaciones. Solo visibles para cocina/barra cuando es necesario.</div>
-      <div class="seccion">
-        <h3>🥗 Alimentación</h3>
-        <div class="toggle-fila"><div class="txt"><strong>Vegano</strong></div><label class="switch"><input type="checkbox" id="prefVegano" ${prefs.vegano ? 'checked' : ''}><span class="slider"></span></label></div>
-        <div class="toggle-fila"><div class="txt"><strong>Vegetariano</strong></div><label class="switch"><input type="checkbox" id="prefVegetariano" ${prefs.vegetariano ? 'checked' : ''}><span class="slider"></span></label></div>
-        <div class="toggle-fila"><div class="txt"><strong>Sin gluten</strong></div><label class="switch"><input type="checkbox" id="prefSinGluten" ${prefs.sinGluten ? 'checked' : ''}><span class="slider"></span></label></div>
-        <div class="toggle-fila"><div class="txt"><strong>Intolerante a la lactosa</strong></div><label class="switch"><input type="checkbox" id="prefLactosa" ${prefs.lactosa ? 'checked' : ''}><span class="slider"></span></label></div>
-        <div class="toggle-fila"><div class="txt"><strong>Consumo alcohol</strong></div><label class="switch"><input type="checkbox" id="prefAlcohol" ${prefs.alcohol !== false ? 'checked' : ''}><span class="slider"></span></label></div>
+    tabPrefs.innerHTML = `
+      <div class="nota-privacidad">ℹ️ Solo visible para cocina/barra cuando es necesario.</div>
+      <div class="seccion"><h3>🥗 Alimentación</h3>
+        <div class="toggle-fila"><div class="txt"><strong>Vegano</strong></div><label class="switch"><input type="checkbox" id="prefVegano" ${prefs.vegano?'checked':''}><span class="slider"></span></label></div>
+        <div class="toggle-fila"><div class="txt"><strong>Vegetariano</strong></div><label class="switch"><input type="checkbox" id="prefVegetariano" ${prefs.vegetariano?'checked':''}><span class="slider"></span></label></div>
+        <div class="toggle-fila"><div class="txt"><strong>Sin gluten</strong></div><label class="switch"><input type="checkbox" id="prefSinGluten" ${prefs.sinGluten?'checked':''}><span class="slider"></span></label></div>
+        <div class="toggle-fila"><div class="txt"><strong>Intolerante a la lactosa</strong></div><label class="switch"><input type="checkbox" id="prefLactosa" ${prefs.lactosa?'checked':''}><span class="slider"></span></label></div>
+        <div class="toggle-fila"><div class="txt"><strong>Consumo alcohol</strong></div><label class="switch"><input type="checkbox" id="prefAlcohol" ${prefs.alcohol!==false?'checked':''}><span class="slider"></span></label></div>
       </div>
-      <div class="seccion">
-        <h3>⚠️ Alergias <span style="font-size:10px;color:var(--color-danger);">SENSIBLE</span></h3>
-        <div class="campo"><label>Alergias / intolerancias</label><input type="text" id="editarAlergias" value="${extras.alergias || ''}"></div>
-        <div class="campo"><label>Notas adicionales</label><textarea id="editarNotasSalud" placeholder="Cualquier otra cosa...">${extras.notasSalud || ''}</textarea></div>
+      <div class="seccion"><h3>⚠️ Alergias</h3>
+        <div class="campo"><label>Alergias / intolerancias</label><input type="text" id="editarAlergias" value="${extras.alergias||''}"></div>
+        <div class="campo"><label>Notas adicionales</label><textarea id="editarNotasSalud">${extras.notasSalud||''}</textarea></div>
       </div>
-      <button class="btn-editar-perfil" id="btnGuardarPreferencias">Guardar preferencias</button>
-    `;
+      <button class="btn-editar-perfil" id="btnGuardarPreferencias">Guardar preferencias</button>`;
     document.getElementById('btnGuardarPreferencias')?.addEventListener('click', () => {
-      const nuevosExtras = {
-        ..._cargarExtras(usuario.nombre),
+      _guardarExtras(usuario.nombre, {...extras,
         preferencias: {
           vegano: document.getElementById('prefVegano').checked,
           vegetariano: document.getElementById('prefVegetariano').checked,
@@ -271,46 +255,28 @@ const Perfil = (() => {
         },
         alergias: document.getElementById('editarAlergias').value,
         notasSalud: document.getElementById('editarNotasSalud').value
-      };
-      _guardarExtras(usuario.nombre, nuevosExtras);
-      mostrarToast('success', 'Preferencias actualizadas');
+      });
+      mostrarToast('success','Preferencias actualizadas');
     });
 
     document.getElementById('tab-participaciones').innerHTML = `
-      <div class="seccion">
-        <h3>Mis clubes</h3>
-        ${(extras.clubes || []).length > 0 ? extras.clubes.map(c => `<div class="club-mini">${c.icono || '🎲'} <span>${c.nombre}</span><span style="margin-left:auto;font-size:10px;color:var(--color-accent);">${c.evento || ''}</span></div>`).join('') : '<p class="desc">Únete a eventos para aparecer aquí.</p>'}
-        <button class="btn-editar-perfil" style="margin-top:12px; width:100%;">Ver próximos eventos →</button>
-      </div>
-    `;
-
-    document.getElementById('tab-staff').innerHTML = `
-      <div class="seccion"><h3>🗓️ Mis turnos</h3><p class="desc">Próximamente: integración con gestión de turnos.</p></div>
-      <div class="seccion"><h3>✅ Tareas de hoy</h3><p class="desc">Próximamente: integración con gestión de tareas.</p></div>
-    `;
-
+      <div class="seccion"><h3>Mis clubes</h3>${(extras.clubes||[]).length ? extras.clubes.map(c => `<div class="club-mini">${c.icono||'🎲'} <span>${c.nombre}</span></div>`).join('') : '<p class="desc">Únete a eventos.</p>'}</div>`;
+    document.getElementById('tab-staff').innerHTML = `<div class="seccion"><h3>🗓️ Turnos</h3><p class="desc">Próximamente.</p></div>`;
     if (esAdmin) {
       document.getElementById('tab-admin').innerHTML = `
-        <div class="nota-privacidad">🔑 Como <strong>${esMaster ? 'master' : 'admin'}</strong>, puedes asignar roles operativos. El rol <strong>Admin</strong> solo puede asignarlo un <strong>Master</strong>.</div>
-        <div class="seccion">
-          <h3>Asignar roles</h3>
-          <p class="desc">Próximamente: listado de personal y asignación de roles.</p>
-          <button class="btn-editar-perfil" style="width:100%; margin-top:12px;">+ Invitar como personal</button>
-        </div>
-      `;
+        <div class="nota-privacidad">🔑 Como <strong>${esMaster?'master':'admin'}</strong> puedes asignar roles.</div>
+        <div class="seccion"><h3>Asignar roles</h3><p class="desc">Próximamente.</p></div>`;
     }
   }
 
   function _renderPanelDerecho(usuario, extras) {
     const panelDer = document.getElementById('panelDerechoPerfil');
-    const puntos = extras.puntos || 0;
-    const actividad = extras.actividad || [];
     panelDer.innerHTML = `
       <h3>📊 Resumen</h3>
-      <div class="resumen-mini"><div class="titulo">Puntos de fidelización</div><div class="valor">${puntos.toLocaleString()}</div></div>
+      <div class="resumen-mini"><div class="titulo">Puntos de fidelización</div><div class="valor">${(extras.puntos||0).toLocaleString()}</div></div>
       <div class="resumen-mini"><div class="titulo">Próxima insignia en</div><div class="valor">3 visitas</div></div>
       <h3 style="margin-top:20px;">🕓 Actividad reciente</h3>
-      ${actividad.length > 0 ? actividad.map(a => `<div class="actividad-item"><div class="punto"></div><div>${a.texto}<span class="txt-sec">${a.fecha || ''}</span></div></div>`).join('') : '<p class="desc">Sin actividad reciente.</p>'}
+      ${(extras.actividad||[]).length ? extras.actividad.map(a => `<div class="actividad-item"><div class="punto"></div><div>${a.texto}<span class="txt-sec">${a.fecha||''}</span></div></div>`).join('') : '<p class="desc">Sin actividad.</p>'}
     `;
   }
 
@@ -326,6 +292,7 @@ const Perfil = (() => {
     }
   }
 
+  // ── DATOS ──────────────────────────────────────────────
   function _cargarExtras(usuario) {
     const raw = localStorage.getItem(_storageKey(usuario));
     const base = raw ? (() => { try { return JSON.parse(raw); } catch { return {}; } })() : {};
@@ -341,6 +308,7 @@ const Perfil = (() => {
     localStorage.setItem(_storageKey(usuario), JSON.stringify(datos));
   }
 
+  // ── CICLO DE VIDA (PATRÓN DESPENSA) ────────────────────
   function activar() {
     limpiar();
     _abortController = new AbortController();
@@ -348,8 +316,9 @@ const Perfil = (() => {
 
     _asegurarVista();
 
-    document.getElementById('btnToggleIzqPerfil')?.addEventListener('click', _togglePanelIzquierdo, { signal });
-    document.getElementById('btnToggleDerPerfil')?.addEventListener('click', _togglePanelDerecho, { signal });
+    // Listeners de UI
+    document.getElementById('btnToggleIzqPerfil')?.addEventListener('click', _toggleIzq, { signal });
+    document.getElementById('btnToggleDerPerfil')?.addEventListener('click', _toggleDer, { signal });
     document.getElementById('perfilOverlay')?.addEventListener('click', _cerrarPaneles, { signal });
     document.getElementById('btnEditarPerfil')?.addEventListener('click', _mostrarEdicion, { signal });
     document.getElementById('btnVolverVitrina')?.addEventListener('click', _mostrarVitrina, { signal });
@@ -372,13 +341,18 @@ const Perfil = (() => {
       }, { signal });
     });
 
+    // Swipe y ajuste de header (solo cuando la vista está activa)
     _configurarSwipe(signal);
     _configurarAjusteHeader(signal);
 
-    _desuscripciones.push(EventBus.on('db:inicializada', () => { if (Auth.getUsuarioActual()) render(); }));
-    _desuscripciones.push(EventBus.on('vista:cambiada', (vista) => { if (vista === 'perfil' && Auth.getUsuarioActual()) render(); }));
+    // Suscripciones a eventos (se limpian en limpiar())
+    _desuscripciones.push(EventBus.on('db:inicializada', _renderContenido));
+    _desuscripciones.push(EventBus.on('vista:cambiada', (vista) => {
+      if (vista === 'perfil') _renderContenido();
+    }));
 
-    if (Auth.getUsuarioActual()) render();
+    // Render inicial si ya hay usuario
+    if (Auth.getUsuarioActual()) _renderContenido();
   }
 
   function limpiar() {
@@ -394,42 +368,28 @@ const Perfil = (() => {
     }
   }
 
-  function _togglePanelIzquierdo() {
+  // ── HELPERS DE UI ──────────────────────────────────────
+  function _toggleIzq() {
     const panel = document.getElementById('panelIzquierdoPerfil');
-    if (panel) {
-      _ajustarPosicionPanel(panel);
-      panel.classList.toggle('abierto');
-      document.getElementById('perfilOverlay')?.classList.toggle('activo');
-    }
+    if (panel) { _ajustarPosicionPanel(panel); panel.classList.toggle('abierto'); document.getElementById('perfilOverlay')?.classList.toggle('activo'); }
   }
-  function _togglePanelDerecho() {
+  function _toggleDer() {
     const panel = document.getElementById('panelDerechoPerfil');
-    if (panel) {
-      _ajustarPosicionPanel(panel);
-      panel.classList.toggle('abierto');
-      document.getElementById('perfilOverlay')?.classList.toggle('activo');
-    }
+    if (panel) { _ajustarPosicionPanel(panel); panel.classList.toggle('abierto'); document.getElementById('perfilOverlay')?.classList.toggle('activo'); }
   }
   function _cerrarPaneles() {
     document.getElementById('panelIzquierdoPerfil')?.classList.remove('abierto');
     document.getElementById('panelDerechoPerfil')?.classList.remove('abierto');
     document.getElementById('perfilOverlay')?.classList.remove('activo');
   }
-  function _mostrarEdicion() {
-    document.getElementById('modoVitrinaPerfil').style.display = 'none';
-    document.getElementById('modoEdicionPerfil').style.display = 'block';
-  }
-  function _mostrarVitrina() {
-    document.getElementById('modoEdicionPerfil').style.display = 'none';
-    document.getElementById('modoVitrinaPerfil').style.display = 'flex';
-  }
+  function _mostrarEdicion() { document.getElementById('modoVitrinaPerfil').style.display='none'; document.getElementById('modoEdicionPerfil').style.display='block'; }
+  function _mostrarVitrina() { document.getElementById('modoEdicionPerfil').style.display='none'; document.getElementById('modoVitrinaPerfil').style.display='flex'; }
 
   function _calcularTopPanel() {
     const appHeader = document.querySelector('.app-header');
     if (!appHeader) return '0';
     return window.getComputedStyle(appHeader).display === 'none' ? '0' : appHeader.offsetHeight + 'px';
   }
-
   function _ajustarPosicionPanel(panel) {
     if (!panel || window.innerWidth > 900) return;
     const top = _calcularTopPanel();
@@ -440,7 +400,6 @@ const Perfil = (() => {
   function _configurarAjusteHeader(signal) {
     const appHeader = document.querySelector('.app-header');
     if (!appHeader) return;
-
     _observerHeader = new MutationObserver(() => {
       const oculto = appHeader.style.display === 'none';
       const top = oculto ? '0' : 'var(--header-h)';
@@ -465,8 +424,8 @@ const Perfil = (() => {
       const dx = e.changedTouches[0].clientX - touchStartX;
       const dy = e.changedTouches[0].clientY - touchStartY;
       if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
-        if (dx > 0 && touchStartX < 40) _togglePanelIzquierdo();
-        else if (dx < 0 && touchStartX > window.innerWidth - 40) _togglePanelDerecho();
+        if (dx > 0 && touchStartX < 40) _toggleIzq();
+        else if (dx < 0 && touchStartX > window.innerWidth - 40) _toggleDer();
         else if (dx > 0 && document.getElementById('panelDerechoPerfil')?.classList.contains('abierto')) _cerrarPaneles();
         else if (dx < 0 && document.getElementById('panelIzquierdoPerfil')?.classList.contains('abierto')) _cerrarPaneles();
       }
@@ -476,7 +435,7 @@ const Perfil = (() => {
   return {
     activar,
     limpiar,
-    render
+    render() { activar(); }   // <-- Render llama a activar (patrón Despensa)
   };
 })();
 
