@@ -1,9 +1,10 @@
 /* ================================================================
-   La Taberna — MÓDULO: eventos-en-vivo.js (v1.3.1 – español utils)
+   La Taberna — MÓDULO: eventos-en-vivo.js (v1.3.2 – obtenerRol)
    Propósito: Panel del animador para eventos en vivo (bingo, karaoke, votaciones).
               Soporta contenedor estático en index.html (estándar B1).
               Sin asignaciones window. Eliminado updatedAt manual.
               Migrado a nuevos nombres en español de utils.js.
+              Auth.getRol → Auth.obtenerRol.
    ================================================================ */
 
 import { EventBus } from '../../lib/eventBus.js';
@@ -20,10 +21,8 @@ const EventosEnVivo = (() => {
   function _asegurarVista() {
     const main = document.getElementById('view-eventos-en-vivo');
 
-    // Si ya tiene contenido, no hacer nada
     if (main && main.querySelector('.eventos-vivo-panel')) return;
 
-    // Si no existe el contenedor (fallback), crearlo
     if (!main) {
       const nuevoMain = document.createElement('main');
       nuevoMain.id = 'view-eventos-en-vivo';
@@ -34,7 +33,6 @@ const EventosEnVivo = (() => {
       return;
     }
 
-    // Si existe pero está vacío (contenedor estático), llenarlo
     _construirContenido(main);
   }
 
@@ -72,14 +70,12 @@ const EventosEnVivo = (() => {
       </div>
     `;
 
-    // Listeners fijos
     document.getElementById('btnCrearEvento').addEventListener('click', crearEvento);
     document.getElementById('btnIniciar').addEventListener('click', () => cambiarEstado('activo'));
     document.getElementById('btnPausar').addEventListener('click', () => cambiarEstado('pausado'));
     document.getElementById('btnFinalizar').addEventListener('click', () => cambiarEstado('finalizado'));
     document.getElementById('btnReiniciar').addEventListener('click', reiniciarEvento);
 
-    // Delegación de eventos dinámicos
     document.getElementById('zonaInteraccion').addEventListener('click', (e) => {
       const target = e.target.closest('[data-action]');
       if (!target) return;
@@ -94,13 +90,11 @@ const EventosEnVivo = (() => {
     });
   }
 
-  /* ── PERMISOS ───────────────────────────────────────────── */
   function _usuarioAutorizado() {
-    const rol = Auth.getRol();
+    const rol = Auth.obtenerRol();
     return ['artista', 'eventos', 'admin', 'master'].includes(rol);
   }
 
-  /* ── RENDERIZADO ────────────────────────────────────────── */
   function render() {
     _asegurarVista();
     if (!_usuarioAutorizado()) {
@@ -145,21 +139,13 @@ const EventosEnVivo = (() => {
     btnReiniciar.style.display = (estado === 'finalizado') ? '' : 'none';
 
     switch (tipo) {
-      case 'bingo':
-        _renderInterfazBingo(datos, estado);
-        break;
-      case 'karaoke':
-        _renderInterfazKaraoke(datos, estado);
-        break;
-      case 'votacion':
-        _renderInterfazVotacion(datos, estado);
-        break;
-      default:
-        zona.innerHTML = '';
+      case 'bingo': _renderInterfazBingo(datos, estado); break;
+      case 'karaoke': _renderInterfazKaraoke(datos, estado); break;
+      case 'votacion': _renderInterfazVotacion(datos, estado); break;
+      default: zona.innerHTML = '';
     }
   }
 
-  /* ── INTERFAZ BINGO ────────────────────────────────────── */
   function _renderInterfazBingo(datos, estado) {
     const zona = document.getElementById('zonaInteraccion');
     const bolas = (datos && datos.bolas) || [];
@@ -186,7 +172,6 @@ const EventosEnVivo = (() => {
     `;
   }
 
-  /* ── INTERFAZ KARAOKE ──────────────────────────────────── */
   function _renderInterfazKaraoke(datos, estado) {
     const zona = document.getElementById('zonaInteraccion');
     const letra = (datos && datos.letra) || '';
@@ -205,7 +190,6 @@ const EventosEnVivo = (() => {
     `;
   }
 
-  /* ── INTERFAZ VOTACIÓN ─────────────────────────────────── */
   function _renderInterfazVotacion(datos, estado) {
     const zona = document.getElementById('zonaInteraccion');
     const opciones = (datos && datos.opciones) || [];
@@ -232,13 +216,12 @@ const EventosEnVivo = (() => {
     `;
   }
 
-  /* ── ACCIONES (sin updatedAt manual) ──────────────────── */
   async function crearEvento() {
     const tipo = document.getElementById('selTipoEvento').value;
     if (!tipo) { mostrarToast('error', 'Selecciona un tipo de evento'); return; }
     const datosIniciales = {
       tipo, estado: 'configuracion', datos: {},
-      creadoPor: Auth.getNombre()
+      creadoPor: Auth.obtenerNombre()
     };
     try {
       const doc = await DBAppwrite.crear('eventos_en_vivo', 'unique()', datosIniciales);

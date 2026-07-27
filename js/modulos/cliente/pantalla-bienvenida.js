@@ -1,10 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — Módulo (ES6)
    Archivo: js/modulos/cliente/pantalla-bienvenida.js
-   Versión: 2.2.3
+   Versión: 2.2.4
    Propósito: Panel de control post-validación.
-              Corregida la limpieza de listeners y la recuperación
-              del estado en mostrar().
+              Corregida la referencia a Auth.obtenerNombre().
    ================================================================ */
 
 import { EventBus } from '../../lib/eventBus.js';
@@ -113,7 +112,7 @@ const PantallaBienvenida = (() => {
   }
 
   function _actualizarPerfil() {
-    const nombre = Auth.getNombre() || 'Comensal';
+    const nombre = Auth.obtenerNombre() || 'Comensal';
     const iniciales = nombre.split(' ').map(n => n.charAt(0).toUpperCase()).slice(0, 2).join('');
     const nombreEl = document.getElementById('bienvenidaNombre');
     const avatarEl = document.getElementById('bienvenidaAvatar');
@@ -231,7 +230,7 @@ const PantallaBienvenida = (() => {
       </div>
     `;
 
-    const iniciales = Auth.getNombre()?.split(' ').map(n => n.charAt(0).toUpperCase()).slice(0, 2).join('') || '??';
+    const iniciales = Auth.obtenerNombre()?.split(' ').map(n => n.charAt(0).toUpperCase()).slice(0, 2).join('') || '??';
     const avatarPrincipal = document.getElementById('avatarPrincipal');
     if (avatarPrincipal) avatarPrincipal.textContent = iniciales;
 

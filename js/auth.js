@@ -1,15 +1,13 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/auth.js
-   Versión: 1.0.11
+   Versión: 1.0.13
    Propósito: Autenticación, hashing SHA-256, roles, login/logout.
-              Modal con formularios de inicio de sesión y registro.
-              Métodos de consulta migrados al español.
+              Gestión de usuarios: cambiar contraseña y cambiar rol.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
 import { EventBus } from './lib/eventBus.js';
-import { Store } from './lib/store.js';
 import { showToast } from './utils.js';
 import { Roles } from './roles.js';
 import { DBAppwrite } from './db-appwrite.js';
@@ -82,24 +80,19 @@ export const Auth = (() => {
   }
 
   async function login(nombre, password) {
-    try {
-      const hashIngresado = await _sha256(password);
-      const usuario = _usuarios.find(u => u.nombre === nombre && u.hash === hashIngresado);
-      if (!usuario) { showToast('error', 'Usuario o contraseña incorrectos'); return false; }
-      const espacioTaberna = { id: 'esp_taberna', nombre: 'La Taberna', tipo: 'bar', rol: usuario.rol };
-      _usuarioActual = { nombre: usuario.nombre, rol: usuario.rol, espacios: [espacioTaberna], espacioActivoId: espacioTaberna.id };
-      _rolSimulado = null;
-      sessionStorage.setItem('usuarioActual', JSON.stringify(_usuarioActual));
-      aplicarRestriccionesUI();
-      cerrarModalLogin();
-      showToast('success', 'Bienvenido/a ' + usuario.nombre + ' (' + usuario.rol + ')');
-      const vistaInicial = obtenerVistaPorDefecto();
-      EventBus.emit('app:cambiarVista', vistaInicial);
-      return true;
-    } catch (e) {
-      Logger.error('[Auth] Error en login:', e);
-      return false;
-    }
+    const hashIngresado = await _sha256(password);
+    const usuario = _usuarios.find(u => u.nombre === nombre && u.hash === hashIngresado);
+    if (!usuario) { showToast('error', 'Usuario o contraseña incorrectos'); return false; }
+    const espacioTaberna = { id: 'esp_taberna', nombre: 'La Taberna', tipo: 'bar', rol: usuario.rol };
+    _usuarioActual = { nombre: usuario.nombre, rol: usuario.rol, espacios: [espacioTaberna], espacioActivoId: espacioTaberna.id };
+    _rolSimulado = null;
+    sessionStorage.setItem('usuarioActual', JSON.stringify(_usuarioActual));
+    aplicarRestriccionesUI();
+    cerrarModalLogin();
+    showToast('success', 'Bienvenido/a ' + usuario.nombre + ' (' + usuario.rol + ')');
+    const vistaInicial = obtenerVistaPorDefecto();
+    EventBus.emit('app:cambiarVista', vistaInicial);
+    return true;
   }
 
   function logout() {
@@ -170,7 +163,7 @@ export const Auth = (() => {
       document.body.appendChild(loginModal);
 
       document.getElementById('btnCerrarModalLogin').addEventListener('click', cerrarModalLogin);
-      document.getElementById('btnModalIngresar').addEventListener('click', _loginFromModal);
+      document.getElementById('btnModalIngresar').addEventListener('click', _iniciarSesionDesdeModal);
       document.getElementById('btnModalRegistrarse').addEventListener('click', _mostrarRegistro);
       document.getElementById('btnVolverLogin').addEventListener('click', _mostrarLoginPanel);
       document.getElementById('btnModalCrearCuenta').addEventListener('click', _registrarDesdeModal);
@@ -193,7 +186,7 @@ export const Auth = (() => {
 
   function cerrarModalLogin() { if (loginModal) loginModal.style.display = 'none'; }
 
-  async function _loginFromModal() {
+  async function _iniciarSesionDesdeModal() {
     const usuario = document.getElementById('loginUsuario')?.value.trim() || '';
     const password = document.getElementById('loginPassword')?.value.trim() || '';
     await login(usuario, password);
@@ -238,6 +231,65 @@ export const Auth = (() => {
     _guardarUsuarios();
     showToast('success', 'Contraseña actualizada');
     return true;
+  }
+
+  /**
+   * Cambia el rol de un usuario respetando la jerarquía de permisos.
+   * Reglas:
+   *  - Solo master o admin pueden cambiar roles.
+   *  - Nadie puede cambiarse a sí mismo.
+   *  - Nadie puede cambiar el rol de un master.
+   *  - Solo un master puede cambiar el rol de un admin.
+   * @param {string} nombreUsuario - Nombre del usuario a modificar.
+   * @param {string} nuevoRol - Nuevo rol a asignar.
+   * @returns {{ exito: boolean, error?: string }}
+   */
+  function cambiarRol(nombreUsuario, nuevoRol) {
+    // Validar que hay un usuario autenticado
+    if (!_usuarioActual) {
+      return { exito: false, error: 'No hay sesión activa.' };
+    }
+
+    // Validar que el ejecutor tiene permisos
+    if (!esMasterReal() && !esAdmin()) {
+      return { exito: false, error: 'No tienes permiso para cambiar roles.' };
+    }
+
+    // Validar que el rol solicitado existe
+    if (typeof Roles === 'undefined' || !Roles.lista.includes(nuevoRol)) {
+      return { exito: false, error: `El rol "${nuevoRol}" no es válido.` };
+    }
+
+    // Nadie puede cambiarse a sí mismo
+    if (nombreUsuario === _usuarioActual.nombre) {
+      return { exito: false, error: 'No puedes cambiar tu propio rol.' };
+    }
+
+    // Buscar al usuario objetivo
+    const idx = _usuarios.findIndex(u => u.nombre === nombreUsuario);
+    if (idx === -1) {
+      return { exito: false, error: 'Usuario no encontrado.' };
+    }
+
+    const usuarioObjetivo = _usuarios[idx];
+
+    // Nadie puede cambiar el rol de un master
+    if (usuarioObjetivo.rol === 'master') {
+      return { exito: false, error: 'No se puede cambiar el rol de un master.' };
+    }
+
+    // Solo un master puede cambiar el rol de un admin
+    if (usuarioObjetivo.rol === 'admin' && !esMasterReal()) {
+      return { exito: false, error: 'Solo un master puede cambiar el rol de un admin.' };
+    }
+
+    // Aplicar el cambio
+    const rolAnterior = usuarioObjetivo.rol;
+    _usuarios[idx].rol = nuevoRol;
+    _guardarUsuarios();
+
+    Logger.info(`[Auth] Rol cambiado: ${nombreUsuario} de "${rolAnterior}" a "${nuevoRol}" por ${_usuarioActual.nombre}.`);
+    return { exito: true };
   }
 
   async function registrarCliente(nombre, password) {
@@ -372,28 +424,19 @@ export const Auth = (() => {
     EventBus.emit('app:cambiarVista', vistaInicial);
   }
 
-  // ── Aliases de compatibilidad (inglés) ──────────────────
-  const getDefaultView = obtenerVistaPorDefecto;
-  const getAppwriteUserId = obtenerIdUsuarioAppwrite;
-  const getRol = obtenerRol;
-  const getNombre = obtenerNombre;
-  const getUsuarioActual = obtenerUsuarioActual;
-  const getEspacios = obtenerEspacios;
-  const getEspacioActivo = obtenerEspacioActivo;
-  const getRolEfectivo = obtenerRolEfectivo;
-
   return {
     init, login, logout,
     obtenerRol, obtenerNombre, obtenerUsuarioActual, obtenerEspacios, obtenerEspacioActivo, cambiarEspacio,
     actualizarNombre, tienePermiso, puede, esMaster, esAdmin, esCocina, esBarra, esCaja, esMesero,
     esDespensa, esReparto, esCliente, esEventos, esArtista, puedeEliminarItemEnviado, puedeCerrarMesa,
     puedeAccederCaja, puedeAccederCocina, puedeCambiarEstadoComanda, puedeEditarProductos, puedeEditarPrecios,
-    obtenerVistaPorDefecto, mostrarLogin, cerrarModalLogin, _loginFromModal, _cambiarRolSimulado, obtenerRolEfectivo,
+    obtenerVistaPorDefecto, mostrarLogin, cerrarModalLogin, _iniciarSesionDesdeModal, _cambiarRolSimulado, obtenerRolEfectivo,
     esMasterReal, aplicarRestriccionesUI, puedeAccederRecetas, puedeAccederReparto, puedeAccederMenu,
-    puedeAccederEventos, puedeAccederPerfil, cambiarPassword, _cargarUsuarios, registrarCliente,
+    puedeAccederEventos, puedeAccederPerfil, cambiarPassword, cambiarRol, _cargarUsuarios, registrarCliente,
     obtenerIdUsuarioAppwrite, _mostrarRegistro,
-    // Aliases en inglés
-    getDefaultView, getAppwriteUserId, getRol, getNombre, getUsuarioActual, getEspacios, getEspacioActivo, getRolEfectivo
+    // Aliases temporales (inglés)
+    getDefaultView: obtenerVistaPorDefecto,
+    getAppwriteUserId: obtenerIdUsuarioAppwrite
   };
 })();
 

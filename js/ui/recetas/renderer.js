@@ -1,10 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — RECETAS SUBMÓDULO (ES6)
    Archivo: js/ui/recetas/renderer.js
-   Versión: 2.1.3
+   Versión: 2.1.4
    Propósito: Layout libro con sidebar de capítulos e índice lateral
-              de colores. Al seleccionar un capítulo, los niveles se
-              muestran como subcapítulos con cabeceras y estantes.
+              de colores. Corrección: Auth.getRol() → Auth.obtenerRol().
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -32,7 +31,7 @@ export function pintar(modo) {
 
   if (modo) setModo(modo);
   else {
-    const rol = Auth.getRol();
+    const rol = Auth.obtenerRol();
     setModo((rol === 'admin' || rol === 'master' || rol === 'cocina' || rol === 'barra') ? 'produccion' : 'consulta');
   }
 
@@ -312,7 +311,6 @@ function _pintarLibro(recetas, productos, categorias, esProduccion) {
         indice.innerHTML = '';
       }
     } else {
-      // Capítulo activo: pestañas de colores = niveles
       const nivelesUnicos = [...new Set(filtradas.map(r => r.nivel || 'sin_nivel'))].sort();
       const nivelActivo = getFiltroNivel();
       if (nivelesUnicos.length > 1) {
@@ -330,7 +328,6 @@ function _pintarLibro(recetas, productos, categorias, esProduccion) {
         indice.innerHTML = '';
       }
 
-      // Aplicar filtro de nivel
       if (getFiltroNivel() !== 'todos') {
         filtradas = filtradas.filter(r => (r.nivel || 'sin_nivel') === getFiltroNivel());
       }
@@ -339,7 +336,6 @@ function _pintarLibro(recetas, productos, categorias, esProduccion) {
 
   // ── Contenido principal ─────────────────────
   if (capActivo === 'todas') {
-    // Vista general: agrupado por capítulos
     const grupos = {};
     filtradas.forEach(r => {
       const cat = r.categoria || 'sin_categoria';
@@ -361,7 +357,6 @@ function _pintarLibro(recetas, productos, categorias, esProduccion) {
         </section>`;
     }).join('');
   } else {
-    // Capítulo activo: agrupado por niveles como subcapítulos
     const cat = categorias.find(c => c.id === capActivo) || { color: PALETA_CATEGORIAS[0] };
     const gruposNivel = {};
     filtradas.forEach(r => {

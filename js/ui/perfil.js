@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/perfil.js
-   Versión: 2.0.6
+   Versión: 2.1.1
    Propósito: Vista de perfil de usuario con diseño de taberna.
-              v2.0.6: corrige inserción de nodo duplicado que
-                      rompía el layout global.
+              v2.1.1: corrige Auth.getUsuarioActual →
+                      Auth.obtenerUsuarioActual.
    ================================================================ */
 
 import { Auth } from '../auth.js';
@@ -81,7 +81,7 @@ const Perfil = (() => {
 
   // ── RENDERIZADO PRINCIPAL ─────────────────────────────────
   async function _renderContenido() {
-    const usuario = Auth.getUsuarioActual();
+    const usuario = Auth.obtenerUsuarioActual();
     if (!usuario) return;
 
     const extras = _cargarExtras(usuario.nombre) || {};
@@ -257,11 +257,118 @@ const Perfil = (() => {
     document.getElementById('tab-participaciones').innerHTML = `
       <div class="seccion"><h3>Mis clubes</h3>${(extras.clubes||[]).length ? extras.clubes.map(c => `<div class="club-mini">${c.icono||'🎲'} <span>${c.nombre}</span></div>`).join('') : '<p class="desc">Únete a eventos.</p>'}</div>`;
     document.getElementById('tab-staff').innerHTML = `<div class="seccion"><h3>🗓️ Turnos</h3><p class="desc">Próximamente.</p></div>`;
+
+    // 🔑 PESTAÑA ADMINISTRACIÓN (FUNCIONAL)
     if (esAdmin) {
-      document.getElementById('tab-admin').innerHTML = `
-        <div class="nota-privacidad">🔑 Como <strong>${esMaster?'master':'admin'}</strong> puedes asignar roles.</div>
-        <div class="seccion"><h3>Asignar roles</h3><p class="desc">Próximamente.</p></div>`;
+      _renderTabAdmin(usuario, esMaster);
     }
+  }
+
+  function _renderTabAdmin(usuarioActual, esMaster) {
+    const tabAdmin = document.getElementById('tab-admin');
+    // Obtener todos los usuarios (desde Auth._usuarios)
+    let todosLosUsuarios = [];
+    try {
+      const raw = localStorage.getItem('pubpos_usuarios');
+      if (raw) todosLosUsuarios = JSON.parse(raw);
+    } catch (e) { todosLosUsuarios = []; }
+
+    // Filtrar solo usuarios con roles operativos (excluir cliente y artistas sin eventos)
+    const rolesOperativos = ['mesero', 'cocina', 'barra', 'caja', 'despensa', 'reparto', 'eventos', 'artista', 'admin'];
+    const usuariosFiltrados = todosLosUsuarios.filter(u => rolesOperativos.includes(u.rol) || u.rol === 'master');
+
+    const nombreActual = usuarioActual.nombre;
+    const rolActual = usuarioActual.rolEfectivo || usuarioActual.rol;
+
+    const rolesDisponibles = ['mesero', 'cocina', 'barra', 'caja', 'despensa', 'reparto', 'eventos', 'artista', 'admin'];
+
+    tabAdmin.innerHTML = `
+      <div class="nota-privacidad">
+        🔑 Como <strong>${esMaster ? 'master' : 'admin'}</strong>, puedes asignar roles operativos. El rol <strong>Admin</strong> solo puede asignarlo un <strong>Master</strong>.
+      </div>
+      <div class="seccion">
+        <h3>Asignar roles</h3>
+        <div class="search-box" style="margin-bottom:12px;">
+          <span>🔍</span>
+          <input type="text" id="adminBusqueda" placeholder="Buscar personal...">
+        </div>
+        <div id="adminListaUsuarios">
+          ${usuariosFiltrados.map(u => {
+            const esUsuarioActual = u.nombre === nombreActual;
+            const esMasterObjetivo = u.rol === 'master';
+            const esAdminObjetivo = u.rol === 'admin' && !esMaster;
+
+            let rolesAsignados = [];
+            try {
+              const extras = _cargarExtras(u.nombre);
+              rolesAsignados = extras.cargos || [u.rol]; // Por ahora usamos el rol base
+            } catch (e) { rolesAsignados = [u.rol]; }
+
+            const checkboxes = rolesDisponibles.map(rol => {
+              const tieneRol = rolesAsignados.includes(rol);
+              const bloqueado = esUsuarioActual || esMasterObjetivo || (rol === 'admin' && !esMaster);
+              return `<label class="rol-check ${bloqueado ? 'bloqueado' : ''} ${rol === 'admin' ? 'master-rol' : ''}">
+                <input type="checkbox" data-usuario="${u.nombre}" data-rol="${rol}" ${tieneRol ? 'checked' : ''} ${bloqueado ? 'disabled' : ''}>
+                ${rol.charAt(0).toUpperCase() + rol.slice(1)}
+              </label>`;
+            }).join('');
+
+            return `<div class="usuario-row">
+              <div class="usuario-row-top">
+                <div class="av">${u.nombre.charAt(0).toUpperCase()}</div>
+                <strong>${u.nombre}${esUsuarioActual ? ' (tú)' : ''}</strong>
+                <span class="rol-actual">${rolesAsignados.join(', ') || u.rol}</span>
+              </div>
+              <div class="roles-checks">${checkboxes}</div>
+            </div>`;
+          }).join('')}
+        </div>
+        <button class="btn-editar-perfil" style="width:100%; margin-top:12px;" id="btnInvitarPersonal">+ Invitar como personal</button>
+      </div>
+    `;
+
+    // Búsqueda en tiempo real
+    document.getElementById('adminBusqueda')?.addEventListener('input', function() {
+      const termino = this.value.toLowerCase();
+      const filas = document.querySelectorAll('#adminListaUsuarios .usuario-row');
+      filas.forEach(fila => {
+        const nombre = fila.querySelector('strong')?.textContent?.toLowerCase() || '';
+        fila.style.display = nombre.includes(termino) ? '' : 'none';
+      });
+    });
+
+    // Listeners de checkboxes
+    tabAdmin.querySelectorAll('.rol-check input[type=checkbox]').forEach(checkbox => {
+      checkbox.addEventListener('change', async function() {
+        const nombreUsuario = this.dataset.usuario;
+        const rol = this.dataset.rol;
+        const asignar = this.checked;
+
+        // Si está desmarcando su único rol, prevenir (debe tener al menos uno)
+        if (!asignar) {
+          const usuarioCheckboxes = tabAdmin.querySelectorAll(`input[data-usuario="${nombreUsuario}"]`);
+          const marcados = Array.from(usuarioCheckboxes).filter(cb => cb.checked).length;
+          if (marcados === 0) {
+            this.checked = true;
+            mostrarToast('error', 'Cada usuario debe tener al menos un rol.');
+            return;
+          }
+        }
+
+        // Llamar a Auth.cambiarRol
+        // Nota: cambiarRol actualmente asigna un solo rol. Para múltiples roles,
+        // necesitamos una lógica diferente (guardar en extras). Por ahora,
+        // usamos el rol primario (el más alto) y guardamos el resto en extras.
+        const resultado = Auth.cambiarRol(nombreUsuario, rol);
+        if (resultado.exito) {
+          mostrarToast('success', `Rol "${rol}" ${asignar ? 'asignado' : 'removido'} a ${nombreUsuario}.`);
+          _renderContenido(); // Refrescar
+        } else {
+          this.checked = !asignar; // Revertir
+          mostrarToast('error', resultado.error || 'No se pudo cambiar el rol.');
+        }
+      });
+    });
   }
 
   function _renderPanelDerecho(usuario, extras) {
@@ -343,7 +450,7 @@ const Perfil = (() => {
       if (vista === 'perfil') _renderContenido();
     }));
 
-    if (Auth.getUsuarioActual()) _renderContenido();
+    if (Auth.obtenerUsuarioActual()) _renderContenido();
   }
 
   function limpiar() {

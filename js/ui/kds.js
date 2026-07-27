@@ -1,14 +1,12 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/kds.js
-   Versión: 5.0.1
+   Versión: 5.0.2
    Propósito: Vista del Jefe de Cocina/Barra. Gestión de comandas con
               pestañas de estado, filtros, progreso, checkeo de ítems,
               swipe entre pestañas, acceso rápido a receta (toque largo)
               y preparación para modo Ayudante (solo lectura).
-              Compatible con app.js (exporta KDS.refresh).
-              Corrección: refresh() ahora invoca activar() si el módulo
-              no estaba activo, garantizando las suscripciones.
+              Corrección: Auth.getRol() → Auth.obtenerRol().
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -16,7 +14,7 @@ import { EventBus } from '../lib/eventBus.js';
 import { CommandBus } from '../lib/command-bus.js';
 import { Auth } from '../auth.js';
 import { Logger } from '../lib/logger.js';
-import { mostrarToast, mostrarConfirmacion } from '../utils.js';
+import { mostrarToast } from '../utils.js';
 import { Recetas } from './recetas.js';
 
 const MINUTOS_URGENTE = 15;
@@ -29,8 +27,7 @@ let _estadoActivo = 'nueva';
 let _ctxAudio = null;
 let _comandas = [];
 
-/* ─── Modo solo lectura (futuro Ayudante) ──── */
-let _soloLectura = false; // TODO: activar cuando existan roles 'ayudante_cocina' / 'ayudante_barra'
+let _soloLectura = false;
 
 /* ─── Cambio de estado ──────────────────────── */
 
@@ -94,7 +91,6 @@ function _asegurarVista() {
 }
 
 function _construirVista(main) {
-  // Ocultamos chip "Retiro" hasta que exista campo tipo en comandas
   main.innerHTML = `
     <div class="kds-filtros" id="kds-filtros">
       <span class="kds-chip activo" data-filtro="todos">Todos</span>
@@ -110,7 +106,6 @@ function _construirVista(main) {
     <div class="kds-lista" id="kds-lista"></div>
   `;
 
-  // Filtros (clicks)
   document.getElementById('kds-filtros').addEventListener('click', e => {
     const chip = e.target.closest('.kds-chip');
     if (!chip) return;
@@ -120,14 +115,12 @@ function _construirVista(main) {
     _pintar();
   });
 
-  // Pestañas (clicks)
   document.getElementById('kds-pestanas').addEventListener('click', e => {
     const pestana = e.target.closest('.kds-pestana');
     if (!pestana) return;
     _activarPestana(pestana.dataset.estado);
   });
 
-  // Swipe entre pestañas
   let touchStartX = 0, touchStartY = 0;
   const lista = document.getElementById('kds-lista');
   lista.addEventListener('touchstart', e => {
@@ -248,9 +241,7 @@ function _crearTicket(c) {
         }, 600);
       };
 
-      const cancelLongPress = () => {
-        clearTimeout(longPressTimer);
-      };
+      const cancelLongPress = () => clearTimeout(longPressTimer);
 
       const handleClick = (ev) => {
         if (isLongPress) {
@@ -341,14 +332,11 @@ function _pintar() {
 /* ─── Recarga desde Store ───────────────────── */
 
 function recargar() {
-  // CORRECCIÓN: Si el módulo aún no está activo, lo activamos
-  if (!_activada) {
-    activar();
-  }
+  if (!_activada) activar();
 
   const state = Store.getState();
   const ahora = Date.now();
-  const rol = Auth.getRol();
+  const rol = Auth.obtenerRol();
   let comandas = state.comandas || [];
 
   const procesadas = [];

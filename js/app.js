@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/app.js
-   Versión: 1.2.9
+   Versión: 1.3.0
    Propósito: Punto de entrada modular. Control de vistas con ciclo
               de vida (limpiar/activar). Ruta 'carta-editor' restaurada.
+              v1.3.0: corrige referencias a Auth (obtenerRol, obtenerVistaPorDefecto).
    ================================================================ */
 
 // ── Utilidades y librerías ────────────────────────────────
@@ -204,7 +205,7 @@ export const App = {
     }
 
     // ── Control de autenticación ──────────────────────
-    if (!this._vistasPublicas.includes(nombre) && !Auth.getRol()) {
+    if (!this._vistasPublicas.includes(nombre) && !Auth.obtenerRol()) {
       Auth.mostrarLogin();
       return;
     }

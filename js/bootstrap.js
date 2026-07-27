@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/bootstrap.js
-   Versión: 1.0.10
+   Versión: 1.0.11
    Propósito: Secuencia de arranque: Auth, DB, Store, dependencias.
-              Usa crearInventarioRepo() en lugar de definición inline.
+              Usa crearInventarioRepo() para el repositorio de inventario.
+              Corregido Auth.getRol() → Auth.obtenerRol().
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -69,7 +70,7 @@ const Bootstrap = (() => {
       }
     };
 
-    const inventarioRepo = crearInventarioRepo();  // ← Usa el módulo unificado de Célula D
+    const inventarioRepo = crearInventarioRepo();
 
     if (typeof Deps !== 'undefined') {
       if (pedidoRepo) Deps.registrar('pedidoRepo', pedidoRepo);
@@ -125,7 +126,7 @@ const Bootstrap = (() => {
     }
 
     try {
-      if (Auth.getRol()) {
+      if (Auth.obtenerRol()) {
         const vistaDefecto = Auth.getDefaultView();
         if (typeof App !== 'undefined' && App.showView) {
           App.showView(vistaDefecto);
