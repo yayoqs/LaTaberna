@@ -17,7 +17,7 @@ css/mesa-detalles.css -> 2.0.0
 css/mesas.css -> 1.0.4
 css/modals.css -> 1.2.0
 css/pedido.css -> 1.0.0
-css/perfil.css -> 1.0.0
+css/perfil.css -> 2.0.1
 css/recetas.css -> 5.1.2
 css/reparto.css -> 1.0.0
 css/responsive.css -> 1.0.0
@@ -104,7 +104,7 @@ js/ui/mesas/fusion.js -> 1.0.3
 js/ui/mesas/notificaciones.js -> 1.0.0
 js/ui/mesas/renderer.js -> 1.1.1
 js/ui/pedido-ui.js -> 2.1.7
-js/ui/perfil.js -> 1.0.9
+js/ui/perfil.js -> 2.0.4
 js/ui/recetas.js -> 6.2.0
 js/ui/recetas/ciclo-vida.js -> 1.0.0
 js/ui/recetas/crear.js -> 2.0.3
@@ -124,4 +124,4 @@ js/ui/tickets.js -> 1.1.1
 js/utils.js -> 1.5.0
 
 Total de archivos con versión: 122
-Fecha de generación: 7/25/2026, 7:07:50 AM
+Fecha de generación: 7/27/2026, 3:28:52 AM

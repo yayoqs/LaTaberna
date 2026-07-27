@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/perfil.js
-   Versión: 2.0.4
+   Versión: 2.0.6
    Propósito: Vista de perfil de usuario con diseño de taberna.
-              v2.0.4: alineación con patrón de ciclo de vida de Despensa.
+              v2.0.6: corrige inserción de nodo duplicado que
+                      rompía el layout global.
    ================================================================ */
 
 import { Auth } from '../auth.js';
@@ -22,18 +23,14 @@ const Perfil = (() => {
     return `pubpos_perfil_${usuario}`;
   }
 
-  // ── CONSTRUCCIÓN DEL DOM (igual que Despensa.asegurarVista) ──
+  // ── CONSTRUCCIÓN DEL DOM (CORREGIDA) ──────────────────────
   function _asegurarVista() {
     let main = document.getElementById('view-perfil');
-    if (main && main.querySelector('.main-layout')) return;
-
     if (!main) {
-      main = document.createElement('main');
-      main.id = 'view-perfil';
-      main.className = 'view';
-      const referencia = document.getElementById('toastContainer') || document.body.lastChild;
-      document.body.insertBefore(main, referencia);
+      console.error('[Perfil] No se encontró #view-perfil en el DOM.');
+      return;
     }
+    if (main.querySelector('.perfil-header')) return;
 
     main.innerHTML = `
       <div class="perfil-header">
@@ -80,11 +77,9 @@ const Perfil = (() => {
       </div>
       <div class="overlay" id="perfilOverlay"></div>
     `;
-
-    main.classList.add('active');
   }
 
-  // ── RENDERIZADO PRINCIPAL (llamado después de activar) ──
+  // ── RENDERIZADO PRINCIPAL ─────────────────────────────────
   async function _renderContenido() {
     const usuario = Auth.getUsuarioActual();
     if (!usuario) return;
@@ -308,7 +303,7 @@ const Perfil = (() => {
     localStorage.setItem(_storageKey(usuario), JSON.stringify(datos));
   }
 
-  // ── CICLO DE VIDA (PATRÓN DESPENSA) ────────────────────
+  // ── CICLO DE VIDA ────────────────────────────────────
   function activar() {
     limpiar();
     _abortController = new AbortController();
@@ -316,7 +311,6 @@ const Perfil = (() => {
 
     _asegurarVista();
 
-    // Listeners de UI
     document.getElementById('btnToggleIzqPerfil')?.addEventListener('click', _toggleIzq, { signal });
     document.getElementById('btnToggleDerPerfil')?.addEventListener('click', _toggleDer, { signal });
     document.getElementById('perfilOverlay')?.addEventListener('click', _cerrarPaneles, { signal });
@@ -341,17 +335,14 @@ const Perfil = (() => {
       }, { signal });
     });
 
-    // Swipe y ajuste de header (solo cuando la vista está activa)
     _configurarSwipe(signal);
     _configurarAjusteHeader(signal);
 
-    // Suscripciones a eventos (se limpian en limpiar())
     _desuscripciones.push(EventBus.on('db:inicializada', _renderContenido));
     _desuscripciones.push(EventBus.on('vista:cambiada', (vista) => {
       if (vista === 'perfil') _renderContenido();
     }));
 
-    // Render inicial si ya hay usuario
     if (Auth.getUsuarioActual()) _renderContenido();
   }
 
@@ -368,34 +359,14 @@ const Perfil = (() => {
     }
   }
 
-  // ── HELPERS DE UI ──────────────────────────────────────
-  function _toggleIzq() {
-    const panel = document.getElementById('panelIzquierdoPerfil');
-    if (panel) { _ajustarPosicionPanel(panel); panel.classList.toggle('abierto'); document.getElementById('perfilOverlay')?.classList.toggle('activo'); }
-  }
-  function _toggleDer() {
-    const panel = document.getElementById('panelDerechoPerfil');
-    if (panel) { _ajustarPosicionPanel(panel); panel.classList.toggle('abierto'); document.getElementById('perfilOverlay')?.classList.toggle('activo'); }
-  }
-  function _cerrarPaneles() {
-    document.getElementById('panelIzquierdoPerfil')?.classList.remove('abierto');
-    document.getElementById('panelDerechoPerfil')?.classList.remove('abierto');
-    document.getElementById('perfilOverlay')?.classList.remove('activo');
-  }
+  function _toggleIzq() { const panel = document.getElementById('panelIzquierdoPerfil'); if (panel) { _ajustarPosicionPanel(panel); panel.classList.toggle('abierto'); document.getElementById('perfilOverlay')?.classList.toggle('activo'); } }
+  function _toggleDer() { const panel = document.getElementById('panelDerechoPerfil'); if (panel) { _ajustarPosicionPanel(panel); panel.classList.toggle('abierto'); document.getElementById('perfilOverlay')?.classList.toggle('activo'); } }
+  function _cerrarPaneles() { document.getElementById('panelIzquierdoPerfil')?.classList.remove('abierto'); document.getElementById('panelDerechoPerfil')?.classList.remove('abierto'); document.getElementById('perfilOverlay')?.classList.remove('activo'); }
   function _mostrarEdicion() { document.getElementById('modoVitrinaPerfil').style.display='none'; document.getElementById('modoEdicionPerfil').style.display='block'; }
   function _mostrarVitrina() { document.getElementById('modoEdicionPerfil').style.display='none'; document.getElementById('modoVitrinaPerfil').style.display='flex'; }
 
-  function _calcularTopPanel() {
-    const appHeader = document.querySelector('.app-header');
-    if (!appHeader) return '0';
-    return window.getComputedStyle(appHeader).display === 'none' ? '0' : appHeader.offsetHeight + 'px';
-  }
-  function _ajustarPosicionPanel(panel) {
-    if (!panel || window.innerWidth > 900) return;
-    const top = _calcularTopPanel();
-    panel.style.top = top;
-    panel.style.height = top === '0' ? '100%' : `calc(100% - ${top})`;
-  }
+  function _calcularTopPanel() { const appHeader = document.querySelector('.app-header'); if (!appHeader) return '0'; return window.getComputedStyle(appHeader).display === 'none' ? '0' : appHeader.offsetHeight + 'px'; }
+  function _ajustarPosicionPanel(panel) { if (!panel || window.innerWidth > 900) return; const top = _calcularTopPanel(); panel.style.top = top; panel.style.height = top === '0' ? '100%' : `calc(100% - ${top})`; }
 
   function _configurarAjusteHeader(signal) {
     const appHeader = document.querySelector('.app-header');
@@ -416,10 +387,7 @@ const Perfil = (() => {
     const mainLayout = document.getElementById('perfilMainLayout');
     if (!mainLayout) return;
     let touchStartX = 0, touchStartY = 0;
-    mainLayout.addEventListener('touchstart', (e) => {
-      touchStartX = e.touches[0].clientX;
-      touchStartY = e.touches[0].clientY;
-    }, { signal });
+    mainLayout.addEventListener('touchstart', (e) => { touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY; }, { signal });
     mainLayout.addEventListener('touchend', (e) => {
       const dx = e.changedTouches[0].clientX - touchStartX;
       const dy = e.changedTouches[0].clientY - touchStartY;
@@ -435,7 +403,7 @@ const Perfil = (() => {
   return {
     activar,
     limpiar,
-    render() { activar(); }   // <-- Render llama a activar (patrón Despensa)
+    render() { activar(); }
   };
 })();
 
