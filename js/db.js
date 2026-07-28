@@ -1,12 +1,12 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db.js
-   Versión: 1.0.13
+   Versión: 1.0.14
    Propósito: Orquestador de base de datos (Appwrite + localStorage).
               Sincronización y reseteo de mesas por configuración de zonas.
               Fallback offline robusto: si Appwrite no responde,
               carga desde localStorage y continúa operando.
-              v1.0.13: Normalización de categoria y nivel en recetas.
+              v1.0.14: Auth.getEspacioActivo → Auth.obtenerEspacioActivo.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -169,7 +169,6 @@ export const DB = (function() {
         if (typeof r.ingredientes === 'string') {
           try { r.ingredientes = JSON.parse(r.ingredientes); } catch (e) { r.ingredientes = []; }
         }
-        // Normalización de campos requeridos por B2
         r.categoria = r.categoria || 'sin_categoria';
         r.nivel     = r.nivel || 'sin_nivel';
         return r;
@@ -408,8 +407,8 @@ export const DB = (function() {
   };
 
   combined.espacioActivoId = function() {
-    if (typeof Auth !== 'undefined' && Auth.getEspacioActivo) {
-      const espacio = Auth.getEspacioActivo();
+    if (typeof Auth !== 'undefined' && Auth.obtenerEspacioActivo) {
+      const espacio = Auth.obtenerEspacioActivo();
       if (espacio && espacio.id) return espacio.id;
     }
     return 'esp_taberna';

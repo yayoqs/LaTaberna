@@ -1,17 +1,17 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/layout.css
-   Versión: 1.0.7
+   Versión: 1.0.8
    Propósito: Header, navegación, vistas, toolbar y botones de zona.
-              Fecha y hora alineadas al top. Header responsive corregido.
+              Header oculto por defecto para evitar flash visual.
    ================================================================ */
 
 /* ── APP SHELL ─────────────────────────────────────────────── */
 body { display: flex; flex-direction: column; }
 
-/* ── HEADER ────────────────────────────────────────────────── */
+/* ── HEADER (oculto por defecto) ──────────────────────────── */
 .app-header {
-  display: flex;
+  display: none;  /* ← oculto hasta que showView lo active */
   align-items: center;
   justify-content: space-between;
   background: var(--color-card);
@@ -28,7 +28,7 @@ body { display: flex; flex-direction: column; }
 /* Fecha y hora centradas horizontalmente, alineadas arriba */
 .header-center {
   display: flex;
-  align-items: flex-start;  /* Alineación superior */
+  align-items: flex-start;
   justify-content: center;
   flex: 1;
   min-width: 0;
@@ -229,7 +229,6 @@ body { display: flex; flex-direction: column; }
   }
 
   .header-left {
-    /* Solo ocupa el ancho del logo, no fuerza fila completa */
     flex: 0;
   }
 

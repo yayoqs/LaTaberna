@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/auth.js
-   Versión: 1.0.13
+   Versión: 1.0.14
    Propósito: Autenticación, hashing SHA-256, roles, login/logout.
-              Gestión de usuarios: cambiar contraseña y cambiar rol.
+              Soporte multi-espacio con espacioId dinámico.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -83,7 +83,7 @@ export const Auth = (() => {
     const hashIngresado = await _sha256(password);
     const usuario = _usuarios.find(u => u.nombre === nombre && u.hash === hashIngresado);
     if (!usuario) { showToast('error', 'Usuario o contraseña incorrectos'); return false; }
-    const espacioTaberna = { id: 'esp_taberna', nombre: 'La Taberna', tipo: 'bar', rol: usuario.rol };
+    const espacioTaberna = { id: 'esp_taberna', nombre: 'La Taberna', tipo: 'bar', rol: usuario.rol, databaseId: '6a0275cb0022ebf7d30d' };
     _usuarioActual = { nombre: usuario.nombre, rol: usuario.rol, espacios: [espacioTaberna], espacioActivoId: espacioTaberna.id };
     _rolSimulado = null;
     sessionStorage.setItem('usuarioActual', JSON.stringify(_usuarioActual));
@@ -233,61 +233,33 @@ export const Auth = (() => {
     return true;
   }
 
-  /**
-   * Cambia el rol de un usuario respetando la jerarquía de permisos.
-   * Reglas:
-   *  - Solo master o admin pueden cambiar roles.
-   *  - Nadie puede cambiarse a sí mismo.
-   *  - Nadie puede cambiar el rol de un master.
-   *  - Solo un master puede cambiar el rol de un admin.
-   * @param {string} nombreUsuario - Nombre del usuario a modificar.
-   * @param {string} nuevoRol - Nuevo rol a asignar.
-   * @returns {{ exito: boolean, error?: string }}
-   */
   function cambiarRol(nombreUsuario, nuevoRol) {
-    // Validar que hay un usuario autenticado
     if (!_usuarioActual) {
       return { exito: false, error: 'No hay sesión activa.' };
     }
-
-    // Validar que el ejecutor tiene permisos
     if (!esMasterReal() && !esAdmin()) {
       return { exito: false, error: 'No tienes permiso para cambiar roles.' };
     }
-
-    // Validar que el rol solicitado existe
     if (typeof Roles === 'undefined' || !Roles.lista.includes(nuevoRol)) {
       return { exito: false, error: `El rol "${nuevoRol}" no es válido.` };
     }
-
-    // Nadie puede cambiarse a sí mismo
     if (nombreUsuario === _usuarioActual.nombre) {
       return { exito: false, error: 'No puedes cambiar tu propio rol.' };
     }
-
-    // Buscar al usuario objetivo
     const idx = _usuarios.findIndex(u => u.nombre === nombreUsuario);
     if (idx === -1) {
       return { exito: false, error: 'Usuario no encontrado.' };
     }
-
     const usuarioObjetivo = _usuarios[idx];
-
-    // Nadie puede cambiar el rol de un master
     if (usuarioObjetivo.rol === 'master') {
       return { exito: false, error: 'No se puede cambiar el rol de un master.' };
     }
-
-    // Solo un master puede cambiar el rol de un admin
     if (usuarioObjetivo.rol === 'admin' && !esMasterReal()) {
       return { exito: false, error: 'Solo un master puede cambiar el rol de un admin.' };
     }
-
-    // Aplicar el cambio
     const rolAnterior = usuarioObjetivo.rol;
     _usuarios[idx].rol = nuevoRol;
     _guardarUsuarios();
-
     Logger.info(`[Auth] Rol cambiado: ${nombreUsuario} de "${rolAnterior}" a "${nuevoRol}" por ${_usuarioActual.nombre}.`);
     return { exito: true };
   }
@@ -322,7 +294,10 @@ export const Auth = (() => {
     return { nombre: _usuarioActual.nombre, rol: _usuarioActual.rol, rolEfectivo: obtenerRolEfectivo(), simulando: _rolSimulado || null, espacios: _usuarioActual.espacios || [], espacioActivoId: _usuarioActual.espacioActivoId };
   }
   function obtenerEspacios() { return _usuarioActual?.espacios || []; }
-  function obtenerEspacioActivo() { if (!_usuarioActual?.espacioActivoId) return null; return _usuarioActual.espacios?.find(e => e.id === _usuarioActual.espacioActivoId) || null; }
+  function obtenerEspacioActivo() {
+    if (!_usuarioActual || !_usuarioActual.espacioActivoId) return null;
+    return _usuarioActual.espacios?.find(e => e.id === _usuarioActual.espacioActivoId) || null;
+  }
 
   function cambiarEspacio(espacioId) {
     const espacio = _usuarioActual?.espacios?.find(e => e.id === espacioId);
@@ -434,7 +409,6 @@ export const Auth = (() => {
     esMasterReal, aplicarRestriccionesUI, puedeAccederRecetas, puedeAccederReparto, puedeAccederMenu,
     puedeAccederEventos, puedeAccederPerfil, cambiarPassword, cambiarRol, _cargarUsuarios, registrarCliente,
     obtenerIdUsuarioAppwrite, _mostrarRegistro,
-    // Aliases temporales (inglés)
     getDefaultView: obtenerVistaPorDefecto,
     getAppwriteUserId: obtenerIdUsuarioAppwrite
   };

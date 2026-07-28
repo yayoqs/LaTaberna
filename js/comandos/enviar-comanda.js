@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — COMANDO JS (ES6)
    Archivo: js/comandos/enviar-comanda.js
-   Versión: 1.0.2
+   Versión: 1.0.3
    Propósito: Enviar comanda a cocina/barra con validación de stock.
-              Con imports explícitos.
+              Con imports explícitos. Nombres en español.
    ================================================================ */
 
 import { CommandBus } from '../lib/command-bus.js';
@@ -11,7 +11,8 @@ import { Deps } from '../lib/deps.js';
 import { EventBus } from '../lib/eventBus.js';
 import { Logger } from '../lib/logger.js';
 import { DB } from '../db.js';
-import { showToast } from '../utils.js';
+import { mostrarToast } from '../utils.js';
+import { PedidoManager } from '../managers/pedido-manager.js';
 
 export function crearComandoEnviarComanda(datos) {
   return {
@@ -27,7 +28,7 @@ export function crearComandoEnviarComanda(datos) {
   };
 }
 
-async function handleEnviarComanda(comando) {
+async function ejecutarEnviarComanda(comando) {
   const { mesa, mozo, comensales, observaciones, itemsPendientes, overrideStock } = comando.datos;
 
   if (!mesa) throw new Error('Mesa no especificada');
@@ -38,7 +39,7 @@ async function handleEnviarComanda(comando) {
   let resultadoStock = { ok: true, faltantes: [] };
   try {
     const inventarioSvc = Deps.obtener('inventarioService');
-    resultadoStock = inventarioSvc.validarStockParaItems(itemsPendientes);
+    resultadoStock = inventarioSvc.validarStockParaArticulos(itemsPendientes);
   } catch (e) {
     Logger.warn('[EnviarComanda] No se pudo validar stock:', e.message);
   }
@@ -57,9 +58,9 @@ async function handleEnviarComanda(comando) {
     const faltantes = resultadoStock.faltantes.map(f =>
       `${f.ingrediente} (faltan ${f.faltante} ${f.unidad})`
     ).join(', ');
-    showToast('warning', `⚠️ Stock bajo: ${faltantes}. La comanda se enviará igual.`);
+    mostrarToast('warning', `⚠️ Stock bajo: ${faltantes}. La comanda se enviará igual.`);
     Logger.warn(`[EnviarComanda] Stock bajo (override): ${faltantes}`);
-    if (typeof PedidoManager.registrar === 'function') {
+    if (typeof PedidoManager !== 'undefined' && typeof PedidoManager.registrar === 'function') {
       PedidoManager.registrar('inventario:alerta_faltante', {
         mesa: mesa.numero,
         items: itemsPendientes.map(it => it.nombre),
@@ -96,4 +97,4 @@ async function handleEnviarComanda(comando) {
   return resultado;
 }
 
-CommandBus.registrar('enviarComanda', handleEnviarComanda);
+CommandBus.registrar('enviarComanda', ejecutarEnviarComanda);

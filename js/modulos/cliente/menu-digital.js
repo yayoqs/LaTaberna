@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — Módulo (ES6)
    Archivo: js/modulos/cliente/menu-digital.js
-   Versión: 2.0.3
+   Versión: 2.0.4
    Propósito: Menú digital interactivo.
-              Migrado a nuevos nombres en español de utils y Store.
+              Corregida referencia a Auth.obtenerNombre().
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -130,7 +130,7 @@ const MenuDigital = (() => {
     if (!idUsuario) { mostrarToast('error', 'No se pudo obtener tu sesión. Intentá de nuevo.'); return; }
 
     const mesa = state.cliente?.mesa || 0; if (!mesa) { mostrarToast('error', 'No se pudo obtener el número de mesa.'); return; }
-    const nombreComensal = Auth.getNombre() || 'comensal';
+    const nombreComensal = Auth.obtenerNombre() || 'comensal';
     const payload = { mesa, items, clienteId: nombreComensal, id_usuario: idUsuario, nombre_comensal: nombreComensal, observaciones: '', timestamp: Date.now() };
     try {
       const resultado = await DBAppwrite.crear('precargas_cliente', 'unique()', { id_mesa: mesa, id_usuario: idUsuario, nombre_comensal: nombreComensal, productos: JSON.stringify(items), estado: 'por_confirmar', timestamp: payload.timestamp });
@@ -153,7 +153,8 @@ const MenuDigital = (() => {
   function ocultar() { if (_vista) _vista.classList.remove('active'); if (_panelOrden) _panelOrden.classList.add('oculto'); }
 
   function _actualizarEstado() {
-    const nombre = Auth.getNombre() || 'comensal'; const state = Store.obtenerEstado(); const mesa = state.cliente?.mesa || '?';
+    const nombre = Auth.obtenerNombre() || 'comensal';
+    const state = Store.obtenerEstado(); const mesa = state.cliente?.mesa || '?';
     document.getElementById('menuEstadoCliente').textContent = `👤 ${nombre}`; document.getElementById('menuEstadoMesa').textContent = `🪑 Mesa ${mesa}`;
   }
   function _verificarPermiso() {
