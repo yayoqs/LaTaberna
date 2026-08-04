@@ -1,10 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO INTERNO (ES6)
    Archivo: js/modulos/interno/precarga-control.js
-   Versión: 2.1.7
+   Versión: 2.1.8
    Propósito: Recepción de precargas, insignia, carga en comanda.
-              Se agregó método limpiar() para desuscribir eventos
-              y resetear el estado (Misión 4.3).
+              Corrección: Auth.getAppwriteUserId() → Auth.obtenerIdUsuarioAppwrite().
    ================================================================ */
 
 import { EventBus } from '../../lib/eventBus.js';
@@ -74,7 +73,7 @@ const PrecargaControl = (() => {
     CommandBus.registrar('precarga:revisar', async (datos) => {
       const { precargaId, revisadoPor } = datos;
       try {
-        const userId = await Auth.getAppwriteUserId();
+        const userId = await Auth.obtenerIdUsuarioAppwrite();
         const permisos = userId ? [
           `read("user:${userId}")`,
           `update("user:${userId}")`,
@@ -97,7 +96,7 @@ const PrecargaControl = (() => {
     _desuscripcionPrecarga = EventBus.on('cliente:precarga_enviada', _onPrecargaEnviada);
     _desuscripcionBadge = EventBus.on('mesa:badge_click', _onBadgeClick);
 
-    Logger.info('[PrecargaControl] Módulo inicializado (ES6 v2.1.7).');
+    Logger.info('[PrecargaControl] Módulo inicializado (v2.1.8).');
   }
 
   function limpiar() {

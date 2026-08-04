@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/app.js
-   Versión: 1.3.2
+   Versión: 1.3.3
    Propósito: Punto de entrada modular. Control de vistas con ciclo
               de vida (limpiar/activar).
-              Auth.logout() → Auth.cerrarSesion().
+              Corregido: referencia redundante a Auth.esMasterReal.
    ================================================================ */
 
 // ── Utilidades y librerías ────────────────────────────────
@@ -181,7 +181,7 @@ export const App = {
     }
 
     // ── Swipe para master en bienvenida ───────────────
-    if (nombre === 'bienvenida' && typeof Auth !== 'undefined' && Auth.esMasterReal && Auth.esMasterReal()) {
+    if (nombre === 'bienvenida' && typeof Auth !== 'undefined' && Auth.esMasterReal()) {
       let touchStartY = 0;
       const onTouchStart = (e) => { touchStartY = e.touches[0].clientY; };
       const onTouchEnd = (e) => {
@@ -264,7 +264,7 @@ export const App = {
 
     EventBus.emit('vista:cambiada', nombre);
 
-    if (Auth.esMasterReal && Auth.esMasterReal()) {
+    if (Auth.esMasterReal()) {
       Auth.aplicarRestriccionesUI();
     }
 
@@ -366,7 +366,7 @@ function _vincularHeader() {
   var logoutBtn = document.getElementById('btnLogout');
   if (logoutBtn) {
     logoutBtn.addEventListener('click', function() {
-      Auth.cerrarSesion();  // ← actualizado
+      Auth.cerrarSesion();
     });
   }
 }

@@ -1,10 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/auth.js
-   Versión: 1.6.0
+   Versión: 1.6.1
    Propósito: Autenticación con Appwrite Account nativo + fallback local.
               API pública completamente en español.
-              v1.6.0: login→iniciarSesion, logout→cerrarSesion, init→iniciar.
+              v1.6.1: corregido ID del selector de local (espacioSelectorContainer)
+                      y typo en asignación de hash (usuario.nuevoHash → usuario.hash).
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -161,7 +162,7 @@ export const Auth = (() => {
           const nuevoHash = await _sha256(password);
 
           if (!usuario) {
-            usuario = { nombre, nuevoHash, rol: rolDefecto, _migradoAAuth: true };
+            usuario = { nombre, hash: nuevoHash, rol: rolDefecto, _migradoAAuth: true };
             _usuarios.push(usuario);
             _guardarUsuarios();
             Logger.info(`[Auth] Usuario ${nombre} creado localmente desde Appwrite.`);
@@ -567,7 +568,7 @@ export const Auth = (() => {
   }
 
   function _renderSelectorLocal() {
-    const container = document.getElementById('localSelectorContainer');
+    const container = document.getElementById('espacioSelectorContainer');
     if (!container || !_usuarioActual) return;
     const locales = _usuarioActual.local || [];
     if (locales.length <= 1) { container.innerHTML = ''; return; }

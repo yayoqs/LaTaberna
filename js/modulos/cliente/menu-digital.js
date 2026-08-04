@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — Módulo (ES6)
    Archivo: js/modulos/cliente/menu-digital.js
-   Versión: 2.0.6
+   Versión: 2.0.7
    Propósito: Menú digital interactivo.
-              AbortController para limpiar listeners del DOM.
+              Corregida API obsoleta y doble lectura del Store.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -21,9 +21,9 @@ const MenuDigital = (() => {
   let _terminoBusqueda = '';
   let _activada = false;
 
-  let _abortController = null;        // listeners fijos
-  let _abortControllerOrden = null;   // listeners del panel de orden
-  let _abortControllerGrilla = null;  // listeners de la grilla de productos
+  let _abortController = null;
+  let _abortControllerOrden = null;
+  let _abortControllerGrilla = null;
 
   let _cbProductosActualizada, _cbMesasActualizada;
 
@@ -54,7 +54,6 @@ const MenuDigital = (() => {
 
     _crearPanelOrden();
 
-    // Listeners fijos con AbortController
     _abortController = new AbortController();
     const { signal } = _abortController;
     document.getElementById('menuDigitalSearch').addEventListener('input', () => {
@@ -99,7 +98,6 @@ const MenuDigital = (() => {
       document.body.appendChild(_panelOrden);
     }
 
-    // Listeners fijos del panel con su propio AbortController
     _abortControllerOrden = new AbortController();
     const { signal: sigOrden } = _abortControllerOrden;
     document.getElementById('btnCerrarOrden').addEventListener('click', () => _panelOrden.classList.add('oculto'), { signal: sigOrden });
@@ -109,7 +107,6 @@ const MenuDigital = (() => {
   function _togglePanelOrden() { _panelOrden.classList.toggle('oculto'); _renderizarItemsOrden(); }
 
   function _renderizarItemsOrden() {
-    // Abortar listeners anteriores del panel de orden
     if (_abortControllerOrden) { _abortControllerOrden.abort(); _abortControllerOrden = null; }
     _abortControllerOrden = new AbortController();
     const { signal } = _abortControllerOrden;
@@ -147,20 +144,25 @@ const MenuDigital = (() => {
   }
 
   async function _confirmarOrden() {
-    const state = Store.obtenerEstado(); const permite = state.cliente?.permitePrepedidos || false;
+    const state = Store.obtenerEstado();  // Leer una sola vez al inicio
+    const permite = state.cliente?.permitePrepedidos || false;
     if (!permite) { mostrarToast('error', 'Tu mesa ya no admite pedidos. Contactá al garzón.'); return; }
-    const items = Orden.obtenerItems(); if (!items.length) { mostrarToast('error', 'Agregá productos a tu orden antes de confirmar.'); return; }
+
+    const items = Orden.obtenerItems();
+    if (!items.length) { mostrarToast('error', 'Agregá productos a tu orden antes de confirmar.'); return; }
 
     let idUsuario;
     try {
-      idUsuario = await Auth.getAppwriteUserId();
+      idUsuario = await Auth.obtenerIdUsuarioAppwrite();
     } catch (e) {
       Logger.error('[MenuDigital] Error al obtener ID de Appwrite:', e);
       idUsuario = null;
     }
     if (!idUsuario) { mostrarToast('error', 'No se pudo obtener tu sesión. Intentá de nuevo.'); return; }
 
-    const mesa = state.cliente?.mesa || 0; if (!mesa) { mostrarToast('error', 'No se pudo obtener el número de mesa.'); return; }
+    const mesa = state.cliente?.mesa || 0;
+    if (!mesa) { mostrarToast('error', 'No se pudo obtener el número de mesa.'); return; }
+
     const nombreComensal = Auth.obtenerNombre() || 'comensal';
     const payload = { mesa, items, clienteId: nombreComensal, id_usuario: idUsuario, nombre_comensal: nombreComensal, observaciones: '', timestamp: Date.now() };
     try {
@@ -184,7 +186,7 @@ const MenuDigital = (() => {
   function ocultar() {
     if (_vista) _vista.classList.remove('active');
     if (_panelOrden) _panelOrden.classList.add('oculto');
-    limpiar();  // Ahora también aborta los controllers
+    limpiar();
   }
 
   function _actualizarEstado() {
@@ -203,7 +205,6 @@ const MenuDigital = (() => {
     const categorias = ['Todas', ...new Set(productos.filter(p => p.activo !== false).map(p => p.categoria))].filter(Boolean);
     container.innerHTML = categorias.map(cat => `<button class="menu-cat-btn ${cat === _categoriaActiva ? 'active' : ''}" data-categoria="${cat}">${cat}</button>`).join('');
 
-    // Abortar listeners anteriores de categorías
     if (_abortControllerGrilla) { _abortControllerGrilla.abort(); _abortControllerGrilla = null; }
     _abortControllerGrilla = new AbortController();
     const { signal: sigCat } = _abortControllerGrilla;
@@ -224,7 +225,6 @@ const MenuDigital = (() => {
       return `<div class="menu-card ${!disponible ? 'menu-card-atenuado' : ''}"><div class="menu-card-img" style="background-color: ${obtenerColorDesdeNombre(prod.nombre)};"><span class="menu-card-inicial">${prod.nombre.charAt(0).toUpperCase()}</span><span class="menu-card-precio">${formatearDinero(prod.precio)}</span></div><div class="menu-card-body"><h3>${prod.nombre}</h3><p>${desc.length > 60 ? desc.substring(0, 60) + '...' : desc}</p><button class="btn-agregar-orden ${!puedeAgregar ? 'btn-deshabilitado' : ''}" ${!puedeAgregar ? 'disabled' : ''} data-id="${prod.id}" data-nombre="${prod.nombre}" data-precio="${prod.precio}" data-categoria="${prod.categoria}" data-destino="${prod.destino || prod.categoria || 'general'}">🛒 Agregar a mi orden</button></div></div>`;
     }).join('');
 
-    // Abortar listeners anteriores de la grilla
     if (_abortControllerGrilla) { _abortControllerGrilla.abort(); _abortControllerGrilla = null; }
     _abortControllerGrilla = new AbortController();
     const { signal: sigGrilla } = _abortControllerGrilla;

@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — COMANDO JS (ES6)
    Archivo: js/comandos/enviar-comanda.js
-   Versión: 1.0.3
+   Versión: 1.0.4
    Propósito: Enviar comanda a cocina/barra con validación de stock.
-              Con imports explícitos. Nombres en español.
+              v1.0.4: await agregado a validarStockParaArticulos (async).
    ================================================================ */
 
 import { CommandBus } from '../lib/command-bus.js';
@@ -39,7 +39,7 @@ async function ejecutarEnviarComanda(comando) {
   let resultadoStock = { ok: true, faltantes: [] };
   try {
     const inventarioSvc = Deps.obtener('inventarioService');
-    resultadoStock = inventarioSvc.validarStockParaArticulos(itemsPendientes);
+    resultadoStock = await inventarioSvc.validarStockParaArticulos(itemsPendientes);
   } catch (e) {
     Logger.warn('[EnviarComanda] No se pudo validar stock:', e.message);
   }

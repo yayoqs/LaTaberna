@@ -1,12 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO INTERNO (ES6)
    Archivo: js/modulos/interno/avisos-mesero.js
-   Versión: 1.0.0
+   Versión: 1.0.1
    Propósito: Indicador visual de notificaciones para el mesero.
-              Muestra un triángulo en la esquina superior izquierda
-              cuando hay eventos que requieren atención en Mesas.
-              Se oculta al cambiar a la vista 'mesas'.
-   Dependencias: EventBus, Logger
+              Corrección: limpiar() ahora desuscribe los listeners.
    ================================================================ */
 
 import { EventBus } from '../../lib/eventBus.js';
@@ -15,11 +12,11 @@ import { Logger } from '../../lib/logger.js';
 const AvisosMesero = (() => {
   let _triangulo = null;
   let _contador = 0;
-  let _vistaActiva = 'mesas'; // valor inicial seguro
+  let _vistaActiva = 'mesas';
   let _activado = false;
 
-  // Colección de notificaciones activas: clave compuesta "tipo:mesa"
   const _notificaciones = new Map();
+  const _desuscripciones = [];
 
   function _crearTriangulo() {
     if (_triangulo) return;
@@ -57,7 +54,6 @@ const AvisosMesero = (() => {
       _actualizarUI();
     });
 
-    // Ícono de campana
     const icono = document.createElement('i');
     icono.className = 'fas fa-bell';
     icono.style.cssText = `
@@ -69,7 +65,6 @@ const AvisosMesero = (() => {
     `;
     _triangulo.appendChild(icono);
 
-    // Contador de notificaciones
     const contador = document.createElement('span');
     contador.id = 'avisos-mesero-contador';
     contador.style.cssText = `
@@ -132,30 +127,25 @@ const AvisosMesero = (() => {
 
     _crearTriangulo();
 
-    // Eventos que generan notificaciones
-    EventBus.on('cliente:mesa_ingresada', (data) => {
+    _desuscripciones.push(EventBus.on('cliente:mesa_ingresada', (data) => {
       if (data && data.mesa) _agregarNotificacion('esperando', data.mesa);
-    });
+    }));
 
-    EventBus.on('cliente:precarga_enviada', (data) => {
+    _desuscripciones.push(EventBus.on('cliente:precarga_enviada', (data) => {
       if (data && data.mesa) _agregarNotificacion('precarga', data.mesa);
-    });
+    }));
 
-    EventBus.on('cliente:llamar_garzon', (data) => {
+    _desuscripciones.push(EventBus.on('cliente:llamar_garzon', (data) => {
       if (data && data.mesa) _agregarNotificacion('llamado', data.mesa);
-    });
+    }));
 
-    // Eventos que eliminan notificaciones (otro mesero ya actuó)
-    EventBus.on('mesa:actualizada', (data) => {
+    _desuscripciones.push(EventBus.on('mesa:actualizada', (data) => {
       if (data && data.estado === 'ocupada' && data.mesa) {
         _removerNotificacion('esperando', data.mesa);
       }
-    });
+    }));
 
-    EventBus.on('precarga:revisada', (data) => {
-      // data tiene precargaId, necesitamos la mesa. No la tenemos directamente,
-      // así que eliminamos todas las notificaciones de precarga (poco preciso pero seguro)
-      // Alternativa: iterar _notificaciones y eliminar las de tipo 'precarga'
+    _desuscripciones.push(EventBus.on('precarga:revisada', () => {
       for (const [clave, valor] of _notificaciones) {
         if (valor.tipo === 'precarga') {
           _notificaciones.delete(clave);
@@ -163,26 +153,27 @@ const AvisosMesero = (() => {
         }
       }
       _actualizarUI();
-    });
+    }));
 
-    EventBus.on('mesas:limpiar_badge', (data) => {
+    _desuscripciones.push(EventBus.on('mesas:limpiar_badge', (data) => {
       if (data && data.mesa) {
         _removerNotificacion('precarga', data.mesa);
         _removerNotificacion('llamado', data.mesa);
       }
-    });
+    }));
 
-    // Seguimiento de vista activa
-    EventBus.on('vista:cambiada', (vista) => {
+    _desuscripciones.push(EventBus.on('vista:cambiada', (vista) => {
       _vistaActiva = vista || 'mesas';
       _actualizarUI();
-    });
+    }));
 
-    Logger.info('[AvisosMesero] Módulo inicializado (v1.0.0).');
+    Logger.info('[AvisosMesero] Módulo inicializado (v1.0.1).');
   }
 
   function limpiar() {
-    // No implementamos desuscripción granular por ahora (se limpia con la página)
+    _desuscripciones.forEach(fn => fn());
+    _desuscripciones.length = 0;
+
     if (_triangulo) {
       _triangulo.remove();
       _triangulo = null;
@@ -190,9 +181,9 @@ const AvisosMesero = (() => {
     _notificaciones.clear();
     _contador = 0;
     _activado = false;
+    Logger.info('[AvisosMesero] Módulo limpiado.');
   }
 
-  // Autoactivación al importar
   activar();
 
   return { activar, limpiar };

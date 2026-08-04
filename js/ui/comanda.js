@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/comanda.js
-   Versión: 2.0.10
+   Versión: 2.0.11
    Propósito: Gestión de la comanda actual.
-              getMesaActiva → obtenerMesaActiva (Misión 2.3).
+              Corrección: referencia interna a obtenerMesaActiva().
    ================================================================ */
 
 import { Store } from '../lib/store.js';

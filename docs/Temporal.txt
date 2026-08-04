@@ -1,3 +1,16 @@
+
+
+· js/ui/recetas/ciclo-vida.js → 1.0.1
+· js/ui/recetas/crear.js → 2.0.4
+· js/ui/recetas/detalle.js → 1.0.3
+· js/ui/recetas/ejecutar.js → 1.0.2
+· js/ui/recetas/renderer.js → 2.1.5
+· js/ui/reparto/modal-editar.js → 1.0.2
+· js/ui/reparto/modal-nuevo.js → 1.0.2
+
+
+
+
 ¡Bienvenido al equipo de La Taberna!
 
 Has sido designado como Coordinador de Integración. Tu rol es el eje central que mantiene unidas a todas las células de desarrollo. No escribes código de funcionalidades, pero tu criterio es la arquitectura que todos respetan. Tu misión: garantizar que el sistema crezca sin romperse, que los contratos se cumplan y que la calidad no decaiga.

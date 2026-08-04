@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/pedido-ui.js
-   Versión: 2.1.8
+   Versión: 2.1.9
    Propósito: Modal de pedido, revisar comandas, validación de stock.
-              getMesaActiva → obtenerMesaActiva (Misión 2.3).
+              Corrección: orden de operaciones en transferirMesa
+              (Store antes que eventos).
    ================================================================ */
 
 import { CommandBus } from '../lib/command-bus.js';
@@ -404,7 +405,7 @@ const Pedido = (() => {
     if (mesaDestino.estado !== 'libre') { mostrarToast('error', 'La mesa ' + mesaDestinoNum + ' no está libre.'); return false; }
     if (mesaOrigen.esVirtual || mesaDestino.esVirtual) { mostrarToast('error', 'No se puede transferir desde/hacia una mesa fusionada.'); return false; }
 
-    // Persistir en DB
+    // 1. Persistir en DB
     const mesaDestinoDB = DB.mesas.find(m => m.numero == mesaDestinoNum);
     const mesaOrigenDB = DB.mesas.find(m => m.numero == mesaOrigenNum);
     if (mesaDestinoDB && mesaOrigenDB) {
@@ -430,10 +431,11 @@ const Pedido = (() => {
       }
     }
 
-    // Despachar al Store
+    // 2. Despachar al Store ANTES de emitir eventos
     Store.despachar({ type: 'MESA_ACTUALIZAR', payload: { numero: mesaDestinoNum, cambios: { estado: mesaOrigen.estado, pedidoId: mesaOrigen.pedidoId, items: mesaOrigen.items, mozo: mesaOrigen.mozo, comensales: mesaOrigen.comensales, abiertaEn: mesaOrigen.abiertaEn, observaciones: mesaOrigen.observaciones, total: mesaOrigen.total } } });
     Store.despachar({ type: 'MESA_ACTUALIZAR', payload: { numero: mesaOrigenNum, cambios: { estado: 'libre', pedidoId: null, items: [], mozo: '', comensales: 0, abiertaEn: null, observaciones: '', total: 0 } } });
 
+    // 3. Emitir eventos después del despacho
     EventBus.emit('mesa:actualizada', { mesa: mesaOrigenNum, estado: 'libre' });
     EventBus.emit('mesa:actualizada', { mesa: mesaDestinoNum, estado: mesaDestino.estado });
     Mesas.render();
