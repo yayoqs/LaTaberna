@@ -1,15 +1,15 @@
 /* ================================================================
    LaTaberna - PubPOS — MESAS SUBMÓDULO (ES6)
    Archivo: js/ui/mesas/ciclo-vida.js
-   Versión: 1.0.9
+   Versión: 1.1.0
    Propósito: Ciclo de vida (activar/limpiar) con AbortController.
-              Migración a Store.suscribir.
+              Suscripción a vista:cambiada para render condicional.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
 import { EventBus } from '../../lib/eventBus.js';
 import { Logger } from '../../lib/logger.js';
-import { renderGrid, renderZoneButtons, asegurarVista } from './renderer.js';
+import { renderGrid, renderZoneButtons, asegurarVista, setVistaActiva } from './renderer.js';
 import { addNotificacion } from './notificaciones.js';
 import { toggleModoFusion, fusionarMesasSeleccionadas } from './fusion.js';
 import { agregarMesa, setBadge, clearBadge } from './acciones-mesa.js';
@@ -69,6 +69,11 @@ export function activar() {
   }));
   _desuscripciones.push(EventBus.on('mesas:limpiar_badge', (data) => {
     clearBadge(data.mesa);
+  }));
+
+  // Render condicional: activar/desactivar según la vista actual
+  _desuscripciones.push(EventBus.on('vista:cambiada', (vista) => {
+    setVistaActiva(vista === 'mesas');
   }));
 }
 

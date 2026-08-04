@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/managers/pedido-manager.js
-   Versión: 1.0.5
+   Versión: 1.1.0
    Propósito: Gestor de pedidos de mesa y delivery, turnos y auditoría.
-              Corrección: Logger en todos los catch.
+              Métodos getTurnoActual y getAuditLog renombrados a español.
+              Corrección: migración var→let/const.
    ================================================================ */
 
 import { Logger } from '../lib/logger.js';
@@ -88,7 +89,7 @@ export const PedidoManager = (() => {
       id: 'aud_' + Date.now() + '_' + Math.random().toString(36).substr(2,6),
       timestamp: new Date().toISOString(),
       tipo, datos,
-      usuario: Auth.getNombre ? Auth.getNombre() : 'sistema'
+      usuario: Auth.obtenerNombre ? Auth.obtenerNombre() : 'sistema'
     };
     auditLog.push(entrada);
     _guardarAuditLog();
@@ -150,8 +151,8 @@ export const PedidoManager = (() => {
 
   return {
     init,
-    getTurnoActual: () => turnoActual,
-    getAuditLog: () => auditLog,
+    obtenerTurnoActual: () => turnoActual,
+    obtenerAuditoria: () => auditLog,
     crearPedidoMesa,
     crearPedidoDelivery,
     enviarPedidoDeliveryACocina,

@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/caja.js
-   Versión: 1.2.1
+   Versión: 1.2.2
    Propósito: Vista de caja: resumen de turno, estadísticas, tabla de pedidos
               y sección de cobros pendientes (split bill).
-              Corrección: listener de vista:cambiada movido a activar().
+              Ciclo de vida con AbortController para listeners del DOM.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -15,9 +15,10 @@ import { Cobro } from './cobro.js';
 
 export const Caja = (() => {
   let _estaActiva = false;
+  let _abortController = null;
   const _cleanups = [];
 
-  function _asegurarVista() {
+  function _asegurarVista(signal) {
     const main = document.getElementById('view-caja');
 
     if (!main) {
@@ -26,16 +27,16 @@ export const Caja = (() => {
       nuevoMain.className = 'view';
       const referencia = $id('toastContainer') || document.body.lastChild;
       document.body.insertBefore(nuevoMain, referencia);
-      _construirContenido(nuevoMain);
+      _construirContenido(nuevoMain, signal);
       return;
     }
 
     if (main.querySelector('.caja-stats')) return;
 
-    _construirContenido(main);
+    _construirContenido(main, signal);
   }
 
-  function _construirContenido(contenedor) {
+  function _construirContenido(contenedor, signal) {
     contenedor.innerHTML = `
       <div class="view-toolbar">
         <h2><i class="fas fa-cash-register"></i> Caja — Resumen del Turno</h2>
@@ -65,7 +66,7 @@ export const Caja = (() => {
 
     document.getElementById('btnCerrarTurno').addEventListener('click', () => {
       CommandBus.ejecutar({ type: 'turno:cerrar' });
-    });
+    }, { signal });
 
     document.getElementById('btnVentaBarra').addEventListener('click', () => {
       const mesas = Store.obtenerEstado().mesas || [];
@@ -75,17 +76,20 @@ export const Caja = (() => {
         return;
       }
       Cobro.abrirModalCierre(mesaBarra);
-    });
+    }, { signal });
   }
 
   function activar() {
     if (_estaActiva) return;
     _estaActiva = true;
 
-    _asegurarVista();
+    // Crear un nuevo AbortController para los listeners del DOM
+    _abortController = new AbortController();
+    const signal = _abortController.signal;
+
+    _asegurarVista(signal);
     render();
 
-    // Suscripción a cambios en pedidos
     const unsubscribeStore = Store.suscribir((state, action) => {
       if (!_estaActiva) return;
       if (action.type.startsWith('PEDIDOS') || action.type.startsWith('PEDIDO')) {
@@ -94,12 +98,10 @@ export const Caja = (() => {
     });
     _cleanups.push(unsubscribeStore);
 
-    // Escuchar db:inicializada
     const onDbInicializada = () => { if (_estaActiva) render(); };
     EventBus.on('db:inicializada', onDbInicializada);
     _cleanups.push(() => EventBus.off('db:inicializada', onDbInicializada));
 
-    // Escuchar cambios de vista para auto-desactivar
     const onVistaCambiada = (vista) => {
       if (vista !== 'caja') {
         limpiar();
@@ -112,6 +114,12 @@ export const Caja = (() => {
   function limpiar() {
     if (!_estaActiva) return;
     _estaActiva = false;
+
+    // Abortar los listeners del DOM
+    if (_abortController) {
+      _abortController.abort();
+      _abortController = null;
+    }
 
     _cleanups.forEach(fn => fn());
     _cleanups.length = 0;

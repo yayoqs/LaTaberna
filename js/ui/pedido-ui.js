@@ -1,10 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/pedido-ui.js
-   Versión: 2.1.7
+   Versión: 2.1.8
    Propósito: Modal de pedido, revisar comandas, validación de stock.
-              Migración a Store como fuente de verdad y
-              reemplazo de prompt por mostrarEntrada.
+              getMesaActiva → obtenerMesaActiva (Misión 2.3).
    ================================================================ */
 
 import { CommandBus } from '../lib/command-bus.js';
@@ -163,7 +162,7 @@ const Pedido = (() => {
       });
     }
 
-    const mesa = Comanda.getMesaActiva();
+    const mesa = Comanda.obtenerMesaActiva();
     if (mesa && mesa.estado === 'libre' && (!mesa.items || mesa.items.length === 0)) {
       if (mesa.esVirtual) {
         DB.liberarMesasFusionadas(mesa);
@@ -185,7 +184,7 @@ const Pedido = (() => {
   }
 
   async function revisarComanda() {
-    const mesa = Comanda.getMesaActiva();
+    const mesa = Comanda.obtenerMesaActiva();
     if (!mesa) { mostrarToast('warning', 'No hay mesa activa.'); return; }
 
     const pendientes = mesa.items.filter(it => !it.enviado);
@@ -438,14 +437,14 @@ const Pedido = (() => {
     EventBus.emit('mesa:actualizada', { mesa: mesaOrigenNum, estado: 'libre' });
     EventBus.emit('mesa:actualizada', { mesa: mesaDestinoNum, estado: mesaDestino.estado });
     Mesas.render();
-    const mesaActiva = Comanda.getMesaActiva();
+    const mesaActiva = Comanda.obtenerMesaActiva();
     if (mesaActiva && mesaActiva.numero === mesaOrigenNum) abrirMesa(mesaDestinoNum);
     mostrarToast('success', 'Pedido transferido de Mesa ' + mesaOrigenNum + ' a Mesa ' + mesaDestinoNum);
     return true;
   }
 
   async function mostrarSelectorTransferencia() {
-    const mesaActual = Comanda.getMesaActiva();
+    const mesaActual = Comanda.obtenerMesaActiva();
     if (!mesaActual) { mostrarToast('warning', 'No hay mesa activa.'); return; }
     if (!Auth.esAdmin()) { mostrarToast('error', 'Solo administradores pueden transferir mesas.'); return; }
     if (mesaActual.esVirtual) { mostrarToast('info', 'No se puede transferir una mesa fusionada.'); return; }

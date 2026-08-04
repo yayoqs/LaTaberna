@@ -1,9 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-appwrite.js
-   Versión: 1.2.0
+   Versión: 1.2.2
    Propósito: Cliente de Appwrite (API TablesDB), Realtime y operadores.
               Soporte multi-espacio con espacioId dinámico.
+              Colecciones globales exentas de filtro.
+              v1.2.2: migración var→let/const.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -20,28 +22,36 @@ export const DBAppwrite = (function() {
   modulo.habilitado = false;
 
   modulo.COLECCIONES = {
-    productos: 'Productos',
-    pedidos: 'Pedidos',
-    mesas: 'Mesas',
-    comandas: 'Comandas',
-    ingredientes: 'Ingredientes',
-    recetas: 'Recetas',
-    pedidos_delivery: 'Pedidos_delivery',
-    usuarios: 'Usuarios',
-    configuracion: 'Configuracion',
-    precargas_cliente: 'Precargas_cliente',
-    eventos_en_vivo: 'Eventos_en_vivo',
-    menus: 'Menus',
-    proveedores: 'Proveedores'
+    productos: 'laTaberna_Productos',
+    pedidos: 'laTaberna_Pedidos',
+    mesas: 'laTaberna_Mesas',
+    comandas: 'laTaberna_Comandas',
+    ingredientes: 'laTaberna_Ingredientes',
+    recetas: 'laTaberna_Recetas',
+    pedidos_delivery: 'laTaberna_Pedidos_delivery',
+    usuarios: 'laTaberna_Usuarios',
+    configuracion: 'laTaberna_Configuracion',
+    precargas_cliente: 'laTaberna_Precargas_cliente',
+    eventos_en_vivo: 'laTaberna_Eventos_en_vivo',
+    menus: 'laTaberna_Menus',
+    proveedores: 'laTaberna_Proveedores',
+    global_perfiles: 'global_Perfiles',
+    global_puntos: 'global_Puntos',
+    global_eventos: 'global_Eventos',
+    global_espacios: 'global_Espacios'
   };
 
-  const COLECCIONES_GLOBALES = ['configuracion', 'usuarios'];
-  const COLECCIONES_SIN_ESPACIO = [...COLECCIONES_GLOBALES];
+  const COLECCIONES_SIN_ESPACIO = [
+    'global_perfiles',
+    'global_puntos',
+    'global_eventos',
+    'global_espacios'
+  ];
 
   function _obtenerEspacioActivo() {
     try {
-      if (typeof Auth !== 'undefined' && Auth.obtenerEspacioActivo) {
-        return Auth.obtenerEspacioActivo();
+      if (typeof Auth !== 'undefined' && Auth.obtenerLocalActivo) {
+        return Auth.obtenerLocalActivo();
       }
     } catch (e) { /* ignorar */ }
     return null;

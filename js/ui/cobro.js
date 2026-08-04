@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/cobro.js
-   Versión: 2.0.5
+   Versión: 2.0.6
    Propósito: Modal de cierre de mesa, split bill con pagos por persona,
               pago total y liberación controlada por caja.
-              Corrección: lectura de pedidos desde Store en lugar de DB.
+              Eliminado bloque syncGuardarPedido (no implementado).
    ================================================================ */
 
 import { Auth } from '../auth.js';
@@ -13,7 +13,6 @@ import { Logger } from '../lib/logger.js';
 import { Deps } from '../lib/deps.js';
 import { CommandBus } from '../lib/command-bus.js';
 import { EventBus } from '../lib/eventBus.js';
-import { DB } from '../db.js';
 import { Store } from '../lib/store.js';
 import { Tickets } from './tickets.js';
 
@@ -402,29 +401,6 @@ const Cobro = (() => {
     if (!resultado.exito) {
       mostrarToast('error', resultado.error || 'Error al procesar el pago');
       return;
-    }
-
-    // Lectura del pedido cerrado desde el Store, no desde DB
-    const pedidoCerrado = Store.obtenerEstado().pedidos.find(p => p.id === _mesaACerrar.pedidoId);
-    if (pedidoCerrado && typeof DB.syncGuardarPedido === 'function') {
-      const pedidoParaSync = {
-        id:          pedidoCerrado.id,
-        mesa:        pedidoCerrado.mesa,
-        mozo:        pedidoCerrado.mozo || 'Sin mozo',
-        comensales:  pedidoCerrado.comensales || 1,
-        estado:      'cerrada',
-        items:       Array.isArray(pedidoCerrado.items) ? JSON.stringify(pedidoCerrado.items) : (pedidoCerrado.items || '[]'),
-        total:       pedidoCerrado.total || 0,
-        created_at:  pedidoCerrado.created_at,
-        updated_at:  pedidoCerrado.updated_at || new Date().toISOString()
-      };
-      try {
-        await DB.syncGuardarPedido(pedidoParaSync);
-        Logger.info('[Cobro] Pedido sincronizado con Sheets tras el cierre.');
-      } catch (e) {
-        Logger.warn('[Cobro] Error al sincronizar con Sheets, encolado.', e);
-        mostrarToast('warning', 'El ticket se guardó localmente y se enviará cuando haya conexión.');
-      }
     }
 
     cerrarModalCierre();

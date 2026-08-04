@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/despensa.css
-   Versión: 3.1.2
+   Versión: 3.1.3
    Propósito: Estilos para la nueva vista de Despensa con pestañas
               centrales, movimientos y gestos swipe.
-              v3.1.2: corrige reglas globales que afectaban a otras vistas.
+              v3.1.3: restaura estilos del panel izquierdo expansible.
    ================================================================ */
 
 /* ── Contenedor principal ─────────────────────────────────── */
@@ -103,20 +103,69 @@
 #view-despensa .panel-tab-content { flex: 1; overflow-y: auto; padding: 8px; display: none; min-height: 0; }
 #view-despensa .panel-tab-content.activo { display: block; }
 
+/* ── TARJETA EXPANSIBLE (panel izquierdo) ─────────────────── */
 #view-despensa .item-card {
-  background: #252535; border-radius: 8px; padding: 10px; margin-bottom: 8px;
-  cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all .2s;
+  background: #252535;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all .2s;
 }
-#view-despensa .item-card:hover { background: #2a2a38; border-color: var(--color-accent); }
-#view-despensa .item-card .avatar {
-  width: 40px; height: 40px; border-radius: 50%; background: var(--color-accent);
-  display: flex; align-items: center; justify-content: center; color: #000;
-  font-weight: 700; font-size: 18px; flex-shrink: 0;
+#view-despensa .item-card:hover { border-color: var(--color-accent); }
+#view-despensa .item-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
-#view-despensa .item-card .info { flex: 1; min-width: 0; }
-#view-despensa .item-card .info strong { font-size: 13px; display: block; }
-#view-despensa .item-card .info span { font-size: 11px; color: var(--color-text-sec); }
-#view-despensa .item-card .precio { font-weight: 700; color: var(--color-success); font-size: 13px; }
+#view-despensa .avatar {
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  display: flex; align-items: center; justify-content: center;
+  color: #000; font-weight: 700; font-size: 18px; flex-shrink: 0;
+}
+#view-despensa .info { flex: 1; }
+#view-despensa .info strong { font-size: 14px; display: block; color: var(--color-text); }
+#view-despensa .info span { font-size: 12px; color: var(--color-text-sec); }
+
+#view-despensa .detalle {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--color-border);
+  display: none;
+  font-size: 12px;
+  color: var(--color-text-sec);
+}
+#view-despensa .item-card.abierto .detalle { display: block; }
+
+#view-despensa .detalle-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 12px;
+}
+#view-despensa .detalle-item .precio {
+  color: var(--color-success);
+  font-weight: 600;
+}
+
+/* Botón de añadir (Proveedor / Producto) */
+#view-despensa .btn-accion {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px;
+  background: var(--color-accent);
+  border: none;
+  color: #000;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  text-align: center;
+}
 
 /* ── PANEL CENTRAL ────────────────────────────────────────── */
 #view-despensa .panel-central {
@@ -151,7 +200,7 @@
 #view-despensa .search-box input { flex: 1; background: transparent; border: none; color: var(--color-text); font-size: 14px; outline: none; }
 #view-despensa .search-box i { color: var(--color-text-sec); }
 
-/* ── ESPACIOS ─────────────────────────────────────────────── */
+/* Espacios */
 #view-despensa .espacio {
   background: var(--color-card); border: 1px solid var(--color-border);
   border-radius: 12px; margin-bottom: 10px; overflow: hidden;
@@ -161,21 +210,9 @@
   cursor: pointer; font-weight: 500; font-size: 12px; transition: background .2s;
 }
 #view-despensa .espacio-header:hover { background: rgba(255,255,255,0.02); }
-#view-despensa .espacio-header .indicador {
-  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
-}
-#view-despensa .espacio-header .nombre {
-  flex: 1;
-  font-size: 12px;
-  font-weight: 500;
-  color: #f1f5f9;
-  -webkit-text-fill-color: #f1f5f9;
-}
-#view-despensa .espacio-header .contador {
-  font-size: 11px;
-  color: var(--color-text-sec);
-  -webkit-text-fill-color: var(--color-text-sec);
-}
+#view-despensa .espacio-header .indicador { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+#view-despensa .espacio-header .nombre { flex: 1; font-size: 12px; font-weight: 500; color: #f1f5f9; -webkit-text-fill-color: #f1f5f9; }
+#view-despensa .espacio-header .contador { font-size: 11px; color: var(--color-text-sec); -webkit-text-fill-color: var(--color-text-sec); }
 #view-despensa .espacio-body { display: none; padding: 0 16px 12px; }
 #view-despensa .espacio.abierto .espacio-body { display: block; }
 
@@ -184,24 +221,15 @@
   border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 13px; font-weight: 400;
 }
 #view-despensa .producto-item:last-child { border-bottom: none; }
-#view-despensa .producto-item .stock-bajo {
-  color: var(--color-danger); font-weight: 600; font-size: 11px;
-}
-#view-despensa .producto-item .nombre {
-  flex: 1;
-  font-size: 13px;
-  font-weight: 400;
-  color: #f1f5f9;
-  -webkit-text-fill-color: #f1f5f9;
-}
+#view-despensa .producto-item .stock-bajo { color: var(--color-danger); font-weight: 600; font-size: 11px; }
+#view-despensa .producto-item .nombre { flex: 1; font-size: 13px; font-weight: 400; color: #f1f5f9; -webkit-text-fill-color: #f1f5f9; }
 #view-despensa .btn-editar-insumo {
   background: transparent; border: 1px solid var(--color-border); color: var(--color-text-sec);
-  border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer;
-  opacity: 0.6; transition: all .2s;
+  border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer; opacity: 0.6; transition: all .2s;
 }
 #view-despensa .btn-editar-insumo:hover { opacity: 1; border-color: var(--color-accent); color: var(--color-accent); }
 
-/* ── MOVIMIENTOS ──────────────────────────────────────────── */
+/* Movimientos */
 #view-despensa .movimientos-filtros { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
 #view-despensa .mov-filtro-btn {
   background: transparent; border: 1px solid var(--color-border); color: var(--color-text-sec);

@@ -1,11 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/cliente-menu.css
-   Versión: 1.0.1
-   Propósito: Menú digital del cliente: banner, búsqueda y botón flotante.
+   Versión: 1.0.2
+   Propósito: Menú digital del cliente. Reglas encapsuladas en #view-menu-digital.
    ================================================================ */
    
-.menu-estado {
+#view-menu-digital .menu-estado {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -17,7 +17,7 @@
   flex-shrink: 0;
 }
 
-.menu-banner-espera {
+#view-menu-digital .menu-banner-espera {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -30,14 +30,14 @@
   flex-shrink: 0;
   transition: opacity .3s ease, max-height .3s ease;
 }
-.menu-banner-espera i { font-size: 20px; }
+#view-menu-digital .menu-banner-espera i { font-size: 20px; }
 
-.menu-card-atenuado {
+#view-menu-digital .menu-card-atenuado {
   opacity: 0.5;
   pointer-events: none;
 }
 
-.btn-agregar-orden {
+#view-menu-digital .btn-agregar-orden {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -52,11 +52,11 @@
   cursor: pointer;
   transition: var(--t);
 }
-.btn-agregar-orden:hover {
+#view-menu-digital .btn-agregar-orden:hover {
   background: var(--color-accent-dark);
   transform: translateY(-1px);
 }
-.btn-agregar-orden.btn-deshabilitado {
+#view-menu-digital .btn-agregar-orden.btn-deshabilitado {
   background: var(--color-hover);
   color: var(--color-text-muted);
   cursor: not-allowed;
@@ -64,7 +64,7 @@
 }
 
 /* Botón flotante para abrir la orden */
-.btn-toggle-orden {
+#view-menu-digital .btn-toggle-orden {
   position: fixed;
   bottom: 24px;
   right: 24px;
@@ -85,11 +85,11 @@
   gap: 2px;
   transition: var(--t);
 }
-.btn-toggle-orden:hover {
+#view-menu-digital .btn-toggle-orden:hover {
   background: var(--color-accent-dark);
   transform: scale(1.05);
 }
-#contadorOrden {
+#view-menu-digital #contadorOrden {
   background: #000;
   color: var(--color-accent);
   border-radius: 50%;
@@ -182,7 +182,7 @@
     gap: 12px;
     padding: 12px;
   }
-  .btn-toggle-orden {
+  #view-menu-digital .btn-toggle-orden {
     bottom: 16px;
     right: 16px;
     width: 48px;

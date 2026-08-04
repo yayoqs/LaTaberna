@@ -1,12 +1,12 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db.js
-   Versión: 1.0.14
+   Versión: 1.0.15
    Propósito: Orquestador de base de datos (Appwrite + localStorage).
               Sincronización y reseteo de mesas por configuración de zonas.
               Fallback offline robusto: si Appwrite no responde,
               carga desde localStorage y continúa operando.
-              v1.0.14: Auth.getEspacioActivo → Auth.obtenerEspacioActivo.
+              v1.0.15: migración var→let/const.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -23,8 +23,8 @@ export const DB = (function() {
   const core = DBCore;
   const inventario = DBInventario;
   const fusion = DBFusion;
-  var appwrite = DBAppwrite;
-  var shim = DBShim;
+  const appwrite = DBAppwrite;
+  const shim = DBShim;
 
   const combined = {
     ...core,
@@ -38,7 +38,7 @@ export const DB = (function() {
     try {
       Logger.info("[DB] Iniciando carga de datos...");
 
-      var appwriteOk = false;
+      let appwriteOk = false;
       if (appwrite && appwrite.iniciar) {
         try {
           appwriteOk = await appwrite.iniciar();
@@ -55,8 +55,8 @@ export const DB = (function() {
       if (appwriteOk) {
         Logger.info('[DB] Appwrite disponible. Cargando datos desde la nube (paralelo)...');
         try {
-          var resultados = {};
-          var promesas = [
+          const resultados = {};
+          const promesas = [
             'productos',
             'pedidos',
             'mesas',
@@ -201,51 +201,51 @@ export const DB = (function() {
   combined.sincronizarMesasConConfig = async function() {
     if (!appwrite || !appwrite.habilitado) return;
 
-    var zonas = this.config.zonas || [{ nombre: 'salon', cantidad: 12 }];
+    const zonas = this.config.zonas || [{ nombre: 'salon', cantidad: 12 }];
 
-    var totalDeseado = 0;
-    for (var i = 0; i < zonas.length; i++) {
+    let totalDeseado = 0;
+    for (let i = 0; i < zonas.length; i++) {
       totalDeseado += zonas[i].cantidad;
     }
 
-    var virtuales = this.mesas.filter(function(m) { return m.esVirtual; });
-    var reales = this.mesas.filter(function(m) { return !m.esVirtual; });
+    const virtuales = this.mesas.filter(function(m) { return m.esVirtual; });
+    let reales = this.mesas.filter(function(m) { return !m.esVirtual; });
 
-    var ocupadas = reales.filter(function(m) { return m.estado !== 'libre'; });
-    var libres = reales.filter(function(m) { return m.estado === 'libre'; });
+    const ocupadas = reales.filter(function(m) { return m.estado !== 'libre'; });
+    let libres = reales.filter(function(m) { return m.estado === 'libre'; });
 
     Logger.info('[DB] Sincronizando mesas. Deseadas: ' + totalDeseado + ', Actuales: ' + reales.length + ', Ocupadas: ' + ocupadas.length);
 
-    var libresNecesarias = Math.max(0, totalDeseado - ocupadas.length);
+    const libresNecesarias = Math.max(0, totalDeseado - ocupadas.length);
 
-    var nuevasMesas = [];
-    var mesasAEliminar = [];
-    var maxNumero = 0;
+    const nuevasMesas = [];
+    let mesasAEliminar = [];
+    let maxNumero = 0;
 
     if (reales.length > 0) {
       maxNumero = Math.max.apply(null, reales.map(function(m) { return m.numero; }));
     }
 
     if (libres.length > libresNecesarias) {
-      var sobrantes = libres.length - libresNecesarias;
+      const sobrantes = libres.length - libresNecesarias;
       libres.sort(function(a, b) { return b.numero - a.numero; });
       mesasAEliminar = libres.slice(0, sobrantes);
       libres = libres.slice(sobrantes);
     }
 
     if (libres.length < libresNecesarias) {
-      var faltantes = libresNecesarias - libres.length;
-      for (var j = 0; j < faltantes; j++) {
+      const faltantes = libresNecesarias - libres.length;
+      for (let j = 0; j < faltantes; j++) {
         maxNumero++;
-        var zonaNombre = zonas[0]?.nombre || 'salon';
-        var nueva = mesaVacia(maxNumero, zonaNombre);
+        const zonaNombre = zonas[0]?.nombre || 'salon';
+        const nueva = mesaVacia(maxNumero, zonaNombre);
         libres.push(nueva);
         nuevasMesas.push(nueva);
       }
     }
 
-    for (var i = 0; i < mesasAEliminar.length; i++) {
-      var mesa = mesasAEliminar[i];
+    for (let i = 0; i < mesasAEliminar.length; i++) {
+      const mesa = mesasAEliminar[i];
       try {
         await appwrite.eliminar('mesas', String(mesa.numero));
         Logger.info('[DB] Mesa ' + mesa.numero + ' eliminada (sobrante).');
@@ -254,10 +254,10 @@ export const DB = (function() {
       }
     }
 
-    for (var i = 0; i < nuevasMesas.length; i++) {
-      var mesa = nuevasMesas[i];
+    for (let i = 0; i < nuevasMesas.length; i++) {
+      const mesa = nuevasMesas[i];
       try {
-        var dataMesa = {
+        const dataMesa = {
           numero: mesa.numero,
           estado: 'libre',
           pedidoId: '',
@@ -288,18 +288,18 @@ export const DB = (function() {
   combined.resetearMesas = async function() {
     if (!appwrite || !appwrite.habilitado) return;
 
-    var zonas = this.config.zonas || [{ nombre: 'salon', cantidad: 12 }];
+    const zonas = this.config.zonas || [{ nombre: 'salon', cantidad: 12 }];
 
-    var virtuales = this.mesas.filter(function(m) { return m.esVirtual; });
-    var reales = this.mesas.filter(function(m) { return !m.esVirtual; });
+    const virtuales = this.mesas.filter(function(m) { return m.esVirtual; });
+    const reales = this.mesas.filter(function(m) { return !m.esVirtual; });
 
-    var ocupadas = reales.filter(function(m) { return m.estado !== 'libre'; });
-    var libres = reales.filter(function(m) { return m.estado === 'libre'; });
+    const ocupadas = reales.filter(function(m) { return m.estado !== 'libre'; });
+    const libres = reales.filter(function(m) { return m.estado === 'libre'; });
 
     Logger.info('[DB] Reseteando mesas. Ocupadas: ' + ocupadas.length + ', Libres: ' + libres.length);
 
-    for (var i = 0; i < libres.length; i++) {
-      var mesa = libres[i];
+    for (let i = 0; i < libres.length; i++) {
+      const mesa = libres[i];
       try {
         await appwrite.eliminar('mesas', String(mesa.numero));
         Logger.info('[DB] Mesa libre ' + mesa.numero + ' eliminada.');
@@ -308,34 +308,34 @@ export const DB = (function() {
       }
     }
 
-    var totalDeseado = 0;
-    for (var i = 0; i < zonas.length; i++) {
+    let totalDeseado = 0;
+    for (let i = 0; i < zonas.length; i++) {
       totalDeseado += zonas[i].cantidad;
     }
 
-    var nuevasMesas = [];
-    var numero = 1;
-    for (var z = 0; z < zonas.length; z++) {
-      var zona = zonas[z];
-      for (var n = 0; n < zona.cantidad; n++) {
-        var nueva = mesaVacia(numero, zona.nombre);
+    const nuevasMesas = [];
+    let numero = 1;
+    for (let z = 0; z < zonas.length; z++) {
+      const zona = zonas[z];
+      for (let n = 0; n < zona.cantidad; n++) {
+        const nueva = mesaVacia(numero, zona.nombre);
         nuevasMesas.push(nueva);
         numero++;
       }
     }
 
-    var siguienteNumero = totalDeseado + 1;
-    for (var i = 0; i < ocupadas.length; i++) {
-      var ocupada = ocupadas[i];
+    let siguienteNumero = totalDeseado + 1;
+    for (let i = 0; i < ocupadas.length; i++) {
+      const ocupada = ocupadas[i];
       ocupada.numero = siguienteNumero;
       siguienteNumero++;
       nuevasMesas.push(ocupada);
     }
 
-    for (var i = 0; i < nuevasMesas.length; i++) {
-      var mesa = nuevasMesas[i];
+    for (let i = 0; i < nuevasMesas.length; i++) {
+      const mesa = nuevasMesas[i];
       try {
-        var dataMesa = {
+        const dataMesa = {
           numero: mesa.numero,
           estado: mesa.estado || 'libre',
           pedidoId: mesa.pedidoId || '',
@@ -366,8 +366,8 @@ export const DB = (function() {
   combined._cargarConfiguracion = async function() {
     if (typeof appwrite !== 'undefined' && appwrite.habilitado) {
       try {
-        var configAppwrite = await appwrite.listar('configuracion');
-        var docGlobal = configAppwrite.find(function(d) { return d.clave === 'global'; });
+        const configAppwrite = await appwrite.listar('configuracion');
+        const docGlobal = configAppwrite.find(function(d) { return d.clave === 'global'; });
         if (docGlobal && docGlobal.valor) {
           this.config = JSON.parse(docGlobal.valor);
           Logger.info('[DB] Configuración cargada desde Appwrite.');
@@ -407,8 +407,8 @@ export const DB = (function() {
   };
 
   combined.espacioActivoId = function() {
-    if (typeof Auth !== 'undefined' && Auth.obtenerEspacioActivo) {
-      const espacio = Auth.obtenerEspacioActivo();
+    if (typeof Auth !== 'undefined' && Auth.obtenerLocalActivo) {
+      const espacio = Auth.obtenerLocalActivo();
       if (espacio && espacio.id) return espacio.id;
     }
     return 'esp_taberna';

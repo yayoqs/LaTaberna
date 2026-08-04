@@ -1,16 +1,21 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/tickets.js
-   Versión: 1.1.1
+   Versión: 1.3.0
    Propósito: Generación y visualización de tickets de comanda, cuenta y cierre.
-              Migración de var a let/const.
+              Configuración leída desde Store, no desde DB.
    ================================================================ */
 
 import { formatearDinero, formatearDineroTicket, formatearHoraCorta, formatearFechaCorta, calcularTotal, mostrarToast } from '../utils.js';
-import { DB } from '../db.js';
+import { Store } from '../lib/store.js';
 import { Logger } from '../lib/logger.js';
 
 const Tickets = (() => {
+
+  function _obtenerConfig() {
+    const state = Store.obtenerEstado();
+    return state.config || {};
+  }
 
   const Renderer = {
     generarComanda(comanda, destino) {
@@ -45,7 +50,7 @@ const Tickets = (() => {
     },
 
     generarCuenta(mesa, config) {
-      const cfg = config || {};
+      const cfg = config || _obtenerConfig();
       const fecha = formatearFechaCorta();
       const hora = formatearHoraCorta(Date.now());
       const grupos = _agruparItems(mesa.items || []);
@@ -73,7 +78,7 @@ const Tickets = (() => {
     },
 
     generarCierre(mesa, totalFinal, descuento, formaPago, config) {
-      const cfg = config || {};
+      const cfg = config || _obtenerConfig();
       const fecha = formatearFechaCorta();
       const hora = formatearHoraCorta(Date.now());
       const grupos = _agruparItems(mesa.items || []);
@@ -105,7 +110,7 @@ const Tickets = (() => {
     },
 
     generarCierreParcial(mesa, pago, config) {
-      const cfg = config || {};
+      const cfg = config || _obtenerConfig();
       const fecha = formatearFechaCorta();
       const hora = formatearHoraCorta(Date.now());
       const numTicket = String(Date.now()).slice(-6);
@@ -260,7 +265,7 @@ const Tickets = (() => {
           }
           const contentDiv = document.getElementById(`${prefix}-content`);
           if (!contentDiv) return;
-          _imprimirEnVentana(contentDiv.innerHTML, 'Comanda');
+          _imprimirConIframe(contentDiv.innerHTML, 'Comanda');
         };
       }
 
@@ -296,34 +301,63 @@ const Tickets = (() => {
     return Object.values(map);
   }
 
-  function _imprimirEnVentana(contenido, titulo) {
-    const win = window.open('', '_blank', 'width=420,height=680');
-    if (!win) {
-      mostrarToast('error', 'El navegador bloqueó la ventana emergente.');
-      return;
+  function _imprimirConIframe(contenido, titulo) {
+    try {
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+
+      const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+      iframeDoc.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>${titulo}</title>
+        <style>
+          @page { size: 80mm auto; margin: 0; } * { box-sizing:border-box; margin:0; padding:0; }
+          body { font-family:"Courier New",monospace; font-size:12px; line-height:1.45; width:80mm; color:#000; background:#fff; }
+          .ticket-80mm { padding:8px 6px; width:100%; } .t-center { text-align:center; } .t-right { text-align:right; }
+          .t-bold { font-weight:bold; } .t-small { font-size:10px; } .t-large { font-size:15px; }
+          .t-xl { font-size:22px; font-weight:bold; text-align:center; } .t-title { font-size:16px; font-weight:bold; text-align:center; line-height:1.2; }
+          .t-subtitle { font-size:11px; text-align:center; } .t-dest-header { background:#000; color:#fff; text-align:center; font-weight:bold; font-size:14px; padding:4px 0; letter-spacing:2px; }
+          .t-hr-dash { border:none; border-top:1px dashed #000; margin:5px 0; } .t-hr-solid { border:none; border-top:2px solid #000; margin:5px 0; }
+          .t-row { display:flex; justify-content:space-between; gap:4px; } .t-item-row { display:grid; grid-template-columns:3ch 1fr auto; gap:4px; margin-bottom:2px; }
+          .t-item-obs { font-style:italic; font-size:10px; padding-left:28px; margin-bottom:3px; } .t-total-row { display:flex; justify-content:space-between; font-size:14px; font-weight:bold; }
+          .t-footer { text-align:center; font-size:11px; margin-top:4px; } .t-spacer { height:16px; }
+        </style></head><body><div class="ticket-80mm">${contenido}</div></body></html>`);
+      iframeDoc.close();
+
+      iframe.onload = () => {
+        try {
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+        } catch (e) {
+          Logger.error('[Tickets] Error al imprimir con iframe:', e);
+          mostrarToast('error', 'Error al imprimir el ticket.');
+        }
+        setTimeout(() => {
+          if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+        }, 1000);
+      };
+
+      setTimeout(() => {
+        if (iframe.parentNode) {
+          try {
+            iframe.contentWindow.print();
+          } catch (e) { /* ignorar */ }
+          setTimeout(() => {
+            if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+          }, 1000);
+        }
+      }, 500);
+
+    } catch (e) {
+      Logger.error('[Tickets] Error al crear iframe de impresión:', e);
+      mostrarToast('error', 'El navegador no permite imprimir de esta forma. Intente de nuevo.');
     }
-    win.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>${titulo}</title>
-      <style>
-        @page { size: 80mm auto; margin: 0; } * { box-sizing:border-box; margin:0; padding:0; }
-        body { font-family:"Courier New",monospace; font-size:12px; line-height:1.45; width:80mm; color:#000; background:#fff; }
-        .ticket-80mm { padding:8px 6px; width:100%; } .t-center { text-align:center; } .t-right { text-align:right; }
-        .t-bold { font-weight:bold; } .t-small { font-size:10px; } .t-large { font-size:15px; }
-        .t-xl { font-size:22px; font-weight:bold; text-align:center; } .t-title { font-size:16px; font-weight:bold; text-align:center; line-height:1.2; }
-        .t-subtitle { font-size:11px; text-align:center; } .t-dest-header { background:#000; color:#fff; text-align:center; font-weight:bold; font-size:14px; padding:4px 0; letter-spacing:2px; }
-        .t-hr-dash { border:none; border-top:1px dashed #000; margin:5px 0; } .t-hr-solid { border:none; border-top:2px solid #000; margin:5px 0; }
-        .t-row { display:flex; justify-content:space-between; gap:4px; } .t-item-row { display:grid; grid-template-columns:3ch 1fr auto; gap:4px; margin-bottom:2px; }
-        .t-item-obs { font-style:italic; font-size:10px; padding-left:28px; margin-bottom:3px; } .t-total-row { display:flex; justify-content:space-between; font-size:14px; font-weight:bold; }
-        .t-footer { text-align:center; font-size:11px; margin-top:4px; } .t-spacer { height:16px; }
-      </style></head><body><div class="ticket-80mm">${contenido}</div>
-      <script>window.onload=function(){window.print();window.close();};<\/script></body></html>`);
-    win.document.close();
   }
 
   return {
     generarComanda: Renderer.generarComanda.bind(Renderer),
-    generarCuenta: (mesa) => Renderer.generarCuenta(mesa, DB.config),
-    generarCierre: (mesa, totalFinal, descuento, formaPago) => Renderer.generarCierre(mesa, totalFinal, descuento, formaPago, DB.config),
-    generarCierreParcial: (mesa, pago) => Renderer.generarCierreParcial(mesa, pago, DB.config),
+    generarCuenta: (mesa, config) => Renderer.generarCuenta(mesa, config),
+    generarCierre: (mesa, totalFinal, descuento, formaPago, config) => Renderer.generarCierre(mesa, totalFinal, descuento, formaPago, config),
+    generarCierreParcial: (mesa, pago, config) => Renderer.generarCierreParcial(mesa, pago, config),
     mostrar: Modal.mostrar.bind(Modal),
     mostrarDoble: Modal.mostrarDoble.bind(Modal),
     cerrar: Modal.cerrar.bind(Modal),

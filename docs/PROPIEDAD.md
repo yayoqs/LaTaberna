@@ -1,28 +1,18 @@
- ┌──────────────────────────────────────────────────────────┐
-│ REMITENTE: Coordinador de Integración                   │
-│ FECHA:     2026-07-21 02:30 UTC                        │
-│ TIPO:      DOCUMENTO OFICIAL                           │
-│ REFERENCIA: Mapa de Propiedad de Archivos v1.2.0        │
-└──────────────────────────────────────────────────────────┘
+# Mapa de Propiedad de Archivos — La Taberna
 
-# 🗺️ Mapa de Propiedad de Archivos — La Taberna
-
-**Versión 1.2.0** — Actualizado el 2026-07-21
+**Versión 1.3.0** — Actualizado el 2026-08-04
 
 ---
 
-## Cambios en v1.2.0 respecto a v1.1.0
+## Cambios en v1.3.0 respecto a v1.2.0
 
 | Cambio | Motivo |
 |--------|--------|
-| `js/ui/recetas.js` confirmado en **B2** | Cocina/Barra es dueña del Recetario |
-| `js/ui/despensa.js` y submódulos confirmados en **D** | Modularización completada |
-| `js/ui/menu.js` y submódulos agregados a **D** | Nuevo módulo Diseñador de Cartas |
-| `js/ui/config.js` actualizado | Eliminada sección de productos |
-| `js/componentes/visualizador-menu.js` pendiente en **E** | Componente compartido futuro |
-| `js/dominio/receta.js` agregado a **A** | Nuevo dominio para recetas anidadas |
-| `js/servicios/inventario-service.js` confirmado en **D** | Servicio de inventario |
-| `css/cliente-inicio.css` corregido | Variables movidas de :root a #view-inicio |
+| `css/modals.css` movido a **E** | Componente de infraestructura (MISIÓN 8.1) |
+| `js/ui/cuenta.js` corregido a **B1** | Error de propiedad detectado en auditoría |
+| `js/modulos/interno/avisos-mesero.js` agregado a **B1** | Nuevo módulo de notificaciones |
+| `js/modulos/interno/guia-mesero.js` confirmado en **B1** | Ratificado |
+| `js/modulos/interno/precarga-control.js` confirmado en **B1** | Ratificado |
 
 ---
 
@@ -42,7 +32,7 @@
   · js/dominio/direccion.js
   · js/dominio/ingrediente.js
   · js/dominio/pedido.js
-  · js/dominio/receta.js (nuevo)
+  · js/dominio/receta.js
   · js/dominio/resultado.js
   · js/comandos/agregar-mesa.js
   · js/comandos/completar-subcomanda.js
@@ -58,7 +48,7 @@
 
 ---
 
-## Célula B1 — Mesero (20 archivos)
+## Célula B1 — Mesero (23 archivos)
 
   · js/ui/mesas.js
   · js/ui/mesas/constantes.js
@@ -75,6 +65,7 @@
   · js/ui/cuenta.js
   · js/modulos/interno/precarga-control.js
   · js/modulos/interno/guia-mesero.js
+  · js/modulos/interno/avisos-mesero.js (nuevo)
   · css/mesas.css
   · css/mesa-detalles.css
   · css/pedido.css
@@ -92,7 +83,7 @@
 
 ---
 
-## Célula B3 — Caja (10 archivos)
+## Célula B3 — Caja (8 archivos)
 
   · js/ui/cobro.js
   · js/ui/caja.js
@@ -131,7 +122,7 @@
 
 ---
 
-## Célula D — Administración (28 archivos)
+## Célula D — Administración (27 archivos)
 
   · js/ui/despensa.js (fachada)
   · js/ui/despensa/estado.js
@@ -164,11 +155,11 @@
   · css/reparto.css
   · css/perfil.css
   · css/config.css
-  · css/modals.css
+  · css/menu-editor.css (nuevo, extraído de inline JS)
 
 ---
 
-## Célula E — Infraestructura (16 archivos)
+## Célula E — Infraestructura (18 archivos)
 
   · index.html
   · js/app.js
@@ -185,15 +176,12 @@
   · css/layout.css
   · css/responsive.css
   · css/extra.css
+  · css/modals.css (transferido desde D)
   · js/appwrite.min.js
-
----
-
-## Archivos Compartidos
-
   · js/utils.js — Uso permitido para todas las células.
+
 
 ---
 
 *Documento mantenido por el Coordinador de Integración.*
-*Versión 1.2.0 — 2026-07-21*
+*Versión 1.3.0 — 2026-08-04*

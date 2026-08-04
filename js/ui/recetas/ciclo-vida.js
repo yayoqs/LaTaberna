@@ -1,8 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — RECETAS SUBMÓDULO (ES6)
    Archivo: js/ui/recetas/ciclo-vida.js
-   Versión: 1.0.0
+   Versión: 1.0.1
    Propósito: Ciclo de vida de la vista de recetas.
+              Misión 2.2: Store.subscribe → Store.suscribir.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -15,7 +16,7 @@ export function activar() {
   setActivada(true);
   const canceladores = getCanceladores();
 
-  canceladores.push(Store.subscribe((_, action) => {
+  canceladores.push(Store.suscribir((_, action) => {
     if (action.type.startsWith('PRODUCTO') || action.type.startsWith('RECETA') || action.type.startsWith('INGREDIENTE')) {
       pintar();
     }

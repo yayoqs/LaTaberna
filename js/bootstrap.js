@@ -1,10 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/bootstrap.js
-   Versión: 1.0.11
+   Versión: 1.0.15
    Propósito: Secuencia de arranque: Auth, DB, Store, dependencias.
-              Usa crearInventarioRepo() para el repositorio de inventario.
-              Corregido Auth.getRol() → Auth.obtenerRol().
+              Auth.init() → Auth.iniciar().
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -13,9 +12,12 @@ import { Store } from './lib/store.js';
 import { Deps } from './lib/deps.js';
 import { Auth } from './auth.js';
 import { DB } from './db.js';
+import { PedidoService } from './servicios/pedido-service.js';
+import { DeliveryService } from './servicios/delivery-service.js';
 import { InventarioService } from './servicios/inventario-service.js';
 import { mostrarToast } from './utils.js';
 import { TurnoManager } from './managers/turno-manager.js';
+import { PedidoManager } from './managers/pedido-manager.js';
 import { App } from './app.js';
 import { crearInventarioRepo } from './repositorios/inventario-repository.js';
 
@@ -27,7 +29,7 @@ const Bootstrap = (() => {
 
     // 1. Inicializar autenticación
     try {
-      Auth.init();
+      Auth.iniciar();  // ← actualizado
       Logger.info('[Bootstrap] Auth listo.');
     } catch (e) {
       Logger.error('[Bootstrap] Error en Auth:', e);
@@ -46,17 +48,15 @@ const Bootstrap = (() => {
     }
 
     // 3. Poblar Store con los datos iniciales
-    if (typeof Store !== 'undefined') {
-      Store.despachar({ type: 'MESAS_INICIALIZAR',       payload: DB.mesas || [] });
-      Store.despachar({ type: 'PEDIDOS_INICIALIZAR',     payload: DB.pedidos || [] });
-      Store.despachar({ type: 'PRODUCTOS_INICIALIZAR',   payload: DB.productos || [] });
-      Store.despachar({ type: 'INGREDIENTES_INICIALIZAR', payload: DB.ingredientes || [] });
-      Store.despachar({ type: 'RECETAS_INICIALIZAR',      payload: DB.recetas || [] });
-      Store.despachar({ type: 'MOZOS_INICIALIZAR',        payload: DB.mozos || [] });
-      Store.despachar({ type: 'CONFIG_INICIALIZAR',       payload: DB.config || {} });
-      Store.despachar({ type: 'PEDIDOSDELIVERY_INICIALIZAR', payload: DB.pedidosDelivery || [] });
-      Logger.info('[Bootstrap] Store poblado con datos iniciales.');
-    }
+    Store.despachar({ type: 'MESAS_INICIALIZAR',       payload: DB.mesas || [] });
+    Store.despachar({ type: 'PEDIDOS_INICIALIZAR',     payload: DB.pedidos || [] });
+    Store.despachar({ type: 'PRODUCTOS_INICIALIZAR',   payload: DB.productos || [] });
+    Store.despachar({ type: 'INGREDIENTES_INICIALIZAR', payload: DB.ingredientes || [] });
+    Store.despachar({ type: 'RECETAS_INICIALIZAR',      payload: DB.recetas || [] });
+    Store.despachar({ type: 'MOZOS_INICIALIZAR',        payload: DB.mozos || [] });
+    Store.despachar({ type: 'CONFIG_INICIALIZAR',       payload: DB.config || {} });
+    Store.despachar({ type: 'PEDIDOSDELIVERY_INICIALIZAR', payload: DB.pedidosDelivery || [] });
+    Logger.info('[Bootstrap] Store poblado con datos iniciales.');
 
     // 4. Configurar repositorios y servicios
     let pedidoRepo = typeof PedidoRepositoryLocal !== 'undefined' ? PedidoRepositoryLocal : null;
@@ -72,43 +72,32 @@ const Bootstrap = (() => {
 
     const inventarioRepo = crearInventarioRepo();
 
-    if (typeof Deps !== 'undefined') {
-      if (pedidoRepo) Deps.registrar('pedidoRepo', pedidoRepo);
-      Deps.registrar('deliveryRepo', deliveryRepo);
-      Deps.registrar('inventarioRepo', inventarioRepo);
-      Logger.info('[Bootstrap] Dependencias registradas en el contenedor.');
-    }
+    Deps.registrar('pedidoRepo', pedidoRepo);
+    Deps.registrar('deliveryRepo', deliveryRepo);
+    Deps.registrar('inventarioRepo', inventarioRepo);
+    Deps.registrar('pedidoManager', PedidoManager);
+    Deps.registrar('turnoManager', TurnoManager);
+    Logger.info('[Bootstrap] Dependencias registradas en el contenedor.');
 
-    if (typeof PedidoService !== 'undefined' && pedidoRepo) {
+    if (pedidoRepo) {
       PedidoService.configurar(pedidoRepo);
-      if (typeof Deps !== 'undefined') Deps.registrar('pedidoService', PedidoService);
+      Deps.registrar('pedidoService', PedidoService);
       Logger.info('[Bootstrap] PedidoService configurado y registrado.');
     }
-    if (typeof DeliveryService !== 'undefined') {
-      DeliveryService.configurar(deliveryRepo);
-      if (typeof Deps !== 'undefined') Deps.registrar('deliveryService', DeliveryService);
-      Logger.info('[Bootstrap] DeliveryService configurado.');
-    }
-    if (typeof InventarioService !== 'undefined') {
-      InventarioService.configurar(inventarioRepo);
-      if (typeof Deps !== 'undefined') Deps.registrar('inventarioService', InventarioService);
-      Logger.info('[Bootstrap] InventarioService configurado y registrado.');
-    } else {
-      Logger.warn('[Bootstrap] InventarioService no está disponible. La configuración de inventario fallará.');
-    }
+    DeliveryService.configurar(deliveryRepo);
+    Deps.registrar('deliveryService', DeliveryService);
+    Logger.info('[Bootstrap] DeliveryService configurado y registrado.');
+
+    InventarioService.configurar(inventarioRepo);
+    Deps.registrar('inventarioService', InventarioService);
+    Logger.info('[Bootstrap] InventarioService configurado y registrado.');
 
     // 5. Inicializar gestor de turnos y pedidos
     try {
-      if (typeof PedidoManager !== 'undefined') {
-        const turno = PedidoManager.init({ pedidoRepo });
-        Logger.info(`[Bootstrap] PedidoManager activo. Turno: ${turno?.id}`);
-      }
+      const turno = PedidoManager.init({ pedidoRepo });
+      Logger.info(`[Bootstrap] PedidoManager activo. Turno: ${turno?.id}`);
     } catch (e) {
       Logger.error('[Bootstrap] Error al iniciar PedidoManager:', e);
-    }
-
-    if (typeof TurnoManager === 'undefined') {
-      Logger.warn('[Bootstrap] TurnoManager no encontrado.');
     }
 
     // 6. Activar tiempo real de Appwrite
@@ -127,7 +116,7 @@ const Bootstrap = (() => {
 
     try {
       if (Auth.obtenerRol()) {
-        const vistaDefecto = Auth.getDefaultView();
+        const vistaDefecto = Auth.obtenerVistaPorDefecto();
         if (typeof App !== 'undefined' && App.showView) {
           App.showView(vistaDefecto);
         }

@@ -1,12 +1,14 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/kds.js
-   Versión: 5.0.2
+   Versión: 5.0.3
    Propósito: Vista del Jefe de Cocina/Barra. Gestión de comandas con
               pestañas de estado, filtros, progreso, checkeo de ítems,
               swipe entre pestañas, acceso rápido a receta (toque largo)
               y preparación para modo Ayudante (solo lectura).
-              Corrección: Auth.getRol() → Auth.obtenerRol().
+              Misión 2.2: Store.getState → Store.obtenerEstado,
+                          Store.dispatch → Store.despachar,
+                          Store.subscribe → Store.suscribir.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -32,7 +34,7 @@ let _soloLectura = false;
 /* ─── Cambio de estado ──────────────────────── */
 
 function _cambiarEstado(id, estado) {
-  const comandas = Store.getState().comandas || [];
+  const comandas = Store.obtenerEstado().comandas || [];
   let c = comandas.find(x => x.id === id);
   if (!c && (id.endsWith('_cocina') || id.endsWith('_barra'))) {
     c = comandas.find(x => x.id === id.replace(/_(cocina|barra)$/, ''));
@@ -40,7 +42,7 @@ function _cambiarEstado(id, estado) {
   if (!c) return;
 
   if (estado === 'en-proceso') {
-    Store.dispatch({ type: 'COMANDA_ACTUALIZADA', payload: { id, cambios: { estado } } });
+    Store.despachar({ type: 'COMANDA_ACTUALIZADA', payload: { id, cambios: { estado } } });
     mostrarToast('success', `<i class="fas fa-check"></i> ${c.mesa} → En proceso`);
     _actualizarLocal(id, { estado });
     return;
@@ -61,7 +63,7 @@ function _cambiarEstado(id, estado) {
         }).catch(e => Logger.error('[KDS] Error en completarSubcomanda:', e));
       return;
     }
-    Store.dispatch({ type: 'COMANDA_ACTUALIZADA', payload: { id, cambios: { estado } } });
+    Store.despachar({ type: 'COMANDA_ACTUALIZADA', payload: { id, cambios: { estado } } });
     EventBus.emit('comanda:lista', { id, mesa: c.mesa });
     if (c.deliveryId) EventBus.emit('delivery:listo', { deliveryId: c.deliveryId, comandaId: id, estado: 'listo' });
     _actualizarLocal(id, { estado });
@@ -334,7 +336,7 @@ function _pintar() {
 function recargar() {
   if (!_activada) activar();
 
-  const state = Store.getState();
+  const state = Store.obtenerEstado();
   const ahora = Date.now();
   const rol = Auth.obtenerRol();
   let comandas = state.comandas || [];
@@ -366,7 +368,7 @@ function recargar() {
 function activar() {
   if (_activada) return;
   _activada = true;
-  _canceladores.push(Store.subscribe((_, action) => { if (action.type.startsWith('COMANDA')) recargar(); }));
+  _canceladores.push(Store.suscribir((_, action) => { if (action.type.startsWith('COMANDA')) recargar(); }));
   _canceladores.push(EventBus.on('comanda:enviada', c => { Logger.debug(`[KDS] Nueva: ${c.id}`); _reproducirAlerta(); recargar(); }));
   _canceladores.push(EventBus.on('db:inicializada', () => setTimeout(recargar, 100)));
   _canceladores.push(EventBus.on('vista:cambiada', v => { if (v === 'cocina') recargar(); }));

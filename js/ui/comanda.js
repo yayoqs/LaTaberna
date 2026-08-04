@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/comanda.js
-   Versión: 2.0.9
+   Versión: 2.0.10
    Propósito: Gestión de la comanda actual.
-              Migración a Store como fuente de verdad para UI.
+              getMesaActiva → obtenerMesaActiva (Misión 2.3).
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -339,7 +339,7 @@ const Comanda = (() => {
 
     EventBus.on('precarga:items_listos', (payload) => {
       try {
-        const mesaActiva = Comanda.getMesaActiva();
+        const mesaActiva = Comanda.obtenerMesaActiva();
         if (!mesaActiva || mesaActiva.numero !== payload.mesa) {
           mostrarToast('warning', 'Abrí la mesa antes de cargar la precarga.');
           return;
@@ -378,7 +378,7 @@ const Comanda = (() => {
     establecerObservacion,
     quitarItem,
     render,
-    getMesaActiva: () => _mesaActiva
+    obtenerMesaActiva: () => _mesaActiva
   };
 })();
 

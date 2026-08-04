@@ -1,13 +1,14 @@
 /* ================================================================
    LaTaberna - PubPOS — PERFIL SUBMÓDULO (ES6)
    Archivo: js/ui/perfil/admin-roles.js
-   Versión: 1.0.0
+   Versión: 1.1.0
    Propósito: Pestaña de administración de roles (solo admin y master).
+              v1.1.0: reemplaza prompt por mostrarEntrada.
    ================================================================ */
 
 import { Auth } from '../../auth.js';
 import { Roles } from '../../roles.js';
-import { mostrarToast } from '../../utils.js';
+import { mostrarToast, mostrarEntrada } from '../../utils.js';
 
 export function renderTabAdmin(usuarioActual, esMaster) {
   const tabAdmin = document.getElementById('tab-admin');
@@ -84,13 +85,14 @@ export function renderTabAdmin(usuarioActual, esMaster) {
         const nombreUsuario = this.dataset.usuario;
         const nuevoRol = this.checked ? this.dataset.rol : 'cliente';
 
-        const resultado = Auth.cambiarRol(nombreUsuario, nuevoRol);
+        const resultado = await Auth.cambiarRol(nombreUsuario, nuevoRol);
         if (!resultado.exito) {
           mostrarToast('error', resultado.error);
           this.checked = !this.checked;
           return;
         }
         mostrarToast('success', `Rol de ${nombreUsuario} actualizado a ${nuevoRol}`);
+        renderTabAdmin(usuarioActual, esMaster);
       });
     });
   }
@@ -103,17 +105,31 @@ export function renderTabAdmin(usuarioActual, esMaster) {
     });
   });
 
+  // ✅ Sin prompt: ahora usamos mostrarEntrada
   document.getElementById('btnInvitarPersonal')?.addEventListener('click', async () => {
-    const nombreCliente = prompt('Ingresa el nombre exacto del cliente a invitar como personal:');
+    const nombreCliente = await mostrarEntrada(
+      'Invitar como personal',
+      'Ingresa el nombre exacto del cliente a invitar:',
+      { placeholder: 'Ej: juanperez' }
+    );
     if (!nombreCliente) return;
-    const rolInicial = prompt('Asignar rol inicial (mesero, cocina, barra, etc.):', 'mesero');
-    if (!rolInicial || !Roles.lista.includes(rolInicial)) {
+
+    const rolInicial = await mostrarEntrada(
+      'Asignar rol inicial',
+      'Elige el primer rol para esta persona:',
+      { valorPredefinido: 'mesero', placeholder: 'mesero, cocina, barra...' }
+    );
+    if (!rolInicial) return;
+
+    if (!Roles.lista.includes(rolInicial.trim())) {
       mostrarToast('error', 'Rol no válido.');
       return;
     }
-    const resultado = Auth.cambiarRol(nombreCliente, rolInicial);
+
+    const resultado = await Auth.cambiarRol(nombreCliente.trim(), rolInicial.trim());
     if (resultado.exito) {
       mostrarToast('success', `${nombreCliente} ahora es ${rolInicial}`);
+      renderTabAdmin(usuarioActual, esMaster);
     } else {
       mostrarToast('error', resultado.error);
     }

@@ -4,6 +4,7 @@
    Versión: 1.1.1
    Propósito: Cierre de turno, respaldo en Google Drive y reseteo del sistema.
               Desacoplado de UI (emite eventos) y corregida referencia a syncQueue.
+              Corrección: migración var→let/const.
    ================================================================ */
 
 import { EventBus } from '../lib/eventBus.js';

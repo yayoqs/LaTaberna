@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — RECETAS SUBMÓDULO (ES6)
    Archivo: js/ui/recetas/renderer.js
-   Versión: 2.1.4
+   Versión: 2.1.5
    Propósito: Layout libro con sidebar de capítulos e índice lateral
-              de colores. Corrección: Auth.getRol() → Auth.obtenerRol().
+              de colores. Misión 2.2: Store.getState → Store.obtenerEstado.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -178,7 +178,7 @@ function cerrarSidebar() {
 function _pintarSidebarCapitulos() {
   const container = document.getElementById('recetasSidebarCapitulos');
   if (!container) return;
-  const state = Store.getState();
+  const state = Store.obtenerEstado();
   const recetas = state.recetas || [];
   const categorias = _obtenerCategorias(recetas);
   setCategorias(categorias);
@@ -229,7 +229,7 @@ function _obtenerCategorias(recetas) {
 }
 
 export function pintarRecetario(contenedor) {
-  const state = Store.getState();
+  const state = Store.obtenerEstado();
   const recetas = state.recetas || [];
   const productos = state.productos || [];
   const esProduccion = getModo() === 'produccion';
@@ -282,7 +282,6 @@ function _pintarLibro(recetas, productos, categorias, esProduccion) {
     return;
   }
 
-  // ── Índice lateral de colores ──────────────
   if (indice) {
     if (capActivo === 'todas') {
       const idsPresentes = categorias.map(c => c.id).filter(id => {
@@ -334,7 +333,6 @@ function _pintarLibro(recetas, productos, categorias, esProduccion) {
     }
   }
 
-  // ── Contenido principal ─────────────────────
   if (capActivo === 'todas') {
     const grupos = {};
     filtradas.forEach(r => {
@@ -404,7 +402,7 @@ function _tarjetaLibro(r, cat) {
 }
 
 export function pintarStock(contenedor) {
-  const state = Store.getState();
+  const state = Store.obtenerEstado();
   const recetas = (state.recetas || []).filter(r => r.es_intermedio);
   const productos = state.productos || [];
   const categorias = _obtenerCategorias(recetas);

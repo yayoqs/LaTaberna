@@ -1,19 +1,19 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/reparto.css
-   Versión: 1.0.0
-   Propósito: Vista de Reparto: tabla de pedidos delivery, badges y modal.
+   Versión: 1.1.0
+   Propósito: Vista de Reparto encapsulada bajo #view-reparto.
    ================================================================ */
 
 /* ── CONTENEDOR DE TABLA ──────────────────────────────────── */
-.reparto-table-wrap {
+#view-reparto .reparto-table-wrap {
   flex: 1;
   overflow-y: auto;
   padding: 20px;
 }
 
 /* ── TABLA ────────────────────────────────────────────────── */
-.reparto-table {
+#view-reparto .reparto-table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
@@ -23,7 +23,7 @@
   box-shadow: var(--shadow-sm);
 }
 
-.reparto-table th {
+#view-reparto .reparto-table th {
   text-align: left;
   padding: 12px 14px;
   background: var(--color-panel);
@@ -39,19 +39,19 @@
   z-index: 1;
 }
 
-.reparto-table td {
+#view-reparto .reparto-table td {
   padding: 10px 14px;
   border-bottom: 1px solid var(--color-border);
   color: var(--color-text);
   vertical-align: middle;
 }
 
-.reparto-table tbody tr:hover td {
+#view-reparto .reparto-table tbody tr:hover td {
   background: var(--color-hover);
 }
 
 /* ── BADGES DE ESTADO ─────────────────────────────────────── */
-.badge {
+#view-reparto .badge {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -62,14 +62,14 @@
   text-transform: uppercase;
 }
 
-.badge.warning { background: rgba(245,158,11,.15); color: var(--color-warning); }
-.badge.info    { background: rgba(59,130,246,.15); color: var(--color-info); }
-.badge.accent  { background: rgba(245,158,11,.2); color: var(--color-accent); }
-.badge.success { background: rgba(34,197,94,.15); color: var(--color-success); }
-.badge.default { background: var(--color-hover); color: var(--color-text-muted); }
+#view-reparto .badge.warning { background: rgba(245,158,11,.15); color: var(--color-warning); }
+#view-reparto .badge.info    { background: rgba(59,130,246,.15); color: var(--color-info); }
+#view-reparto .badge.accent  { background: rgba(245,158,11,.2); color: var(--color-accent); }
+#view-reparto .badge.success { background: rgba(34,197,94,.15); color: var(--color-success); }
+#view-reparto .badge.default { background: var(--color-hover); color: var(--color-text-muted); }
 
 /* ── BOTONES DE ACCIÓN EN TABLA ───────────────────────────── */
-.reparto-table .btn-ajuste {
+#view-reparto .reparto-table .btn-ajuste {
   background: var(--color-hover);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xs);
@@ -86,20 +86,20 @@
   white-space: nowrap;
 }
 
-.reparto-table .btn-ajuste:hover {
+#view-reparto .reparto-table .btn-ajuste:hover {
   background: var(--color-accent);
   color: #000;
   border-color: var(--color-accent);
 }
 
-.reparto-table .btn-ajuste.del:hover {
+#view-reparto .reparto-table .btn-ajuste.del:hover {
   background: var(--color-danger);
   color: #fff;
   border-color: var(--color-danger);
 }
 
 /* ── MODAL DE NUEVO PEDIDO ────────────────────────────────── */
-#modalReparto .modal-small-body textarea {
+#view-reparto #modalReparto .modal-small-body textarea {
   width: 100%;
   background: var(--color-panel);
   border: 1px solid var(--color-border);
@@ -113,25 +113,24 @@
   transition: var(--t);
 }
 
-#modalReparto .modal-small-body textarea:focus {
+#view-reparto #modalReparto .modal-small-body textarea:focus {
   border-color: var(--color-accent);
 }
 
 /* ── RESPONSIVE ───────────────────────────────────────────── */
 @media (max-width: 600px) {
-  .reparto-table-wrap {
+  #view-reparto .reparto-table-wrap {
     padding: 10px;
   }
 
-  .reparto-table {
+  #view-reparto .reparto-table {
     font-size: 12px;
   }
 
-  /* Oculta columnas menos importantes en móvil */
-  .reparto-table th:nth-child(3),
-  .reparto-table td:nth-child(3),
-  .reparto-table th:nth-child(7),
-  .reparto-table td:nth-child(7) {
+  #view-reparto .reparto-table th:nth-child(3),
+  #view-reparto .reparto-table td:nth-child(3),
+  #view-reparto .reparto-table th:nth-child(7),
+  #view-reparto .reparto-table td:nth-child(7) {
     display: none;
   }
 }

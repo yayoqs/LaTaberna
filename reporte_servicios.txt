@@ -121,15 +121,16 @@
 📦 Variable/Parámetro de BD: `if (typeof databaseId === 'undefined') {` -> en appwrite.min.js (Línea 8609)
 📦 Variable/Parámetro de BD: `throw new AppwriteException('Missing required parameter: "databaseId"');` -> en appwrite.min.js (Línea 8610)
 📦 Variable/Parámetro de BD: `const apiPath = '/tablesdb/{databaseId}/tables/{tableId}/rows/{rowId}/{column}/increment'.replace('{databaseId}', databaseId).replace('{tableId}', tableId).replace('{rowId}', rowId).replace('{column}', column);` -> en appwrite.min.js (Línea 8621)
-📦 Variable/Parámetro de BD: `delete datos.$databaseId;` -> en db-appwrite.js (Línea 49)
-📦 Variable/Parámetro de BD: `databaseId: modulo.idBaseDeDatos,` -> en db-appwrite.js (Línea 100)
-📦 Variable/Parámetro de BD: `databaseId: modulo.idBaseDeDatos,` -> en db-appwrite.js (Línea 131)
-📦 Variable/Parámetro de BD: `databaseId: modulo.idBaseDeDatos,` -> en db-appwrite.js (Línea 173)
-📦 Variable/Parámetro de BD: `databaseId: modulo.idBaseDeDatos,` -> en db-appwrite.js (Línea 204)
-📦 Variable/Parámetro de BD: `databaseId: modulo.idBaseDeDatos,` -> en db-appwrite.js (Línea 237)
-📦 Variable/Parámetro de BD: `databaseId: modulo.idBaseDeDatos,` -> en db-appwrite.js (Línea 267)
-📦 Variable/Parámetro de BD: `databaseId: modulo.idBaseDeDatos,` -> en db-appwrite.js (Línea 295)
-📦 Variable/Parámetro de BD: `databaseId: modulo.idBaseDeDatos,` -> en db-appwrite.js (Línea 394)
+📦 Variable/Parámetro de BD: `const localTaberna = { id: 'lataberna', nombre: 'La Taberna', tipo: 'bar', rol: usuario.rol, databaseId: '6a0275cb0022ebf7d30d' };` -> en auth.js (Línea 175)
+📦 Variable/Parámetro de BD: `const localTaberna = { id: 'lataberna', nombre: 'La Taberna', tipo: 'bar', rol: usuario.rol, databaseId: '6a0275cb0022ebf7d30d' };` -> en auth.js (Línea 214)
+📦 Variable/Parámetro de BD: `databaseId: modulo.idBaseDeDatos,` -> en db-appwrite.js (Línea 127)
+📦 Variable/Parámetro de BD: `databaseId: modulo.idBaseDeDatos,` -> en db-appwrite.js (Línea 157)
+📦 Variable/Parámetro de BD: `databaseId: modulo.idBaseDeDatos,` -> en db-appwrite.js (Línea 191)
+📦 Variable/Parámetro de BD: `databaseId: modulo.idBaseDeDatos,` -> en db-appwrite.js (Línea 215)
+📦 Variable/Parámetro de BD: `databaseId: modulo.idBaseDeDatos,` -> en db-appwrite.js (Línea 236)
+📦 Variable/Parámetro de BD: `databaseId: modulo.idBaseDeDatos,` -> en db-appwrite.js (Línea 256)
+📦 Variable/Parámetro de BD: `databaseId: modulo.idBaseDeDatos,` -> en db-appwrite.js (Línea 276)
+📦 Variable/Parámetro de BD: `databaseId: modulo.idBaseDeDatos,` -> en db-appwrite.js (Línea 373)
 
 2. CLOUD FUNCTIONS EN APPWRITE:
    No se detectaron invocaciones a funciones de Appwrite.
@@ -138,6 +139,14 @@
    No se detectaron enlaces directos a macros de Google.
 
 4. VARIABLES DE CONFIGURACIÓN CLAVE (Revisar consistencia):
+🔑 `.setEndpoint(process.env.APPWRITE_ENDPOINT)` -> en index.js (Línea 5)
+🔑 `.setProject(process.env.APPWRITE_PROJECT_ID)` -> en index.js (Línea 6)
+🔑 `.setKey(process.env.APPWRITE_API_KEY);` -> en index.js (Línea 7)
 🔑 `.setEndpoint(process.env.APPWRITE_ENDPOINT)` -> en index.js (Línea 4)
 🔑 `.setProject(process.env.APPWRITE_PROJECT_ID)` -> en index.js (Línea 5)
 🔑 `.setKey(process.env.APPWRITE_API_KEY);` -> en index.js (Línea 6)
+🔑 `export const APPWRITE_ENDPOINT =` -> en config-appwrite.js (Línea 14)
+🔑 `export const APPWRITE_PROJECT_ID =` -> en config-appwrite.js (Línea 23)
+🔑 `import { APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID } from './config-appwrite.js';` -> en db-appwrite.js (Línea 12)
+🔑 `const endpoint = APPWRITE_ENDPOINT;` -> en db-appwrite.js (Línea 88)
+🔑 `const projectId = APPWRITE_PROJECT_ID;` -> en db-appwrite.js (Línea 89)

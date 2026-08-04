@@ -1,11 +1,27 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS
    Archivo: css/cliente-bienvenida.css
-   Versión: 2.1.0
-   Propósito: Panel de control post-validación con hero,
-             comensales en columna lateral y acciones rápidas.
-   Dependencias: css/vars.css
+   Versión: 2.1.1
+   Propósito: Pantalla de bienvenida post-login con panel de control.
+             Reglas encapsuladas en #view-bienvenida.
    ================================================================ */
+
+/* === Variables encapsuladas en la vista de bienvenida === */
+#view-bienvenida {
+  --color-accent: var(--color-accent-global, #f59e0b);
+  --color-primary: var(--color-primary-global, #6366f1);
+  --color-bg: #0f0f14;
+  --color-card: #1a1a24;
+  --color-panel: #21212e;
+  --color-border: #2e2e42;
+  --color-text: #f1f5f9;
+  --color-text-sec: #94a3b8;
+  --color-text-muted: #64748b;
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --radius: 16px;
+  --radius-sm: 10px;
+  --t: all 0.2s ease;
+}
 
 /* Vista activa */
 .view.active#view-bienvenida {
@@ -24,7 +40,7 @@
 }
 
 /* Barra superior */
-.top-bar {
+#view-bienvenida .top-bar {
   width: 100%;
   max-width: 540px;
   display: flex;
@@ -39,8 +55,8 @@
   border-radius: var(--radius);
   flex-shrink: 0;
 }
-.user-profile { display: flex; align-items: center; gap: 10px; }
-.user-avatar {
+#view-bienvenida .user-profile { display: flex; align-items: center; gap: 10px; }
+#view-bienvenida .user-avatar {
   width: 40px; height: 40px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
@@ -48,9 +64,9 @@
   font-weight: bold; font-size: 0.9rem; color: #fff;
   box-shadow: 0 0 10px rgba(245,158,11,0.4);
 }
-.user-info h3 { font-size: 0.95rem; font-weight: 700; }
-.user-info p  { font-size: 0.75rem; color: var(--color-accent); }
-.logout-btn {
+#view-bienvenida .user-info h3 { font-size: 0.95rem; font-weight: 700; }
+#view-bienvenida .user-info p  { font-size: 0.75rem; color: var(--color-accent); }
+#view-bienvenida .logout-btn {
   background: transparent;
   border: 1px solid rgba(245,158,11,0.4);
   color: var(--color-accent);
@@ -59,10 +75,10 @@
   font-size: 0.8rem; font-weight: 600;
   cursor: pointer; transition: var(--t);
 }
-.logout-btn:hover { background: var(--color-accent); color: #000; }
+#view-bienvenida .logout-btn:hover { background: var(--color-accent); color: #000; }
 
-/* Contenedor principal (se reemplaza al activar la mesa) */
-.welcome-container {
+/* Contenedor principal */
+#view-bienvenida .welcome-container {
   width: 100%;
   max-width: 540px;
   display: flex;
@@ -71,35 +87,35 @@
 }
 
 /* Hero + comensales en fila */
-.hero-row {
+#view-bienvenida .hero-row {
   display: flex;
   gap: 16px;
   align-items: flex-start;
   flex-shrink: 0;
 }
-.hero-estado {
+#view-bienvenida .hero-estado {
   flex: 1;
   text-align: center;
 }
-.icono-mesa {
+#view-bienvenida .icono-mesa {
   width: 90px; height: 90px;
   margin: 0 auto 8px;
 }
-.icono-mesa svg {
+#view-bienvenida .icono-mesa svg {
   width: 100%; height: 100%;
 }
-.hero-estado h1 {
+#view-bienvenida .hero-estado h1 {
   font-size: 1.5rem; font-weight: 800;
   background: linear-gradient(to right, var(--color-accent), var(--color-primary));
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
-.hero-estado p {
+#view-bienvenida .hero-estado p {
   font-size: 0.85rem; color: var(--color-text-sec); font-style: italic;
 }
 
 /* Columna de comensales */
-.sidebar-comensales {
+#view-bienvenida .sidebar-comensales {
   width: 110px; flex-shrink: 0;
   background: var(--color-card);
   border: 1px solid var(--color-border);
@@ -107,64 +123,64 @@
   padding: 12px;
   display: flex; flex-direction: column; align-items: center; gap: 10px;
 }
-.sidebar-comensales h4 {
+#view-bienvenida .sidebar-comensales h4 {
   font-size: 0.7rem; color: var(--color-text-sec); text-align: center;
   display: flex; align-items: center; gap: 4px;
 }
-.avatar-list-vertical {
+#view-bienvenida .avatar-list-vertical {
   display: flex; flex-direction: column; align-items: center; gap: 6px;
 }
-.avatar-mini {
+#view-bienvenida .avatar-mini {
   width: 40px; height: 40px; border-radius: 50%;
   background: var(--color-panel); border: 2px solid var(--color-border);
   display: flex; align-items: center; justify-content: center;
   font-weight: 700; font-size: 0.8rem; transition: var(--t);
 }
-.avatar-mini.activo {
+#view-bienvenida .avatar-mini.activo {
   border-color: var(--color-accent);
   box-shadow: 0 0 8px rgba(245,158,11,0.3);
 }
-.btn-agregar-comensal {
+#view-bienvenida .btn-agregar-comensal {
   width: 40px; height: 40px; border-radius: 50%;
   background: transparent; border: 2px dashed var(--color-border);
   color: var(--color-text-sec); cursor: pointer;
   display: flex; align-items: center; justify-content: center;
   font-size: 1.1rem; transition: var(--t);
 }
-.btn-agregar-comensal:hover {
+#view-bienvenida .btn-agregar-comensal:hover {
   border-color: var(--color-accent); color: var(--color-accent);
 }
 
 /* Botones de acción */
-.acciones-grid {
+#view-bienvenida .acciones-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
   flex-shrink: 0;
 }
-.btn-accion {
+#view-bienvenida .btn-accion {
   padding: 14px; border-radius: var(--radius-sm); font-weight: 700;
   font-size: 0.9rem; cursor: pointer; border: none;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
   display: flex; flex-direction: column; align-items: center; gap: 6px;
 }
-.btn-accion:hover {
+#view-bienvenida .btn-accion:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 16px rgba(0,0,0,0.3);
 }
-.btn-pedido {
+#view-bienvenida .btn-pedido {
   background: linear-gradient(135deg, var(--color-accent), var(--color-accent-dark, #d97706));
   color: #000;
 }
-.btn-llamar {
+#view-bienvenida .btn-llamar {
   background: var(--color-panel);
   border: 2px solid var(--color-primary);
   color: var(--color-primary);
 }
-.btn-accion i { font-size: 1.6rem; }
+#view-bienvenida .btn-accion i { font-size: 1.6rem; }
 
 /* Vistazo rápido al pedido */
-.pedido-vistazo {
+#view-bienvenida .pedido-vistazo {
   background: var(--color-card);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
@@ -172,11 +188,11 @@
   flex-shrink: 0;
   display: flex; align-items: center; gap: 10px;
 }
-.pedido-icono { font-size: 1.6rem; color: var(--color-accent); }
-.pedido-detalle { flex: 1; }
-.pedido-detalle h4 { font-size: 0.9rem; margin-bottom: 2px; }
-.pedido-detalle p { font-size: 0.75rem; color: var(--color-text-sec); }
-.pedido-badge {
+#view-bienvenida .pedido-icono { font-size: 1.6rem; color: var(--color-accent); }
+#view-bienvenida .pedido-detalle { flex: 1; }
+#view-bienvenida .pedido-detalle h4 { font-size: 0.9rem; margin-bottom: 2px; }
+#view-bienvenida .pedido-detalle p { font-size: 0.75rem; color: var(--color-text-sec); }
+#view-bienvenida .pedido-badge {
   background: rgba(245,158,11,0.15);
   color: var(--color-accent);
   padding: 4px 8px;
@@ -184,11 +200,11 @@
   font-size: 0.7rem; font-weight: 700;
 }
 
-/* Tarjetas inferiores (conservadas del diseño actual) */
-.menu-grid {
+/* Tarjetas inferiores */
+#view-bienvenida .menu-grid {
   display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;
 }
-.action-card {
+#view-bienvenida .action-card {
   background: var(--color-card);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
@@ -197,36 +213,36 @@
   cursor: pointer; text-align: left; position: relative;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
-.action-card::after {
+#view-bienvenida .action-card::after {
   content: '\f105';
   font-family: 'Font Awesome 6 Free';
   font-weight: 900;
   position: absolute; right: 16px;
-  color: var(--color-text-muted, #64748b);
+  color: var(--color-text-muted);
   font-size: 1rem;
   transition: transform 0.2s;
 }
-.action-card.order-mode:hover {
+#view-bienvenida .action-card.order-mode:hover {
   border-color: var(--color-accent);
   background: rgba(245,158,11,0.04);
   box-shadow: 0 0 16px rgba(245,158,11,0.1);
   transform: translateY(-2px);
 }
-.action-card.order-mode .action-icon { color: var(--color-accent); }
-.action-card.events-mode:hover {
+#view-bienvenida .action-card.order-mode .action-icon { color: var(--color-accent); }
+#view-bienvenida .action-card.events-mode:hover {
   border-color: var(--color-primary);
   background: rgba(99,102,241,0.04);
   box-shadow: 0 0 16px rgba(99,102,241,0.1);
   transform: translateY(-2px);
 }
-.action-card.events-mode .action-icon { color: var(--color-primary); }
-.action-card:hover::after { transform: translateX(3px); color: #fff; }
-.action-icon { font-size: 1.7rem; width: 40px; display: flex; justify-content: center; }
-.action-details h4 { font-size: 0.95rem; font-weight: 700; margin-bottom: 2px; }
-.action-details p  { font-size: 0.75rem; color: var(--color-text-sec); }
+#view-bienvenida .action-card.events-mode .action-icon { color: var(--color-primary); }
+#view-bienvenida .action-card:hover::after { transform: translateX(3px); color: #fff; }
+#view-bienvenida .action-icon { font-size: 1.7rem; width: 40px; display: flex; justify-content: center; }
+#view-bienvenida .action-details h4 { font-size: 0.95rem; font-weight: 700; margin-bottom: 2px; }
+#view-bienvenida .action-details p  { font-size: 0.75rem; color: var(--color-text-sec); }
 
-/* --- Tarjeta de ingreso y espera (pre-validación) --- */
-.status-card {
+/* Tarjeta de ingreso y espera (pre-validación) */
+#view-bienvenida .status-card {
   background: var(--color-card);
   border-radius: var(--radius);
   padding: 25px;
@@ -235,23 +251,23 @@
   box-shadow: 0 10px 30px rgba(0,0,0,0.5);
   position: relative; overflow: hidden;
 }
-.status-card::before {
+#view-bienvenida .status-card::before {
   content: '';
   position: absolute; top: 0; left: 0;
   width: 100%; height: 4px;
   background: linear-gradient(to right, var(--color-accent), var(--color-primary));
 }
-.status-card h2 {
+#view-bienvenida .status-card h2 {
   font-size: 1.3rem;
   margin-bottom: 15px;
   letter-spacing: 0.5px;
 }
 
 /* Input de mesa */
-.input-group {
+#view-bienvenida .input-group {
   display: flex; gap: 10px; margin-top: 15px; justify-content: center;
 }
-.table-input {
+#view-bienvenida .table-input {
   width: 100px;
   background: var(--color-panel);
   border: 2px solid rgba(245,158,11,0.3);
@@ -260,22 +276,22 @@
   font-size: 1.2rem; font-weight: 700; text-align: center;
   outline: none; transition: var(--t);
 }
-.table-input:focus { border-color: var(--color-accent); }
-.primary-btn {
+#view-bienvenida .table-input:focus { border-color: var(--color-accent); }
+#view-bienvenida .primary-btn {
   background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
   border: none; color: #fff;
   padding: 12px 24px; border-radius: var(--radius-sm);
   font-weight: 700; font-size: 0.95rem;
   cursor: pointer; transition: var(--t);
 }
-.primary-btn:hover { transform: translateY(-1px); }
+#view-bienvenida .primary-btn:hover { transform: translateY(-1px); }
 
 /* Espera */
-.waiting-status {
+#view-bienvenida .waiting-status {
   display: flex; flex-direction: column; align-items: center;
   gap: 12px; margin-top: 10px;
 }
-.spinner {
+#view-bienvenida .spinner {
   width: 24px; height: 24px;
   border: 3px solid rgba(245,158,11,0.2);
   border-top-color: var(--color-accent);
@@ -283,7 +299,7 @@
   animation: spin 1s infinite linear;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
-.pre-order-badge {
+#view-bienvenida .pre-order-badge {
   display: inline-block; margin-top: 15px;
   padding: 6px 12px;
   background: rgba(245,158,11,0.08);
@@ -293,30 +309,30 @@
   opacity: 0;
   transition: opacity 0.5s ease;
 }
-.pre-order-badge.visible { opacity: 1; }
+#view-bienvenida .pre-order-badge.visible { opacity: 1; }
 
 /* Responsive */
 @media (max-width: 450px) {
-  .hero-row {
-    flex-direction: row;          /* se mantiene en fila incluso en móvil */
+  #view-bienvenida .hero-row {
+    flex-direction: row;
     gap: 10px;
   }
-  .icono-mesa {
+  #view-bienvenida .icono-mesa {
     width: 70px; height: 70px;
   }
-  .hero-estado h1 { font-size: 1.3rem; }
-  .hero-estado p { font-size: 0.75rem; }
-  .sidebar-comensales {
+  #view-bienvenida .hero-estado h1 { font-size: 1.3rem; }
+  #view-bienvenida .hero-estado p { font-size: 0.75rem; }
+  #view-bienvenida .sidebar-comensales {
     width: 90px;
     padding: 10px;
   }
-  .avatar-mini {
+  #view-bienvenida .avatar-mini {
     width: 34px; height: 34px; font-size: 0.7rem;
   }
-  .btn-agregar-comensal {
+  #view-bienvenida .btn-agregar-comensal {
     width: 34px; height: 34px; font-size: 1rem;
   }
-  .top-bar { flex-direction: column; gap: 12px; align-items: flex-start; }
-  .status-card { padding: 18px; }
-  .action-card { padding: 14px; }
+  #view-bienvenida .top-bar { flex-direction: column; gap: 12px; align-items: flex-start; }
+  #view-bienvenida .status-card { padding: 18px; }
+  #view-bienvenida .action-card { padding: 14px; }
 }

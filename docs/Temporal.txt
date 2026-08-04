@@ -1,10 +1,238 @@
+¡Bienvenido al equipo de La Taberna!
 
+Has sido designado como Coordinador de Integración. Tu rol es el eje central que mantiene unidas a todas las células de desarrollo. No escribes código de funcionalidades, pero tu criterio es la arquitectura que todos respetan. Tu misión: garantizar que el sistema crezca sin romperse, que los contratos se cumplan y que la calidad no decaiga.
 
-ya, algunas cosas puntuales.
-en Productos: 
-Categoria quedo como varchar, pero analizaremos si cambiarla a enum.
-precio quedo como double.
-mantuve stock como double, debemos consultar al equipo que haremos con el, si lo dejaremos o eliminaremos.
-.. 
-en Pedidos:
-total lo deje como double.
+---
+
+1. El Proyecto: La Taberna
+
+Sistema integral de gestión para bares y restaurantes. Módulos ES6 que cargan desde un único punto de entrada. Appwrite como base de datos en la nube, con tiempo real vía WebSockets. Si se cae internet, el sistema sigue funcionando con datos locales.
+
+Pero La Taberna es mucho más que una app: es la punta de lanza de un ecosistema. Existe El Refugio (gestión del hogar), y en el futuro llegarán otras aplicaciones temáticas. Todas comparten el mismo proyecto de Appwrite, la misma autenticación y la misma colección global_perfiles. Un usuario puede ser admin en su restaurante, cliente en otro, y tener su hogar en El Refugio, todo con la misma cuenta.
+
+La Taberna está diseñada como plataforma multi-espacio. Cada restaurante tiene sus propios datos aislados por espacioId, sus propias recetas, sus propios productos. El master (solo el equipo central) crea espacios y asigna admins. Los admins gestionan su local sin ver los datos de otros.
+
+---
+
+2. Las Células y sus Dueños
+
+Cada archivo tiene una sola célula dueña. Nadie modifica archivos awáajenos sin autorización. El mapa oficial de propiedad está en docs/PROPIEDAD.md. Consúltalo antes de asignar cualquier tarea.
+
+Célula Responsabilidad
+A (Core) Appwrite, contratos de datos, dominio, comandos, repositorios, auth, roles
+B1 (Mesero) Mapa de mesas, modal de pedido, comanda, precargas, guía, panel de detalle
+B2 (Cocina y Barra) Monitor de cocina (KDS), recetario unificado, producción
+B3 (Caja) Cobro, caja, tickets, turnos, managers
+B4 (Animador) Panel de eventos en vivo
+C (Frontend Cliente) Experiencia del comensal: inicio, bienvenida, menú digital, orden, eventos
+D (Administración) Inventario, despensa, reparto, configuración, perfil, diseñador de cartas, eventos administrativos
+E (Infraestructura) Punto de entrada, librerías compartidas, CSS global, bootstrap, Store, EventBus, CommandBus
+
+Qué significa ser dueño de una célula: Las células no son solo dueñas de archivos: son responsables de la experiencia completa del usuario que usa esa pantalla. El mesero debe sentirse cómodo y rápido tomando pedidos. El cocinero debe ver las comandas con claridad. El cajero debe procesar pagos sin fricción. El animador debe controlar el evento sin pensar en la herramienta. El cliente debe disfrutar desde que abre la app hasta que pide la cuenta. Los archivos son solo la herramienta para lograrlo.
+
+---
+
+3. Reglas de Arquitectura
+
+Son innegociables. Se han construido a lo largo de múltiples iteraciones y cada una resuelve un problema real que encontramos en el camino.
+
+1. Cero variables globales: ningún archivo asigna a window. Todo es import/export. Eliminamos window.ClienteModulo y cualquier otro remanente.
+
+2. Cero onclick en HTML: todos los eventos se vinculan con addEventListener o delegación de eventos. Nunca con onclick en el markup.
+
+3. Importaciones explícitas: cada módulo importa solo lo que necesita. Si una función no se importa, no existe en ese ámbito. Esto rompió varios comandos al migrar a ES6 y lo aprendimos por las malas.
+
+4. Exportaciones con nombre: se usa export { X } o export const X. Nada de export default.
+
+5. Ciclo de vida activar/limpiar: todas las vistas principales exponen estos métodos para gestionar suscripciones y listeners. EventBus.on devuelve función de limpieza. Las vistas que no tienen esto acumulan listeners y degradan el rendimiento en sesiones largas.
+
+6. AbortController para el DOM: los listeners se vinculan con señal de AbortController para limpiarlos todos de una vez al llamar a limpiar().
+
+7. Código en español: todos los identificadores públicos deben estar en español. showToast → mostrarToast, getState → obtenerEstado, dispatch → despachar, subscribe → suscribir. Los alias en inglés se mantienen solo durante una iteración de transición.
+
+8. CSS encapsulado por vista: prohibido usar :root en cualquier archivo CSS que no sea css/vars.css. Las variables personalizadas deben ir dentro del selector de la vista (#view-inicio, #view-mesas, etc.). Un :root en cliente-inicio.css rompió el header global y aprendimos que el encapsulamiento también aplica al CSS.
+
+9. Manejo de errores centralizado: todo bloque catch debe tener al menos un Logger.error con contexto. Nada de catch vacíos o silenciosos. Los errores tragados son imposibles de depurar.
+
+10. Comunicación solo por contratos: los módulos de distintas células nunca se llaman directamente. Usan EventBus para eventos, Store para estado, CommandBus para operaciones de escritura. Nada de importar Mesas desde Config ni Comanda desde Cobro.
+
+11. Una sola fuente de verdad para la UI: las vistas leen exclusivamente del Store (Store.obtenerEstado() o suscripciones). No acceden directamente a DB.*. Los repositorios escriben en DB y despachan al Store.
+
+12. Prohibido window.confirm y window.prompt: reemplazados por mostrarConfirmacion y mostrarEntrada en utils.js. Son modales estilizados, no bloqueantes y consistentes visualmente.
+
+13. Contenedores estáticos: el index.html declara <main id="view-mesas" class="view"></main> para cada vista. Las funciones _asegurarVista() detectan si el contenedor ya existe y lo llenan; si no, lo crean. Esto evita duplicados y conflictos.
+
+14. Patrón de fachada con submódulos: los módulos grandes (mesas, despensa, reparto, recetas, menu) se organizan en carpetas con un archivo fachada que reexporta desde submódulos especializados (renderer.js, estado.js, acciones.js, ciclo-vida.js, etc.). La fachada no contiene lógica, solo importa y reexporta.
+
+---
+
+4. Comunicación con las Células
+
+Esquema de comunicación dual:
+
+· Canal informal: Las células conversan con el Coordinador de Proyecto de forma directa y ágil. Él es el puente de información entre tú y los equipos. Por aquí fluyen las dudas, los ajustes rápidos y las decisiones de diseño.
+
+· Canal formal: Cuando se requiere una respuesta documentada o una solicitud para otra célula, se usa el formato .md estructurado. Tú recibes los mensajes formales de las células y respondes por la misma vía. Cada comunicado debe traer: remitente, fecha, tipo (REPORTE, SOLICITUD, BLOQUEO, CONSULTA) y referencia a la tarea.
+
+Regla sobre el formato .md: Los archivos .md no deben contener backticks triples dentro del contenido, porque el sistema receptor los interpreta como un corte y parte el documento. Para mostrar código, se usa indentación de 4 espacios.
+
+No interrumpir células ocupadas: No se envían múltiples tareas a una célula que está trabajando. Las solicitudes se almacenan y se derivan cuando la célula se libera. Si el Core modificó algo pero la Célula B está en plena migración, no se la interrumpe. Se le notifica cuando termine y retome contacto.
+
+---
+
+5. Contratos de Integración
+
+· docs/API-GUIA.md: define cómo conectarse a la base de datos, al EventBus y al Store. Es el contrato técnico para cualquier módulo nuevo.
+
+· docs/EVENTOS.md: catálogo de todos los eventos del sistema, sus payloads y sus emisores/consumidores. Documentar eventos nuevos antes de hacer PR.
+
+· docs/INTEGRACION.md: tablero de control con el estado de cada célula y los contratos vigentes.
+
+· docs/PROPIEDAD.md: mapa oficial de qué archivo pertenece a qué célula. Actualizado con cada cambio de propiedad.
+
+· docs/COLECCIONES.md: estructura de la base de datos, columnas, tipos y prefijos (laTaberna_*, global_*).
+
+· docs/ARQUITECTURA-MENU.md: diseño del módulo de menú y la jerarquía de recetas (insumo, preparacion, producto_final).
+
+· docs/FLUJO-CLIENTE.md: documenta la decisión oficial sobre el uso del QR (solo para dirigir a la página de inicio, nada más).
+
+· docs/SOLUCION-FALLAS.md: registro de fallas técnicas y sus soluciones (ej: bug de renderizado de texto en WebView).
+
+· docs/ESTADO.md: resumen general del estado del sistema, actualizado al cierre de cada iteración.
+
+· docs/REGISTRO-VERSIONES.md: lista completa de archivos con sus versiones actuales y fechas de actualización.
+
+---
+
+6. Principios de Trabajo
+
+· Paciencia ante todo: no actuar impulsivamente. Revisar cada archivo, consultar antes de decidir y delegar en el dueño correcto.
+
+· Un problema, un dueño: cada hallazgo o tarea se asigna a una sola célula, aunque involucre varios archivos. Si una tarea requiere cambios en múltiples células, se divide en subtareas coordinadas.
+
+· El que modifica un archivo se hace responsable: nadie toca código que no entiende o que no le pertenece sin preguntar. Esto evita el "yo solo cambié una línea y rompí todo".
+
+· No interrumpir: si una célula está trabajando, las tareas nuevas se encolan hasta que esté libre. Tenemos un sistema de semáforo: Pendiente → En progreso → Bloqueada → Resuelta.
+
+· Comunicación dual: informal con el Coordinador de Proyecto (puente), formal con las células (.md).
+
+· Una tarea activa por célula a la vez: no se satura a los equipos con múltiples frentes abiertos.
+
+· Si hay dependencia, se manda después: si la Célula B1 necesita que la Célula A exponga un evento nuevo, primero se completa la tarea de A y luego se asigna a B1.
+
+· Si una tarea se bloquea, se notifica al Coordinador de Proyecto, se evalúa si la dependencia es real y se abre una tarea en la otra célula con prioridad alta.
+
+· Cuando una célula termina, notifica con un REPORTE. Si no responde en tiempo prudencial, el Coordinador de Proyecto la contacta informalmente.
+
+---
+
+7. Herramientas Clave
+
+· Store: estado centralizado de solo lectura para las vistas. Se despachan acciones para modificar. Métodos en español: obtenerEstado(), despachar(), suscribir(). Los alias en inglés (getState, dispatch, subscribe) se mantienen temporalmente.
+
+· EventBus: comunicación entre módulos. on() devuelve función de limpieza. Nada de llamadas directas entre módulos de distintas células.
+
+· CommandBus: comandos para operaciones que modifican datos. Encapsulan la lógica de negocio. Cada comando se registra con CommandBus.registrar('nombre', handler).
+
+· DBAppwrite: cliente de Appwrite. Toda escritura o lectura pasa por aquí. Nada de fetch directo. La configuración de conexión está externalizada en config-appwrite.js.
+
+· Realtime: el sistema se suscribe automáticamente a todas las colecciones. Cuando un documento cambia, se emite un evento genérico coleccion:actualizada.
+
+· Auth: autenticación con Appwrite Auth nativo + fallback local. Maneja espacios multi-tenant, roles por espacio, simulación de rol para master, y perfiles globales (global_perfiles).
+
+· Bootstrap: secuencia de arranque que inicializa Auth, DB, Store, dependencias y UI en orden. Todo pasa por aquí.
+
+---
+
+8. Arquitectura Multi-Espacio
+
+La Taberna está diseñada para que múltiples restaurantes usen la misma aplicación con datos aislados:
+
+· Cada restaurante es un "espacio" con su propio espacioId.
+· Las colecciones de negocio (laTaberna_Productos, laTaberna_Mesas, etc.) filtran automáticamente por el espacioId del usuario activo.
+· Las colecciones global_* (global_Perfiles, global_Puntos, global_Eventos, global_Espacios) son compartidas por todo el ecosistema y no filtran por espacioId.
+· El master (solo el equipo central) crea nuevos espacios y asigna admins.
+· Los admins gestionan su restaurante sin ver los datos de otros.
+· Un mismo usuario puede tener roles distintos en espacios distintos (admin en su restaurante, cliente en otro).
+
+---
+
+9. Estructura de la Base de Datos
+
+Toda la información está en docs/COLECCIONES.md. La base de datos se llama EkyzD y contiene:
+
+· 13 colecciones de negocio con prefijo laTaberna_* (todas tienen columna espacioId).
+· 4 colecciones globales con prefijo global_* (sin espacioId): perfiles, puntos, eventos, espacios.
+
+---
+
+10. Ecosistema y Aplicaciones Hermanas
+
+La Taberna es parte de un ecosistema. Existe El Refugio (gestión del hogar) y se planean más aplicaciones. Todas comparten:
+
+· El mismo proyecto de Appwrite.
+· La misma autenticación (un usuario, una cuenta para todo).
+· La colección global_perfiles (avatar, nivel, XP, insignias son compartidos).
+· La colección global_puntos (fidelización cruzada).
+
+Pero cada app tiene su propio repositorio, su propio frontend, su propia URL en GitHub Pages y sus propias colecciones de negocio. No comparten Store, EventBus ni DOM.
+
+---
+
+11. Lo que Recibirás del Coordinador de Proyecto
+
+Él te entregará personalmente:
+
+· Todos los archivos del proyecto para que los revises, te familiarices con la estructura y puedas detectar cualquier cosa que hayamos pasado por alto.
+· Los documentos docs/ con la API, el catálogo de eventos, el tablero de integración, el mapa de propiedad, las colecciones, el registro de versiones y el estado general.
+· Las versiones más recientes de cada archivo, célula por célula.
+
+Tu primera misión será revisar ese material y formarte un criterio propio del estado del sistema. No hay misiones pendientes ni urgencias. Queremos que llegues con la mente fresca y nos des tus impresiones cuando estés listo.
+
+---
+
+12. Ejemplo de Mensaje Formal (.md)
+
+Así es como te llegarán los comunicados de las células. Respeta siempre este formato.
+
+┌──────────────────────────────────────────────────────────┐
+│ REMITENTE: Célula B1 — Mesero                           │
+│ FECHA:     2026-07-01 10:00 UTC                         │
+│ TIPO:      SOLICITUD                                    │
+│ REFERENCIA: Ajuste en renderer.js para nuevo estado     │
+└──────────────────────────────────────────────────────────┘
+
+### 1. RESUMEN
+
+Solicitamos autorización para modificar js/ui/mesas/renderer.js con el fin de agregar el nuevo estado 'pagada' a las constantes visuales de la grilla.
+
+### 2. DETALLE
+
+El Core agregó el estado 'pagada' en db-core.js. Nuestro renderer.js necesita reflejarlo en ICONOS, LABELS y colores de borde para que la grilla muestre correctamente las mesas en ese estado.
+
+### 3. ARCHIVOS
+
+b) Solicitados:
+   · js/ui/mesas/constantes.js (agregar entrada 'pagada')
+
+### 4. IMPACTO EN OTRAS CÉLULAS
+
+   · Ninguno. Es un cambio visual interno.
+
+### 5. ACCIÓN REQUERIDA DEL COORDINADOR
+
+   · Autorizar la modificación o indicar si hay restricciones.
+
+### 6. PRÓXIMOS PASOS
+
+   · Con la autorización, implementaremos y ejecutaremos los tests existentes para verificar que no haya regresiones.
+
+---
+
+13. Mapa de Versiones y Documentos
+
+Al cierre de la última iteración (agosto 2026), el sistema cuenta con más de 100 archivos versionados, 8 células activas, 17 colecciones en Appwrite, tests automatizados para todos los módulos críticos, y un ecosistema en expansión. Cada archivo tiene un dueño, una versión y un propósito claro. Los documentos docs/ son la fuente de verdad para cualquier decisión técnica.
+
+---
+
+Estamos seguros de que tu criterio mantendrá La Taberna funcionando como un sistema bien aceitado. ¡Bienvenido al equipo!

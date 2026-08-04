@@ -1,28 +1,205 @@
 # 📦 COLECCIONES.md — Estructura de la Base de Datos "EkyzD"
 
-**Versión:** 1.1.0  
-**Fecha:** 28 de julio de 2026  
-**Base de datos:** `EkysD` (ID: `6a0275cb0022ebf7d30d`)  
-**Propósito:** Especificación de colecciones, columnas y configuración para Appwrite Cloud.
+**Versión:** 1.2.0
+**Fecha:** 2 de agosto de 2026
+**Base de datos:** `EkyzD` (ID: `6a0275cb0022ebf7d30d`)
+**Propósito:** Especificación de colecciones, columnas, configuración y permisos para Appwrite Cloud.
 
 ---
 
 ## 🏷️ Nomenclatura
 
 - `laTaberna_*`: Colecciones de negocio de La Taberna (tienen `espacioId`).
-- `global_*`: Colecciones compartidas por todo el ecosistema (no tienen `espacioId`).
+- `global_*`: Colecciones compartidas entre todas las apps del ecosistema (no tienen `espacioId`).
 
 ---
 
-## 🔐 Configuración general
+## 🔐 Configuración de permisos (Labels)
 
-Todas las colecciones deben tener los siguientes permisos a nivel tabla (Settings > Permissions):
+Los permisos se asignan mediante **Labels** de Appwrite. Cada rol tiene asociado un label que se sincroniza automáticamente al iniciar sesión o al cambiar el rol de un usuario.
 
-| Rol | Permisos |
-|-----|----------|
-| `Any` | CREATE, READ, UPDATE, DELETE |
+### Roles del sistema
 
-**Row Security:** No se habilita por ahora, excepto donde se indique lo contrario.
+| Rol | Descripción |
+|-----|-------------|
+| `master` | Administrador global del ecosistema. Acceso total. |
+| `admin` | Administrador de un local específico. |
+| `cocina` | Encargado de cocina. Prepara recetas y gestiona stock. |
+| `barra` | Encargado de barra. Prepara bebidas y cócteles. |
+| `mesero` | Atención de mesas, toma de pedidos. |
+| `caja` | Cobro y cierre de turno. |
+| `despensa` | Gestión de inventario, ingredientes y proveedores. |
+| `eventos` | Organización de eventos en vivo. |
+| `reparto` | Gestión de pedidos de delivery. |
+| `artista` | Participación en eventos como artista. |
+| `cliente` | Usuario registrado desde la app pública. |
+
+### Matriz de permisos por colección
+
+#### 1. `laTaberna_Productos`
+
+| Label | Permisos |
+|-------|----------|
+| `master` | CREATE, READ, UPDATE, DELETE |
+| `admin` | CREATE, READ, UPDATE, DELETE |
+| `cocina` | READ |
+| `barra` | READ |
+| `mesero` | READ |
+| `despensa` | READ |
+| `eventos` | READ |
+| `artista` | READ |
+| `reparto` | READ |
+| `cliente` | READ |
+
+#### 2. `laTaberna_Pedidos`
+
+| Label | Permisos |
+|-------|----------|
+| `master` | CREATE, READ, UPDATE, DELETE |
+| `admin` | CREATE, READ, UPDATE, DELETE |
+| `mesero` | CREATE, READ, UPDATE |
+| `cocina` | READ |
+| `barra` | READ |
+| `caja` | READ, UPDATE |
+
+#### 3. `laTaberna_Mesas`
+
+| Label | Permisos |
+|-------|----------|
+| `master` | CREATE, READ, UPDATE, DELETE |
+| `admin` | CREATE, READ, UPDATE, DELETE |
+| `mesero` | READ, UPDATE |
+| `caja` | READ |
+
+#### 4. `laTaberna_Comandas`
+
+| Label | Permisos |
+|-------|----------|
+| `master` | CREATE, READ, UPDATE, DELETE |
+| `admin` | CREATE, READ, UPDATE, DELETE |
+| `cocina` | READ, UPDATE |
+| `barra` | READ, UPDATE |
+| `mesero` | CREATE, READ |
+
+#### 5. `laTaberna_Ingredientes`
+
+| Label | Permisos |
+|-------|----------|
+| `master` | CREATE, READ, UPDATE, DELETE |
+| `admin` | CREATE, READ, UPDATE, DELETE |
+| `despensa` | CREATE, READ, UPDATE |
+| `cocina` | READ |
+| `barra` | READ |
+
+#### 6. `laTaberna_Recetas`
+
+| Label | Permisos |
+|-------|----------|
+| `master` | CREATE, READ, UPDATE, DELETE |
+| `admin` | CREATE, READ, UPDATE, DELETE |
+| `cocina` | CREATE, READ, UPDATE |
+| `barra` | CREATE, READ, UPDATE |
+| `despensa` | READ |
+
+#### 7. `laTaberna_Pedidos_delivery`
+
+| Label | Permisos |
+|-------|----------|
+| `master` | CREATE, READ, UPDATE, DELETE |
+| `admin` | CREATE, READ, UPDATE, DELETE |
+| `reparto` | READ, UPDATE |
+| `caja` | READ, UPDATE |
+
+#### 8. `laTaberna_Usuarios`
+
+| Label | Permisos |
+|-------|----------|
+| `master` | CREATE, READ, UPDATE, DELETE |
+| `admin` | CREATE, READ, UPDATE, DELETE |
+
+#### 9. `laTaberna_Configuracion`
+
+| Label | Permisos |
+|-------|----------|
+| `master` | CREATE, READ, UPDATE, DELETE |
+| `admin` | CREATE, READ, UPDATE, DELETE |
+
+#### 10. `laTaberna_Precargas_cliente`
+
+| Label | Permisos |
+|-------|----------|
+| `master` | CREATE, READ, UPDATE, DELETE |
+| `admin` | CREATE, READ, UPDATE, DELETE |
+| `cliente` | CREATE, READ, UPDATE |
+| `mesero` | READ, UPDATE |
+
+#### 11. `laTaberna_Eventos_en_vivo`
+
+| Label | Permisos |
+|-------|----------|
+| `master` | CREATE, READ, UPDATE, DELETE |
+| `admin` | CREATE, READ, UPDATE, DELETE |
+| `eventos` | CREATE, READ, UPDATE |
+| `artista` | READ, UPDATE |
+| `cliente` | READ |
+
+#### 12. `laTaberna_Menus`
+
+| Label | Permisos |
+|-------|----------|
+| `master` | CREATE, READ, UPDATE, DELETE |
+| `admin` | CREATE, READ, UPDATE, DELETE |
+| `mesero` | READ |
+| `cliente` | READ |
+
+#### 13. `laTaberna_Proveedores`
+
+| Label | Permisos |
+|-------|----------|
+| `master` | CREATE, READ, UPDATE, DELETE |
+| `admin` | CREATE, READ, UPDATE, DELETE |
+| `despensa` | CREATE, READ, UPDATE |
+
+#### 14. `global_Perfiles`
+
+| Label | Permisos |
+|-------|----------|
+| `master` | CREATE, READ, UPDATE, DELETE |
+| `admin` | READ, UPDATE |
+| `cocina` | READ |
+| `barra` | READ |
+| `mesero` | READ |
+| `despensa` | READ |
+| `eventos` | READ |
+| `artista` | READ |
+| `reparto` | READ |
+| `caja` | READ |
+| `cliente` | READ, UPDATE |
+
+#### 15. `global_Puntos`
+
+| Label | Permisos |
+|-------|----------|
+| `master` | CREATE, READ, UPDATE, DELETE |
+| `admin` | READ |
+| `cliente` | READ |
+
+#### 16. `global_Eventos`
+
+| Label | Permisos |
+|-------|----------|
+| `master` | CREATE, READ, UPDATE, DELETE |
+| `admin` | CREATE, READ, UPDATE, DELETE |
+| `eventos` | CREATE, READ, UPDATE |
+| `artista` | READ, UPDATE |
+| `cliente` | READ |
+
+#### 17. `global_Espacios`
+
+| Label | Permisos |
+|-------|----------|
+| `master` | CREATE, READ, UPDATE, DELETE |
+| `admin` | READ |
 
 ---
 
@@ -32,7 +209,7 @@ Todas las colecciones deben tener los siguientes permisos a nivel tabla (Setting
 
 ## 1. `laTaberna_Productos`
 
-**Name:** laTaberna_Productos  
+**Name:** laTaberna_Productos
 **Table ID:** laTaberna_Productos
 
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
@@ -47,13 +224,13 @@ Todas las colecciones deben tener los siguientes permisos a nivel tabla (Setting
 | `disponible` | boolean | Sí | — | `true` |
 | `tipo` | enum | Sí | `simple`, `compuesto` | `simple` |
 | `nivel` | enum | No | `insumo`, `preparacion`, `producto_final` | — |
-| `espacioId` | varchar | No | 100 | `esp_taberna` |
+| `espacioId` | varchar | No | 100 | `lataberna` |
 
 ---
 
 ## 2. `laTaberna_Pedidos`
 
-**Name:** laTaberna_Pedidos  
+**Name:** laTaberna_Pedidos
 **Table ID:** laTaberna_Pedidos
 
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
@@ -66,13 +243,13 @@ Todas las colecciones deben tener los siguientes permisos a nivel tabla (Setting
 | `total` | float | Sí | — | `0` |
 | `observaciones` | varchar | No | 500 | — |
 | `transacciones` | varchar | No | 16383 | `[]` |
-| `espacioId` | varchar | No | 100 | `esp_taberna` |
+| `espacioId` | varchar | No | 100 | `lataberna` |
 
 ---
 
 ## 3. `laTaberna_Mesas`
 
-**Name:** laTaberna_Mesas  
+**Name:** laTaberna_Mesas
 **Table ID:** laTaberna_Mesas
 
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
@@ -89,13 +266,13 @@ Todas las colecciones deben tener los siguientes permisos a nivel tabla (Setting
 | `esVirtual` | boolean | Sí | — | `false` |
 | `mesasFusionadas` | varchar | No | 500 | — |
 | `permite_prepedidos` | boolean | Sí | — | `false` |
-| `espacioId` | varchar | No | 100 | `esp_taberna` |
+| `espacioId` | varchar | No | 100 | `lataberna` |
 
 ---
 
 ## 4. `laTaberna_Comandas`
 
-**Name:** laTaberna_Comandas  
+**Name:** laTaberna_Comandas
 **Table ID:** laTaberna_Comandas
 
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
@@ -108,13 +285,13 @@ Todas las colecciones deben tener los siguientes permisos a nivel tabla (Setting
 | `ts` | integer | No | — | — |
 | `deliveryId` | varchar | No | 100 | — |
 | `mozo` | varchar | No | 100 | — |
-| `espacioId` | varchar | No | 100 | `esp_taberna` |
+| `espacioId` | varchar | No | 100 | `lataberna` |
 
 ---
 
 ## 5. `laTaberna_Ingredientes`
 
-**Name:** laTaberna_Ingredientes  
+**Name:** laTaberna_Ingredientes
 **Table ID:** laTaberna_Ingredientes
 
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
@@ -128,13 +305,13 @@ Todas las colecciones deben tener los siguientes permisos a nivel tabla (Setting
 | `valor_unitario` | float | No | — | `0` |
 | `proveedor` | varchar | No | 255 | — |
 | `precio_proveedor` | float | No | — | `0` |
-| `espacioId` | varchar | No | 100 | `esp_taberna` |
+| `espacioId` | varchar | No | 100 | `lataberna` |
 
 ---
 
 ## 6. `laTaberna_Recetas`
 
-**Name:** laTaberna_Recetas  
+**Name:** laTaberna_Recetas
 **Table ID:** laTaberna_Recetas
 
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
@@ -149,13 +326,13 @@ Todas las colecciones deben tener los siguientes permisos a nivel tabla (Setting
 | `destino` | varchar | No | 50 | — |
 | `stockActual` | float | No | — | `0` |
 | `unidadStock` | varchar | No | 50 | — |
-| `espacioId` | varchar | No | 100 | `esp_taberna` |
+| `espacioId` | varchar | No | 100 | `lataberna` |
 
 ---
 
 ## 7. `laTaberna_Pedidos_delivery`
 
-**Name:** laTaberna_Pedidos_delivery  
+**Name:** laTaberna_Pedidos_delivery
 **Table ID:** laTaberna_Pedidos_delivery
 
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
@@ -167,14 +344,14 @@ Todas las colecciones deben tener los siguientes permisos a nivel tabla (Setting
 | `repartidor` | varchar | No | 100 | — |
 | `observaciones` | varchar | No | 500 | — |
 | `total` | float | Sí | — | `0` |
-| `espacioId` | varchar | No | 100 | `esp_taberna` |
+| `espacioId` | varchar | No | 100 | `lataberna` |
 
 ---
 
 ## 8. `laTaberna_Usuarios`
 
-**Name:** laTaberna_Usuarios  
-**Table ID:** laTaberna_Usuarios  
+**Name:** laTaberna_Usuarios
+**Table ID:** laTaberna_Usuarios
 **Propósito:** Personal del restaurante (admin, meseros, cocineros, etc.).
 
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
@@ -182,28 +359,27 @@ Todas las colecciones deben tener los siguientes permisos a nivel tabla (Setting
 | `nombre` | varchar | Sí | 100 | — |
 | `hash` | varchar | Sí | 255 | — |
 | `rol` | varchar | Sí | 100 | `cliente` |
-| `espacioId` | varchar | No | 100 | `esp_taberna` |
+| `espacioId` | varchar | No | 100 | `lataberna` |
 
 ---
 
 ## 9. `laTaberna_Configuracion`
 
-**Name:** laTaberna_Configuracion  
-**Table ID:** laTaberna_Configuracion  
-**Propósito:** Configuración por restaurante (nombre, dirección, zonas, etc.).  
-**Nota:** Corregido en v1.1.0. Esta colección ahora tiene `espacioId`.
+**Name:** laTaberna_Configuracion
+**Table ID:** laTaberna_Configuracion
+**Propósito:** Configuración por local (nombre, dirección, zonas, etc.).
 
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
 |---------|------|:----------:|-------------------|---------|
 | `clave` | varchar | Sí | 100 | — |
 | `valor` | varchar | Sí | 16383 | — |
-| `espacioId` | varchar | No | 100 | `esp_taberna` |
+| `espacioId` | varchar | No | 100 | `lataberna` |
 
 ---
 
 ## 10. `laTaberna_Precargas_cliente`
 
-**Name:** laTaberna_Precargas_cliente  
+**Name:** laTaberna_Precargas_cliente
 **Table ID:** laTaberna_Precargas_cliente
 
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
@@ -216,13 +392,13 @@ Todas las colecciones deben tener los siguientes permisos a nivel tabla (Setting
 | `observaciones` | varchar | No | 500 | — |
 | `revisadoPor` | varchar | No | 100 | — |
 | `timestamp` | integer | No | — | — |
-| `espacioId` | varchar | No | 100 | `esp_taberna` |
+| `espacioId` | varchar | No | 100 | `lataberna` |
 
 ---
 
 ## 11. `laTaberna_Eventos_en_vivo`
 
-**Name:** laTaberna_Eventos_en_vivo  
+**Name:** laTaberna_Eventos_en_vivo
 **Table ID:** laTaberna_Eventos_en_vivo
 
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
@@ -232,13 +408,13 @@ Todas las colecciones deben tener los siguientes permisos a nivel tabla (Setting
 | `datos` | varchar | No | 16383 | — |
 | `creadoPor` | varchar | No | 100 | — |
 | `updatedAt` | integer | No | — | — |
-| `espacioId` | varchar | No | 100 | `esp_taberna` |
+| `espacioId` | varchar | No | 100 | `lataberna` |
 
 ---
 
 ## 12. `laTaberna_Menus`
 
-**Name:** laTaberna_Menus  
+**Name:** laTaberna_Menus
 **Table ID:** laTaberna_Menus
 
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
@@ -247,33 +423,31 @@ Todas las colecciones deben tener los siguientes permisos a nivel tabla (Setting
 | `activo` | boolean | Sí | — | `true` |
 | `productos` | varchar | No | 16383 | `[]` |
 | `creadoPor` | varchar | No | 255 | — |
-| `espacioId` | varchar | No | 100 | `esp_taberna` |
+| `espacioId` | varchar | No | 100 | `lataberna` |
 
 ---
 
 ## 13. `laTaberna_Proveedores`
 
-**Name:** laTaberna_Proveedores  
+**Name:** laTaberna_Proveedores
 **Table ID:** laTaberna_Proveedores
 
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
 |---------|------|:----------:|-------------------|---------|
 | `nombre` | varchar | Sí | 255 | — |
 | `notas` | varchar | No | 2000 | — |
-| `espacioId` | varchar | No | 100 | `esp_taberna` |
+| `espacioId` | varchar | No | 100 | `lataberna` |
 
 ---
 
 ## 🌐 Colecciones globales (`global_*`)
 
-Estas colecciones son compartidas por todo el ecosistema. **No tienen columna `espacioId`.**
-
 ---
 
 ## 14. `global_Perfiles`
 
-**Name:** global_Perfiles  
-**Table ID:** global_Perfiles  
+**Name:** global_Perfiles
+**Table ID:** global_Perfiles
 **Propósito:** Perfil de cliente del ecosistema (avatar, nivel, XP). Compartido entre todas las apps.
 
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
@@ -291,8 +465,8 @@ Estas colecciones son compartidas por todo el ecosistema. **No tienen columna `e
 
 ## 15. `global_Puntos`
 
-**Name:** global_Puntos  
-**Table ID:** global_Puntos  
+**Name:** global_Puntos
+**Table ID:** global_Puntos
 **Propósito:** Historial de puntos de fidelización del ecosistema.
 
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
@@ -306,8 +480,8 @@ Estas colecciones son compartidas por todo el ecosistema. **No tienen columna `e
 
 ## 16. `global_Eventos`
 
-**Name:** global_Eventos  
-**Table ID:** global_Eventos  
+**Name:** global_Eventos
+**Table ID:** global_Eventos
 **Propósito:** Eventos globales visibles desde cualquier app del ecosistema.
 
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
@@ -323,9 +497,9 @@ Estas colecciones son compartidas por todo el ecosistema. **No tienen columna `e
 
 ## 17. `global_Espacios`
 
-**Name:** global_Espacios  
-**Table ID:** global_Espacios  
-**Propósito:** Registro de restaurantes y hogares del ecosistema.
+**Name:** global_Espacios
+**Table ID:** global_Espacios
+**Propósito:** Registro de locales y hogares del ecosistema.
 
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
 |---------|------|:----------:|-------------------|---------|

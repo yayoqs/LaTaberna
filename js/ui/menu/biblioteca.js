@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MENÚ SUBMÓDULO (ES6)
    Archivo: js/ui/menu/biblioteca.js
-   Versión: 1.1.0
+   Versión: 1.1.1
    Propósito: Panel inferior de biblioteca de productos (bottom sheet).
-              Carga todos los productos activos, simples y compuestos.
+              v1.1.1: migra a nombres en español del Store.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -12,16 +12,11 @@ import { getCategoriaFiltro, setCategoriaFiltro, getTerminoBusqueda, setTerminoB
 
 let _onProductoAgregado = null;
 
-/**
- * Inicializa la biblioteca: carga productos del Store y configura eventos.
- * @param {function} onProductoAgregado - Callback cuando se agrega un producto al lienzo.
- */
 export function inicializar(onProductoAgregado) {
   _onProductoAgregado = onProductoAgregado;
 
   const sheetList = document.getElementById('menuSheetList');
   if (sheetList) {
-    // Delegación de eventos para arrastre
     sheetList.addEventListener('dragstart', (e) => {
       const card = e.target.closest('.product-card');
       if (!card) return;
@@ -71,7 +66,6 @@ export function inicializar(onProductoAgregado) {
     });
   }
 
-  // Configurar drop en el lienzo
   const canvas = document.getElementById('menuCanvas');
   if (canvas) {
     canvas.addEventListener('dragover', (e) => e.preventDefault());
@@ -91,28 +85,20 @@ export function inicializar(onProductoAgregado) {
   }
 }
 
-/**
- * Refresca la lista de productos de la biblioteca según filtros.
- * Ahora incluye todos los productos activos (simples y compuestos).
- */
 export function refrescar() {
-  const state = Store.obtenerEstado();
-  // Cargar todos los productos activos, sin limitar a producto_final
+  const state = Store.obtenerEstado();  // ✅ español
   let productos = (state.productos || []).filter(p => p.activo !== false);
 
-  // Filtro de categoría
   const catFiltro = getCategoriaFiltro();
   if (catFiltro !== 'todas') {
     productos = productos.filter(p => p.categoria === catFiltro);
   }
 
-  // Filtro de búsqueda
   const termino = getTerminoBusqueda();
   if (termino) {
     productos = productos.filter(p => p.nombre.toLowerCase().includes(termino.toLowerCase()));
   }
 
-  // Agregar imagen y costo (desde receta si existe, sino 0)
   productos = productos.map(p => {
     const receta = (state.recetas || []).find(r => r.productoId === p.id);
     return {
@@ -127,9 +113,6 @@ export function refrescar() {
   renderBiblioteca(productos);
 }
 
-/**
- * Alterna la visibilidad del panel de biblioteca.
- */
 export function toggle() {
   const sheet = document.getElementById('menuBottomSheet');
   if (sheet && sheet.classList.contains('active')) {

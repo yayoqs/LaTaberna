@@ -1,9 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — MESAS SUBMÓDULO (ES6)
    Archivo: js/ui/mesas/renderer.js
-   Versión: 1.1.1
-   Propósito: Renderizado de la grilla, tarjetas, popover.
-              Migración a Store.obtenerEstado.
+   Versión: 1.2.0
+   Propósito: Renderizado de la grilla, tarjetas, popover
+              y botones de zona. Con callbacks para el toolbar.
+              Render condicional: solo actualiza el DOM si la vista
+              'mesas' está activa (optimización de rendimiento).
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -15,6 +17,8 @@ import { getEstadoComandas, colorEstado } from './estado-comandas.js';
 let _modoSeleccion = false;
 let _mesasSeleccionadas = new Set();
 let _zonaActiva = 'todas';
+let _vistaActiva = true; // se asume que la vista arranca activa
+
 let _longPressTimer = null;
 let _longPressMesa = null;
 let _popoverCloseListeners = [];
@@ -30,6 +34,12 @@ export function getMesasSeleccionadas() { return _mesasSeleccionadas; }
 export function limpiarSeleccion() { _mesasSeleccionadas.clear(); }
 export function setZonaActiva(zona) { _zonaActiva = zona; }
 export function getZonaActiva() { return _zonaActiva; }
+
+export function setVistaActiva(valor) {
+  _vistaActiva = valor;
+  if (valor) renderGrid(); // al activar la vista, poner todo al día
+}
+export function isVistaActiva() { return _vistaActiva; }
 
 function _getZonaColor(zonaNombre) {
   const zonas = (Store.obtenerEstado().config && Store.obtenerEstado().config.zonas) || [];
@@ -68,6 +78,9 @@ export function renderZoneButtons() {
 }
 
 export function renderGrid() {
+  // Si la vista no está activa, no tocamos el DOM
+  if (!_vistaActiva) return;
+
   const grid = document.getElementById('mesasGrid');
   if (!grid) return;
 

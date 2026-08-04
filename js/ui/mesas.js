@@ -1,12 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/mesas.js
-   Versión: 2.2.1
+   Versión: 2.2.2
    Propósito: Fachada del mapa de mesas. Reexporta desde submódulos
               para mantener API pública sin cambios.
               Sin window, sin onclick.
-   Corrección: imports estáticos en el nivel superior (getNotificaciones,
-              EventBus) — error detectado por el Coordinador.
+              Agrega import de AvisosMesero para el indicador visual.
    ================================================================ */
 
 import { EventBus } from '../lib/eventBus.js';
@@ -26,6 +25,7 @@ import {
 import { renderGrid, renderZoneButtons, asegurarVista } from './mesas/renderer.js';
 import { toggleModoFusion, toggleSeleccionMesa, fusionarMesasSeleccionadas } from './mesas/fusion.js';
 import { activar, limpiar } from './mesas/ciclo-vida.js';
+import { AvisosMesero } from '../modulos/interno/avisos-mesero.js';
 
 const Mesas = (() => {
 

@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO INTERNO (ES6)
    Archivo: js/modulos/interno/precarga-control.js
-   Versión: 2.1.6
+   Versión: 2.1.7
    Propósito: Recepción de precargas, insignia, carga en comanda.
-              Log de inicialización movido a función activar().
+              Se agregó método limpiar() para desuscribir eventos
+              y resetear el estado (Misión 4.3).
    ================================================================ */
 
 import { EventBus } from '../../lib/eventBus.js';
@@ -16,6 +17,8 @@ import { mostrarToast } from '../../utils.js';
 const PrecargaControl = (() => {
   const _precargas = new Map();
   let _activado = false;
+  let _desuscripcionPrecarga = null;
+  let _desuscripcionBadge = null;
 
   function _onPrecargaEnviada(data) {
     if (!data || !data.id || !data.mesa || !Array.isArray(data.items)) {
@@ -91,15 +94,28 @@ const PrecargaControl = (() => {
       }
     });
 
-    EventBus.on('cliente:precarga_enviada', _onPrecargaEnviada);
-    EventBus.on('mesa:badge_click', _onBadgeClick);
+    _desuscripcionPrecarga = EventBus.on('cliente:precarga_enviada', _onPrecargaEnviada);
+    _desuscripcionBadge = EventBus.on('mesa:badge_click', _onBadgeClick);
 
-    Logger.info('[PrecargaControl] Módulo inicializado (ES6 v2.1.6).');
+    Logger.info('[PrecargaControl] Módulo inicializado (ES6 v2.1.7).');
+  }
+
+  function limpiar() {
+    if (_desuscripcionPrecarga) {
+      _desuscripcionPrecarga();
+      _desuscripcionPrecarga = null;
+    }
+    if (_desuscripcionBadge) {
+      _desuscripcionBadge();
+      _desuscripcionBadge = null;
+    }
+    _activado = false;
+    Logger.info('[PrecargaControl] Módulo limpiado.');
   }
 
   activar();
 
-  return { _precargas, activar };
+  return { _precargas, activar, limpiar };
 })();
 
 export { PrecargaControl };

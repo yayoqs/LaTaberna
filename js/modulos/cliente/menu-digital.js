@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — Módulo (ES6)
    Archivo: js/modulos/cliente/menu-digital.js
-   Versión: 2.0.4
+   Versión: 2.0.6
    Propósito: Menú digital interactivo.
-              Corregida referencia a Auth.obtenerNombre().
+              AbortController para limpiar listeners del DOM.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -20,6 +20,10 @@ const MenuDigital = (() => {
   let _categoriaActiva = 'Todas';
   let _terminoBusqueda = '';
   let _activada = false;
+
+  let _abortController = null;        // listeners fijos
+  let _abortControllerOrden = null;   // listeners del panel de orden
+  let _abortControllerGrilla = null;  // listeners de la grilla de productos
 
   let _cbProductosActualizada, _cbMesasActualizada;
 
@@ -50,12 +54,15 @@ const MenuDigital = (() => {
 
     _crearPanelOrden();
 
+    // Listeners fijos con AbortController
+    _abortController = new AbortController();
+    const { signal } = _abortController;
     document.getElementById('menuDigitalSearch').addEventListener('input', () => {
       _terminoBusqueda = document.getElementById('menuDigitalSearch')?.value?.trim() || '';
       _renderProductos();
-    });
-    document.getElementById('btnToggleOrden').addEventListener('click', _togglePanelOrden);
-    document.getElementById('btnVolverMenu').addEventListener('click', () => EventBus.emit('app:cambiarVista', 'bienvenida'));
+    }, { signal });
+    document.getElementById('btnToggleOrden').addEventListener('click', _togglePanelOrden, { signal });
+    document.getElementById('btnVolverMenu').addEventListener('click', () => EventBus.emit('app:cambiarVista', 'bienvenida'), { signal });
   }
 
   function activar() {
@@ -65,6 +72,9 @@ const MenuDigital = (() => {
   }
 
   function limpiar() {
+    if (_abortController) { _abortController.abort(); _abortController = null; }
+    if (_abortControllerOrden) { _abortControllerOrden.abort(); _abortControllerOrden = null; }
+    if (_abortControllerGrilla) { _abortControllerGrilla.abort(); _abortControllerGrilla = null; }
     if (!_activada) return;
     _activada = false;
     if (EventBus.off) {
@@ -82,14 +92,28 @@ const MenuDigital = (() => {
       <div class="orden-items" id="ordenItems"></div>
       <div class="orden-pie"><div class="orden-total"><span>Total</span><span id="ordenTotal">$0</span></div><button class="btn-primary" id="btnConfirmarOrden">Confirmar Orden</button></div>
     `;
-    document.body.appendChild(_panelOrden);
-    document.getElementById('btnCerrarOrden').addEventListener('click', () => _panelOrden.classList.add('oculto'));
-    document.getElementById('btnConfirmarOrden').addEventListener('click', _confirmarOrden);
+    const vista = document.getElementById('view-menu-digital');
+    if (vista) {
+      vista.appendChild(_panelOrden);
+    } else {
+      document.body.appendChild(_panelOrden);
+    }
+
+    // Listeners fijos del panel con su propio AbortController
+    _abortControllerOrden = new AbortController();
+    const { signal: sigOrden } = _abortControllerOrden;
+    document.getElementById('btnCerrarOrden').addEventListener('click', () => _panelOrden.classList.add('oculto'), { signal: sigOrden });
+    document.getElementById('btnConfirmarOrden').addEventListener('click', _confirmarOrden, { signal: sigOrden });
   }
 
   function _togglePanelOrden() { _panelOrden.classList.toggle('oculto'); _renderizarItemsOrden(); }
 
   function _renderizarItemsOrden() {
+    // Abortar listeners anteriores del panel de orden
+    if (_abortControllerOrden) { _abortControllerOrden.abort(); _abortControllerOrden = null; }
+    _abortControllerOrden = new AbortController();
+    const { signal } = _abortControllerOrden;
+
     const container = document.getElementById('ordenItems');
     const totalEl = document.getElementById('ordenTotal');
     const items = Orden.obtenerItems(); const total = Orden.obtenerTotal();
@@ -99,15 +123,22 @@ const MenuDigital = (() => {
     container.innerHTML = items.map(item => `
       <div class="orden-item"><div class="orden-item-info"><div class="orden-item-nombre">${item.nombre}</div><div class="orden-item-precio">${formatearDinero(item.precio)} c/u</div><div class="orden-item-cantidad"><button data-id="${item.prodId}" data-accion="restar">−</button><span>${item.qty}</span><button data-id="${item.prodId}" data-accion="sumar">+</button></div><div class="orden-item-obs"><input type="text" placeholder="Observación (ej: sin cebolla)" value="${item.obs || ''}" data-id="${item.prodId}" /></div></div><button class="btn-quitar-item" data-id="${item.prodId}" title="Quitar"><i class="fas fa-trash-alt"></i></button></div>
     `).join('');
+
     container.querySelectorAll('[data-accion]').forEach(btn => {
       btn.addEventListener('click', () => {
         const id = btn.dataset.id; const item = items.find(i => i.prodId === id); if (!item) return;
         const nuevaCantidad = btn.dataset.accion === 'sumar' ? item.qty + 1 : item.qty - 1;
         Orden.modificarCantidad(id, nuevaCantidad); _renderizarItemsOrden(); _actualizarContador();
-      });
+      }, { signal });
     });
-    container.querySelectorAll('.orden-item-obs input').forEach(input => { input.addEventListener('input', () => Orden.modificarObservacion(input.dataset.id, input.value)); });
-    container.querySelectorAll('.btn-quitar-item').forEach(btn => { btn.addEventListener('click', () => { Orden.quitarItem(btn.dataset.id); _renderizarItemsOrden(); _actualizarContador(); }); });
+
+    container.querySelectorAll('.orden-item-obs input').forEach(input => {
+      input.addEventListener('input', () => Orden.modificarObservacion(input.dataset.id, input.value), { signal });
+    });
+
+    container.querySelectorAll('.btn-quitar-item').forEach(btn => {
+      btn.addEventListener('click', () => { Orden.quitarItem(btn.dataset.id); _renderizarItemsOrden(); _actualizarContador(); }, { signal });
+    });
   }
 
   function _actualizarContador() {
@@ -150,7 +181,11 @@ const MenuDigital = (() => {
     _actualizarEstado(); _verificarPermiso(); _renderCategorias(); _renderProductos(); _actualizarContador();
   }
 
-  function ocultar() { if (_vista) _vista.classList.remove('active'); if (_panelOrden) _panelOrden.classList.add('oculto'); }
+  function ocultar() {
+    if (_vista) _vista.classList.remove('active');
+    if (_panelOrden) _panelOrden.classList.add('oculto');
+    limpiar();  // Ahora también aborta los controllers
+  }
 
   function _actualizarEstado() {
     const nombre = Auth.obtenerNombre() || 'comensal';
@@ -167,7 +202,14 @@ const MenuDigital = (() => {
     const productos = Store.obtenerEstado().productos || [];
     const categorias = ['Todas', ...new Set(productos.filter(p => p.activo !== false).map(p => p.categoria))].filter(Boolean);
     container.innerHTML = categorias.map(cat => `<button class="menu-cat-btn ${cat === _categoriaActiva ? 'active' : ''}" data-categoria="${cat}">${cat}</button>`).join('');
-    container.querySelectorAll('.menu-cat-btn').forEach(btn => { btn.addEventListener('click', () => { _categoriaActiva = btn.dataset.categoria; _renderCategorias(); _renderProductos(); }); });
+
+    // Abortar listeners anteriores de categorías
+    if (_abortControllerGrilla) { _abortControllerGrilla.abort(); _abortControllerGrilla = null; }
+    _abortControllerGrilla = new AbortController();
+    const { signal: sigCat } = _abortControllerGrilla;
+    container.querySelectorAll('.menu-cat-btn').forEach(btn => {
+      btn.addEventListener('click', () => { _categoriaActiva = btn.dataset.categoria; _renderCategorias(); _renderProductos(); }, { signal: sigCat });
+    });
   }
   function _renderProductos() {
     const grid = document.getElementById('menuDigitalGrid'); if (!grid) return;
@@ -181,7 +223,19 @@ const MenuDigital = (() => {
       const disponible = prod.disponible !== false; const puedeAgregar = permite && disponible; const desc = prod.descripcion || 'Consulta a nuestro personal.';
       return `<div class="menu-card ${!disponible ? 'menu-card-atenuado' : ''}"><div class="menu-card-img" style="background-color: ${obtenerColorDesdeNombre(prod.nombre)};"><span class="menu-card-inicial">${prod.nombre.charAt(0).toUpperCase()}</span><span class="menu-card-precio">${formatearDinero(prod.precio)}</span></div><div class="menu-card-body"><h3>${prod.nombre}</h3><p>${desc.length > 60 ? desc.substring(0, 60) + '...' : desc}</p><button class="btn-agregar-orden ${!puedeAgregar ? 'btn-deshabilitado' : ''}" ${!puedeAgregar ? 'disabled' : ''} data-id="${prod.id}" data-nombre="${prod.nombre}" data-precio="${prod.precio}" data-categoria="${prod.categoria}" data-destino="${prod.destino || prod.categoria || 'general'}">🛒 Agregar a mi orden</button></div></div>`;
     }).join('');
-    grid.querySelectorAll('.btn-agregar-orden:not(.btn-deshabilitado)').forEach(btn => { btn.addEventListener('click', () => { Orden.agregarItem({ id: btn.dataset.id, nombre: btn.dataset.nombre, precio: parseInt(btn.dataset.precio, 10), categoria: btn.dataset.categoria, destino: btn.dataset.destino }); mostrarToast('success', `${btn.dataset.nombre} agregado a tu orden`); _actualizarContador(); _renderizarItemsOrden(); }); });
+
+    // Abortar listeners anteriores de la grilla
+    if (_abortControllerGrilla) { _abortControllerGrilla.abort(); _abortControllerGrilla = null; }
+    _abortControllerGrilla = new AbortController();
+    const { signal: sigGrilla } = _abortControllerGrilla;
+    grid.querySelectorAll('.btn-agregar-orden:not(.btn-deshabilitado)').forEach(btn => {
+      btn.addEventListener('click', () => {
+        Orden.agregarItem({ id: btn.dataset.id, nombre: btn.dataset.nombre, precio: parseInt(btn.dataset.precio, 10), categoria: btn.dataset.categoria, destino: btn.dataset.destino });
+        mostrarToast('success', `${btn.dataset.nombre} agregado a tu orden`);
+        _actualizarContador();
+        _renderizarItemsOrden();
+      }, { signal: sigGrilla });
+    });
   }
 
   function _initRealtime() {

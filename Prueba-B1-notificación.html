@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Prueba de Notificación — La Taberna</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --color-bg: #0f0f14;
+      --color-accent: #f59e0b;
+      --color-primary: #6366f1;
+      --color-card: #1a1a24;
+      --color-panel: #21212e;
+      --color-border: #2e2e42;
+      --color-text: #f1f5f9;
+      --color-text-sec: #94a3b8;
+      --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      --radius: 12px;
+      --radius-sm: 8px;
+      --t: all 0.25s ease;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: var(--font-ui);
+      background: var(--color-bg);
+      color: var(--color-text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── HEADER SIMULADO ────────────────────────────── */
+    .app-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      height: 56px;
+      background: var(--color-panel);
+      border-bottom: 1px solid var(--color-border);
+      flex-shrink: 0;
+    }
+    .app-header .logo {
+      font-weight: 800;
+      font-size: 1.1rem;
+      color: var(--color-accent);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .app-tabs {
+      display: flex;
+      gap: 4px;
+    }
+    .app-tab {
+      padding: 8px 16px;
+      border-radius: 99px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: var(--t);
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--color-text-sec);
+      position: relative;
+    }
+    .app-tab.active {
+      background: var(--color-primary);
+      color: #fff;
+      border-color: var(--color-primary);
+    }
+    .app-tab.notificacion::after {
+      content: '';
+      position: absolute;
+      top: 4px;
+      right: 8px;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--color-accent);
+      animation: pulse-badge 1.5s infinite;
+    }
+    @keyframes pulse-badge {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,.6); }
+      50%      { box-shadow: 0 0 0 6px rgba(245,158,11,0); }
+    }
+
+    /* ── CONTENIDO PRINCIPAL ────────────────────────── */
+    .main-content {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-direction: column;
+      gap: 16px;
+      color: var(--color-text-sec);
+      font-size: 1.1rem;
+      position: relative;
+    }
+
+    /* ── TRIÁNGULO NOTIFICACIÓN (Opción A) ──────────── */
+    .notif-triangulo {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 60px;
+      height: 60px;
+      background: var(--color-accent);
+      clip-path: polygon(0 0, 100% 0, 0 100%);
+      cursor: pointer;
+      display: flex;
+      align-items: flex-start;
+      justify-content: flex-start;
+      z-index: 9999;
+      transition: transform 0.2s ease, opacity 0.3s ease;
+      box-shadow: 0 4px 12px rgba(245,158,11,.4);
+    }
+    .notif-triangulo:hover {
+      transform: scale(1.08);
+    }
+    .notif-triangulo .notif-icono {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      font-size: 1rem;
+      color: #1a1a24;
+    }
+    .notif-triangulo .notif-contador {
+      position: absolute;
+      top: 22px;
+      left: 4px;
+      background: #ef4444;
+      color: #fff;
+      font-size: 0.6rem;
+      font-weight: 800;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 1px 4px rgba(0,0,0,.4);
+    }
+    .notif-triangulo.oculto {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* ── CONTROLES DE PRUEBA ────────────────────────── */
+    .controles {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+      padding: 16px;
+    }
+    .controles button {
+      background: var(--color-card);
+      border: 1px solid var(--color-border);
+      color: var(--color-text);
+      padding: 10px 18px;
+      border-radius: var(--radius-sm);
+      font-weight: 600;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: var(--t);
+    }
+    .controles button:hover {
+      border-color: var(--color-accent);
+      color: var(--color-accent);
+    }
+    .controles button.activo {
+      background: var(--color-accent);
+      color: #000;
+      border-color: var(--color-accent);
+    }
+
+    .info-texto {
+      font-size: 0.8rem;
+      color: var(--color-text-muted, #64748b);
+      text-align: center;
+      max-width: 480px;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header simulado con pestañas -->
+  <header class="app-header">
+    <div class="logo"><i class="fas fa-wine-glass-alt"></i> La Taberna</div>
+    <nav class="app-tabs" id="appTabs">
+      <div class="app-tab" data-vista="mesas">Mesas</div>
+      <div class="app-tab active" data-vista="caja">Caja</div>
+      <div class="app-tab" data-vista="cocina">Cocina</div>
+      <div class="app-tab" data-vista="perfil">Perfil</div>
+    </nav>
+  </header>
+
+  <!-- Contenido principal -->
+  <div class="main-content" id="mainContent">
+    <i class="fas fa-cash-register" style="font-size:3rem; opacity:.2;"></i>
+    <span id="vistaActualTexto">Vista actual: Caja</span>
+    <span class="info-texto">
+      Este es el contenido de la vista activa. El indicador de notificación
+      aparece aquí cuando hay novedades en Mesas y no estás en esa vista.
+    </span>
+  </div>
+
+  <!-- Triángulo de notificación (Opción A) -->
+  <div class="notif-triangulo oculto" id="notifTriangulo" title="Ir a Mesas">
+    <i class="fas fa-bell notif-icono"></i>
+    <span class="notif-contador" id="notifContador">1</span>
+  </div>
+
+  <!-- Controles de prueba -->
+  <div class="controles">
+    <button id="btnTriangulo" class="activo">Opción A: Triángulo</button>
+    <button id="btnPestana">Opción B: Pestaña resaltada</button>
+    <button id="btnNotificar">Simular notificación</button>
+    <button id="btnLimpiar">Limpiar notificación</button>
+  </div>
+
+  <script>
+    const triNotif = document.getElementById('notifTriangulo');
+    const contador = document.getElementById('notifContador');
+    const vistaTexto = document.getElementById('vistaActualTexto');
+    const tabs = document.querySelectorAll('.app-tab');
+    const btnTriangulo = document.getElementById('btnTriangulo');
+    const btnPestana = document.getElementById('btnPestana');
+    const btnNotificar = document.getElementById('btnNotificar');
+    const btnLimpiar = document.getElementById('btnLimpiar');
+    const mesasTab = document.querySelector('[data-vista="mesas"]');
+
+    let vistaActiva = 'caja';
+    let opcionActiva = 'triangulo'; // 'triangulo' | 'pestana'
+    let hayNotificacion = false;
+
+    function actualizarUI() {
+      // Triángulo
+      if (opcionActiva === 'triangulo') {
+        triNotif.classList.toggle('oculto', !hayNotificacion || vistaActiva === 'mesas');
+      } else {
+        triNotif.classList.add('oculto');
+      }
+
+      // Pestaña resaltada
+      if (opcionActiva === 'pestana') {
+        mesasTab.classList.toggle('notificacion', hayNotificacion && vistaActiva !== 'mesas');
+      } else {
+        mesasTab.classList.remove('notificacion');
+      }
+
+      // Pestañas activas
+      tabs.forEach(t => {
+        t.classList.toggle('active', t.dataset.vista === vistaActiva);
+      });
+
+      // Texto vista
+      const nombres = { mesas: 'Mesas', caja: 'Caja', cocina: 'Cocina', perfil: 'Perfil' };
+      vistaTexto.textContent = 'Vista actual: ' + (nombres[vistaActiva] || vistaActiva);
+    }
+
+    // Cambiar vista al hacer clic en pestaña
+    tabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        vistaActiva = tab.dataset.vista;
+        actualizarUI();
+      });
+    });
+
+    // Triángulo: clic → ir a mesas y limpiar notificación
+    triNotif.addEventListener('click', () => {
+      vistaActiva = 'mesas';
+      hayNotificacion = false;
+      actualizarUI();
+      alert('✅ Redirigido a la grilla de Mesas.\n(En la app real: EventBus.emit("app:cambiarVista", "mesas"))');
+    });
+
+    // Botones de control
+    btnTriangulo.addEventListener('click', () => {
+      opcionActiva = 'triangulo';
+      btnTriangulo.classList.add('activo');
+      btnPestana.classList.remove('activo');
+      actualizarUI();
+    });
+
+    btnPestana.addEventListener('click', () => {
+      opcionActiva = 'pestana';
+      btnPestana.classList.add('activo');
+      btnTriangulo.classList.remove('activo');
+      actualizarUI();
+    });
+
+    btnNotificar.addEventListener('click', () => {
+      hayNotificacion = true;
+      contador.textContent = Math.floor(Math.random() * 3) + 1;
+      actualizarUI();
+    });
+
+    btnLimpiar.addEventListener('click', () => {
+      hayNotificacion = false;
+      actualizarUI();
+    });
+
+    actualizarUI();
+  </script>
+</body>
+</html>

@@ -1,12 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — RECETAS SUBMÓDULO (ES6)
    Archivo: js/ui/recetas/crear.js
-   Versión: 2.0.3
+   Versión: 2.0.4
    Propósito: Modal sheet para crear/editar recetas.
-              - Producto: texto libre, sin sugerencias.
-              - Capítulo: input + datalist con capítulos existentes.
-              - Nivel: texto libre opcional.
-              Usa receta-repository para persistencia.
+              Misión 2.2: Store.getState → Store.obtenerEstado.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -34,15 +31,14 @@ export function mostrarModalReceta(idReceta = null) {
   _editandoId = idReceta;
   _asegurarModal();
 
-  const state = Store.getState();
+  const state = Store.obtenerEstado();
   const recetas = state.recetas || [];
   const productos = state.productos || [];
   const receta = idReceta ? recetas.find(r => r.id === idReceta) : null;
 
-  // Poblar datalist de capítulos (desde recetas existentes)
   const categorias = [...new Set(recetas.map(r => r.categoria || 'sin_categoria'))].sort();
   const datalistCap = document.getElementById('recModalListaCapitulos');
-  datalistCap.innerHTML = categorias.map(c => `<option value="${c}">`).join('');
+  if (datalistCap) datalistCap.innerHTML = categorias.map(c => `<option value="${c}">`).join('');
 
   if (receta) {
     const prod = productos.find(p => p.id == receta.productoId);
@@ -206,7 +202,7 @@ function _actualizarSelectorIngredientes() {
   const tipo = document.getElementById('recModalTipoIng').value;
   const select = document.getElementById('recModalSelectorIng');
   select.innerHTML = '<option value="">— Seleccionar —</option>';
-  const state = Store.getState();
+  const state = Store.obtenerEstado();
   if (tipo === 'insumo') {
     (state.ingredientes || []).forEach(i => {
       const opt = document.createElement('option');
@@ -319,7 +315,7 @@ async function _guardarReceta() {
   if (!ingredientes.length) { mostrarToast('error', 'Añade al menos un ingrediente'); return; }
   if (!pasosValidos.length) { mostrarToast('error', 'Añade al menos un paso'); return; }
 
-  const state = Store.getState();
+  const state = Store.obtenerEstado();
   const productos = state.productos || [];
   const repo = _getRepo();
 
@@ -359,7 +355,7 @@ async function _guardarReceta() {
       instrucciones: pasosValidos.join('\n'),
       stockActual: 0,
       unidadStock: '',
-      creadoPor: Auth.getRol(),
+      creadoPor: Auth.obtenerRol(),
       creadoEn: new Date().toISOString()
     });
   }

@@ -1,184 +1,183 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS
    Archivo: css/mesas.css
-   Versión: 1.0.4
-   Propósito: Estilos para el mapa de mesas, incluyendo zonas,
-              estados, tarjetas, modo fusión y notificaciones.
+   Versión: 1.0.5
+   Propósito: Estilos para el mapa de mesas. Encapsulados bajo
+              #view-mesas.
    ================================================================ */
 
-/* ── GRID DE MESAS ──────────────────────────────────────────── */
-.mesas-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 16px;
-  padding: 20px;
-  overflow-y: auto;
-  align-content: start;
-}
+#view-mesas {
+  /* ── GRID DE MESAS ──────────────────────────────────── */
+  .mesas-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 16px;
+    padding: 20px;
+    overflow-y: auto;
+    align-content: start;
+  }
 
-/* ── TARJETA DE MESA ───────────────────────────────────────── */
-.mesa-card {
-  background: var(--color-card);
-  border-radius: var(--radius);
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  position: relative;
-  transition: var(--t);
-  box-shadow: var(--shadow-sm);
-  min-height: 140px;
-  justify-content: center;
-}
+  /* ── TARJETA DE MESA ───────────────────────────────── */
+  .mesa-card {
+    background: var(--color-card);
+    border-radius: var(--radius);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    position: relative;
+    transition: var(--t);
+    box-shadow: var(--shadow-sm);
+    min-height: 140px;
+    justify-content: center;
+  }
 
-.mesa-card:hover {
-  box-shadow: var(--shadow-md);
-  transform: translateY(-2px);
-}
+  .mesa-card:hover {
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+  }
 
-/* ── COLORACIÓN POR ESTADO ─────────────────────────────────── */
-.mesa-card.libre       { border-left: 5px solid #22c55e; }
-.mesa-card.ocupada     { border-left: 5px solid #3b82f6; }
-.mesa-card.esperando   { border-left: 5px solid #f59e0b; }
-.mesa-card.cuenta      { border-left: 5px solid #ef4444; }
-.mesa-card.fusionada   { border-left: 5px solid #8b5cf6; }
+  /* ── COLORACIÓN POR ESTADO ─────────────────────────── */
+  .mesa-card.libre       { border-left: 5px solid #22c55e; }
+  .mesa-card.ocupada     { border-left: 5px solid #3b82f6; }
+  .mesa-card.esperando   { border-left: 5px solid #f59e0b; }
+  .mesa-card.cuenta      { border-left: 5px solid #ef4444; }
+  .mesa-card.pagada      { border-left: 5px solid #10b981; }
+  .mesa-card.fusionada   { border-left: 5px solid #8b5cf6; }
 
-/* ── VIRTUAL (FUSIÓN) ─────────────────────────────────────── */
-.mesa-virtual {
-  border-style: dashed;
-  opacity: .85;
-}
+  /* ── VIRTUAL (FUSIÓN) ─────────────────────────────── */
+  .mesa-virtual {
+    border-style: dashed;
+    opacity: .85;
+  }
 
-.mesa-virtual-badge {
-  font-size: 10px;
-  background: #8b5cf6;
-  color: #fff;
-  padding: 2px 8px;
-  border-radius: 99px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
+  .mesa-virtual-badge {
+    font-size: 10px;
+    background: #8b5cf6;
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 99px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
 
-/* ── ELEMENTOS INTERNOS ───────────────────────────────────── */
-.mesa-icon {
-  font-size: 24px;
-  color: var(--color-text-sec);
-}
+  /* ── ELEMENTOS INTERNOS ───────────────────────────── */
+  .mesa-icon {
+    font-size: 24px;
+    color: var(--color-text-sec);
+  }
 
-.mesa-numero {
-  font-size: 18px;
-  font-weight: 800;
-  color: var(--color-text);
-}
+  .mesa-numero {
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--color-text);
+  }
 
-.mesa-estado-label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: .5px;
-  color: var(--color-text-muted);
-}
+  .mesa-estado-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--color-text-muted);
+  }
 
-.mesa-zona-badge {
-  font-size: 10px;
-  padding: 2px 8px;
-  border-radius: 99px;
-  position: absolute;
-  bottom: 8px;
-  right: 8px;
-}
+  .mesa-zona-badge {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 99px;
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
+  }
 
-/* ── MODO SELECCIÓN (FUSIÓN) ─────────────────────────────── */
-.mesa-checkbox {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-  z-index: 2;
-}
+  /* ── MODO SELECCIÓN (FUSIÓN) ─────────────────────── */
+  .mesa-checkbox {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    z-index: 2;
+  }
 
-/* ── MICRO-INSIGNIAS KDS ─────────────────────────────────── */
-.micro-insignias {
-  display: flex;
-  gap: 8px;
-  margin-top: 4px;
-}
+  /* ── MICRO-INSIGNIAS KDS ─────────────────────────── */
+  .micro-insignias {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+  }
 
-.micro-badge {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 8px;
-  color: #fff;
-  box-shadow: 0 1px 3px rgba(0,0,0,.3);
-}
+  .micro-badge {
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 8px;
+    color: #fff;
+    box-shadow: 0 1px 3px rgba(0,0,0,.3);
+  }
 
-/* ── INSIGNIA DE PRECARGA ─────────────────────────────────── */
-.precarga-badge {
-  position: absolute;
-  top: -8px;
-  right: -8px;
-  background: #f59e0b;
-  color: #1a1a24;
-  font-size: 12px;
-  font-weight: bold;
-  min-width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0,0,0,.3);
-  z-index: 5;
-  transition: transform .15s ease;
-  padding: 0 4px;
-  gap: 3px;
-}
+  /* ── INSIGNIA DE PRECARGA ─────────────────────────── */
+  .precarga-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: #f59e0b;
+    color: #1a1a24;
+    font-size: 12px;
+    font-weight: bold;
+    min-width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,.3);
+    z-index: 5;
+    transition: transform .15s ease;
+    padding: 0 4px;
+    gap: 3px;
+  }
 
-.precarga-badge:hover {
-  transform: scale(1.15);
-  background: #fbbf24;
-}
+  .precarga-badge:hover {
+    transform: scale(1.15);
+    background: #fbbf24;
+  }
 
-.precarga-badge i {
-  font-size: 10px;
-}
+  .precarga-badge i {
+    font-size: 10px;
+  }
 
-/* ── INSIGNIA CLIENTE ESPERANDO ─────────────────────────────── */
-.esperando-cliente-badge {
-  position: absolute;
-  top: 20px;
-  right: -8px;
-  background: #3b82f6;
-  color: #fff;
-  font-size: 10px;
-  min-width: 22px;
-  height: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  cursor: default;
-  box-shadow: 0 2px 6px rgba(0,0,0,.3);
-  z-index: 5;
-  padding: 0 4px;
-  animation: esperando-pulse 2s infinite;
-}
+  /* ── INSIGNIA CLIENTE ESPERANDO ─────────────────────── */
+  .esperando-cliente-badge {
+    position: absolute;
+    top: 20px;
+    right: -8px;
+    background: #3b82f6;
+    color: #fff;
+    font-size: 10px;
+    min-width: 22px;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    cursor: default;
+    box-shadow: 0 2px 6px rgba(0,0,0,.3);
+    z-index: 5;
+    padding: 0 4px;
+    animation: esperando-pulse 2s infinite;
+  }
 
-@keyframes esperando-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,.4); }
-  50%      { box-shadow: 0 0 0 6px rgba(59,130,246,0); }
-}
-/* ── ESTADO PAGADA ─────────────────────────────────────────── */
-.mesa-card.pagada {
-  border-left: 5px solid #10b981;
+  @keyframes esperando-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,.4); }
+    50%      { box-shadow: 0 0 0 6px rgba(59,130,246,0); }
+  }
 }

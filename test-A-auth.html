@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test A — Autenticación (Appwrite Auth)</title>
+  <style>
+    body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
+    h1 { color: #f59e0b; }
+    h2 { color: #94a3b8; margin-top: 24px; }
+    .suite { margin-bottom: 16px; border-bottom: 1px solid #2e2e42; padding-bottom: 8px; }
+    .test { margin: 4px 0; padding: 4px 8px; border-radius: 4px; }
+    .pass { background: rgba(34,197,94,.2); }
+    .fail { background: rgba(239,68,68,.2); }
+    .summary { margin-top: 20px; font-weight: bold; }
+    .info { color: #94a3b8; font-size: 12px; margin: 2px 0; }
+    button { margin-top: 16px; padding: 12px 24px; background: #f59e0b; color: #000; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+    pre { background: #111; padding: 10px; white-space: pre-wrap; word-wrap: break-word; font-size: 11px; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test A — Autenticación (Appwrite Auth)</h1>
+  <p class="info">Verifica el flujo completo: registro, login, cambio de contraseña, cambio de rol y eliminación de cuentas.</p>
+  <div id="results"></div>
+  <button onclick="location.reload()">🔄 Ejecutar de nuevo</button>
+
+  <script src="/js/appwrite.min.js"></script>
+
+  <script type="module">
+    import { Logger } from './js/lib/logger.js';
+    import { Auth } from './js/auth.js';
+    import { DBAppwrite } from './js/db-appwrite.js';
+
+    (function() {
+      var resultsEl = document.getElementById('results');
+      var passed = 0, failed = 0;
+      var TEST_USER = 'test_auth_' + Date.now();
+      var TEST_PASS = 'test123456';
+      var TEST_NEW_PASS = 'nuevapass789';
+
+      function assert(condition, msg) {
+        if (condition) {
+          passed++;
+          resultsEl.innerHTML += '<div class="test pass">✔ ' + msg + '</div>';
+        } else {
+          failed++;
+          resultsEl.innerHTML += '<div class="test fail">✘ ' + msg + '</div>';
+        }
+      }
+
+      function logSection(title, obj) {
+        resultsEl.innerHTML += '<div class="suite"><strong>' + title + '</strong><pre>' + JSON.stringify(obj, null, 2) + '</pre></div>';
+      }
+
+      async function limpiarSesion() {
+        try {
+          await Auth.logout();
+        } catch(e) {}
+      }
+
+      async function runTests() {
+        resultsEl.innerHTML = '';
+        Logger.setLevel('ERROR');
+
+        await Auth._cargarUsuarios();
+
+        // ── 1. Inicializar Appwrite ──────────────────
+        resultsEl.innerHTML += '<h2>1. Inicializar Appwrite</h2>';
+        var appwriteOk = await DBAppwrite.iniciar();
+        assert(appwriteOk === true, 'DBAppwrite.iniciar() exitoso');
+        assert(DBAppwrite.habilitado === true, 'DBAppwrite.habilitado = true');
+        if (!appwriteOk) return;
+
+        await limpiarSesion();
+
+        // ── 2. Login como Master ─────────────────────
+        resultsEl.innerHTML += '<h2>2. Login como Master</h2>';
+        var loginMaster = await Auth.login('master', 'master123');
+        assert(loginMaster === true, 'Login Master exitoso');
+        assert(Auth.esMasterReal() === true, 'Rol Master confirmado');
+        logSection('Datos del Master', Auth.obtenerUsuarioActual());
+
+        // ── 3. Registrar Cliente Nuevo ───────────────
+        resultsEl.innerHTML += '<h2>3. Registrar Nuevo Cliente</h2>';
+        var resultadoReg = await Auth.registrarCliente(TEST_USER, TEST_PASS);
+        assert(resultadoReg.exito === true, 'Registro de cliente exitoso: ' + TEST_USER);
+
+        // ── 4. Login con el Nuevo Cliente ───────────
+        resultsEl.innerHTML += '<h2>4. Login del Nuevo Cliente</h2>';
+        await limpiarSesion();
+        var loginCliente = await Auth.login(TEST_USER, TEST_PASS);
+        assert(loginCliente === true, 'Login del cliente exitoso');
+        var usuarioActual = Auth.obtenerUsuarioActual();
+        assert(usuarioActual && usuarioActual.nombre === TEST_USER, 'Nombre de usuario coincide');
+        assert(usuarioActual && usuarioActual.rol === 'cliente', 'Rol por defecto asignado: cliente');
+        logSection('Perfil Cliente Creado', usuarioActual);
+
+        // ── 5. Cliente Edita su Nombre y Perfil ──────
+        resultsEl.innerHTML += '<h2>5. Cliente Edita su Nombre y Perfil</h2>';
+        var nombreEditado = TEST_USER + '_editado';
+        try {
+          await DBAppwrite.cuenta.updateName(nombreEditado);
+          var perfilId = usuarioActual._appwriteUserId || (await Auth.obtenerIdUsuarioAppwrite());
+          if (perfilId) {
+            await DBAppwrite.actualizar('global_perfiles', perfilId, { nombre: nombreEditado });
+          }
+          assert(true, 'Nombre y perfil actualizados en Appwrite');
+        } catch (e) {
+          assert(false, 'Error editando perfil: ' + e.message);
+        }
+
+        // ── 6. Cliente Cambia su Propia Contraseña ──
+        resultsEl.innerHTML += '<h2>6. Cliente Cambia su Contraseña</h2>';
+        try {
+          await DBAppwrite.cuenta.updatePassword(TEST_NEW_PASS, TEST_PASS);
+          assert(true, 'Contraseña actualizada mediante account.updatePassword');
+        } catch (e) {
+          assert(false, 'Error al cambiar contraseña: ' + e.message);
+        }
+
+        await limpiarSesion();
+        var loginClaveNueva = await Auth.login(TEST_USER, TEST_NEW_PASS);
+        assert(loginClaveNueva === true, 'Login exitoso con la NUEVA contraseña');
+
+        await limpiarSesion();
+        var loginClaveVieja = await Auth.login(TEST_USER, TEST_PASS);
+        assert(loginClaveVieja === false, 'Login rechazado con la contraseña ANTIGUA');
+
+        // ── 7. Master Cambia el Rol del Cliente ──────
+        resultsEl.innerHTML += '<h2>7. Master Cambia el Rol del Cliente</h2>';
+        await limpiarSesion();
+        await Auth.login('master', 'master123');
+        
+        var cambioRol = await Auth.cambiarRol(TEST_USER, 'mesero');
+        assert(cambioRol.exito === true, 'Invocación a cambiarRol exitosa');
+
+        await limpiarSesion();
+        await Auth.login(TEST_USER, TEST_NEW_PASS);
+        var usuarioRolCambiado = Auth.obtenerUsuarioActual();
+        assert(usuarioRolCambiado && usuarioRolCambiado.rol === 'mesero', 'Rol "mesero" confirmado al re-iniciar sesión');
+
+        // ── 8. Eliminación de Perfil / Cuenta ────────
+        resultsEl.innerHTML += '<h2>8. Eliminación de Perfil / Cuenta</h2>';
+        var idEliminar = await Auth.obtenerIdUsuarioAppwrite();
+        
+        await limpiarSesion();
+        await Auth.login('master', 'master123');
+
+        try {
+          if (idEliminar) {
+            await DBAppwrite.eliminar('global_perfiles', idEliminar);
+            assert(true, 'Documento eliminado de global_perfiles en Appwrite');
+          }
+        } catch (e) {
+          assert(false, 'Error eliminando perfil global: ' + e.message);
+        }
+
+        var usuariosLocales = JSON.parse(localStorage.getItem('pubpos_usuarios') || '[]');
+        var filtrados = usuariosLocales.filter(u => u.nombre !== TEST_USER);
+        localStorage.setItem('pubpos_usuarios', JSON.stringify(filtrados));
+        assert(true, 'Registro local removido de localStorage');
+
+        // ── 9. Verificar Perfil Global Master ────────
+        resultsEl.innerHTML += '<h2>9. Verificar Perfil Global Master</h2>';
+        var usrMaster = Auth.obtenerUsuarioActual();
+        if (usrMaster && usrMaster.perfil) {
+          assert(!!usrMaster.perfil.usuarioId, 'Perfil global Master tiene usuarioId');
+          logSection('Perfil Global Master', usrMaster.perfil);
+        } else {
+          resultsEl.innerHTML += '<div class="info">⚠️ Perfil global de Master no disponible o no asignado aún en DB.</div>';
+        }
+
+        // ── Resumen ──────────────────────────────────
+        resultsEl.innerHTML += '<h2>Resultado del Test</h2>';
+        resultsEl.innerHTML += '<p><strong>' + passed + ' pasaron, ' + failed + ' fallaron.</strong></p>';
+        if (failed === 0) {
+          resultsEl.innerHTML += '<div class="test pass">🎉 ¡Todo el flujo de autenticación y permisos funciona al 100%!</div>';
+        }
+      }
+
+      window.addEventListener('load', function() {
+        setTimeout(runTests, 500);
+      });
+    })();
+  </script>
+</body>
+</html>

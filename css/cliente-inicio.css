@@ -1,10 +1,8 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS
    Archivo: css/cliente-inicio.css
-   Versión: 2.1.4
-   Propósito: Pantalla de inicio con triángulo neón, cabecera,
-             vitrinas con imagen, títulos de sección y modal expansivo.
-             Variables encapsuladas en #view-inicio.
+   Versión: 2.1.6
+   Propósito: Pantalla de inicio. Reglas encapsuladas en #view-inicio.
    ================================================================ */
 
 /* === Variables encapsuladas en la vista de inicio === */
@@ -28,17 +26,16 @@
   --triangulo-alto: 210px;
 }
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
-
-html, body {
-  width: 100%;
-  height: 100vh;
-  overflow: hidden;
-  background: var(--color-bg);
-  font-family: var(--font-body);
-  color: var(--color-text);
+/* === Reset local (solo dentro de #view-inicio) === */
+#view-inicio *,
+#view-inicio *::before,
+#view-inicio *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
+/* === Animaciones === */
 @keyframes neonPulse {
   0%, 100% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.2), 0 0 40px rgba(99, 102, 241, 0.1); }
   50% { box-shadow: 0 0 30px rgba(245, 158, 11, 0.4), 0 0 55px rgba(99, 102, 241, 0.2); }
@@ -52,6 +49,7 @@ html, body {
   50% { transform: translate(4px,-6px); }
 }
 
+/* === Vista activa === */
 .view.active#view-inicio {
   width: 100%;
   height: 100vh;
@@ -65,6 +63,8 @@ html, body {
     linear-gradient(180deg, #0f0f14 0%, #060609 100%);
   position: relative;
   box-shadow: inset 0 0 100px rgba(0,0,0,0.8);
+  font-family: var(--font-body);
+  color: var(--color-text);
 }
 
 .view.active#view-inicio::before,
@@ -81,7 +81,7 @@ html, body {
 .view.active#view-inicio::after { top: 75%; left: 85%; animation-delay: 2.5s; background: var(--neon-indigo); }
 
 /* === Triángulo === */
-.login-corner {
+#view-inicio .login-corner {
   position: absolute;
   top: 0; right: 0;
   width: var(--triangulo-ancho);
@@ -94,8 +94,8 @@ html, body {
   transition: var(--t);
   z-index: 100;
 }
-.login-corner:hover { transform: scale(1.02); }
-.login-corner-inner {
+#view-inicio .login-corner:hover { transform: scale(1.02); }
+#view-inicio .login-corner-inner {
   background: rgba(10, 10, 15, 0.96);
   width: 100%; height: 100%;
   clip-path: polygon(100% 0, 0 0, 100% 100%);
@@ -103,30 +103,30 @@ html, body {
   align-items: flex-end; justify-content: flex-start;
   padding: 24px 20px 0 0;
 }
-.login-title {
+#view-inicio .login-title {
   font-family: var(--font-display);
   font-size: 0.82rem; font-weight: 700; letter-spacing: 1px;
   color: var(--neon-amber);
   text-shadow: 0 0 8px rgba(245,158,11,0.6);
   margin-bottom: 6px; white-space: nowrap;
 }
-.login-subtitle {
+#view-inicio .login-subtitle {
   font-family: var(--font-ui);
   font-size: 0.65rem; font-weight: 700;
   text-transform: uppercase; letter-spacing: 1px;
   color: var(--neon-indigo);
   text-decoration: none; transition: var(--t);
 }
-.login-subtitle:hover { color: #fff; text-shadow: 0 0 8px var(--neon-indigo); }
+#view-inicio .login-subtitle:hover { color: #fff; text-shadow: 0 0 8px var(--neon-indigo); }
 
 /* === Cabecera === */
-.header-block {
+#view-inicio .header-block {
   align-self: flex-start;
   margin-top: 8px;
   max-width: calc(100% - 140px);
   animation: floatIn 0.6s ease both;
 }
-.icono-marco {
+#view-inicio .icono-marco {
   width: 60px; height: 60px;
   border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, #1e1e2e, #12121a 70%);
@@ -135,12 +135,12 @@ html, body {
   margin-bottom: 8px;
   box-shadow: 0 0 16px rgba(245, 158, 11, 0.22), inset 0 2px 4px rgba(0,0,0,0.4);
 }
-.icono-marco i {
+#view-inicio .icono-marco i {
   font-size: 28px;
   color: var(--neon-amber);
   filter: drop-shadow(0 0 4px var(--neon-amber));
 }
-.nombre {
+#view-inicio .nombre {
   font-family: var(--font-display);
   font-size: 1.8rem; font-weight: 400; letter-spacing: 1px; line-height: 1.1;
   background: linear-gradient(to right, var(--neon-amber), var(--neon-indigo));
@@ -148,7 +148,7 @@ html, body {
   filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.3));
   margin-bottom: 4px;
 }
-.eslogan {
+#view-inicio .eslogan {
   font-family: var(--font-script);
   font-size: 1.25rem; font-weight: 600;
   color: var(--neon-amber);
@@ -157,7 +157,7 @@ html, body {
 }
 
 /* === Envoltura Principal === */
-.main-wrapper {
+#view-inicio .main-wrapper {
   width: 100%;
   display: flex; flex-direction: column; gap: 14px;
   margin-top: 10px; margin-bottom: 10px;
@@ -165,28 +165,28 @@ html, body {
   justify-content: center;
 }
 
-.vitrina-contenedor { width: 100%; animation: floatIn 0.7s ease both; }
+#view-inicio .vitrina-contenedor { width: 100%; animation: floatIn 0.7s ease both; }
 
-.vitrina-titulo-seccion {
+#view-inicio .vitrina-titulo-seccion {
   font-family: var(--font-ui);
   font-size: 0.7rem; font-weight: 700;
   letter-spacing: 1.5px; text-transform: uppercase;
   margin-bottom: 6px;
   display: flex; align-items: center; gap: 6px;
 }
-.vitrina-cocktails .vitrina-titulo-seccion { color: var(--neon-purple); }
-.vitrina-burgers .vitrina-titulo-seccion { color: var(--neon-orange); }
-.vitrina-karaoke .vitrina-titulo-seccion { color: var(--neon-indigo); }
+#view-inicio .vitrina-cocktails .vitrina-titulo-seccion { color: var(--neon-purple); }
+#view-inicio .vitrina-burgers .vitrina-titulo-seccion { color: var(--neon-orange); }
+#view-inicio .vitrina-karaoke .vitrina-titulo-seccion { color: var(--neon-indigo); }
 
-.vitrina-scroll {
+#view-inicio .vitrina-scroll {
   display: flex; gap: 10px;
   overflow-x: auto; scroll-snap-type: x mandatory;
   scrollbar-width: none; width: 100%;
 }
-.vitrina-scroll::-webkit-scrollbar { display: none; }
+#view-inicio .vitrina-scroll::-webkit-scrollbar { display: none; }
 
 /* === Tarjetas con Imagen === */
-.vitrina-card {
+#view-inicio .vitrina-card {
   position: relative;
   flex: 0 0 76%;
   scroll-snap-align: center;
@@ -202,11 +202,11 @@ html, body {
   transition: var(--t);
   overflow: hidden; cursor: pointer;
 }
-.vitrina-card:hover {
+#view-inicio .vitrina-card:hover {
   border-color: rgba(255,255,255,0.15);
   transform: translateY(-2px);
 }
-.vitrina-card::after {
+#view-inicio .vitrina-card::after {
   content: '';
   position: absolute;
   inset: 0;
@@ -215,22 +215,22 @@ html, body {
   pointer-events: none;
 }
 
-.vitrina-texto { position: relative; z-index: 2; min-width: 0; }
-.vitrina-titulo {
+#view-inicio .vitrina-texto { position: relative; z-index: 2; min-width: 0; }
+#view-inicio .vitrina-titulo {
   font-family: var(--font-ui);
   font-size: 0.9rem; font-weight: 700;
   color: #fff;
   line-height: 1.2;
   text-shadow: 0 1px 3px rgba(0,0,0,0.8);
 }
-.vitrina-desc {
+#view-inicio .vitrina-desc {
   font-size: 0.68rem;
   color: rgba(255,255,255,0.8);
   text-shadow: 0 1px 2px rgba(0,0,0,0.8);
   margin-top: 2px;
 }
 
-.vitrina-tag {
+#view-inicio .vitrina-tag {
   position: absolute;
   top: 0; right: 0;
   font-size: 0.52rem; font-weight: 800;
@@ -238,9 +238,9 @@ html, body {
   padding: 3px 8px; border-bottom-left-radius: 6px;
   color: #000; z-index: 3;
 }
-.vitrina-cocktails .vitrina-tag { background: var(--neon-purple); color: #fff; }
-.vitrina-burgers .vitrina-tag { background: var(--neon-orange); }
-.vitrina-karaoke .vitrina-tag { background: var(--neon-indigo); color: #fff; }
+#view-inicio .vitrina-cocktails .vitrina-tag { background: var(--neon-purple); color: #fff; }
+#view-inicio .vitrina-burgers .vitrina-tag { background: var(--neon-orange); }
+#view-inicio .vitrina-karaoke .vitrina-tag { background: var(--neon-indigo); color: #fff; }
 
 /* === Modal de Expansión (solo #modalPortal) === */
 #modalPortal.modal-overlay {
@@ -257,7 +257,7 @@ html, body {
 }
 #modalPortal.modal-overlay.active { opacity: 1; pointer-events: auto; }
 
-.modal-altar {
+#modalPortal .modal-altar {
   background: #111116;
   border: 1px solid rgba(255,255,255,0.08);
   width: 100%; max-width: 360px;
@@ -269,18 +269,18 @@ html, body {
 }
 #modalPortal.modal-overlay.active .modal-altar { transform: scale(1); }
 
-.modal-img-frame {
+#modalPortal .modal-img-frame {
   width: 100%; height: 180px;
   background-size: cover; background-position: center;
   position: relative;
 }
-.modal-img-frame::before {
+#modalPortal .modal-img-frame::before {
   content: ''; position: absolute;
   top: 0; left: 0; width: 100%; height: 100%;
   background: linear-gradient(to top, #111116 0%, transparent 60%);
 }
 
-.modal-badge {
+#modalPortal .modal-badge {
   position: absolute; top: 14px; left: 14px;
   font-family: var(--font-ui);
   font-size: 0.58rem; font-weight: 800;
@@ -288,31 +288,32 @@ html, body {
   padding: 4px 10px; border-radius: 20px;
 }
 
-.modal-body { padding: 20px; text-align: left; }
-.modal-header-line {
+#modalPortal .modal-body { padding: 20px; text-align: left; }
+#modalPortal .modal-header-line {
   display: flex; justify-content: space-between; align-items: baseline;
   margin-bottom: 6px;
 }
-.modal-titulo { font-family: var(--font-ui); font-size: 1.4rem; font-weight: 700; color: #fff; }
-.modal-ingredientes { font-size: 0.72rem; color: var(--neon-amber); font-weight: 600; font-family: var(--font-ui); }
-.modal-lore { font-size: 0.82rem; color: var(--color-text-sec); line-height: 1.4; margin-bottom: 18px; }
+#modalPortal .modal-titulo { font-family: var(--font-ui); font-size: 1.4rem; font-weight: 700; color: #fff; }
+#modalPortal .modal-ingredientes { font-size: 0.72rem; color: var(--neon-amber); font-weight: 600; font-family: var(--font-ui); }
+#modalPortal .modal-lore { font-size: 0.82rem; color: var(--color-text-sec); line-height: 1.4; margin-bottom: 18px; }
 
-.modal-btn-action {
+#modalPortal .modal-btn-action {
   width: 100%; background: linear-gradient(90deg, var(--neon-amber), var(--neon-orange));
   border: none; padding: 12px; border-radius: 8px;
   font-family: var(--font-ui); font-size: 0.85rem; font-weight: 700;
   color: #000; text-transform: uppercase; letter-spacing: 0.5px;
   cursor: pointer; transition: var(--t);
 }
-.modal-btn-action:active { transform: scale(0.98); }
+#modalPortal .modal-btn-action:active { transform: scale(0.98); }
 
+/* === Responsive === */
 @media (max-width: 400px) {
   .view.active#view-inicio { padding: 14px; }
   #view-inicio { --triangulo-ancho: 165px; --triangulo-alto: 165px; }
-  .main-wrapper { gap: 10px; }
-  .vitrina-card { flex: 0 0 82%; height: 90px; }
-  .nombre { font-size: 1.4rem; }
-  .icono-marco { width: 50px; height: 50px; }
-  .icono-marco i { font-size: 24px; }
-  .eslogan { font-size: 1.1rem; }
+  #view-inicio .main-wrapper { gap: 10px; }
+  #view-inicio .vitrina-card { flex: 0 0 82%; height: 90px; }
+  #view-inicio .nombre { font-size: 1.4rem; }
+  #view-inicio .icono-marco { width: 50px; height: 50px; }
+  #view-inicio .icono-marco i { font-size: 24px; }
+  #view-inicio .eslogan { font-size: 1.1rem; }
 }

@@ -1,16 +1,17 @@
 /* ================================================================
    LaTaberna - PubPOS — RECETAS SUBMÓDULO (ES6)
    Archivo: js/ui/recetas/detalle.js
-   Versión: 1.0.1
+   Versión: 1.0.3
    Propósito: Modal de detalle rápido, árbol de ingredientes y exportación PDF.
-              Corrección: el modal se inserta dentro de #view-recetas.
+              v1.0.3: exportarPDF usa iframe oculto en lugar de window.open
+              (Misión 5.2). Store.getState → Store.obtenerEstado.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
 import { mostrarToast } from '../../utils.js';
 
 export function mostrarDetalle(idReceta) {
-  const state = Store.getState();
+  const state = Store.obtenerEstado();
   const receta = (state.recetas || []).find(r => r.id === idReceta || r.productoId == idReceta);
   if (!receta) { mostrarToast('error', 'Receta no encontrada'); return; }
   const prod = (state.productos || []).find(p => p.id == receta.productoId);
@@ -35,7 +36,6 @@ export function mostrarDetalle(idReceta) {
           <button class="btn-secondary" id="btnExportarPDF"><i class="fas fa-print"></i> Exportar PDF</button>
         </div>
       </div>`;
-    // Insertar dentro de #view-recetas
     const vista = document.getElementById('view-recetas');
     if (vista) {
       vista.appendChild(modal);
@@ -107,7 +107,7 @@ export function construirArbolIngredientes(ingredientes, state, profundidad) {
 }
 
 export function exportarPDF(idReceta) {
-  const state = Store.getState();
+  const state = Store.obtenerEstado();
   const receta = (state.recetas || []).find(r => r.id === idReceta || r.productoId == idReceta);
   if (!receta) return;
   const prod = (state.productos || []).find(p => p.id == receta.productoId);
@@ -128,7 +128,39 @@ export function exportarPDF(idReceta) {
     }
     filas += `<tr><td>${nombreIng} (${tipo})</td><td>${ing.cantidad} ${ing.unidad || ''}</td></tr>`;
   });
+
   const html = `<html><head><title>Receta: ${nombre}</title><style>body{font-family:sans-serif;padding:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px}th{background:#f5f5f5}</style></head><body><h1>${nombre}</h1><h2>Ingredientes</h2><table><thead><tr><th>Ingrediente</th><th>Cantidad</th></tr></thead><tbody>${filas}</tbody></table><h2>Preparación</h2><p>${(receta.instrucciones||'').replace(/\n/g,'<br>')}</p></body></html>`;
-  const w = window.open('', '_blank', 'width=800,height=600');
-  w.document.write(html); w.document.close(); w.focus(); w.print(); w.close();
+
+  // Usar iframe oculto en lugar de window.open (Misión 5.2)
+  const iframe = document.createElement('iframe');
+  iframe.style.display = 'none';
+  document.body.appendChild(iframe);
+
+  iframe.contentWindow.document.open();
+  iframe.contentWindow.document.write(html);
+  iframe.contentWindow.document.close();
+
+  // Esperar a que el contenido cargue antes de imprimir
+  iframe.onload = () => {
+    try {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    } catch (e) {
+      mostrarToast('error', 'No se pudo imprimir. Revisa los permisos del navegador.');
+    }
+    // Limpiar el iframe después de imprimir (o cancelar)
+    setTimeout(() => {
+      if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
+    }, 1000);
+  };
+
+  // Fallback por si onload no se dispara
+  setTimeout(() => {
+    try {
+      iframe.contentWindow.focus();
+      iframe.contentWindow.print();
+    } catch (e) {
+      // Ya manejado arriba
+    }
+  }, 500);
 }

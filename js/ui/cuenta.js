@@ -1,14 +1,15 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/cuenta.js
-   Versión: 1.0.3
+   Versión: 1.0.5
    Propósito: Solicitud de cuenta (pre-cierre).
-              Migración a Store como fuente de verdad.
+              Corrección: Auth.getRol() → Auth.obtenerRol().
    ================================================================ */
 
 import { Auth } from '../auth.js';
 import { mostrarToast } from '../utils.js';
 import { EventBus } from '../lib/eventBus.js';
+import { Logger } from '../lib/logger.js';
 import { Store } from '../lib/store.js';
 import { DB } from '../db.js';
 import { Comanda } from './comanda.js';
@@ -17,14 +18,14 @@ import { Tickets } from './tickets.js';
 const Cuenta = (() => {
 
   function pedirCuenta() {
-    const rol = Auth.getRol();
+    const rol = Auth.obtenerRol();
     const rolesPermitidos = ['mesero', 'admin', 'master', 'caja'];
     if (!rolesPermitidos.includes(rol)) {
       mostrarToast('error', 'No tienes permiso para pedir la cuenta');
       return;
     }
 
-    const mesa = Comanda.getMesaActiva();
+    const mesa = Comanda.obtenerMesaActiva();
     if (!mesa) {
       mostrarToast('warning', 'No hay ninguna mesa abierta.');
       return;

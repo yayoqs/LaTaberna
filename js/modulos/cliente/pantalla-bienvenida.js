@@ -1,14 +1,15 @@
 /* ================================================================
    LaTaberna - PubPOS — Módulo (ES6)
    Archivo: js/modulos/cliente/pantalla-bienvenida.js
-   Versión: 2.2.4
+   Versión: 2.2.7
    Propósito: Panel de control post-validación.
-              Corregida la referencia a Auth.obtenerNombre().
+              Auth.logout → Auth.cerrarSesion.
    ================================================================ */
 
 import { EventBus } from '../../lib/eventBus.js';
 import { Store } from '../../lib/store.js';
 import { Auth } from '../../auth.js';
+import { mostrarEntrada } from '../../utils.js';
 
 const PantallaBienvenida = (() => {
   let _vista = null;
@@ -16,6 +17,9 @@ const PantallaBienvenida = (() => {
   let _permitePrepedidos = false;
   let _interfazActivada = false;
   let _activada = false;
+
+  let _abortController = null;
+  let _abortControllerPanel = null;
 
   let _cbMesasActualizada, _cbMesaActualizada, _cbEventosActualizada, _cbPrecargasActualizada;
   let _cbBtnGuardar, _cbBtnBarra, _cbLogout, _cbGastroInicial, _cbEventosInicial;
@@ -80,26 +84,31 @@ const PantallaBienvenida = (() => {
     if (_activada) return;
     _activada = true;
 
+    _abortController = new AbortController();
+    const { signal } = _abortController;
+
     _cbBtnGuardar = _guardarMesa;
     _cbBtnBarra = _vincularBarra;
-    _cbLogout = () => { if (typeof Auth.logout === 'function') Auth.logout(); };
+    _cbLogout = () => { if (typeof Auth.cerrarSesion === 'function') Auth.cerrarSesion(); };
     _cbGastroInicial = () => {
       if (!_permitePrepedidos) { document.getElementById('mensajeGastroInicial').textContent = 'Espera la activación del garzón.'; return; }
       _irAlMenu();
     };
     _cbEventosInicial = _irAEventos;
 
-    document.getElementById('btnGuardarMesa').addEventListener('click', _cbBtnGuardar);
-    document.getElementById('btnBarra').addEventListener('click', _cbBtnBarra);
-    document.getElementById('btnLogout').addEventListener('click', _cbLogout);
-    document.getElementById('cardEntretenimientoInicial').addEventListener('click', _cbEventosInicial);
-    document.getElementById('cardGastronomicaInicial').addEventListener('click', _cbGastroInicial);
+    document.getElementById('btnGuardarMesa').addEventListener('click', _cbBtnGuardar, { signal });
+    document.getElementById('btnBarra').addEventListener('click', _cbBtnBarra, { signal });
+    document.getElementById('btnLogout').addEventListener('click', _cbLogout, { signal });
+    document.getElementById('cardEntretenimientoInicial').addEventListener('click', _cbEventosInicial, { signal });
+    document.getElementById('cardGastronomicaInicial').addEventListener('click', _cbGastroInicial, { signal });
 
     _initRealtime();
     _actualizarPerfil();
   }
 
   function limpiar() {
+    if (_abortController) { _abortController.abort(); _abortController = null; }
+    if (_abortControllerPanel) { _abortControllerPanel.abort(); _abortControllerPanel = null; }
     if (!_activada) return;
     _activada = false;
 
@@ -189,6 +198,10 @@ const PantallaBienvenida = (() => {
   }
 
   function _construirPanelControl() {
+    if (_abortControllerPanel) { _abortControllerPanel.abort(); }
+    _abortControllerPanel = new AbortController();
+    const { signal } = _abortControllerPanel;
+
     const container = document.getElementById('welcomeContainer');
     if (!container) return;
     const esBarra = _mesa === 'barra';
@@ -234,11 +247,11 @@ const PantallaBienvenida = (() => {
     const avatarPrincipal = document.getElementById('avatarPrincipal');
     if (avatarPrincipal) avatarPrincipal.textContent = iniciales;
 
-    document.getElementById('btnHacerPedido').addEventListener('click', _irAlMenu);
-    document.getElementById('btnLlamarGarzon').addEventListener('click', _llamarGarzon);
-    document.getElementById('cardGastronomica').addEventListener('click', _irAlMenu);
-    document.getElementById('cardEntretenimiento').addEventListener('click', _irAEventos);
-    document.getElementById('btnAgregarComensal').addEventListener('click', _agregarComensal);
+    document.getElementById('btnHacerPedido').addEventListener('click', _irAlMenu, { signal });
+    document.getElementById('btnLlamarGarzon').addEventListener('click', _llamarGarzon, { signal });
+    document.getElementById('cardGastronomica').addEventListener('click', _irAlMenu, { signal });
+    document.getElementById('cardEntretenimiento').addEventListener('click', _irAEventos, { signal });
+    document.getElementById('btnAgregarComensal').addEventListener('click', _agregarComensal, { signal });
 
     _cbPrecargasActualizada = _actualizarVistazoPedido;
     EventBus.on('precargas_cliente:actualizada', _cbPrecargasActualizada);
@@ -255,8 +268,8 @@ const PantallaBienvenida = (() => {
     }
   }
 
-  function _agregarComensal() {
-    const nombre = prompt('Nombre del nuevo comensal:');
+  async function _agregarComensal() {
+    const nombre = await mostrarEntrada('Agregar comensal', 'Nombre del nuevo comensal:');
     if (!nombre) return;
     const iniciales = nombre.split(' ').map(n => n.charAt(0).toUpperCase()).slice(0, 2).join('');
     const lista = document.getElementById('listaComensales');
@@ -304,6 +317,7 @@ const PantallaBienvenida = (() => {
 
   function ocultar() {
     if (_vista) _vista.classList.remove('active');
+    limpiar();
   }
 
   function _initRealtime() {

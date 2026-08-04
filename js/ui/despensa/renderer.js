@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — DESPENSA SUBMÓDULO (ES6)
    Archivo: js/ui/despensa/renderer.js
-   Versión: 4.2.2
+   Versión: 4.2.1
    Propósito: Renderizado de la vista de despensa con panel izquierdo
               tipo acordeón (Proveedores/Productos) como la maqueta.
-              v4.2.2: restaura lógica de expansión en panel izquierdo.
+              v4.2.1: renderMovimientos solo lee del Store.
    ================================================================ */
 
 import { formatearDinero, formatearHoraCorta } from '../../utils.js';
@@ -196,7 +196,7 @@ export function renderProveedores(proveedores) {
     return;
   }
   tab.innerHTML = proveedores.map(p => `
-    <div class="item-card" onclick="this.classList.toggle('abierto')">
+    <div class="item-card">
       <div class="item-card-header">
         <div class="avatar">${(p.nombre.charAt(0) || '?').toUpperCase()}</div>
         <div class="info"><strong>${p.nombre}</strong><span>${p.productos} productos</span></div>
@@ -209,6 +209,7 @@ export function renderProveedores(proveedores) {
     </div>
   `).join('')
   + '<button class="btn-accion" id="btnNuevoProveedor">+ Añadir Proveedor</button>';
+  tab.querySelectorAll('.item-card').forEach(card => card.addEventListener('click', () => card.classList.toggle('abierto')));
 }
 
 export function renderProductosDisponibles(productos) {
@@ -219,7 +220,7 @@ export function renderProductosDisponibles(productos) {
     return;
   }
   tab.innerHTML = productos.map(p => `
-    <div class="item-card" onclick="this.classList.toggle('abierto')">
+    <div class="item-card">
       <div class="item-card-header">
         <div class="avatar">📦</div>
         <div class="info"><strong>${p.nombre}</strong><span>${p.proveedores} proveedores</span></div>
@@ -232,6 +233,7 @@ export function renderProductosDisponibles(productos) {
     </div>
   `).join('')
   + '<button class="btn-accion" id="btnNuevoProducto">+ Añadir Producto</button>';
+  tab.querySelectorAll('.item-card').forEach(card => card.addEventListener('click', () => card.classList.toggle('abierto')));
 }
 
 function _calcularTopPanel() {

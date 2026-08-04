@@ -18,15 +18,13 @@
 </head>
 <body>
   <h1>🧪 Test A — Diagnóstico Appwrite (TablesDB)</h1>
-  <p class="info">Verifica conexión, listado de colecciones (paralelo), CRUD e integración con Store.</p>
+  <p class="info">Verifica conexión, listado de colecciones (incluidas las nuevas y globales), CRUD e integración con Store.</p>
   <div id="results"></div>
   <button onclick="location.reload()">🔄 Ejecutar de nuevo</button>
 
-  <!-- Scripts globales (deben cargarse antes que los módulos) -->
-  <script src="/js/utils.js"></script>
+  <!-- Solo el SDK de Appwrite como script global -->
   <script src="/js/appwrite.min.js"></script>
 
-  <!-- Módulo de prueba -->
   <script type="module">
     import { Logger } from './js/lib/logger.js';
     import { EventBus } from './js/lib/eventBus.js';
@@ -52,6 +50,7 @@
         resultsEl.innerHTML = '';
         Logger.setLevel('ERROR');
 
+        // ── Suite 1: Iniciar DBAppwrite ──────────────────
         resultsEl.innerHTML += '<h2>1. Iniciar DBAppwrite (TablesDB)</h2>';
         var appwriteOk = await DBAppwrite.iniciar();
         assert(appwriteOk === true, 'DBAppwrite.iniciar() exitoso');
@@ -61,8 +60,21 @@
           return;
         }
 
+        // Mock de Auth con los nombres actuales de las funciones
+        window.Auth = {
+          obtenerEspacioActivo: function() { return { id: 'esp_taberna' }; },
+          getEspacioActivo: function() { return { id: 'esp_taberna' }; } // alias por si acaso
+        };
+
+        // ── Suite 2: Listar colecciones (paralelo) ───────
         resultsEl.innerHTML += '<h2>2. Listar colecciones (paralelo)</h2>';
-        var colecciones = ['productos','pedidos','mesas','comandas','ingredientes','recetas','pedidos_delivery','usuarios','configuracion','precargas_cliente','eventos_en_vivo'];
+        var colecciones = [
+          'productos', 'pedidos', 'mesas', 'comandas',
+          'ingredientes', 'recetas', 'pedidos_delivery',
+          'usuarios', 'configuracion', 'precargas_cliente',
+          'eventos_en_vivo', 'menus', 'proveedores',
+          'global_perfiles', 'global_puntos', 'global_eventos', 'global_espacios'
+        ];
 
         var resultados = {};
         await Promise.all(colecciones.map(function(col) {
@@ -83,6 +95,7 @@
           }
         }
 
+        // ── Suite 3: CRUD básico ─────────────────────────
         resultsEl.innerHTML += '<h2>3. CRUD básico en pedidos</h2>';
         try {
           var doc = {
@@ -99,8 +112,9 @@
           assert(false, 'Error CRUD: ' + e.message);
         }
 
+        // ── Suite 4: Integración con Store ───────────────
         resultsEl.innerHTML += '<h2>4. Integración Appwrite → Store</h2>';
-        window.Auth = window.Auth || { getEspacioActivo: function() { return { id: 'esp_taberna' }; } };
+        // El mock de Auth ya está definido arriba
         window.PedidoManager = window.PedidoManager || { getTurnoActual: function() { return { id: 'test', estado: 'abierto' }; }, registrar: function() {} };
 
         var productos = resultados.productos || [];
@@ -131,6 +145,7 @@
           resultsEl.innerHTML += '<div class="info">⚠️ Todas las colecciones están vacías. ¿Ejecutaste la migración inicial?</div>';
         }
 
+        // ── Resumen ──────────────────────────────────────
         resultsEl.innerHTML += '<h2>Resultado</h2>';
         resultsEl.innerHTML += '<p>' + passed + ' pasaron, ' + failed + ' fallaron.</p>';
         if (failed === 0) {

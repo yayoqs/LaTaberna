@@ -1,11 +1,13 @@
 /* ================================================================
    LaTaberna - PubPOS — RECETAS SUBMÓDULO (ES6)
    Archivo: js/ui/recetas/ejecutar.js
-   Versión: 1.0.1
+   Versión: 1.0.2
    Propósito: Ejecución de preparaciones. Usa receta-repository
               para actualizar stocks con persistencia.
+              Misión 2.2: Store.getState → Store.obtenerEstado.
    ================================================================ */
 
+import { Store } from '../../lib/store.js';
 import { EventBus } from '../../lib/eventBus.js';
 import { mostrarToast } from '../../utils.js';
 import { getPestanaActiva } from './estado.js';
@@ -26,12 +28,10 @@ export async function ejecutarPreparacion(idReceta) {
   const cantidad = await pedirCantidad('Preparar ' + receta.productoId, '¿Cuánto vas a preparar?', receta.unidadStock || 'unidades');
   if (!cantidad || cantidad <= 0) return;
 
-  const { Store } = await import('../../lib/store.js');
-  const state = Store.getState();
+  const state = Store.obtenerEstado();
   const ingredientes = state.ingredientes || [];
   const recetas = state.recetas || [];
 
-  // Verificar stock
   for (const ing of (receta.ingredientes || [])) {
     const tipo = ing.tipo || 'insumo';
     if (tipo === 'insumo') {
@@ -52,7 +52,6 @@ export async function ejecutarPreparacion(idReceta) {
     }
   }
 
-  // Descontar ingredientes
   for (const ing of (receta.ingredientes || [])) {
     const tipo = ing.tipo || 'insumo';
     if (tipo === 'insumo') {
@@ -70,7 +69,6 @@ export async function ejecutarPreparacion(idReceta) {
     }
   }
 
-  // Aumentar stock de la preparación
   const nuevoStock = (receta.stockActual || 0) + cantidad;
   await repo.actualizarStockReceta(idReceta, nuevoStock);
 

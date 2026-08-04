@@ -1,16 +1,12 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/ticket.css
-   Versión: 1.0.0
-   Propósito: Estilos del ticket de 80mm (preview e impresión).
-   ============================================
-   ----------------------------
-   El div .ticket-80mm simula el papel físico de 80mm (~302px a 96dpi)
-   Usar font-family monoespaciada para alineación correcta al imprimir.
-============================================= */
+   Versión: 1.1.0
+   Propósito: Estilos del ticket de 80mm encapsulados bajo #ticketPreview.
+   ================================================================ */
 
 /* ── PREVIEW EN PANTALLA ───────────────────────────────────── */
-.ticket-80mm {
+#ticketPreview .ticket-80mm {
   width: 302px;
   background: #fff;
   color: #000;
@@ -22,24 +18,24 @@
 }
 
 /* ── ELEMENTOS INTERNOS DEL TICKET ────────────────────────── */
-.t-center  { text-align: center; }
-.t-right   { text-align: right; }
-.t-bold    { font-weight: bold; }
-.t-small   { font-size: 10px; }
-.t-large   { font-size: 15px; }
-.t-xl      { font-size: 22px; font-weight: bold; text-align: center; }
+#ticketPreview .t-center  { text-align: center; }
+#ticketPreview .t-right   { text-align: right; }
+#ticketPreview .t-bold    { font-weight: bold; }
+#ticketPreview .t-small   { font-size: 10px; }
+#ticketPreview .t-large   { font-size: 15px; }
+#ticketPreview .t-xl      { font-size: 22px; font-weight: bold; text-align: center; }
 
 /* Título y subtítulo del local */
-.t-title {
+#ticketPreview .t-title {
   font-size: 16px;
   font-weight: bold;
   text-align: center;
   line-height: 1.2;
 }
-.t-subtitle { font-size: 11px; text-align: center; }
+#ticketPreview .t-subtitle { font-size: 11px; text-align: center; }
 
 /* Header de destino (fondo negro, texto blanco) */
-.t-dest-header {
+#ticketPreview .t-dest-header {
   background: #000;
   color: #fff;
   text-align: center;
@@ -51,24 +47,24 @@
 }
 
 /* Separadores */
-.t-hr-dash  { border: none; border-top: 1px dashed #000; margin: 5px 0; }
-.t-hr-solid { border: none; border-top: 2px solid  #000; margin: 5px 0; }
+#ticketPreview .t-hr-dash  { border: none; border-top: 1px dashed #000; margin: 5px 0; }
+#ticketPreview .t-hr-solid { border: none; border-top: 2px solid  #000; margin: 5px 0; }
 
 /* Fila flex (izquierda / derecha) */
-.t-row {
+#ticketPreview .t-row {
   display: flex;
   justify-content: space-between;
   gap: 4px;
 }
 /* Fila de ítem: cant | nombre | precio */
-.t-item-row {
+#ticketPreview .t-item-row {
   display: grid;
   grid-template-columns: 3ch 1fr auto;
   gap: 4px;
   margin-bottom: 2px;
 }
 /* Aclaración debajo del ítem */
-.t-item-obs {
+#ticketPreview .t-item-obs {
   font-style: italic;
   font-size: 10px;
   padding-left: 28px;
@@ -76,7 +72,7 @@
 }
 
 /* Fila de total */
-.t-total-row {
+#ticketPreview .t-total-row {
   display: flex;
   justify-content: space-between;
   font-size: 14px;
@@ -84,21 +80,15 @@
 }
 
 /* Pie del ticket */
-.t-footer {
+#ticketPreview .t-footer {
   text-align: center;
   font-size: 11px;
   margin-top: 4px;
 }
 
 /* Espaciado interno */
-.t-mb1 { margin-bottom: 2px; }
-.t-mb2 { margin-bottom: 5px; }
-.t-mt1 { margin-top:    2px; }
-.t-mt2 { margin-top:    5px; }
-.t-spacer { height: 16px; }
-
-/* ── REGLAS DE IMPRESIÓN ───────────────────────────────────── */
-/*
-  La impresión se genera en una nueva ventana con estas reglas:
-  ver js/tickets.js → función imprimirTicket()
-*/
+#ticketPreview .t-mb1 { margin-bottom: 2px; }
+#ticketPreview .t-mb2 { margin-bottom: 5px; }
+#ticketPreview .t-mt1 { margin-top:    2px; }
+#ticketPreview .t-mt2 { margin-top:    5px; }
+#ticketPreview .t-spacer { height: 16px; }

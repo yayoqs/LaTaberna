@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/app.js
-   Versión: 1.3.0
+   Versión: 1.3.2
    Propósito: Punto de entrada modular. Control de vistas con ciclo
-              de vida (limpiar/activar). Ruta 'carta-editor' restaurada.
-              v1.3.0: corrige referencias a Auth (obtenerRol, obtenerVistaPorDefecto).
+              de vida (limpiar/activar).
+              Auth.logout() → Auth.cerrarSesion().
    ================================================================ */
 
 // ── Utilidades y librerías ────────────────────────────────
@@ -67,7 +67,7 @@ import { Cuenta } from './ui/cuenta.js';
 import { Despensa } from './ui/despensa.js';
 import { Eventos } from './ui/eventos.js';
 import { KDS } from './ui/kds.js';
-import { Menu } from './ui/menu.js';                        // ← verificado
+import { Menu } from './ui/menu.js';
 import { MesaDetalles } from './ui/mesa-detalles.js';
 import { Mesas } from './ui/mesas.js';
 import { Pedido } from './ui/pedido-ui.js';
@@ -98,7 +98,7 @@ const modulosVista = {
   eventos: Eventos,
   'eventos-en-vivo': EventosEnVivo,
   perfil: Perfil,
-  'carta-editor': Menu   // ← RESTAURADO
+  'carta-editor': Menu
   // Las vistas 'inicio' y 'bienvenida' se gestionan internamente
 };
 
@@ -268,21 +268,8 @@ export const App = {
       Auth.aplicarRestriccionesUI();
     }
 
-    // ── Renderizados explícitos (a revisar en futuras iteraciones) ─
-    try {
-      if (nombre === 'mesas' && typeof Mesas !== 'undefined') Mesas.render();
-      if (nombre === 'cocina' && typeof KDS !== 'undefined') KDS.refresh();
-      if (nombre === 'caja' && typeof Caja !== 'undefined') Caja.render();
-      if (nombre === 'config' && typeof Config !== 'undefined') Config.cargar();
-      if (nombre === 'despensa' && typeof Despensa !== 'undefined') Despensa.render();
-      if (nombre === 'recetas' && typeof Recetas !== 'undefined') Recetas.render();
-      if (nombre === 'reparto' && typeof Reparto !== 'undefined') Reparto.render();
-      if (nombre === 'eventos' && typeof Eventos !== 'undefined') Eventos.render();
-      if (nombre === 'eventos-en-vivo' && typeof EventosEnVivo !== 'undefined') EventosEnVivo.render();
-      if (nombre === 'perfil' && typeof Perfil !== 'undefined') Perfil.render();
-    } catch (e) {
-      Logger.error('[App] Error al renderizar vista ' + nombre + ':', e);
-    }
+    // ── Notificar a las vistas para que se rendericen ─
+    EventBus.emit('vista:activada', nombre);
   },
 
   _iniciarMonitoreoConexion() {
@@ -379,7 +366,7 @@ function _vincularHeader() {
   var logoutBtn = document.getElementById('btnLogout');
   if (logoutBtn) {
     logoutBtn.addEventListener('click', function() {
-      Auth.logout();
+      Auth.cerrarSesion();  // ← actualizado
     });
   }
 }

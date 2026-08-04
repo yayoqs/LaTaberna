@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — REPARTO SUBMÓDULO (ES6)
    Archivo: js/ui/reparto/modal-editar.js
-   Versión: 1.0.1
+   Versión: 1.0.2
    Propósito: Modal para editar los ítems de un pedido de delivery existente.
-              v1.0.1: migra a nombres en español (utils, store).
+              v1.0.2: elimina eventos inline (onmouseover/onmouseout).
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -66,7 +66,18 @@ export function mostrar(deliveryId, onCerrar) {
         if (!isNaN(idx)) _quitarItemEdicion(idx);
       }
     });
-    modal.querySelector('#editResultadosBusqueda').addEventListener('click', function (e) {
+
+    // Delegación de eventos para hover en resultados de búsqueda (reemplaza eventos inline)
+    const resultadosBusqueda = modal.querySelector('#editResultadosBusqueda');
+    resultadosBusqueda.addEventListener('mouseover', function(e) {
+      const item = e.target.closest('.resultado-item');
+      if (item) item.style.background = 'var(--color-hover)';
+    });
+    resultadosBusqueda.addEventListener('mouseout', function(e) {
+      const item = e.target.closest('.resultado-item');
+      if (item) item.style.background = '';
+    });
+    resultadosBusqueda.addEventListener('click', function (e) {
       const item = e.target.closest('.resultado-item');
       if (item) _seleccionarProductoEdicion(item);
     });
@@ -101,7 +112,8 @@ function _filtrarProductosEdicion() {
     res.style.display = 'block';
     _productoSeleccionado = null;
   } else {
-    res.innerHTML = prod.map(p => `<div class="resultado-item" data-id="${p.id}" data-nombre="${p.nombre}" data-precio="${p.precio}" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--color-border);" onmouseover="this.style.background='var(--color-hover)'" onmouseout="this.style.background=''"><strong>${p.nombre}</strong> <span style="float:right;color:var(--color-accent);">${formatearDinero(p.precio)}</span></div>`).join('');
+    // ✅ Sin eventos inline: las clases CSS y la delegación se encargan del hover
+    res.innerHTML = prod.map(p => `<div class="resultado-item" data-id="${p.id}" data-nombre="${p.nombre}" data-precio="${p.precio}" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--color-border);"><strong>${p.nombre}</strong> <span style="float:right;color:var(--color-accent);">${formatearDinero(p.precio)}</span></div>`).join('');
     res.style.display = 'block';
   }
 }

@@ -1,13 +1,23 @@
-┌──────────────────────────────────────────────┐
-│ REMITENTE: Coordinador de Integración        │
-│ FECHA:     2026-07-01 23:59 UTC              │
-│ TIPO:      DOCUMENTO OFICIAL                 │
-│ REFERENCIA: Catálogo de Eventos del Sistema  │
-└──────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│ REMITENTE: Coordinador de Integración                   │
+│ FECHA:     2026-08-01 08:00 UTC                        │
+│ TIPO:      DOCUMENTO OFICIAL                           │
+│ REFERENCIA: Catálogo de Eventos del Sistema v4.0        │
+└──────────────────────────────────────────────────────────┘
 
-# 📡 Catálogo de Eventos del Sistema – La Taberna (v3.0)
+# 📡 Catálogo de Eventos del Sistema – La Taberna (v4.0)
 
-**Última actualización:** 2026-07-01
+**Última actualización:** 2026-08-01
+
+---
+
+## Cambios en v4.0 respecto a v3.1
+
+- **Agregados**: eventos de autenticación con Appwrite Auth (`auth:login_exitoso`, `auth:login_fallido`, `auth:registro_completado`).
+- **Agregados**: eventos de perfil global (`perfil:actualizado`, `perfil:cargado`).
+- **Agregados**: eventos de multi-espacio (`espacio:cambiado`).
+- **Actualizados**: emisor de `cliente:cuenta_creada` ahora incluye `perfil_global`.
+- **Actualizados**: payload de `app:cambiarVista` ahora incluye `espacioActivoId`.
 
 ---
 
@@ -46,7 +56,6 @@
 | `mesas:limpiar_badge` | Comanda | `{ mesa: number }` | Mesas |
 | `mesa-detalle:abierto` | MesaDetalles | *(sin payload)* | Pedido (bloqueo de apertura) |
 | `mesa-detalle:cerrado` | MesaDetalles | *(sin payload)* | Pedido (desbloqueo de apertura) |
-| `mesa:abrir_desde_detalle` | MesaDetalles | `{ mesa: number }` | Pedido |
 | `mesa:tomar_pedido` | MesaDetalles | `{ mesa: number }` | Pedido |
 
 ---
@@ -80,7 +89,7 @@
 | `producto:agotado` | Comando marcarAgotado | `{ prodId: string }` | KDS, Menu, Carta |
 | `ingredientes:actualizados` | DBInventario | `array de ingredientes` | Store |
 | `inventario:actualizado` | DBInventario | *(sin payload)* | Store |
-| `inventario:stock_bajo` | DBInventario | `{ ingrediente, stock, unidad }` | App (showToast) |
+| `inventario:stock_bajo` | DBInventario | `{ ingrediente, stock, unidad }` | App (mostrarToast) |
 | `recetas:actualizadas` | DBInventario | *(sin payload)* | Recetas, App |
 
 ---
@@ -102,7 +111,7 @@
 |--------|--------|---------|--------------|
 | `turno:iniciado` | PedidoManager | `objeto turno` | App (Caja.render) |
 | `turno:solicitar_cierre` | PedidoManager | *(sin payload)* | TurnoManager |
-| `turno:cerrado` | TurnoManager | `{ timestamp: string }` | App (Caja.render, showToast) |
+| `turno:cerrado` | TurnoManager | `{ timestamp: string }` | App (Caja.render, mostrarToast) |
 | `audit:actualizado` | PedidoManager | `{ turnoId, total }` | App |
 
 ---
@@ -112,7 +121,7 @@
 | Evento | Emisor | Payload | Consumidores |
 |--------|--------|---------|--------------|
 | `cliente:mesa_ingresada` | PantallaBienvenida | `{ mesa: number }` | Mesas (badge de espera) |
-| `cliente:cuenta_creada` | Auth | `{ nombre, timestamp }` | ClienteModulo (cambio de vista) |
+| `cliente:cuenta_creada` | Auth | `{ nombre, timestamp, perfil_global }` | ClienteModulo (cambio de vista) |
 | `cliente:precarga_enviada` | MenuDigital | `{ id, mesa, items, clienteId, id_usuario, nombre_comensal }` | PrecargaControl |
 | `cliente:llamar_garzon` | PantallaBienvenida | `{ mesa: number }` | Mesas (notificación visual) |
 | `cliente:comensal_agregado` | PantallaBienvenida | `{ mesa, nombre, iniciales }` | Mesas |
@@ -146,20 +155,34 @@
 
 | Evento | Emisor | Payload | Consumidores |
 |--------|--------|---------|--------------|
-| `app:cambiarVista` | Auth / EventBus | `string` (nombre de vista) | App (showView) |
-| `app:error` | DB | `string` (mensaje) | App (showToast) |
+| `app:cambiarVista` | Auth / EventBus | `{ vista: string, espacioActivoId: string }` | App (showView) |
+| `app:error` | DB | `string` (mensaje) | App (mostrarToast) |
 
 ---
 
-## 11. Eventos de Autenticación
+## 11. Eventos de Autenticación (v4.0 — Appwrite Auth)
 
 | Evento | Emisor | Payload | Consumidores |
 |--------|--------|---------|--------------|
 | `auth:mostrarRegistro` | Auth | *(sin payload)* | PantallaInicio |
+| `auth:login_exitoso` | Auth (login) | `{ nombre, rol, vistaInicial }` | App, Store (sincronizar estado) |
+| `auth:login_fallido` | Auth (login) | `{ nombre, motivo }` | App (mostrarToast) |
+| `auth:registro_completado` | Auth (registrarCliente) | `{ nombre, perfil_global }` | App, ClienteModulo |
+| `auth:sesion_expirada` | Auth (logout) | *(sin payload)* | App (redirigir a inicio) |
 
 ---
 
-## 12. Cómo suscribirse a un evento
+## 12. Eventos de Perfil Global (v4.0 — multi-espacio)
+
+| Evento | Emisor | Payload | Consumidores |
+|--------|--------|---------|--------------|
+| `perfil:actualizado` | Auth / Perfil UI | `{ usuarioId, cambios }` | Store (global_perfiles), vistas de perfil |
+| `perfil:cargado` | Auth (login) | `{ usuarioId, perfil }` | PantallaBienvenida, Perfil |
+| `espacio:cambiado` | Auth (cambiarEspacio) | `{ espacioId, nombre, rol }` | App (reiniciar Store con nuevo espacioId) |
+
+---
+
+## 13. Cómo suscribirse a un evento
 
     // Suscripción simple
     EventBus.on('mesa:actualizada', (data) => {
@@ -174,7 +197,7 @@
 
 ---
 
-## 13. Convención para nuevos eventos
+## 14. Convención para nuevos eventos
 
 1. Usar el formato `modulo:accion` (ej: `receta:creada`, `cliente:pedido_confirmado`).
 2. Documentar el evento en este archivo antes de hacer el PR.
@@ -185,4 +208,4 @@
 ---
 
 *Documento mantenido por el Coordinador de Integración.*
-*Versión 3.0 — 2026-07-01*
+*Versión 4.0 — 2026-08-01*

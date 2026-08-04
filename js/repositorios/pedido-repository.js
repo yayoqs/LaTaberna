@@ -1,10 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — REPOSITORIO JS (ES6)
    Archivo: js/repositorios/pedido-repository.js
-   Versión: 1.0.9
+   Versión: 1.0.10
    Propósito: Implementación local del repositorio de pedidos con
               sincronización directa a Appwrite.
               Despacha acciones al Store tras cada escritura.
+              v1.0.10: migración var→let/const.
    ================================================================ */
 
 import { DB } from '../db.js';
@@ -34,8 +35,8 @@ const PedidoRepositoryLocal = (() => {
   function _normalizarFecha(valor) {
     if (!valor) return null;
     if (typeof valor === 'number') return new Date(valor).toISOString();
-    var str = String(valor);
-    var parsed = new Date(str);
+    const str = String(valor);
+    const parsed = new Date(str);
     if (!isNaN(parsed.getTime())) return parsed.toISOString();
     return str.substring(0, 100);
   }
@@ -57,7 +58,7 @@ const PedidoRepositoryLocal = (() => {
   }
 
   function _sanitizarPedido(p) {
-    var data = Object.assign({}, p);
+    const data = Object.assign({}, p);
     delete data.id;
     if (Array.isArray(data.items)) data.items = JSON.stringify(data.items).substring(0, 5000);
     else data.items = String(data.items || '[]').substring(0, 5000);
@@ -68,7 +69,7 @@ const PedidoRepositoryLocal = (() => {
   }
 
   function _sanitizarComanda(c) {
-    var data = Object.assign({}, c);
+    const data = Object.assign({}, c);
     delete data.id;
     if (Array.isArray(data.items)) data.items = JSON.stringify(data.items).substring(0, 5000);
     else data.items = String(data.items || '[]').substring(0, 5000);
@@ -257,12 +258,12 @@ const PedidoRepositoryLocal = (() => {
       pedido.transacciones = [];
     }
 
-    var totalCubierto = pedido.transacciones.reduce(function(sum, t) {
+    let totalCubierto = pedido.transacciones.reduce(function(sum, t) {
       return sum + (t.monto || 0);
     }, 0);
 
-    var totalPedido = pedido.total || 0;
-    var saldoPendiente = totalPedido - totalCubierto;
+    const totalPedido = pedido.total || 0;
+    const saldoPendiente = totalPedido - totalCubierto;
 
     if (datosTransaccion.monto > saldoPendiente) {
       return {
@@ -272,7 +273,7 @@ const PedidoRepositoryLocal = (() => {
       };
     }
 
-    var nuevaTransaccion = {
+    const nuevaTransaccion = {
       persona: datosTransaccion.persona || 'General',
       monto: datosTransaccion.monto,
       formaPago: datosTransaccion.formaPago || 'efectivo',
@@ -284,8 +285,8 @@ const PedidoRepositoryLocal = (() => {
       return sum + (t.monto || 0);
     }, 0);
 
-    var nuevoSaldo = totalPedido - totalCubierto;
-    var pedidoCerrado = false;
+    const nuevoSaldo = totalPedido - totalCubierto;
+    let pedidoCerrado = false;
 
     if (nuevoSaldo <= 0) {
       pedido.estado = 'cerrada';
@@ -294,7 +295,7 @@ const PedidoRepositoryLocal = (() => {
       await _syncPedido(pedido, false);
       Store.despachar({ type: 'PEDIDO_CERRADO', payload: { id: pedidoId, total: totalPedido, actualizadoEn: new Date().toISOString() } });
 
-      var mesa = DB.mesas.find(function(m) { return m.pedidoId === pedidoId; });
+      const mesa = DB.mesas.find(function(m) { return m.pedidoId === pedidoId; });
       if (mesa && !mesa.esVirtual) {
         mesa.estado = 'pagada';
         DB.saveMesas();
@@ -326,9 +327,9 @@ const PedidoRepositoryLocal = (() => {
     if (!DB || !DB.pedidos) return [];
     return DB.pedidos.filter(function(p) {
       if (p.estado === 'cerrada') return false;
-      var totalCubierto = (Array.isArray(p.transacciones) ? p.transacciones : [])
+      const totalCubierto = (Array.isArray(p.transacciones) ? p.transacciones : [])
         .reduce(function(sum, t) { return sum + (t.monto || 0); }, 0);
-      var totalPedido = p.total || 0;
+      const totalPedido = p.total || 0;
       return totalCubierto < totalPedido;
     }).map(function(p) {
       if (!p.transacciones) p.transacciones = [];

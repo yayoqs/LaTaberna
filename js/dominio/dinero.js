@@ -1,12 +1,13 @@
 /* ================================================================
    LaTaberna - PubPOS — DOMINIO JS (ES6)
    Archivo: js/dominio/dinero.js
-   Versión: 1.1.3
+   Versión: 1.1.4
    Propósito: Objeto de Valor Dinero: monto inmutable, operaciones matemáticas.
-              Sin asignaciones window. Importa fmtMoney desde utils.js.
+              Sin asignaciones window.
+              v1.1.4: import usa formatearDinero (español).
    ================================================================ */
 
-import { fmtMoney } from '../utils.js';
+import { formatearDinero } from '../utils.js';
 
 export class Dinero {
   constructor(monto) {
@@ -31,7 +32,7 @@ export class Dinero {
   esIgual(otro)    { return this._monto === otro._monto; }
   esCero()         { return this._monto === 0; }
 
-  toString() { return fmtMoney(this._monto); }
+  toString() { return formatearDinero(this._monto); }
   toJSON()   { return this._monto; }
 }
 

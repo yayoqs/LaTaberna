@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — SERVICIO JS (ES6)
    Archivo: js/servicios/inventario-service.js
-   Versión: 1.1.7
+   Versión: 1.2.0
    Propósito: Servicio de casos de uso para inventario e ingredientes.
-              v1.1.7: no envía ID al crear (deja que Appwrite lo genere).
+              v1.2.0: validarStockParaArticulos ahora usa el repositorio
+                      en lugar de DB directo.
    ================================================================ */
 
 import { Ingrediente, reconstruirIngrediente } from '../dominio/ingrediente.js';
@@ -11,7 +12,6 @@ import { Cantidad, crearCantidad } from '../dominio/cantidad.js';
 import { Dinero, crearDinero } from '../dominio/dinero.js';
 import { Resultado } from '../dominio/resultado.js';
 import { EventBus } from '../lib/eventBus.js';
-import { DB } from '../db.js';
 import { Logger } from '../lib/logger.js';
 import { DBInventario } from '../db-inventario.js';
 import { Store } from '../lib/store.js';
@@ -34,32 +34,31 @@ const InventarioService = (() => {
       return Resultado.fallo('Datos numéricos inválidos (stock, mínimo o valor unitario)');
     }
 
-    // Construir el objeto JSON, sin ID si es creación nueva
-    const esNuevo = !datos.id;
-    const jsonIngrediente = {
-      nombre: datos.nombre,
-      stock: stock.valor,
-      unidad: datos.unidad || 'u',
-      stock_minimo: stockMin.valor,
-      categoria: datos.categoria || 'general',
-      ubicacion: datos.ubicacion || '',
-      valor_unitario: valorUnit.monto,
-      proveedor: datos.proveedor || '',
-      precio_proveedor: datos.precio_proveedor || 0
-    };
-
-    // Solo incluir ID si estamos editando
-    if (!esNuevo) {
-      jsonIngrediente.id = datos.id;
+    let ingrediente;
+    try {
+      ingrediente = new Ingrediente(
+        datos.id || `ins_${Date.now()}_${Math.random().toString(36).substr(2,6)}`,
+        datos.nombre,
+        stock,
+        datos.unidad || 'u',
+        stockMin,
+        datos.categoria || 'general',
+        datos.ubicacion || '',
+        valorUnit
+      );
+    } catch (e) {
+      return Resultado.fallo(`Error al crear ingrediente: ${e.message}`);
     }
 
+    // Guardar en repositorio y obtener el objeto definitivo (con ID)
     let ingredienteGuardado;
     try {
-      ingredienteGuardado = await _inventarioRepo.guardarIngrediente(jsonIngrediente);
+      ingredienteGuardado = await _inventarioRepo.guardarIngrediente(ingrediente.toJSON());
     } catch (e) {
       return Resultado.fallo(`Error al guardar ingrediente: ${e.message}`);
     }
 
+    // Actualizar Store con el objeto que tiene el ID correcto
     try {
       Store.despachar({ type: 'INGREDIENTE_GUARDADO', payload: ingredienteGuardado });
     } catch (e) {
@@ -113,20 +112,27 @@ const InventarioService = (() => {
     return Resultado.ok(ingredienteNuevo);
   }
 
-  function validarStockParaArticulos(items) {
+  async function validarStockParaArticulos(items) {
+    if (!_inventarioRepo) return { ok: false, faltantes: [{ ingrediente: 'Sistema', faltante: 0, stockActual: 0, unidad: '', error: 'Repositorio no configurado' }] };
+
     const faltantes = [];
     const totalNecesario = new Map();
-    const ingredientesState = DB.ingredientes || [];
+
+    // ✅ Leer desde el repositorio, no desde DB
+    const [ingredientesState, recetasState] = await Promise.all([
+      _inventarioRepo.obtenerIngredientes(),
+      _inventarioRepo.obtenerRecetas()
+    ]);
 
     for (const item of items) {
-      const receta = DB.recetas.find(r => r.productoId == item.prodId);
+      const receta = recetasState.find(r => r.productoId == item.prodId);
       if (!receta) continue;
 
       const ingredientesPlanos = DBInventario.getIngredientesDeProducto(
         item.prodId,
         item.qty,
-        DB.recetas,
-        DB.ingredientes
+        recetasState,
+        ingredientesState
       );
 
       for (const datos of ingredientesPlanos) {
