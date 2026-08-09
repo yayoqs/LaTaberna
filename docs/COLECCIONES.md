@@ -1,9 +1,9 @@
 # 📦 COLECCIONES.md — Estructura de la Base de Datos "EkyzD"
 
-**Versión:** 1.2.0
-**Fecha:** 2 de agosto de 2026
+**Versión:** 3.0.0 (Final)
+**Fecha:** 7 de agosto de 2026
 **Base de datos:** `EkyzD` (ID: `6a0275cb0022ebf7d30d`)
-**Propósito:** Especificación de colecciones, columnas, configuración y permisos para Appwrite Cloud.
+**Propósito:** Especificación canónica de colecciones, columnas, configuración y permisos para Appwrite Cloud.
 
 ---
 
@@ -28,7 +28,7 @@ Los permisos se asignan mediante **Labels** de Appwrite. Cada rol tiene asociado
 | `barra` | Encargado de barra. Prepara bebidas y cócteles. |
 | `mesero` | Atención de mesas, toma de pedidos. |
 | `caja` | Cobro y cierre de turno. |
-| `despensa` | Gestión de inventario, ingredientes y proveedores. |
+| `despensa` | Gestión de inventario, insumos y proveedores. |
 | `eventos` | Organización de eventos en vivo. |
 | `reparto` | Gestión de pedidos de delivery. |
 | `artista` | Participación en eventos como artista. |
@@ -81,7 +81,7 @@ Los permisos se asignan mediante **Labels** de Appwrite. Cada rol tiene asociado
 | `barra` | READ, UPDATE |
 | `mesero` | CREATE, READ |
 
-#### 5. `laTaberna_Ingredientes`
+#### 5. `laTaberna_Insumos`
 
 | Label | Permisos |
 |-------|----------|
@@ -101,39 +101,21 @@ Los permisos se asignan mediante **Labels** de Appwrite. Cada rol tiene asociado
 | `barra` | CREATE, READ, UPDATE |
 | `despensa` | READ |
 
-#### 7. `laTaberna_Pedidos_delivery`
-
-| Label | Permisos |
-|-------|----------|
-| `master` | CREATE, READ, UPDATE, DELETE |
-| `admin` | CREATE, READ, UPDATE, DELETE |
-| `reparto` | READ, UPDATE |
-| `caja` | READ, UPDATE |
-
-#### 8. `laTaberna_Usuarios`
+#### 7. `laTaberna_Staff`
 
 | Label | Permisos |
 |-------|----------|
 | `master` | CREATE, READ, UPDATE, DELETE |
 | `admin` | CREATE, READ, UPDATE, DELETE |
 
-#### 9. `laTaberna_Configuracion`
+#### 8. `laTaberna_Configuracion`
 
 | Label | Permisos |
 |-------|----------|
 | `master` | CREATE, READ, UPDATE, DELETE |
 | `admin` | CREATE, READ, UPDATE, DELETE |
 
-#### 10. `laTaberna_Precargas_cliente`
-
-| Label | Permisos |
-|-------|----------|
-| `master` | CREATE, READ, UPDATE, DELETE |
-| `admin` | CREATE, READ, UPDATE, DELETE |
-| `cliente` | CREATE, READ, UPDATE |
-| `mesero` | READ, UPDATE |
-
-#### 11. `laTaberna_Eventos_en_vivo`
+#### 9. `laTaberna_Eventos_en_vivo`
 
 | Label | Permisos |
 |-------|----------|
@@ -143,7 +125,7 @@ Los permisos se asignan mediante **Labels** de Appwrite. Cada rol tiene asociado
 | `artista` | READ, UPDATE |
 | `cliente` | READ |
 
-#### 12. `laTaberna_Menus`
+#### 10. `laTaberna_Menus`
 
 | Label | Permisos |
 |-------|----------|
@@ -152,13 +134,32 @@ Los permisos se asignan mediante **Labels** de Appwrite. Cada rol tiene asociado
 | `mesero` | READ |
 | `cliente` | READ |
 
-#### 13. `laTaberna_Proveedores`
+#### 11. `laTaberna_Proveedores`
 
 | Label | Permisos |
 |-------|----------|
 | `master` | CREATE, READ, UPDATE, DELETE |
 | `admin` | CREATE, READ, UPDATE, DELETE |
 | `despensa` | CREATE, READ, UPDATE |
+
+#### 12. `laTaberna_Entradas`
+
+| Label | Permisos |
+|-------|----------|
+| `master` | CREATE, READ, UPDATE, DELETE |
+| `admin` | CREATE, READ, UPDATE, DELETE |
+| `despensa` | CREATE, READ, UPDATE |
+| `cocina` | READ |
+| `barra` | READ |
+
+#### 13. `laTaberna_Comensales`
+
+| Label | Permisos |
+|-------|----------|
+| `master` | CREATE, READ, UPDATE, DELETE |
+| `admin` | CREATE, READ, UPDATE, DELETE |
+| `mesero` | CREATE, READ, UPDATE |
+| `caja` | READ |
 
 #### 14. `global_Perfiles`
 
@@ -221,10 +222,10 @@ Los permisos se asignan mediante **Labels** de Appwrite. Cada rol tiene asociado
 | `descripcion` | varchar | No | 500 | — |
 | `activo` | boolean | Sí | — | `true` |
 | `imagen` | varchar | No | 500 | — |
-| `disponible` | boolean | Sí | — | `true` |
-| `tipo` | enum | Sí | `simple`, `compuesto` | `simple` |
-| `nivel` | enum | No | `insumo`, `preparacion`, `producto_final` | — |
+| `estado` | enum | Sí | `disponible`, `agotado` | `disponible` |
 | `espacioId` | varchar | No | 100 | `lataberna` |
+
+**Índices:** `categoria`, `activo`, `destino`
 
 ---
 
@@ -233,17 +234,29 @@ Los permisos se asignan mediante **Labels** de Appwrite. Cada rol tiene asociado
 **Name:** laTaberna_Pedidos
 **Table ID:** laTaberna_Pedidos
 
+Colección unificada para todos los tipos de pedido: salón, delivery, retiro y precargas de clientes.
+
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
 |---------|------|:----------:|-------------------|---------|
-| `mesa` | integer | Sí | — | — |
+| `mesa` | varchar | No | 100 | — |
+| `tipo` | enum | Sí | `local`, `reparto`, `retiro` | `local` |
+| `origen` | enum | Sí | `staff`, `cliente` | `staff` |
+| `estado` | enum | Sí | `abierta`, `en_proceso`, `cerrada`, `precarga` | `abierta` |
 | `mozo` | varchar | No | 100 | — |
 | `comensales` | integer | Sí | — | `1` |
-| `estado` | enum | Sí | `abierta`, `en_proceso`, `cerrada` | `abierta` |
 | `items` | varchar | No | 16383 | `[]` |
 | `total` | float | Sí | — | `0` |
 | `observaciones` | varchar | No | 500 | — |
 | `transacciones` | varchar | No | 16383 | `[]` |
+| `descuento` | float | No | — | `0` |
+| `direccion` | varchar | No | 500 | — |
+| `telefono` | varchar | No | 50 | — |
+| `repartidor` | varchar | No | 100 | — |
+| `id_usuario` | varchar | No | 255 | — |
+| `nombre_comensal` | varchar | No | 255 | — |
 | `espacioId` | varchar | No | 100 | `lataberna` |
+
+**Índices:** `mesa`, `estado`, `tipo`
 
 ---
 
@@ -252,21 +265,20 @@ Los permisos se asignan mediante **Labels** de Appwrite. Cada rol tiene asociado
 **Name:** laTaberna_Mesas
 **Table ID:** laTaberna_Mesas
 
+Colección simplificada que gestiona exclusivamente la disponibilidad física de las mesas.
+
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
 |---------|------|:----------:|-------------------|---------|
-| `numero` | integer | Sí | — | — |
+| `numero` | varchar | Sí | 100 | — |
 | `estado` | enum | Sí | `libre`, `ocupada`, `esperando`, `cuenta`, `fusionada`, `pagada` | `libre` |
 | `pedidoId` | varchar | No | 100 | — |
-| `items` | varchar | No | 16383 | `[]` |
-| `mozo` | varchar | No | 100 | — |
 | `comensales` | integer | Sí | — | `1` |
-| `abiertaEn` | datetime | No | — | — |
-| `observaciones` | varchar | No | 500 | — |
 | `zona` | varchar | No | 100 | `salon` |
 | `esVirtual` | boolean | Sí | — | `false` |
 | `mesasFusionadas` | varchar | No | 500 | — |
-| `permite_prepedidos` | boolean | Sí | — | `false` |
 | `espacioId` | varchar | No | 100 | `lataberna` |
+
+**Índices:** `estado`, `zona`
 
 ---
 
@@ -278,21 +290,25 @@ Los permisos se asignan mediante **Labels** de Appwrite. Cada rol tiene asociado
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
 |---------|------|:----------:|-------------------|---------|
 | `mesa` | varchar | Sí | 100 | — |
+| `pedidoId` | varchar | No | 100 | — |
 | `destino` | enum | Sí | `cocina`, `barra`, `ambos` | `cocina` |
 | `items` | varchar | Sí | 16383 | — |
 | `observaciones` | varchar | No | 500 | — |
-| `estado` | enum | Sí | `nueva`, `lista`, `completada` | `nueva` |
+| `estado` | enum | Sí | `nueva`, `en-proceso`, `lista`, `completada` | `nueva` |
+| `subcomandas` | varchar | No | 16383 | `{}` |
 | `ts` | integer | No | — | — |
 | `deliveryId` | varchar | No | 100 | — |
 | `mozo` | varchar | No | 100 | — |
 | `espacioId` | varchar | No | 100 | `lataberna` |
 
+**Índices:** `estado`, `pedidoId`, `destino`
+
 ---
 
-## 5. `laTaberna_Ingredientes`
+## 5. `laTaberna_Insumos`
 
-**Name:** laTaberna_Ingredientes
-**Table ID:** laTaberna_Ingredientes
+**Name:** laTaberna_Insumos
+**Table ID:** laTaberna_Insumos
 
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
 |---------|------|:----------:|-------------------|---------|
@@ -302,10 +318,11 @@ Los permisos se asignan mediante **Labels** de Appwrite. Cada rol tiene asociado
 | `ubicacion` | varchar | No | 255 | — |
 | `stock` | float | No | — | `0` |
 | `stock_minimo` | float | No | — | `0` |
-| `valor_unitario` | float | No | — | `0` |
-| `proveedor` | varchar | No | 255 | — |
-| `precio_proveedor` | float | No | — | `0` |
+| `tipo` | enum | Sí | `cocina`, `operativo`, `menaje`, `aseo` | `cocina` |
+| `costo_manual` | float | No | — | `null` |
 | `espacioId` | varchar | No | 100 | `lataberna` |
+
+**Índices:** `tipo`, `categoria`
 
 ---
 
@@ -314,56 +331,47 @@ Los permisos se asignan mediante **Labels** de Appwrite. Cada rol tiene asociado
 **Name:** laTaberna_Recetas
 **Table ID:** laTaberna_Recetas
 
+> **Nota:** La colección no almacena el nombre del producto. El nombre se obtiene mediante la relación `productoId` → `laTaberna_Productos.$id`. Para obtener una receta con el nombre del producto resuelto, usar el método `DBInventario.obtenerRecetaConProducto(recetaId)`.
+
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
 |---------|------|:----------:|-------------------|---------|
-| `productoId` | varchar | No | 255 | — |
-| `nombre` | varchar | Sí | 255 | — |
+| `productoId` | varchar | Sí | 255 | — |
 | `ingredientes` | varchar | No | 16383 | `[]` |
 | `instrucciones` | varchar | No | 2000 | — |
 | `es_intermedio` | boolean | No | — | `false` |
 | `nivel` | varchar | No | 100 | — |
 | `categoria` | varchar | No | 100 | — |
 | `destino` | varchar | No | 50 | — |
-| `stockActual` | float | No | — | `0` |
 | `unidadStock` | varchar | No | 50 | — |
 | `espacioId` | varchar | No | 100 | `lataberna` |
 
----
-
-## 7. `laTaberna_Pedidos_delivery`
-
-**Name:** laTaberna_Pedidos_delivery
-**Table ID:** laTaberna_Pedidos_delivery
-
-| Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
-|---------|------|:----------:|-------------------|---------|
-| `direccion` | varchar | Sí | 500 | — |
-| `telefono` | varchar | Sí | 50 | — |
-| `items` | varchar | Sí | 16383 | — |
-| `estado` | enum | Sí | `pendiente`, `en_preparacion`, `en_camino`, `entregado` | `pendiente` |
-| `repartidor` | varchar | No | 100 | — |
-| `observaciones` | varchar | No | 500 | — |
-| `total` | float | Sí | — | `0` |
-| `espacioId` | varchar | No | 100 | `lataberna` |
+**Índices:** `productoId`, `categoria`
 
 ---
 
-## 8. `laTaberna_Usuarios`
+## 7. `laTaberna_Staff`
 
-**Name:** laTaberna_Usuarios
-**Table ID:** laTaberna_Usuarios
-**Propósito:** Personal del restaurante (admin, meseros, cocineros, etc.).
+**Name:** laTaberna_Staff
+**Table ID:** laTaberna_Staff
+**Propósito:** Personal del restaurante (admin, meseros, cocineros, etc.). Vinculable a perfiles globales.
 
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
 |---------|------|:----------:|-------------------|---------|
 | `nombre` | varchar | Sí | 100 | — |
-| `hash` | varchar | Sí | 255 | — |
 | `rol` | varchar | Sí | 100 | `cliente` |
+| `usuarioId` | varchar | No | 100 | — |
+| `estado` | enum | Sí | `activo`, `inactivo`, `vacaciones` | `activo` |
+| `fechaIngreso` | datetime | No | — | — |
+| `telefono` | varchar | No | 50 | — |
+| `email` | varchar | No | 255 | — |
+| `notas` | varchar | No | 2000 | — |
 | `espacioId` | varchar | No | 100 | `lataberna` |
+
+**Índices:** `usuarioId`
 
 ---
 
-## 9. `laTaberna_Configuracion`
+## 8. `laTaberna_Configuracion`
 
 **Name:** laTaberna_Configuracion
 **Table ID:** laTaberna_Configuracion
@@ -377,26 +385,7 @@ Los permisos se asignan mediante **Labels** de Appwrite. Cada rol tiene asociado
 
 ---
 
-## 10. `laTaberna_Precargas_cliente`
-
-**Name:** laTaberna_Precargas_cliente
-**Table ID:** laTaberna_Precargas_cliente
-
-| Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
-|---------|------|:----------:|-------------------|---------|
-| `mesa` | integer | Sí | — | — |
-| `items` | varchar | Sí | 16383 | — |
-| `estado` | enum | Sí | `por_confirmar`, `revisado` | `por_confirmar` |
-| `id_usuario` | varchar | Sí | 255 | — |
-| `nombre_comensal` | varchar | Sí | 255 | — |
-| `observaciones` | varchar | No | 500 | — |
-| `revisadoPor` | varchar | No | 100 | — |
-| `timestamp` | integer | No | — | — |
-| `espacioId` | varchar | No | 100 | `lataberna` |
-
----
-
-## 11. `laTaberna_Eventos_en_vivo`
+## 9. `laTaberna_Eventos_en_vivo`
 
 **Name:** laTaberna_Eventos_en_vivo
 **Table ID:** laTaberna_Eventos_en_vivo
@@ -407,12 +396,11 @@ Los permisos se asignan mediante **Labels** de Appwrite. Cada rol tiene asociado
 | `estado` | enum | Sí | `configuracion`, `activo`, `pausado`, `finalizado` | `configuracion` |
 | `datos` | varchar | No | 16383 | — |
 | `creadoPor` | varchar | No | 100 | — |
-| `updatedAt` | integer | No | — | — |
 | `espacioId` | varchar | No | 100 | `lataberna` |
 
 ---
 
-## 12. `laTaberna_Menus`
+## 10. `laTaberna_Menus`
 
 **Name:** laTaberna_Menus
 **Table ID:** laTaberna_Menus
@@ -420,14 +408,17 @@ Los permisos se asignan mediante **Labels** de Appwrite. Cada rol tiene asociado
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
 |---------|------|:----------:|-------------------|---------|
 | `nombre` | varchar | Sí | 255 | — |
-| `activo` | boolean | Sí | — | `true` |
+| `estado` | enum | Sí | `borrador`, `publicado` | `borrador` |
 | `productos` | varchar | No | 16383 | `[]` |
 | `creadoPor` | varchar | No | 255 | — |
+| `fondo` | varchar | No | 50 | `#1a1a2e` |
+| `tipografia` | varchar | No | 100 | `'Inter', sans-serif` |
+| `grilla` | boolean | No | — | `false` |
 | `espacioId` | varchar | No | 100 | `lataberna` |
 
 ---
 
-## 13. `laTaberna_Proveedores`
+## 11. `laTaberna_Proveedores`
 
 **Name:** laTaberna_Proveedores
 **Table ID:** laTaberna_Proveedores
@@ -435,8 +426,84 @@ Los permisos se asignan mediante **Labels** de Appwrite. Cada rol tiene asociado
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
 |---------|------|:----------:|-------------------|---------|
 | `nombre` | varchar | Sí | 255 | — |
+| `tipo` | enum | Sí | `distribuidor`, `supermercado`, `feria`, `huerta`, `donacion`, `otro` | `otro` |
+| `contacto` | varchar | No | 255 | — |
+| `telefono` | varchar | No | 50 | — |
+| `email` | varchar | No | 255 | — |
+| `direccion` | varchar | No | 500 | — |
+| `rubro` | varchar | No | 100 | — |
 | `notas` | varchar | No | 2000 | — |
+| `activo` | boolean | Sí | — | `true` |
 | `espacioId` | varchar | No | 100 | `lataberna` |
+
+---
+
+## 12. `laTaberna_Entradas`
+
+**Name:** laTaberna_Entradas
+**Table ID:** laTaberna_Entradas
+**Propósito:** Registro de cada recepción de mercadería. Reemplaza la lógica de precios y proveedores que antes estaba en Insumos.
+
+| Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
+|---------|------|:----------:|-------------------|---------|
+| `insumoId` | varchar | Sí | 255 | — |
+| `proveedorId` | varchar | Sí | 255 | — |
+| `formato` | varchar | No | 100 | — |
+| `cantidad` | float | Sí | — | — |
+| `unidad_por_formato` | float | Sí | — | — |
+| `costo_total` | float | Sí | — | — |
+| `costo_unitario` | float | Sí | — | — |
+| `fecha` | datetime | No | — | — |
+| `espacioId` | varchar | No | 100 | `lataberna` |
+
+**Índices:** `insumoId`, `proveedorId`, `fecha`
+
+---
+
+## 13. `laTaberna_Comensales`
+
+**Name:** laTaberna_Comensales
+**Table ID:** laTaberna_Comensales
+**Propósito:** Registro de personas en una mesa, con o sin cuenta del ecosistema. Soporta identificación gradual y split bill.
+
+| Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
+|---------|------|:----------:|-------------------|---------|
+| `mesaId` | varchar | Sí | 100 | — |
+| `usuarioId` | varchar | No | 100 | `null` |
+| `nombre` | varchar | Sí | 100 | — |
+| `iniciales` | varchar | No | 4 | — |
+| `activo` | boolean | Sí | — | `true` |
+| `unidoEn` | datetime | No | — | — |
+| `espacioId` | varchar | No | 100 | `lataberna` |
+
+**Índices:** `mesaId`, `usuarioId`
+
+**Flujo de registro gradual:**
+1. Al abrir la mesa, el mesero ingresa la cantidad de personas. El sistema crea registros anónimos (`nombre = "Comensal 1"`, `usuarioId = null`).
+2. Si un cliente se identifica (QR, app, número de mesa), el sistema actualiza su registro anónimo con `usuarioId` y `nombre` real.
+3. El mesero puede editar estos registros manualmente si es necesario.
+
+**Split bill:**
+- Los items de la comanda no se asignan a una persona al pedir. El mesero toma el pedido sin fricción.
+- Al momento del pago, el cajero puede arrastrar items a cada comensal. Si no se divide, los items quedan sin asignar.
+
+---
+
+## 📋 Colecciones obsoletas
+
+Las siguientes colecciones han sido reemplazadas por `laTaberna_Pedidos` unificada y deben eliminarse de Appwrite:
+
+| Colección | Reemplazada por |
+|-----------|-----------------|
+| `laTaberna_Pedidos_delivery` | `laTaberna_Pedidos` con `tipo = delivery` |
+| `laTaberna_Precargas_cliente` | `laTaberna_Pedidos` con `estado = precarga` y `origen = cliente` |
+
+**Flujo de precargas unificado:**
+1. **Una precarga activa por persona por mesa.** Si ya existe una precarga no revisada para ese `usuarioId` en esa mesa, el cliente solo puede editarla.
+2. **Validación de mesa real.** El cliente solo puede enviar precargas a una mesa que existe, está ocupada y tiene un pedido activo.
+3. **Identificación del cliente.** La precarga se asocia al `usuarioId` del cliente o a un identificador anónimo.
+4. **El mesero siempre autoriza.** La precarga no se convierte en comanda automáticamente. El mesero revisa, modifica si es necesario, y solo entonces la envía a cocina/barra.
+5. **Límite de items por precarga.** Pendiente para futura implementación.
 
 ---
 
@@ -448,7 +515,7 @@ Los permisos se asignan mediante **Labels** de Appwrite. Cada rol tiene asociado
 
 **Name:** global_Perfiles
 **Table ID:** global_Perfiles
-**Propósito:** Perfil de cliente del ecosistema (avatar, nivel, XP). Compartido entre todas las apps.
+**Propósito:** Perfil de usuario del ecosistema (avatar, nivel, XP). Compartido entre todas las apps.
 
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
 |---------|------|:----------:|-------------------|---------|
@@ -460,6 +527,9 @@ Los permisos se asignan mediante **Labels** de Appwrite. Cada rol tiene asociado
 | `insignias` | varchar | No | 16383 | `[]` |
 | `racha` | integer | Sí | — | `0` |
 | `titulos` | varchar | No | 16383 | `[]` |
+| `fechaRegistro` | datetime | No | — | — |
+| `bio` | varchar | No | 500 | — |
+| `ultimaActividad` | datetime | No | — | — |
 
 ---
 
@@ -475,6 +545,11 @@ Los permisos se asignan mediante **Labels** de Appwrite. Cada rol tiene asociado
 | `cantidad` | integer | Sí | — | `0` |
 | `motivo` | varchar | No | 255 | — |
 | `origen` | varchar | No | 100 | — |
+| `app` | varchar | No | 50 | — |
+| `espacioId` | varchar | No | 100 | — |
+| `fecha` | datetime | No | — | — |
+
+**Índices:** `usuarioId`, `app`
 
 ---
 
@@ -492,6 +567,10 @@ Los permisos se asignan mediante **Labels** de Appwrite. Cada rol tiene asociado
 | `tipo` | enum | Sí | `promocion`, `concurso`, `aviso` | `aviso` |
 | `estado` | enum | Sí | `pendiente`, `activo`, `finalizado` | `pendiente` |
 | `creadoPor` | varchar | No | 100 | — |
+| `app` | varchar | No | 50 | — |
+| `espacioId` | varchar | No | 100 | — |
+
+**Índices:** `estado`, `fecha`
 
 ---
 
@@ -504,9 +583,15 @@ Los permisos se asignan mediante **Labels** de Appwrite. Cada rol tiene asociado
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
 |---------|------|:----------:|-------------------|---------|
 | `nombre` | varchar | Sí | 255 | — |
-| `tipo` | enum | Sí | `bar`, `hogar` | `bar` |
+| `tipo` | enum | Sí | `bar`, `hogar`, `tienda`, `veterinaria`, `hotel`, `otro` | `bar` |
 | `databaseId` | varchar | No | 100 | — |
 | `adminAsignado` | varchar | No | 100 | — |
+| `direccion` | varchar | No | 500 | — |
+| `ciudad` | varchar | No | 100 | — |
+| `pais` | varchar | No | 100 | — |
+| `activo` | boolean | Sí | — | `true` |
+
+**Índices:** `tipo`, `activo`
 
 ---
 

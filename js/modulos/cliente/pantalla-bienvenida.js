@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — Módulo (ES6)
    Archivo: js/modulos/cliente/pantalla-bienvenida.js
-   Versión: 2.2.7
+   Versión: 2.2.10
    Propósito: Panel de control post-validación.
-              Auth.logout → Auth.cerrarSesion.
+              Verificación de permiso adaptada a la nueva estructura
+              de pedidos (laTaberna_Pedidos).
    ================================================================ */
 
 import { EventBus } from '../../lib/eventBus.js';
@@ -21,7 +22,7 @@ const PantallaBienvenida = (() => {
   let _abortController = null;
   let _abortControllerPanel = null;
 
-  let _cbMesasActualizada, _cbMesaActualizada, _cbEventosActualizada, _cbPrecargasActualizada;
+  let _cbMesasActualizada, _cbMesaActualizada, _cbEventosActualizada, _cbPedidosActualizada;
   let _cbBtnGuardar, _cbBtnBarra, _cbLogout, _cbGastroInicial, _cbEventosInicial;
 
   function _asegurarVista() {
@@ -116,7 +117,7 @@ const PantallaBienvenida = (() => {
       if (_cbMesasActualizada) EventBus.off('mesas:actualizada', _cbMesasActualizada);
       if (_cbMesaActualizada) EventBus.off('mesa:actualizada', _cbMesaActualizada);
       if (_cbEventosActualizada) EventBus.off('eventos_en_vivo:actualizada', _cbEventosActualizada);
-      if (_cbPrecargasActualizada) EventBus.off('precargas_cliente:actualizada', _cbPrecargasActualizada);
+      if (_cbPedidosActualizada) EventBus.off('pedidos:actualizada', _cbPedidosActualizada);
     }
   }
 
@@ -134,10 +135,6 @@ const PantallaBienvenida = (() => {
     const valor = parseInt(input?.value, 10);
     const estadoEl = document.getElementById('estadoMesa');
     if (!valor || valor < 1) { estadoEl.textContent = 'Ingresá un número válido.'; return; }
-    const state = Store.obtenerEstado();
-    const mesas = state.mesas || [];
-    const mesaExiste = mesas.some(m => m.numero === valor);
-    if (!mesaExiste) { estadoEl.textContent = `La mesa ${valor} no existe. Verificá el número.`; return; }
     _vincular(valor, estadoEl);
   }
 
@@ -171,9 +168,10 @@ const PantallaBienvenida = (() => {
   function _verificarPermisoMesa() {
     if (!_mesa) return;
     const state = Store.obtenerEstado();
-    const mesas = state.mesas || [];
-    const mesaActual = _mesa === 'barra' ? mesas.find(m => m.numero === 0 || m.nombre === 'barra') : mesas.find(m => m.numero === _mesa);
-    const permite = mesaActual && mesaActual.permite_prepedidos === true;
+    const pedidos = state.pedidos || [];
+    // Verificar si existe un pedido activo para esta mesa (abierto por el garzón)
+    const pedidoActivo = pedidos.find(p => String(p.mesa) === String(_mesa) && p.estado === 'abierta');
+    const permite = !!pedidoActivo;
 
     if (permite && !_interfazActivada) {
       _interfazActivada = true;
@@ -253,8 +251,8 @@ const PantallaBienvenida = (() => {
     document.getElementById('cardEntretenimiento').addEventListener('click', _irAEventos, { signal });
     document.getElementById('btnAgregarComensal').addEventListener('click', _agregarComensal, { signal });
 
-    _cbPrecargasActualizada = _actualizarVistazoPedido;
-    EventBus.on('precargas_cliente:actualizada', _cbPrecargasActualizada);
+    _cbPedidosActualizada = _actualizarVistazoPedido;
+    EventBus.on('pedidos:actualizada', _cbPedidosActualizada);
     _actualizarVistazoPedido();
   }
 
@@ -282,13 +280,14 @@ const PantallaBienvenida = (() => {
 
   function _actualizarVistazoPedido() {
     const state = Store.obtenerEstado();
-    const precargas = state.precargas_cliente || [];
-    const misPrecargas = precargas.filter(p => p.id_usuario === (Auth.getAppwriteUserId?.() || ''));
+    const pedidos = state.pedidos || [];
+    const idUsuario = Auth.obtenerIdUsuarioAppwrite?.() || '';
+    const misPrecargas = pedidos.filter(p => p.estado === 'precarga' && p.origen === 'cliente' && p.id_usuario === idUsuario);
     const texto = document.getElementById('textoEstadoPedido');
     const badge = document.getElementById('badgeCantidadPedidos');
     if (misPrecargas.length === 0) { if (texto) texto.textContent = 'Aún no has hecho ningún pedido.'; if (badge) badge.style.display = 'none'; return; }
     const ultima = misPrecargas[misPrecargas.length - 1];
-    const items = typeof ultima.productos === 'string' ? JSON.parse(ultima.productos) : ultima.productos;
+    const items = typeof ultima.items === 'string' ? JSON.parse(ultima.items) : ultima.items;
     const totalItems = items.reduce((sum, i) => sum + i.qty, 0);
     if (texto) texto.innerHTML = `${items[0]?.nombre || 'Producto'} x${totalItems} — <span style="color:#f59e0b;">${ultima.estado || 'pendiente'}</span>`;
     if (badge) { badge.style.display = 'inline-block'; badge.textContent = `${misPrecargas.length} activo${misPrecargas.length > 1 ? 's' : ''}`; }

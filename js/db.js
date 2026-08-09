@@ -1,12 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db.js
-   Versión: 1.0.15
+   Versión: 1.1.0
    Propósito: Orquestador de base de datos (Appwrite + localStorage).
-              Sincronización y reseteo de mesas por configuración de zonas.
-              Fallback offline robusto: si Appwrite no responde,
-              carga desde localStorage y continúa operando.
-              v1.0.15: migración var→let/const.
+              v1.1.0: carga unificada de pedidos, eliminados métodos
+                      de delivery separados, adaptado a nuevo esquema
+                      de Mesas (numero varchar).
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -61,9 +60,8 @@ export const DB = (function() {
             'pedidos',
             'mesas',
             'comandas',
-            'ingredientes',
-            'recetas',
-            'pedidos_delivery'
+            'insumos',
+            'recetas'
           ].map(function(coleccion) {
             return appwrite.listar(coleccion).then(function(lista) {
               resultados[coleccion] = lista;
@@ -79,9 +77,8 @@ export const DB = (function() {
           this._procesarPedidos(resultados.pedidos);
           this._procesarMesas(resultados.mesas);
           this._procesarComandas(resultados.comandas);
-          this._procesarIngredientes(resultados.ingredientes);
+          this._procesarInsumos(resultados.insumos);
           this._procesarRecetas(resultados.recetas);
-          this._procesarPedidosDelivery(resultados.pedidos_delivery);
 
           Logger.info('[DB] Datos cargados exitosamente.');
         } catch (e) {
@@ -152,14 +149,14 @@ export const DB = (function() {
     } else {
       this._cargarMesasLocal();
     }
-    this.mesas.sort((a, b) => a.numero - b.numero);
+    this.mesas.sort((a, b) => parseInt(a.numero) - parseInt(b.numero));
   };
 
-  combined._procesarIngredientes = function(lista) {
+  combined._procesarInsumos = function(lista) {
     if (lista && Array.isArray(lista) && lista.length > 0) {
-      this.ingredientes = lista.map(i => this._normalizarIngrediente(i));
+      this.insumos = lista.map(i => this._normalizarInsumo(i));
     } else {
-      this._cargarIngredientesLocal();
+      this._cargarInsumosLocal();
     }
   };
 
@@ -178,22 +175,13 @@ export const DB = (function() {
     }
   };
 
-  combined._procesarPedidosDelivery = function(lista) {
-    if (lista && Array.isArray(lista) && lista.length > 0) {
-      this.pedidosDelivery = lista;
-    } else {
-      this._cargarPedidosDeliveryLocal();
-    }
-  };
-
   combined._cargarTodoLocal = function() {
     this._cargarProductosLocal();
     this._cargarPedidosLocal();
     this._cargarMesasLocal();
     this._cargarComandasLocal();
-    this._cargarIngredientesLocal();
+    this._cargarInsumosLocal();
     this._cargarRecetasLocal();
-    this._cargarPedidosDeliveryLocal();
     this.saveMesas();
     Logger.info('[DB] Todos los datos cargados desde localStorage.');
   };
@@ -223,12 +211,12 @@ export const DB = (function() {
     let maxNumero = 0;
 
     if (reales.length > 0) {
-      maxNumero = Math.max.apply(null, reales.map(function(m) { return m.numero; }));
+      maxNumero = Math.max.apply(null, reales.map(function(m) { return parseInt(m.numero) || 0; }));
     }
 
     if (libres.length > libresNecesarias) {
       const sobrantes = libres.length - libresNecesarias;
-      libres.sort(function(a, b) { return b.numero - a.numero; });
+      libres.sort(function(a, b) { return parseInt(b.numero) - parseInt(a.numero); });
       mesasAEliminar = libres.slice(0, sobrantes);
       libres = libres.slice(sobrantes);
     }
@@ -247,7 +235,7 @@ export const DB = (function() {
     for (let i = 0; i < mesasAEliminar.length; i++) {
       const mesa = mesasAEliminar[i];
       try {
-        await appwrite.eliminar('mesas', String(mesa.numero));
+        await appwrite.eliminar('mesas', mesa.numero);
         Logger.info('[DB] Mesa ' + mesa.numero + ' eliminada (sobrante).');
       } catch (e) {
         Logger.warn('[DB] Error al eliminar mesa ' + mesa.numero + ':', e);
@@ -261,16 +249,11 @@ export const DB = (function() {
           numero: mesa.numero,
           estado: 'libre',
           pedidoId: '',
-          items: '[]',
-          mozo: '',
           comensales: 1,
-          abiertaEn: new Date().toISOString(),
-          observaciones: '',
           zona: mesa.zona || 'salon',
-          esVirtual: false,
-          permite_prepedidos: false
+          esVirtual: false
         };
-        await appwrite.crear('mesas', String(mesa.numero), dataMesa);
+        await appwrite.crear('mesas', mesa.numero, dataMesa);
         Logger.info('[DB] Mesa ' + mesa.numero + ' creada en Appwrite.');
       } catch (e) {
         Logger.warn('[DB] Error al crear mesa ' + mesa.numero + ':', e);
@@ -278,7 +261,7 @@ export const DB = (function() {
     }
 
     this.mesas = [].concat(ocupadas, libres, virtuales);
-    this.mesas.sort(function(a, b) { return a.numero - b.numero; });
+    this.mesas.sort(function(a, b) { return parseInt(a.numero) - parseInt(b.numero); });
 
     this.saveMesas();
     EventBus.emit('mesas:guardadas', this.mesas);
@@ -301,7 +284,7 @@ export const DB = (function() {
     for (let i = 0; i < libres.length; i++) {
       const mesa = libres[i];
       try {
-        await appwrite.eliminar('mesas', String(mesa.numero));
+        await appwrite.eliminar('mesas', mesa.numero);
         Logger.info('[DB] Mesa libre ' + mesa.numero + ' eliminada.');
       } catch (e) {
         Logger.warn('[DB] Error al eliminar mesa libre ' + mesa.numero + ':', e);
@@ -318,7 +301,7 @@ export const DB = (function() {
     for (let z = 0; z < zonas.length; z++) {
       const zona = zonas[z];
       for (let n = 0; n < zona.cantidad; n++) {
-        const nueva = mesaVacia(numero, zona.nombre);
+        const nueva = mesaVacia(String(numero), zona.nombre);
         nuevasMesas.push(nueva);
         numero++;
       }
@@ -327,7 +310,7 @@ export const DB = (function() {
     let siguienteNumero = totalDeseado + 1;
     for (let i = 0; i < ocupadas.length; i++) {
       const ocupada = ocupadas[i];
-      ocupada.numero = siguienteNumero;
+      ocupada.numero = String(siguienteNumero);
       siguienteNumero++;
       nuevasMesas.push(ocupada);
     }
@@ -339,16 +322,11 @@ export const DB = (function() {
           numero: mesa.numero,
           estado: mesa.estado || 'libre',
           pedidoId: mesa.pedidoId || '',
-          items: Array.isArray(mesa.items) ? JSON.stringify(mesa.items) : (mesa.items || '[]'),
-          mozo: mesa.mozo || '',
           comensales: mesa.comensales || 1,
-          abiertaEn: mesa.abiertaEn || new Date().toISOString(),
-          observaciones: mesa.observaciones || '',
           zona: mesa.zona || 'salon',
-          esVirtual: mesa.esVirtual || false,
-          permite_prepedidos: mesa.permite_prepedidos || false
+          esVirtual: mesa.esVirtual || false
         };
-        await appwrite.crear('mesas', String(mesa.numero), dataMesa);
+        await appwrite.crear('mesas', mesa.numero, dataMesa);
         Logger.info('[DB] Mesa ' + mesa.numero + ' creada en Appwrite (reset).');
       } catch (e) {
         Logger.warn('[DB] Error al crear mesa ' + mesa.numero + ':', e);
@@ -356,7 +334,7 @@ export const DB = (function() {
     }
 
     this.mesas = nuevasMesas.concat(virtuales);
-    this.mesas.sort(function(a, b) { return a.numero - b.numero; });
+    this.mesas.sort(function(a, b) { return parseInt(a.numero) - parseInt(b.numero); });
 
     this.saveMesas();
     EventBus.emit('mesas:guardadas', this.mesas);

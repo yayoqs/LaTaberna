@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/modulos/cliente/principal.js
-   Versión: 2.0.0
+   Versión: 2.0.1
    Propósito: Punto de entrada del frontend del cliente.
-              Ya no llama a render(), confía en _asegurarVista.
+              Corregida API de Auth (obtenerUsuarioActual).
    ================================================================ */
 
 import { PantallaInicio } from './pantalla-inicio.js';
@@ -70,6 +70,6 @@ export const ClienteModulo = {
     }
   });
 
-  const usuario = Auth.getUsuarioActual?.() || null;
+  const usuario = Auth.obtenerUsuarioActual?.() || null;
   if (!usuario) PantallaInicio.mostrar();
 })();

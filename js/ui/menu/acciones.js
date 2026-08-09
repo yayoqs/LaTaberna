@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MENÚ SUBMÓDULO (ES6)
    Archivo: js/ui/menu/acciones.js
-   Versión: 1.2.0
+   Versión: 1.3.0
    Propósito: Persistencia de menús en Appwrite y sincronización con Store.
-              v1.2.0: incluye estilos visuales (fondo, tipografía, grilla).
+              v1.3.0: adaptado a laTaberna_Menus (estado, fondo, tipografia, grilla).
    ================================================================ */
 
 import { DBAppwrite } from '../../db-appwrite.js';

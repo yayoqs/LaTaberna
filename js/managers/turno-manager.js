@@ -1,10 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/managers/turno-manager.js
-   Versión: 1.1.1
+   Versión: 1.2.0
    Propósito: Cierre de turno, respaldo en Google Drive y reseteo del sistema.
-              Desacoplado de UI (emite eventos) y corregida referencia a syncQueue.
-              Corrección: migración var→let/const.
+              Eliminadas referencias a DB.pedidosDelivery (colección obsoleta).
    ================================================================ */
 
 import { EventBus } from '../lib/eventBus.js';
@@ -41,10 +40,8 @@ export const TurnoManager = (() => {
       inicio: turno.inicio,
       cierre: new Date().toISOString(),
       pedidos: DB.pedidos || [],
-      pedidosDelivery: DB.pedidosDelivery || [],
       auditLog: auditLog,
-      mesas: DB.mesas ? DB.mesas.filter(m => m.estado !== 'libre') : [],
-      syncQueue: DB.syncQueue || []
+      mesas: DB.mesas ? DB.mesas.filter(m => m.estado !== 'libre') : []
     };
 
     Logger.info(`[TurnoManager] Cerrando turno ${turno.id}...`);
@@ -111,12 +108,6 @@ export const TurnoManager = (() => {
       DB.pedidos = [];
       DB.savePedidos();
       EventBus.emit('pedidos:guardados', []);
-    }
-
-    if (DB.pedidosDelivery) {
-      DB.pedidosDelivery = [];
-      DB.savePedidosDelivery();
-      EventBus.emit('pedidosDelivery:guardados', []);
     }
 
     if (DB.comandas) {

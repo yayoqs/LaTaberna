@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — REPARTO SUBMÓDULO (ES6)
    Archivo: js/ui/reparto/ciclo-vida.js
-   Versión: 1.0.2
+   Versión: 1.1.1
    Propósito: Suscripciones al Store y EventBus para reparto.
-              v1.0.2: migra a nombres en español (store).
+              v1.1.1: corrige filtro de tipo ('reparto' en lugar de 'delivery').
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -17,9 +17,9 @@ let _abortController = null;
 let _desuscripciones = [];
 
 function _renderCompleto() {
-  const pedidos = Store.obtenerEstado().pedidosDelivery || [];
-  const pedidosValidos = pedidos.filter(p => p && p.id);
-  renderTabla(pedidosValidos);
+  const pedidos = Store.obtenerEstado().pedidos || [];
+  const pedidosDelivery = pedidos.filter(p => p && p.id && p.tipo === 'reparto');
+  renderTabla(pedidosDelivery);
 }
 
 export function activar() {
@@ -50,7 +50,7 @@ export function activar() {
   }
 
   const unsubscribeStore = Store.suscribir((state, action) => {
-    if (action.type.startsWith('DELIVERY') || action.type.startsWith('PEDIDOSDELIVERY')) {
+    if (action.type.startsWith('PEDIDOS') || action.type.startsWith('DELIVERY')) {
       _renderCompleto();
     }
   });

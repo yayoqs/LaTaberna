@@ -1,11 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/auth.js
-   Versión: 1.6.1
+   Versión: 1.6.2
    Propósito: Autenticación con Appwrite Account nativo + fallback local.
               API pública completamente en español.
-              v1.6.1: corregido ID del selector de local (espacioSelectorContainer)
-                      y typo en asignación de hash (usuario.nuevoHash → usuario.hash).
+              v1.6.2: USUARIOS_POR_DEFECTO se importa desde config-appwrite.js.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -13,24 +12,11 @@ import { EventBus } from './lib/eventBus.js';
 import { mostrarToast } from './utils.js';
 import { Roles } from './roles.js';
 import { DBAppwrite } from './db-appwrite.js';
+import { USUARIOS_POR_DEFECTO } from './config-appwrite.js';
 
 const URL_FUNCION_ASIGNAR_ROL = 'https://6a6b3c8a003b634646cc.tor.appwrite.run';
 
 export const Auth = (() => {
-  const USUARIOS_POR_DEFECTO = [
-    { nombre: 'master',   password: 'master123', rol: 'master' },
-    { nombre: 'admin',    password: 'admin123',  rol: 'admin' },
-    { nombre: 'cocina',   password: 'cocina',    rol: 'cocina' },
-    { nombre: 'barra',    password: 'barra',     rol: 'barra' },
-    { nombre: 'caja',     password: 'caja',      rol: 'caja' },
-    { nombre: 'mesero',   password: 'mesero',    rol: 'mesero' },
-    { nombre: 'despensa', password: 'despensa',  rol: 'despensa' },
-    { nombre: 'eventos',  password: 'eventos',   rol: 'eventos' },
-    { nombre: 'reparto',  password: 'reparto',   rol: 'reparto' },
-    { nombre: 'cliente',  password: 'cliente',   rol: 'cliente' },
-    { nombre: 'artista',  password: 'artista',   rol: 'artista' }
-  ];
-
   let _usuarios = [];
   let _usuarioActual = null;
   let _rolSimulado = null;

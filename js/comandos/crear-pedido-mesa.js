@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — COMANDO JS (ES6)
    Archivo: js/comandos/crear-pedido-mesa.js
-   Versión: 1.0.3
+   Versión: 1.0.4
    Propósito: Comando para crear un pedido asociado a una mesa.
-              Con imports explícitos. PedidoManager importado correctamente.
+              v1.0.4: asigna tipo=salon, origen=staff, pedidoId en comandas.
    ================================================================ */
 
 import { CommandBus } from '../lib/command-bus.js';
@@ -20,7 +20,9 @@ export function crearComandoPedidoMesa(datos) {
     datos: {
       numeroMesa: datos.numeroMesa,
       mozo: datos.mozo || 'Sin mozo',
-      comensales: datos.comensales || 1
+      comensales: datos.comensales || 1,
+      tipo: 'salon',
+      origen: 'staff'
     }
   };
 }
@@ -28,10 +30,10 @@ export function crearComandoPedidoMesa(datos) {
 async function handleCrearPedidoMesa(comando) {
   const { numeroMesa, mozo, comensales } = comando.datos;
 
-  if (!PedidoManager || !PedidoManager.getTurnoActual) {
+  if (!PedidoManager || !PedidoManager.obtenerTurnoActual) {
     throw new Error('Sistema de turnos no disponible');
   }
-  const turno = PedidoManager.getTurnoActual();
+  const turno = PedidoManager.obtenerTurnoActual();
   if (!turno || turno.estado !== 'abierto') {
     throw new Error('No hay turno abierto para crear pedidos');
   }
@@ -55,17 +57,12 @@ async function handleCrearPedidoMesa(comando) {
         const mesaBase = (typeof DB !== 'undefined' && DB.mesaVacia)
           ? DB.mesaVacia(numeroMesa, 'salon')
           : {
-              numero: numeroMesa,
+              numero: String(numeroMesa),
               estado: 'libre',
               pedidoId: '',
-              items: '[]',
-              mozo: '',
               comensales: 1,
-              abiertaEn: new Date().toISOString(),
-              observaciones: '',
               zona: 'salon',
-              esVirtual: false,
-              permite_prepedidos: false
+              esVirtual: false
             };
         await DBAppwrite.crear('mesas', String(numeroMesa), mesaBase);
         Logger.info('[crearPedidoMesa] Mesa ' + numeroMesa + ' recreada exitosamente.');
@@ -84,7 +81,7 @@ async function handleCrearPedidoMesa(comando) {
   if (!pedido) throw new Error('No se pudo crear el pedido');
 
   if (typeof DBAppwrite !== 'undefined' && DBAppwrite.habilitado) {
-    await DBAppwrite.actualizar('mesas', String(numeroMesa), { permite_prepedidos: true });
+    await DBAppwrite.actualizar('mesas', String(numeroMesa), { estado: 'ocupada', pedidoId: pedido.id });
   }
 
   if (typeof PedidoManager.registrar === 'function') {

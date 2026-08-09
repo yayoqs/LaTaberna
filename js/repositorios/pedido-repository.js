@@ -1,11 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — REPOSITORIO JS (ES6)
    Archivo: js/repositorios/pedido-repository.js
-   Versión: 1.0.10
+   Versión: 1.1.1
    Propósito: Implementación local del repositorio de pedidos con
               sincronización directa a Appwrite.
-              Despacha acciones al Store tras cada escritura.
-              v1.0.10: migración var→let/const.
+              v1.1.1: enviarComanda lee items/mozo/comensales del pedido
+                      activo, no de la mesa (campos eliminados en Mesas).
    ================================================================ */
 
 import { DB } from '../db.js';
@@ -43,14 +43,10 @@ const PedidoRepositoryLocal = (() => {
 
   function _sanitizarMesa(m) {
     return {
-      numero: m.numero,
+      numero: String(m.numero),
       estado: String(m.estado || 'libre'),
       pedidoId: String(m.pedidoId || '').substring(0, 50),
-      items: Array.isArray(m.items) ? JSON.stringify(m.items).substring(0, 5000) : String(m.items || '[]').substring(0, 5000),
-      mozo: String(m.mozo || '').substring(0, 100),
       comensales: Number(m.comensales) || 1,
-      abiertaEn: _normalizarFecha(m.abiertaEn),
-      observaciones: String(m.observaciones || '').substring(0, 500),
       zona: String(m.zona || 'salon').substring(0, 50),
       mesasFusionadas: Array.isArray(m.mesasFusionadas) ? JSON.stringify(m.mesasFusionadas).substring(0, 500) : String(m.mesasFusionadas || '').substring(0, 500),
       esVirtual: Boolean(m.esVirtual)
@@ -73,6 +69,7 @@ const PedidoRepositoryLocal = (() => {
     delete data.id;
     if (Array.isArray(data.items)) data.items = JSON.stringify(data.items).substring(0, 5000);
     else data.items = String(data.items || '[]').substring(0, 5000);
+    if (!data.subcomandas) data.subcomandas = '{}';
     return data;
   }
 
@@ -98,7 +95,7 @@ const PedidoRepositoryLocal = (() => {
 
   async function _syncMesa(mesa) {
     if (!mesa || mesa.esVirtual) return;
-    await _guardarEnAppwrite('mesas', String(mesa.numero), _sanitizarMesa(mesa), false);
+    await _guardarEnAppwrite('mesas', mesa.numero, _sanitizarMesa(mesa), false);
   }
 
   async function _syncPedido(pedido, esNuevo) {
@@ -118,16 +115,15 @@ const PedidoRepositoryLocal = (() => {
     if (mesa.estado !== 'libre') throw new Error(`La mesa ${numeroMesa} no está libre`);
 
     mesa.estado = 'ocupada';
-    mesa.abiertaEn = Date.now();
-    mesa.mozo = mozo;
     mesa.comensales = comensales;
-    mesa.items = [];
-    mesa.observaciones = '';
+    mesa.pedidoId = null;
     DB.saveMesas();
 
     const pedidoLocal = await DB.crearPedido(numeroMesa, mozo, comensales);
     if (!pedidoLocal) throw new Error('No se pudo crear el pedido localmente');
     pedidoLocal.transacciones = [];
+    pedidoLocal.tipo = 'salon';
+    pedidoLocal.origen = 'staff';
     mesa.pedidoId = pedidoLocal.id;
     DB.saveMesas();
 
@@ -137,7 +133,16 @@ const PedidoRepositoryLocal = (() => {
   }
 
   async function enviarComanda(mesa, itemsPendientes, mozo, comensales, observaciones) {
-    if (!DB || !DB.comandas) throw new Error('DB.comandas no disponible');
+    if (!DB || !DB.comandas || !DB.pedidos) throw new Error('DB no disponible');
+
+    // Obtener datos del pedido activo, no de la mesa
+    const pedidoActivo = mesa.pedidoId ? DB.pedidos.find(p => p.id === mesa.pedidoId) : null;
+    const itemsActuales = pedidoActivo ? (() => {
+      try { return typeof pedidoActivo.items === 'string' ? JSON.parse(pedidoActivo.items) : (pedidoActivo.items || []); }
+      catch { return []; }
+    })() : [];
+    const mozoActivo = pedidoActivo ? pedidoActivo.mozo : (mozo || '');
+    const comensalesActivos = pedidoActivo ? pedidoActivo.comensales : (comensales || 1);
 
     const cocinaItems = itemsPendientes.filter(it => it.destino === 'cocina' || it.destino === 'ambos');
     const barraItems  = itemsPendientes.filter(it => it.destino === 'barra'  || it.destino === 'ambos');
@@ -147,8 +152,9 @@ const PedidoRepositoryLocal = (() => {
       items.forEach(it => { it.enviado = true; it.enviadoA = destinoKds; it.enviadoTs = Date.now(); });
       const comanda = {
         id: 'kds_' + Date.now() + '_' + Math.random().toString(36).substr(2,6),
-        mesa: mesa.numero, mozo, destino: destinoKds,
-        items: items.map(it => ({ ...it })), observaciones: observaciones || '', estado: 'nueva', ts: Date.now()
+        mesa: mesa.numero, mozo: mozoActivo, destino: destinoKds,
+        items: items.map(it => ({ ...it })), observaciones: observaciones || '', estado: 'nueva', ts: Date.now(),
+        pedidoId: mesa.pedidoId || null, subcomandas: {}
       };
       DB.comandas.push(comanda);
       return comanda;
@@ -169,9 +175,11 @@ const PedidoRepositoryLocal = (() => {
     if (mesa.pedidoId && typeof DB.actualizarPedido === 'function') {
       await DB.actualizarPedido(mesa.pedidoId, {
         estado: 'en_proceso',
-        items: JSON.stringify(mesa.items),
-        total: calcularTotal(mesa.items),
-        mozo: mesa.mozo, comensales: mesa.comensales, observaciones: mesa.observaciones
+        items: JSON.stringify(itemsActuales),
+        total: calcularTotal(itemsActuales),
+        mozo: mozoActivo,
+        comensales: comensalesActivos,
+        observaciones: observaciones || ''
       });
     }
 
@@ -189,6 +197,8 @@ const PedidoRepositoryLocal = (() => {
     const pedidoLocal = await DB.crearPedido(datos.mesa, datos.mozo, datos.comensales);
     if (!pedidoLocal) throw new Error('No se pudo crear el pedido localmente');
     pedidoLocal.transacciones = [];
+    pedidoLocal.tipo = datos.tipo || 'salon';
+    pedidoLocal.origen = datos.origen || 'staff';
     await _syncPedido(pedidoLocal, true);
     return pedidoLocal;
   }
@@ -211,7 +221,7 @@ const PedidoRepositoryLocal = (() => {
       Store.despachar({ type: 'PEDIDO_CERRADO', payload: { id, total: datosCierre.total, actualizadoEn: pedidoCerrado.actualizadoEn } });
       const mesa = DB.mesas.find(m => m.pedidoId === id);
       if (mesa && !mesa.esVirtual) {
-        mesa.estado = 'libre'; mesa.pedidoId = ''; mesa.items = []; mesa.mozo = ''; mesa.comensales = 1; mesa.observaciones = '';
+        mesa.estado = 'libre'; mesa.pedidoId = ''; mesa.comensales = 1;
         DB.saveMesas();
         await _syncMesa(mesa);
         EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: 'libre' });

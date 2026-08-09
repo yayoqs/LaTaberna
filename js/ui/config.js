@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/config.js
-   Versión: 2.0.1
-   Propósito: Vista de configuración del local: datos, zonas, impresoras, mozos y contraseñas. Eliminada la sección de Productos/Carta.
-              v2.0.1: elimina autoactivación en scope de módulo.
+   Versión: 2.0.2
+   Propósito: Vista de configuración del local: datos, zonas, impresoras,
+              mozos y contraseñas.
+              v2.0.2: corrige verificación redundante de esMasterReal.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -209,7 +210,8 @@ const Config = (() => {
   }
 
   async function _mostrarCambiarPassword(nombreUsuario) {
-    if (!Auth.esMasterReal || !Auth.esMasterReal()) {
+    // ✅ Corrección H11: verificación simple, sin redundancia
+    if (!Auth.esMasterReal()) {
       mostrarToast('error', 'Solo el master puede cambiar contraseñas');
       return;
     }
@@ -372,8 +374,6 @@ const Config = (() => {
       mostrarToast('error', 'Función no disponible');
     }
   }
-
-  // ❌ Eliminada autoactivación: activar();
 
   return {
     activar, limpiar, cargar, guardar,

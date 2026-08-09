@@ -1,21 +1,21 @@
 /* ================================================================
    LaTaberna - PubPOS — RECETAS SUBMÓDULO (ES6)
    Archivo: js/ui/recetas/detalle.js
-   Versión: 1.0.3
+   Versión: 1.1.2
    Propósito: Modal de detalle rápido, árbol de ingredientes y exportación PDF.
-              v1.0.3: exportarPDF usa iframe oculto en lugar de window.open
-              (Misión 5.2). Store.getState → Store.obtenerEstado.
+              Hallazgo H15: reemplazado setTimeout por verificación de
+              readyState en la exportación de PDF.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
+import { DBInventario } from '../../db-inventario.js';
 import { mostrarToast } from '../../utils.js';
 
 export function mostrarDetalle(idReceta) {
   const state = Store.obtenerEstado();
-  const receta = (state.recetas || []).find(r => r.id === idReceta || r.productoId == idReceta);
-  if (!receta) { mostrarToast('error', 'Receta no encontrada'); return; }
-  const prod = (state.productos || []).find(p => p.id == receta.productoId);
-  const nombre = prod ? prod.nombre : 'Receta';
+  const recetaConProducto = DBInventario.obtenerRecetaConProducto(idReceta);
+  if (!recetaConProducto) { mostrarToast('error', 'Receta no encontrada'); return; }
+  const nombre = recetaConProducto.nombre || 'Receta';
 
   let modal = document.getElementById('modalRecetaDetalle');
   if (!modal) {
@@ -44,19 +44,24 @@ export function mostrarDetalle(idReceta) {
     }
     document.getElementById('btnCerrarDetalle').addEventListener('click', cerrarDetalle);
     document.getElementById('btnCerrarDetalle2').addEventListener('click', cerrarDetalle);
-    document.getElementById('btnExportarPDF').addEventListener('click', () => exportarPDF(receta.id));
+    document.getElementById('btnExportarPDF').addEventListener('click', () => exportarPDF(idReceta));
   }
 
-  const tipoReceta = receta.es_intermedio ? 'Preparación intermedia' : 'Producto final';
-  document.getElementById('detalleTitulo').innerHTML = `<i class="fas fa-utensils"></i> ${nombre} <span class="recetas-chip-nivel">${receta.nivel || 'sin_nivel'}</span> <span class="recetas-tipo-badge">${tipoReceta}</span>`;
-  if (receta.es_intermedio) {
-    document.getElementById('detalleTitulo').innerHTML += ` <span class="recetas-stock-info">Stock: ${receta.stockActual || 0} ${receta.unidadStock || ''}</span>`;
+  const tipoReceta = recetaConProducto.es_intermedio ? 'Preparación intermedia' : 'Producto final';
+  document.getElementById('detalleTitulo').innerHTML = `<i class="fas fa-utensils"></i> ${nombre} <span class="recetas-chip-nivel">${recetaConProducto.nivel || 'sin_nivel'}</span> <span class="recetas-tipo-badge">${tipoReceta}</span>`;
+  if (recetaConProducto.es_intermedio) {
+    const tipoInsumo = (recetaConProducto.destino === 'barra') ? 'barra' : 'cocina';
+    const insumos = state.insumos || [];
+    const insumo = insumos.find(i => i.nombre === nombre && i.tipo === tipoInsumo);
+    const stock = insumo ? insumo.stock : 0;
+    const unidad = insumo ? insumo.unidad : (recetaConProducto.unidadStock || '');
+    document.getElementById('detalleTitulo').innerHTML += ` <span class="recetas-stock-info">Stock: ${stock} ${unidad}</span>`;
   }
 
-  const htmlIngredientes = construirArbolIngredientes(receta.ingredientes || [], state, 0);
+  const htmlIngredientes = construirArbolIngredientes(recetaConProducto.ingredientes || [], state, 0);
   document.getElementById('detalleIngredientes').innerHTML = `<h4><i class="fas fa-list-ul"></i> Ingredientes</h4>${htmlIngredientes}`;
   document.getElementById('detalleCosto').innerHTML = '';
-  document.getElementById('detalleInstrucciones').innerHTML = `<h4><i class="fas fa-tasks"></i> Preparación</h4><div class="recetas-pasos">${(receta.instrucciones || 'Sin instrucciones').split('\n').filter(l => l.trim()).map((l, i) => `<div class="recetas-paso"><span class="recetas-paso-num">${i+1}</span><span class="recetas-paso-texto">${l}</span></div>`).join('') || '<p>Sin instrucciones.</p>'}</div>`;
+  document.getElementById('detalleInstrucciones').innerHTML = `<h4><i class="fas fa-tasks"></i> Preparación</h4><div class="recetas-pasos">${(recetaConProducto.instrucciones || 'Sin instrucciones').split('\n').filter(l => l.trim()).map((l, i) => `<div class="recetas-paso"><span class="recetas-paso-num">${i+1}</span><span class="recetas-paso-texto">${l}</span></div>`).join('') || '<p>Sin instrucciones.</p>'}</div>`;
 
   modal.dataset.recetaId = idReceta;
   modal.style.display = 'flex';
@@ -70,32 +75,31 @@ export function cerrarDetalle() {
 export function construirArbolIngredientes(ingredientes, state, profundidad) {
   if (!ingredientes.length) return '<p class="recetas-sin-ingredientes">Sin ingredientes</p>';
 
-  const ingredientesState = state.ingredientes || [];
+  const insumosState = state.insumos || [];
   const recetasState = state.recetas || [];
-  const productosState = state.productos || [];
 
   let html = '<ul class="recetas-arbol-ingredientes">';
   ingredientes.forEach(ing => {
     const tipo = ing.tipo || 'insumo';
     if (tipo === 'insumo') {
-      const ingData = ingredientesState.find(i => i.id == ing.id);
-      const nombre = ingData ? ingData.nombre : ing.id;
+      const insumoData = insumosState.find(i => i.id == ing.id);
+      const nombre = insumoData ? insumoData.nombre : ing.id;
       html += `
         <li class="recetas-nodo-insumo">
           <span class="recetas-ing-nombre">🧄 ${nombre}</span>
-          <span class="recetas-ing-cantidad">${ing.cantidad} ${ingData?.unidad || ing.unidad || ''}</span>
+          <span class="recetas-ing-cantidad">${ing.cantidad} ${insumoData?.unidad || ing.unidad || ''}</span>
         </li>`;
     } else if (tipo === 'subreceta') {
       const subReceta = recetasState.find(r => r.id == ing.id);
-      const prod = subReceta ? productosState.find(p => p.id == subReceta.productoId) : null;
-      const nombreSub = prod ? prod.nombre : (subReceta ? subReceta.productoId : ing.id);
+      const subConProducto = subReceta ? DBInventario.obtenerRecetaConProducto(subReceta.id) : null;
+      const nombreSub = subConProducto ? subConProducto.nombre : (subReceta ? subReceta.productoId : ing.id);
       html += `
         <li class="recetas-nodo-subreceta">
           <details ${profundidad === 0 ? 'open' : ''}>
             <summary>
               <span class="recetas-ing-nombre">📦 ${nombreSub}</span>
               <span class="recetas-ing-cantidad">${ing.cantidad} ${subReceta?.unidadStock || ''}</span>
-              ${subReceta?.es_intermedio ? `<span class="recetas-stock-info">Stock: ${subReceta.stockActual || 0} ${subReceta.unidadStock || ''}</span>` : ''}
+              ${subReceta?.es_intermedio ? `<span class="recetas-stock-info">Stock: ${_obtenerStockSubreceta(subReceta, state)}</span>` : ''}
             </summary>
             ${subReceta ? construirArbolIngredientes(subReceta.ingredientes || [], state, profundidad + 1) : '<p class="recetas-sin-ingredientes">Receta no encontrada</p>'}
           </details>
@@ -106,32 +110,41 @@ export function construirArbolIngredientes(ingredientes, state, profundidad) {
   return html;
 }
 
+function _obtenerStockSubreceta(subReceta, state) {
+  const subConProducto = DBInventario.obtenerRecetaConProducto(subReceta.id);
+  const nombre = subConProducto ? subConProducto.nombre : '';
+  const tipoInsumo = (subReceta.destino === 'barra') ? 'barra' : 'cocina';
+  const insumos = state.insumos || [];
+  const insumo = insumos.find(i => i.nombre === nombre && i.tipo === tipoInsumo);
+  const stock = insumo ? insumo.stock : 0;
+  const unidad = insumo ? insumo.unidad : (subReceta.unidadStock || '');
+  return `${stock} ${unidad}`;
+}
+
 export function exportarPDF(idReceta) {
   const state = Store.obtenerEstado();
-  const receta = (state.recetas || []).find(r => r.id === idReceta || r.productoId == idReceta);
-  if (!receta) return;
-  const prod = (state.productos || []).find(p => p.id == receta.productoId);
-  const nombre = prod ? prod.nombre : 'Receta';
-  const ingredientesState = state.ingredientes || [];
+  const recetaConProducto = DBInventario.obtenerRecetaConProducto(idReceta);
+  if (!recetaConProducto) return;
+  const nombre = recetaConProducto.nombre || 'Receta';
+  const insumosState = state.insumos || [];
   const recetasState = state.recetas || [];
   let filas = '';
-  (receta.ingredientes || []).forEach(ing => {
+  (recetaConProducto.ingredientes || []).forEach(ing => {
     const tipo = ing.tipo || 'insumo';
     let nombreIng = ing.id;
     if (tipo === 'insumo') {
-      const ingData = ingredientesState.find(i => i.id == ing.id);
-      nombreIng = ingData ? ingData.nombre : ing.id;
+      const insumoData = insumosState.find(i => i.id == ing.id);
+      nombreIng = insumoData ? insumoData.nombre : ing.id;
     } else {
       const sub = recetasState.find(r => r.id == ing.id);
-      const p = sub ? (state.productos || []).find(p => p.id == sub.productoId) : null;
-      nombreIng = p ? p.nombre : (sub ? sub.productoId : ing.id);
+      const subConProducto = sub ? DBInventario.obtenerRecetaConProducto(sub.id) : null;
+      nombreIng = subConProducto ? subConProducto.nombre : (sub ? sub.productoId : ing.id);
     }
     filas += `<tr><td>${nombreIng} (${tipo})</td><td>${ing.cantidad} ${ing.unidad || ''}</td></tr>`;
   });
 
-  const html = `<html><head><title>Receta: ${nombre}</title><style>body{font-family:sans-serif;padding:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px}th{background:#f5f5f5}</style></head><body><h1>${nombre}</h1><h2>Ingredientes</h2><table><thead><tr><th>Ingrediente</th><th>Cantidad</th></tr></thead><tbody>${filas}</tbody></table><h2>Preparación</h2><p>${(receta.instrucciones||'').replace(/\n/g,'<br>')}</p></body></html>`;
+  const html = `<html><head><title>Receta: ${nombre}</title><style>body{font-family:sans-serif;padding:20px}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ccc;padding:8px}th{background:#f5f5f5}</style></head><body><h1>${nombre}</h1><h2>Ingredientes</h2><table><thead><tr><th>Ingrediente</th><th>Cantidad</th></tr></thead><tbody>${filas}</tbody></table><h2>Preparación</h2><p>${(recetaConProducto.instrucciones||'').replace(/\n/g,'<br>')}</p></body></html>`;
 
-  // Usar iframe oculto en lugar de window.open (Misión 5.2)
   const iframe = document.createElement('iframe');
   iframe.style.display = 'none';
   document.body.appendChild(iframe);
@@ -140,27 +153,21 @@ export function exportarPDF(idReceta) {
   iframe.contentWindow.document.write(html);
   iframe.contentWindow.document.close();
 
-  // Esperar a que el contenido cargue antes de imprimir
-  iframe.onload = () => {
+  const intentarImprimir = () => {
     try {
       iframe.contentWindow.focus();
       iframe.contentWindow.print();
     } catch (e) {
       mostrarToast('error', 'No se pudo imprimir. Revisa los permisos del navegador.');
     }
-    // Limpiar el iframe después de imprimir (o cancelar)
     setTimeout(() => {
       if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
     }, 1000);
   };
 
-  // Fallback por si onload no se dispara
-  setTimeout(() => {
-    try {
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
-    } catch (e) {
-      // Ya manejado arriba
-    }
-  }, 500);
+  if (iframe.contentWindow.document.readyState === 'complete') {
+    intentarImprimir();
+  } else {
+    iframe.onload = intentarImprimir;
+  }
 }

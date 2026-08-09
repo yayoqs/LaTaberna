@@ -1,11 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-appwrite.js
-   Versión: 1.2.2
+   Versión: 1.5.0
    Propósito: Cliente de Appwrite (API TablesDB), Realtime y operadores.
               Soporte multi-espacio con espacioId dinámico.
               Colecciones globales exentas de filtro.
-              v1.2.2: migración var→let/const.
+              v1.5.0: renombrada colección usuarios → staff.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -26,15 +26,15 @@ export const DBAppwrite = (function() {
     pedidos: 'laTaberna_Pedidos',
     mesas: 'laTaberna_Mesas',
     comandas: 'laTaberna_Comandas',
-    ingredientes: 'laTaberna_Ingredientes',
+    insumos: 'laTaberna_Insumos',
     recetas: 'laTaberna_Recetas',
-    pedidos_delivery: 'laTaberna_Pedidos_delivery',
-    usuarios: 'laTaberna_Usuarios',
+    staff: 'laTaberna_Staff',
     configuracion: 'laTaberna_Configuracion',
-    precargas_cliente: 'laTaberna_Precargas_cliente',
     eventos_en_vivo: 'laTaberna_Eventos_en_vivo',
     menus: 'laTaberna_Menus',
     proveedores: 'laTaberna_Proveedores',
+    entradas: 'laTaberna_Entradas',
+    comensales: 'laTaberna_Comensales',
     global_perfiles: 'global_Perfiles',
     global_puntos: 'global_Puntos',
     global_eventos: 'global_Eventos',

@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — REPARTO SUBMÓDULO (ES6)
    Archivo: js/ui/reparto/tabla.js
-   Versión: 1.0.5
+   Versión: 1.1.1
    Propósito: Render de la tabla de pedidos delivery y filtro por estado.
-              v1.0.5: usa formatearDinero en español.
+              v1.1.1: corrige filtro de tipo ('reparto' en lugar de 'delivery').
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -86,7 +86,7 @@ export function renderTabla(pedidos) {
   });
   tbody.innerHTML = ordenados.map(p => {
     const idSeguro = (p.id || '').toString();
-    const idCorto = idSeguro.replace('deliv_', '').slice(-6) || '—';
+    const idCorto = idSeguro.replace('deliv_', '').replace('ped_', '').slice(-6) || '—';
     let items = p.items;
     if (typeof items === 'string') { try { items = JSON.parse(items); } catch (e) { items = []; } }
     if (!Array.isArray(items)) items = [];

@@ -1,14 +1,17 @@
 /* ================================================================
    LaTaberna - PubPOS — RECETAS SUBMÓDULO (ES6)
    Archivo: js/ui/recetas/renderer.js
-   Versión: 2.1.5
+   Versión: 2.2.1
    Propósito: Layout libro con sidebar de capítulos e índice lateral
-              de colores. Misión 2.2: Store.getState → Store.obtenerEstado.
+              de colores. Migrado a state.insumos.
+              Uso de DBInventario.obtenerRecetaConProducto para el nombre.
+              Hallazgo 15: búsqueda de stock con filtro por destino.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
 import { Auth } from '../../auth.js';
 import { obtenerColorDesdeNombre } from '../../utils.js';
+import { DBInventario } from '../../db-inventario.js';
 import {
   getModo, setModo, getActivada, getPestanaActiva, setPestanaActiva,
   getBusqueda, setBusqueda, getFiltroNivel, setFiltroNivel,
@@ -187,7 +190,7 @@ function _pintarSidebarCapitulos() {
   let html = '';
   categorias.forEach((cat, i) => {
     const count = recetas.filter(r => (r.categoria || 'sin_categoria') === cat.id &&
-      (!termino || (r._productoNombre || r.productoId || '').toLowerCase().includes(termino))).length;
+      (!termino || (DBInventario.obtenerRecetaConProducto(r.id)?.nombre || '').toLowerCase().includes(termino))).length;
     html += `<button class="recetas-sidebar-item ${getCategoriaActiva() === cat.id ? 'activo' : ''}" data-cap="${cat.id}" style="--cap-color:${cat.color}">
       <span class="recetas-sidebar-cap-color" style="background:${cat.color};"></span>
       <span>${cat.nombre}</span>
@@ -269,8 +272,12 @@ function _pintarLibro(recetas, productos, categorias, esProduccion) {
   const capActivo = getCategoriaActiva();
 
   let filtradas = recetas.map(r => {
-    const prod = productos.find(p => p.id == r.productoId);
-    return { ...r, _nombre: prod ? prod.nombre : (r.productoId || 'Sin nombre'), _activo: prod ? prod.activo !== false : true };
+    const recetaConNombre = DBInventario.obtenerRecetaConProducto(r.id);
+    return {
+      ...r,
+      _nombre: recetaConNombre ? recetaConNombre.nombre : (r.productoId || 'Sin nombre'),
+      _activo: true
+    };
   }).filter(r => r._activo);
 
   if (termino) filtradas = filtradas.filter(r => r._nombre.toLowerCase().includes(termino));
@@ -392,7 +399,7 @@ function _tarjetaLibro(r, cat) {
     ? '<span class="recetas-badge-intermedio">Prep</span>'
     : '<span class="recetas-badge-final">Final</span>';
   const numIng = r.ingredientes ? r.ingredientes.length : 0;
-  const stockInfo = r.es_intermedio ? `<span class="recetas-badge-stock">${r.stockActual || 0} ${r.unidadStock || ''}</span>` : '';
+  const stockInfo = _obtenerStockInfo(r);
   return `
     <div class="recetas-tarjeta-libro" data-receta="${r.id}" style="--cap-color:${color}">
       <div class="recetas-tarjeta-libro-img" style="background:linear-gradient(160deg, ${color}55, ${color}22);">${r._nombre.charAt(0).toUpperCase()}</div>
@@ -401,18 +408,38 @@ function _tarjetaLibro(r, cat) {
     </div>`;
 }
 
+function _obtenerStockInfo(r) {
+  if (!r.es_intermedio) return '';
+  const state = Store.obtenerEstado();
+  const insumos = state.insumos || [];
+  const tipoInsumo = (r.destino === 'barra') ? 'barra' : 'cocina';
+  const insumo = insumos.find(i => i.nombre === r._nombre && i.tipo === tipoInsumo);
+  const stock = insumo ? insumo.stock : 0;
+  const unidad = insumo ? insumo.unidad : (r.unidadStock || '');
+  return `<span class="recetas-badge-stock">${stock} ${unidad}</span>`;
+}
+
 export function pintarStock(contenedor) {
   const state = Store.obtenerEstado();
+  const insumos = state.insumos || [];
   const recetas = (state.recetas || []).filter(r => r.es_intermedio);
-  const productos = state.productos || [];
   const categorias = _obtenerCategorias(recetas);
 
   const stockItems = recetas.map(r => {
-    const prod = productos.find(p => p.id == r.productoId);
-    return { ...r, _nombre: prod ? prod.nombre : r.productoId, _activo: prod ? prod.activo !== false : true };
+    const recetaConNombre = DBInventario.obtenerRecetaConProducto(r.id);
+    const nombre = recetaConNombre ? recetaConNombre.nombre : (r.productoId || 'Sin nombre');
+    const tipoInsumo = (r.destino === 'barra') ? 'barra' : 'cocina';
+    const insumo = insumos.find(i => i.nombre === nombre && i.tipo === tipoInsumo);
+    return {
+      ...r,
+      _nombre: nombre,
+      _stock: insumo ? insumo.stock : 0,
+      _unidad: insumo ? insumo.unidad : (r.unidadStock || ''),
+      _activo: true
+    };
   }).filter(r => r._activo).sort((a, b) => a._nombre.localeCompare(b._nombre));
 
-  const alertaBaja = stockItems.filter(r => (r.stockActual || 0) <= 1);
+  const alertaBaja = stockItems.filter(r => r._stock <= 1);
 
   contenedor.innerHTML = `
     <div class="recetas-stock-scroll">
@@ -426,11 +453,11 @@ export function pintarStock(contenedor) {
           <tbody>
             ${stockItems.map(r => {
               const cat = categorias.find(c => c.id === (r.categoria || 'sin_categoria')) || { nombre: 'Sin categoría', color: PALETA_CATEGORIAS[0] };
-              return `<tr class="${(r.stockActual || 0) <= 1 ? 'recetas-stock-bajo' : ''}">
+              return `<tr class="${r._stock <= 1 ? 'recetas-stock-bajo' : ''}">
                 <td><strong>${r._nombre}</strong></td>
                 <td><span class="recetas-chip-nivel" style="background:${cat.color}33;color:${cat.color}">${cat.nombre}</span></td>
-                <td><span class="recetas-stock-valor">${r.stockActual || 0}</span></td>
-                <td>${r.unidadStock || ''}</td>
+                <td><span class="recetas-stock-valor">${r._stock}</span></td>
+                <td>${r._unidad}</td>
                 <td>
                   <button class="recetas-accion-preparar" data-receta="${r.id}"><i class="fas fa-fire"></i> Preparar</button>
                   <button class="recetas-accion-ver" data-receta="${r.id}"><i class="fas fa-eye"></i></button>

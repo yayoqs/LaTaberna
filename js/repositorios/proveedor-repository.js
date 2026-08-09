@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — REPOSITORIO JS (ES6)
    Archivo: js/repositorios/proveedor-repository.js
-   Versión: 1.0.4
+   Versión: 1.1.0
    Propósito: Repositorio de proveedores (Appwrite + localStorage).
-              v1.0.4: deja que Appwrite genere el ID y lo captura.
+              v1.1.0: adaptado a laTaberna_Proveedores con todos los nuevos campos.
    ================================================================ */
 
 import { Logger } from '../lib/logger.js';
@@ -21,16 +21,21 @@ export function crearProveedorRepo() {
         try {
           const doc = {
             nombre: proveedor.nombre,
-            notas: proveedor.notas || ''
+            tipo: proveedor.tipo || 'otro',
+            contacto: proveedor.contacto || '',
+            telefono: proveedor.telefono || '',
+            email: proveedor.email || '',
+            direccion: proveedor.direccion || '',
+            rubro: proveedor.rubro || '',
+            notas: proveedor.notas || '',
+            activo: proveedor.activo !== false
           };
 
           if (proveedor.id) {
-            // Intentar actualizar si ya tiene ID
             try {
               await DBAppwrite.actualizar('proveedores', proveedor.id, doc);
               guardadoRemoto = true;
             } catch (e) {
-              // Si falla la actualización (404), crear nuevo
               if (e.code === 404) {
                 const docRemoto = await DBAppwrite.crear('proveedores', null, doc);
                 if (docRemoto && docRemoto.id) {
@@ -42,7 +47,6 @@ export function crearProveedorRepo() {
               }
             }
           } else {
-            // Crear nuevo sin ID
             const docRemoto = await DBAppwrite.crear('proveedores', null, doc);
             if (docRemoto && docRemoto.id) {
               proveedor.id = docRemoto.id;
@@ -87,7 +91,18 @@ export function crearProveedorRepo() {
       if (DBAppwrite && DBAppwrite.habilitado) {
         try {
           const lista = await DBAppwrite.listar('proveedores');
-          return lista.map(doc => ({ id: doc.id, nombre: doc.nombre, notas: doc.notas }));
+          return lista.map(doc => ({
+            id: doc.id,
+            nombre: doc.nombre,
+            tipo: doc.tipo,
+            contacto: doc.contacto,
+            telefono: doc.telefono,
+            email: doc.email,
+            direccion: doc.direccion,
+            rubro: doc.rubro,
+            notas: doc.notas,
+            activo: doc.activo
+          }));
         } catch (e) {
           Logger.warn('[ProveedorRepo] Error al listar proveedores de Appwrite:', e);
         }

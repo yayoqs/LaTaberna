@@ -4,18 +4,6 @@
 
 ---
 
-## Cambios en v1.3.0 respecto a v1.2.0
-
-| Cambio | Motivo |
-|--------|--------|
-| `css/modals.css` movido a **E** | Componente de infraestructura (MISIÓN 8.1) |
-| `js/ui/cuenta.js` corregido a **B1** | Error de propiedad detectado en auditoría |
-| `js/modulos/interno/avisos-mesero.js` agregado a **B1** | Nuevo módulo de notificaciones |
-| `js/modulos/interno/guia-mesero.js` confirmado en **B1** | Ratificado |
-| `js/modulos/interno/precarga-control.js` confirmado en **B1** | Ratificado |
-
----
-
 ## Célula A — Core (27 archivos)
 
   · js/auth.js
@@ -170,7 +158,6 @@
   · js/lib/command-bus.js
   · js/lib/deps.js
   · js/lib/logger.js
-  · js/componentes/visualizador-menu.js (pendiente)
   · css/vars.css
   · css/base.css
   · css/layout.css

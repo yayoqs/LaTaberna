@@ -1,11 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MESAS SUBMÓDULO (ES6)
    Archivo: js/ui/mesas/renderer.js
-   Versión: 1.2.0
-   Propósito: Renderizado de la grilla, tarjetas, popover
-              y botones de zona. Con callbacks para el toolbar.
-              Render condicional: solo actualiza el DOM si la vista
-              'mesas' está activa (optimización de rendimiento).
+   Versión: 1.2.2
+   Propósito: Renderizado de la grilla, tarjetas, popover.
+              Corrección NC2: pasar evento a mostrarPopover.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -17,7 +15,7 @@ import { getEstadoComandas, colorEstado } from './estado-comandas.js';
 let _modoSeleccion = false;
 let _mesasSeleccionadas = new Set();
 let _zonaActiva = 'todas';
-let _vistaActiva = true; // se asume que la vista arranca activa
+let _vistaActiva = true;
 
 let _longPressTimer = null;
 let _longPressMesa = null;
@@ -37,7 +35,7 @@ export function getZonaActiva() { return _zonaActiva; }
 
 export function setVistaActiva(valor) {
   _vistaActiva = valor;
-  if (valor) renderGrid(); // al activar la vista, poner todo al día
+  if (valor) renderGrid();
 }
 export function isVistaActiva() { return _vistaActiva; }
 
@@ -78,7 +76,6 @@ export function renderZoneButtons() {
 }
 
 export function renderGrid() {
-  // Si la vista no está activa, no tocamos el DOM
   if (!_vistaActiva) return;
 
   const grid = document.getElementById('mesasGrid');
@@ -121,7 +118,7 @@ export function renderGrid() {
       if (e.target.closest('.precarga-badge') || e.target.closest('.micro-badge') || e.target.closest('.esperando-cliente-badge')) return;
       _longPressMesa = mesa.numero;
       _longPressTimer = setTimeout(() => {
-        mostrarPopover(mesa, card);
+        mostrarPopover(mesa, card, e);
         _longPressTimer = null;
       }, 400);
     });
@@ -154,7 +151,7 @@ export function renderGrid() {
       if (e.target.closest('.precarga-badge') || e.target.closest('.micro-badge') || e.target.closest('.esperando-cliente-badge')) return;
       _longPressMesa = mesa.numero;
       _longPressTimer = setTimeout(() => {
-        mostrarPopover(mesa, card);
+        mostrarPopover(mesa, card, e);
         _longPressTimer = null;
       }, 400);
     });
@@ -212,7 +209,7 @@ function _htmlMesa(mesa, puedeSeleccionar, colorZona) {
 
   let esperandoHTML = '';
   const esperaNotif = notificaciones.find(n => n.tipo === 'esperando');
-  if (esperaNotif && mesa.estado === 'libre' && mesa.permite_prepedidos === false) {
+  if (esperaNotif && mesa.estado === 'libre') {
     esperandoHTML = `<span class="esperando-cliente-badge" title="Cliente esperando validación"><i class="fas fa-clock"></i></span>`;
   } else if (esperaNotif) {
     removeNotificacion(mesa.numero, 'esperando');
@@ -247,13 +244,15 @@ function _htmlMesa(mesa, puedeSeleccionar, colorZona) {
   }
 }
 
-export function mostrarPopover(mesa, card) {
+export function mostrarPopover(mesa, card, event) {
   const cont = document.getElementById('popoverContainer');
   if (!cont) return;
 
   _limpiarPopoverListeners();
 
-  const rect = card.getBoundingClientRect();
+  const clientX = event ? (event.clientX || (event.touches && event.touches[0]?.clientX) || event.pageX) : 0;
+  const clientY = event ? (event.clientY || (event.touches && event.touches[0]?.clientY) || event.pageY) : 0;
+
   const estados = getEstadoComandas(mesa.numero);
   const comandas = Store.obtenerEstado().comandas || [];
   const mesaComandas = comandas.filter(c => c.mesa == mesa.numero);
@@ -268,7 +267,7 @@ export function mostrarPopover(mesa, card) {
   });
 
   cont.innerHTML = `
-    <div style="background:#1a1a2e;border:1px solid #2e2e42;border-radius:8px;padding:12px;color:#f1f5f9;font-size:12px;min-width:180px;pointer-events:auto;position:absolute;top:${rect.top}px;left:${rect.right + 8}px;z-index:9999;" id="popoverContent">
+    <div style="background:#1a1a2e;border:1px solid #2e2e42;border-radius:8px;padding:12px;color:#f1f5f9;font-size:12px;min-width:180px;pointer-events:auto;position:fixed;top:${clientY}px;left:${clientX}px;z-index:9999;" id="popoverContent">
       <strong>Mesa ${mesa.numero}</strong>
       <div style="margin-top:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${colorEstado(estados.cocina)};margin-right:4px;"></span> Cocina: ${estados.cocina}</div>
       <div><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${colorEstado(estados.barra)};margin-right:4px;"></span> Barra: ${estados.barra}</div>

@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MENÚ SUBMÓDULO (ES6)
    Archivo: js/ui/menu/ciclo-vida.js
-   Versión: 1.2.0
+   Versión: 1.2.1
    Propósito: Ciclo de vida de la vista de menú.
-              v1.2.0: aplica y persiste configuración visual del lienzo.
+              v1.2.1: _serializarLienzo usa getComputedStyle para
+                      capturar dimensiones reales del CSS.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -45,8 +46,7 @@ export function activar() {
       const menu = getMenuActivo();
       if (menu) {
         document.getElementById('menuNameInput').value = menu.nombre;
-        _aplicarEstilos(menu);
-        renderLienzo(menu.productos || []);
+        renderLienzo(getProductosMenuActivo());
       }
     }, 100);
   }));
@@ -61,37 +61,11 @@ export function limpiar() {
   _desuscripciones = [];
 }
 
-function _aplicarEstilos(menu) {
-  const canvas = document.getElementById('menuCanvas');
-  if (!canvas) return;
-
-  canvas.style.backgroundColor = menu.fondo || '#1a1a2e';
-  canvas.style.fontFamily = menu.tipografia || "'Inter', sans-serif";
-  if (menu.grilla) {
-    canvas.classList.add('grid');
-  } else {
-    canvas.classList.remove('grid');
-  }
-
-  document.getElementById('menuBgSelect').value = menu.fondo || '#1a1a2e';
-  document.getElementById('menuFontSelect').value = menu.tipografia || "'Inter', sans-serif";
-  document.getElementById('menuGridToggle').checked = menu.grilla || false;
-}
-
-function _guardarEstilosEnMenu() {
-  const menu = getMenuActivo();
-  if (!menu) return;
-  menu.fondo = document.getElementById('menuBgSelect').value;
-  menu.tipografia = document.getElementById('menuFontSelect').value;
-  menu.grilla = document.getElementById('menuGridToggle').checked;
-}
-
 // ── CALLBACKS ─────────────────────────────────────────────
 
 function onMenuSeleccionado(menu) {
   setMenuActivo(menu);
   document.getElementById('menuNameInput').value = menu.nombre;
-  _aplicarEstilos(menu);
   renderLienzo(menu.productos || []);
 }
 
@@ -201,27 +175,22 @@ function _vincularEventosDOM(signal) {
     document.getElementById('menuContextMenu')?.classList.toggle('active');
   }, { signal });
 
-  // Listeners de estilos: aplican en vivo y guardan en el menú activo
   document.getElementById('menuBgSelect')?.addEventListener('change', function() {
     const canvas = document.getElementById('menuCanvas');
     if (canvas) canvas.style.backgroundColor = this.value;
-    _guardarEstilosEnMenu();
   }, { signal });
   document.getElementById('menuFontSelect')?.addEventListener('change', function() {
     const canvas = document.getElementById('menuCanvas');
     if (canvas) canvas.style.fontFamily = this.value;
-    _guardarEstilosEnMenu();
   }, { signal });
   document.getElementById('menuGridToggle')?.addEventListener('change', function() {
     document.getElementById('menuCanvas')?.classList.toggle('grid', this.checked);
-    _guardarEstilosEnMenu();
   }, { signal });
 
   document.getElementById('menuSaveBtn')?.addEventListener('click', async () => {
     const menu = getMenuActivo() || {};
     menu.nombre = document.getElementById('menuNameInput')?.value || 'Sin nombre';
     menu.productos = _serializarLienzo();
-    _guardarEstilosEnMenu();
     await guardarMenu(menu);
     refrescarLista();
   }, { signal });
@@ -234,7 +203,6 @@ function _vincularEventosDOM(signal) {
     }
     menu.nombre = document.getElementById('menuNameInput')?.value || menu.nombre;
     menu.productos = _serializarLienzo();
-    _guardarEstilosEnMenu();
     await publicarMenu();
     refrescarLista();
     document.getElementById('menuContextMenu')?.classList.remove('active');
@@ -282,20 +250,24 @@ function _serializarLienzo() {
   const canvas = document.getElementById('menuCanvas');
   if (!canvas) return [];
   const fichas = canvas.querySelectorAll('.ficha');
-  return Array.from(fichas).map(f => ({
-    id: f.dataset.id,
-    tipo: f.dataset.tipo || 'producto',
-    x: parseFloat(f.style.left) || 0,
-    y: parseFloat(f.style.top) || 0,
-    nombre: f.querySelector('.nombre')?.textContent || '',
-    precio: parseFloat(f.dataset.price) || 0,
-    costo: parseFloat(f.dataset.cost) || 0,
-    imagen: f.dataset.imagen || '',
-    shape: f.dataset.shape || 'rect',
-    display: f.dataset.display || 'both',
-    content: f.dataset.content || '',
-    color: f.dataset.color || '',
-    width: f.style.width || '200px',
-    height: f.style.height || '80px'
-  }));
+  return Array.from(fichas).map(f => {
+    // ✅ Corrección H16: usar getComputedStyle para obtener dimensiones reales
+    const computed = getComputedStyle(f);
+    return {
+      id: f.dataset.id,
+      tipo: f.dataset.tipo || 'producto',
+      x: parseFloat(f.style.left) || 0,
+      y: parseFloat(f.style.top) || 0,
+      nombre: f.querySelector('.nombre')?.textContent || '',
+      precio: parseFloat(f.dataset.price) || 0,
+      costo: parseFloat(f.dataset.cost) || 0,
+      imagen: f.dataset.imagen || '',
+      shape: f.dataset.shape || 'rect',
+      display: f.dataset.display || 'both',
+      content: f.dataset.content || '',
+      color: f.dataset.color || '',
+      width: computed.width,
+      height: computed.height
+    };
+  });
 }

@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — COMANDO JS (ES6)
    Archivo: js/comandos/enviar-comanda.js
-   Versión: 1.0.4
+   Versión: 1.0.6
    Propósito: Enviar comanda a cocina/barra con validación de stock.
-              v1.0.4: await agregado a validarStockParaArticulos (async).
+              v1.0.6: corregido texto de toast (ingrediente → insumo).
    ================================================================ */
 
 import { CommandBus } from '../lib/command-bus.js';
@@ -46,7 +46,7 @@ async function ejecutarEnviarComanda(comando) {
 
   if (!resultadoStock.ok && bloquearStock && !overrideStock) {
     const faltantes = resultadoStock.faltantes.map(f =>
-      `${f.ingrediente} (faltan ${f.faltante} ${f.unidad})`
+      `${f.insumo} (faltan ${f.faltante} ${f.unidad})`
     ).join(', ');
     const error = new Error('STOCK_INSUFICIENTE');
     error.faltantes = resultadoStock.faltantes;
@@ -56,7 +56,7 @@ async function ejecutarEnviarComanda(comando) {
 
   if (!resultadoStock.ok) {
     const faltantes = resultadoStock.faltantes.map(f =>
-      `${f.ingrediente} (faltan ${f.faltante} ${f.unidad})`
+      `${f.insumo} (faltan ${f.faltante} ${f.unidad})`
     ).join(', ');
     mostrarToast('warning', `⚠️ Stock bajo: ${faltantes}. La comanda se enviará igual.`);
     Logger.warn(`[EnviarComanda] Stock bajo (override): ${faltantes}`);
@@ -90,7 +90,11 @@ async function ejecutarEnviarComanda(comando) {
   if (mesa.estado === 'libre') mesa.estado = 'ocupada';
   DB.saveMesas();
 
-  resultado.comandas.forEach(c => EventBus.emit('comanda:enviada', c));
+  resultado.comandas.forEach(c => {
+    c.pedidoId = mesa.pedidoId || null;
+    c.subcomandas = c.subcomandas || {};
+    EventBus.emit('comanda:enviada', c);
+  });
   EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: mesa.estado });
   Logger.info(`[EnviarComanda] ${resultado.comandas.length} comanda(s) enviada(s).`);
 

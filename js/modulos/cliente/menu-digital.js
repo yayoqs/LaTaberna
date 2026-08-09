@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — Módulo (ES6)
    Archivo: js/modulos/cliente/menu-digital.js
-   Versión: 2.0.7
+   Versión: 2.0.8
    Propósito: Menú digital interactivo.
-              Corregida API obsoleta y doble lectura del Store.
+              Adaptado al nuevo modelo de precargas (laTaberna_Pedidos).
+              Confirmado: await en Auth.obtenerIdUsuarioAppwrite().
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -144,7 +145,7 @@ const MenuDigital = (() => {
   }
 
   async function _confirmarOrden() {
-    const state = Store.obtenerEstado();  // Leer una sola vez al inicio
+    const state = Store.obtenerEstado();
     const permite = state.cliente?.permitePrepedidos || false;
     if (!permite) { mostrarToast('error', 'Tu mesa ya no admite pedidos. Contactá al garzón.'); return; }
 
@@ -153,7 +154,7 @@ const MenuDigital = (() => {
 
     let idUsuario;
     try {
-      idUsuario = await Auth.obtenerIdUsuarioAppwrite();
+      idUsuario = await Auth.obtenerIdUsuarioAppwrite();  // ← await presente
     } catch (e) {
       Logger.error('[MenuDigital] Error al obtener ID de Appwrite:', e);
       idUsuario = null;
@@ -164,12 +165,39 @@ const MenuDigital = (() => {
     if (!mesa) { mostrarToast('error', 'No se pudo obtener el número de mesa.'); return; }
 
     const nombreComensal = Auth.obtenerNombre() || 'comensal';
-    const payload = { mesa, items, clienteId: nombreComensal, id_usuario: idUsuario, nombre_comensal: nombreComensal, observaciones: '', timestamp: Date.now() };
+    const payload = {
+      mesa, items, clienteId: nombreComensal,
+      id_usuario: idUsuario, nombre_comensal: nombreComensal,
+      observaciones: '', timestamp: Date.now()
+    };
+
     try {
-      const resultado = await DBAppwrite.crear('precargas_cliente', 'unique()', { id_mesa: mesa, id_usuario: idUsuario, nombre_comensal: nombreComensal, productos: JSON.stringify(items), estado: 'por_confirmar', timestamp: payload.timestamp });
-      if (!resultado) { mostrarToast('error', 'Error al enviar tu orden. Intentá de nuevo.'); return; }
-      payload.id = resultado.id || 'pre_' + Date.now(); EventBus.emit('cliente:precarga_enviada', payload);
-      Orden.vaciar(); _actualizarContador(); _panelOrden.classList.add('oculto'); mostrarToast('success', '✅ ¡Orden enviada! El garzón la revisará pronto.');
+      const resultado = await DBAppwrite.crear('laTaberna_Pedidos', 'unique()', {
+        mesa: String(mesa),
+        tipo: 'salon',
+        origen: 'cliente',
+        estado: 'precarga',
+        comensales: 1,
+        items: JSON.stringify(items),
+        total: Orden.obtenerTotal(),
+        observaciones: '',
+        id_usuario: idUsuario,
+        nombre_comensal: nombreComensal,
+        timestamp: payload.timestamp
+      });
+
+      if (!resultado) {
+        mostrarToast('error', 'Error al enviar tu orden. Intentá de nuevo.');
+        return;
+      }
+
+      payload.id = resultado.id || 'ped_' + Date.now();
+      EventBus.emit('cliente:precarga_enviada', payload);
+
+      Orden.vaciar();
+      _actualizarContador();
+      _panelOrden.classList.add('oculto');
+      mostrarToast('success', '✅ ¡Orden enviada! El garzón la revisará pronto.');
     } catch (e) {
       Logger.error('[MenuDigital] Error al confirmar orden:', e);
       mostrarToast('error', 'Error de conexión. Revisá tu internet.');

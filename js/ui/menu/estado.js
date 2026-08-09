@@ -1,8 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MENÚ SUBMÓDULO (ES6)
    Archivo: js/ui/menu/estado.js
-   Versión: 1.0.0
+   Versión: 1.1.0
    Propósito: Estado centralizado del diseñador de menú.
+              v1.1.0: adaptado a laTaberna_Menus (activo → estado).
    ================================================================ */
 
 let _menuActivo = null;           // { id, nombre, estado, productos: [] }

@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — DESPENSA SUBMÓDULO (ES6)
    Archivo: js/ui/despensa/ciclo-vida.js
-   Versión: 3.4.0
+   Versión: 3.4.1
    Propósito: Ciclo de vida de la despensa con panel izquierdo acordeón,
-              proveedores reales y conexión Ingrediente ↔ Proveedor.
-              v3.4.0: migrado al estándar Store (sin lectura directa de DB).
+              proveedores reales y conexión Insumo ↔ Proveedor.
+              v3.4.1: migrado a la nueva nomenclatura de colecciones.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -38,13 +38,13 @@ let _filtroMovimientos = 'todos';
 
 async function _refresh() {
   const state = Store.obtenerEstado();
-  const ingredientes = (state.ingredientes || []).filter(i => {
+  const insumos = (state.insumos || state.ingredientes || []).filter(i => {
     const t = getTerminoBusqueda();
     return !t || i.nombre.toLowerCase().includes(t.toLowerCase());
   });
 
-  renderResumen(ingredientes);
-  renderEspacios(ingredientes);
+  renderResumen(insumos);
+  renderEspacios(insumos);
   renderListaCompras(getListaCompras());
   renderMovimientos(_filtroMovimientos);
 
@@ -58,23 +58,22 @@ async function _refresh() {
 
   const productosMap = new Map();
 
-  ingredientes.forEach(ing => {
-    const provNombre = ing.proveedor || 'Sin proveedor';
-    const precioProv = ing.precio_proveedor || ing.valor_unitario || 0;
+  insumos.forEach(insumo => {
+    const provNombre = insumo.proveedor || 'Sin proveedor';
 
     if (!proveedoresMap.has(provNombre)) {
       proveedoresMap.set(provNombre, { nombre: provNombre, notas: '', productos: 0, ingredientes: [] });
     }
     const prov = proveedoresMap.get(provNombre);
     prov.productos++;
-    prov.ingredientes.push({ nombre: ing.nombre, precio_proveedor: precioProv });
+    prov.ingredientes.push({ nombre: insumo.nombre, precio_proveedor: insumo.precio_proveedor || 0 });
 
-    if (!productosMap.has(ing.nombre)) {
-      productosMap.set(ing.nombre, { nombre: ing.nombre, proveedores: 0, proveedoresLista: [] });
+    if (!productosMap.has(insumo.nombre)) {
+      productosMap.set(insumo.nombre, { nombre: insumo.nombre, proveedores: 0, proveedoresLista: [] });
     }
-    const prod = productosMap.get(ing.nombre);
+    const prod = productosMap.get(insumo.nombre);
     prod.proveedores++;
-    prod.proveedoresLista.push({ nombre: provNombre, precio: precioProv });
+    prod.proveedoresLista.push({ nombre: provNombre, precio: insumo.precio_proveedor || 0 });
   });
 
   renderProveedores(Array.from(proveedoresMap.values()));
@@ -133,7 +132,7 @@ export function activar() {
   if (panelIzq) {
     panelIzq.addEventListener('click', (e) => {
       if (e.target.closest('#btnNuevoProducto')) {
-        import('./modal-ingrediente.js').then(mod => mod.mostrar(null, _refresh));
+        import('./modal-insumo.js').then(mod => mod.mostrar(null, _refresh));
       }
       if (e.target.closest('#btnNuevoProveedor')) {
         mostrarModalProveedor(null, _refresh);
@@ -145,7 +144,7 @@ export function activar() {
   document.getElementById('espaciosContainer')?.addEventListener('click', (e) => {
     const btn = e.target.closest('.btn-editar-insumo');
     if (btn) {
-      import('./modal-ingrediente.js').then(mod => mod.editarIngrediente(btn.dataset.id, _refresh));
+      import('./modal-insumo.js').then(mod => mod.editarInsumo(btn.dataset.id, _refresh));
     }
   }, { signal });
 
@@ -195,9 +194,9 @@ export function activar() {
     }
   }, { signal });
   document.getElementById('btnSugerirCompras')?.addEventListener('click', () => {
-    const ingredientes = Store.obtenerEstado().ingredientes || [];
+    const insumos = Store.obtenerEstado().insumos || Store.obtenerEstado().ingredientes || [];
     const actuales = getListaCompras().map(i => i.nombre);
-    ingredientes.forEach(ing => {
+    insumos.forEach(ing => {
       if (ing.stock <= ing.stock_minimo && !actuales.includes(ing.nombre)) {
         agregarAListaCompras({ nombre: ing.nombre, stock: `${ing.stock} ${ing.unidad}` });
       }
@@ -233,7 +232,7 @@ export function activar() {
 
   // Suscripciones Store/EventBus
   _desuscripciones.push(Store.suscribir((state, action) => {
-    if (action.type.startsWith('INGREDIENTE') || action.type.startsWith('MOVIMIENTO') || action.type.startsWith('PROVEEDOR')) {
+    if (action.type.startsWith('INSUMO') || action.type.startsWith('INGREDIENTE') || action.type.startsWith('MOVIMIENTO') || action.type.startsWith('PROVEEDOR')) {
       _refresh();
     }
   }));
@@ -242,7 +241,7 @@ export function activar() {
     if (vista === 'despensa') _refresh();
   }));
 
-  if ((Store.obtenerEstado().ingredientes || []).length > 0) _refresh();
+  if ((Store.obtenerEstado().insumos || Store.obtenerEstado().ingredientes || []).length > 0) _refresh();
 }
 
 export function limpiar() {

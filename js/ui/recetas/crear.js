@@ -1,14 +1,15 @@
 /* ================================================================
    LaTaberna - PubPOS — RECETAS SUBMÓDULO (ES6)
    Archivo: js/ui/recetas/crear.js
-   Versión: 2.0.4
+   Versión: 2.1.0
    Propósito: Modal sheet para crear/editar recetas.
-              Misión 2.2: Store.getState → Store.obtenerEstado.
+              Migrado a state.insumos.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
 import { EventBus } from '../../lib/eventBus.js';
 import { Auth } from '../../auth.js';
+import { DBInventario } from '../../db-inventario.js';
 import { mostrarToast } from '../../utils.js';
 import { getModo } from './estado.js';
 import { pintar } from './renderer.js';
@@ -33,7 +34,6 @@ export function mostrarModalReceta(idReceta = null) {
 
   const state = Store.obtenerEstado();
   const recetas = state.recetas || [];
-  const productos = state.productos || [];
   const receta = idReceta ? recetas.find(r => r.id === idReceta) : null;
 
   const categorias = [...new Set(recetas.map(r => r.categoria || 'sin_categoria'))].sort();
@@ -41,8 +41,8 @@ export function mostrarModalReceta(idReceta = null) {
   if (datalistCap) datalistCap.innerHTML = categorias.map(c => `<option value="${c}">`).join('');
 
   if (receta) {
-    const prod = productos.find(p => p.id == receta.productoId);
-    document.getElementById('recModalNombre').value = prod ? prod.nombre : '';
+    const recetaConProducto = DBInventario.obtenerRecetaConProducto(receta.id);
+    document.getElementById('recModalNombre').value = recetaConProducto ? recetaConProducto.nombre : '';
     document.getElementById('recModalCapitulo').value = receta.categoria || 'sin_categoria';
     document.getElementById('recModalNivel').value = receta.nivel || '';
     document.getElementById('recModalIntermedio').checked = !!receta.es_intermedio;
@@ -51,18 +51,19 @@ export function mostrarModalReceta(idReceta = null) {
       btn.classList.toggle('activo', btn.dataset.destino === destinoActivo);
       if (btn.dataset.destino === 'barra') btn.classList.toggle('barra', destinoActivo === 'barra');
     });
+    const insumosState = state.insumos || [];
     _ingredientesActuales = (receta.ingredientes || []).map(ing => {
       const tipo = ing.tipo || 'insumo';
       let nombre = ing.id;
       let unidad = '';
       if (tipo === 'insumo') {
-        const ingData = (state.ingredientes || []).find(i => i.id == ing.id);
-        nombre = ingData ? ingData.nombre : ing.id;
-        unidad = ingData ? ingData.unidad : '';
+        const insumoData = insumosState.find(i => i.id == ing.id);
+        nombre = insumoData ? insumoData.nombre : ing.id;
+        unidad = insumoData ? insumoData.unidad : '';
       } else {
         const sub = recetas.find(r => r.id == ing.id);
-        const p = sub ? productos.find(p => p.id == sub.productoId) : null;
-        nombre = p ? p.nombre : (sub ? sub.productoId : ing.id);
+        const subConProducto = sub ? DBInventario.obtenerRecetaConProducto(sub.id) : null;
+        nombre = subConProducto ? subConProducto.nombre : (sub ? sub.productoId : ing.id);
         unidad = sub ? sub.unidadStock : '';
       }
       return { tipo, id: ing.id, cantidad: ing.cantidad, _nombre: nombre, _unidad: unidad };
@@ -204,7 +205,7 @@ function _actualizarSelectorIngredientes() {
   select.innerHTML = '<option value="">— Seleccionar —</option>';
   const state = Store.obtenerEstado();
   if (tipo === 'insumo') {
-    (state.ingredientes || []).forEach(i => {
+    (state.insumos || []).forEach(i => {
       const opt = document.createElement('option');
       opt.value = i.id;
       opt.textContent = `${i.nombre} (${i.unidad})`;
@@ -214,8 +215,8 @@ function _actualizarSelectorIngredientes() {
     });
   } else {
     (state.recetas || []).filter(r => r.es_intermedio).forEach(r => {
-      const prod = (state.productos || []).find(p => p.id == r.productoId);
-      const nombre = prod ? prod.nombre : r.productoId;
+      const recetaConProducto = DBInventario.obtenerRecetaConProducto(r.id);
+      const nombre = recetaConProducto ? recetaConProducto.nombre : r.productoId;
       const opt = document.createElement('option');
       opt.value = r.id;
       opt.textContent = `${nombre} (${r.unidadStock || ''})`;
@@ -339,10 +340,6 @@ async function _guardarReceta() {
     recetaExistente.destino = destino;
     recetaExistente.ingredientes = ingredientes;
     recetaExistente.instrucciones = pasosValidos.join('\n');
-    if (!esIntermedio) {
-      recetaExistente.stockActual = 0;
-      recetaExistente.unidadStock = '';
-    }
     recetaGuardada = await repo.guardarReceta(recetaExistente);
   } else {
     recetaGuardada = await repo.guardarReceta({
@@ -353,8 +350,6 @@ async function _guardarReceta() {
       destino,
       ingredientes,
       instrucciones: pasosValidos.join('\n'),
-      stockActual: 0,
-      unidadStock: '',
       creadoPor: Auth.obtenerRol(),
       creadoEn: new Date().toISOString()
     });

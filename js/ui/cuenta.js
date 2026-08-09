@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/cuenta.js
-   Versión: 1.0.5
-   Propósito: Solicitud de cuenta (pre-cierre).
-              Corrección: Auth.getRol() → Auth.obtenerRol().
+   Versión: 1.0.6
+   Propósito: Solicitud de cuenta. Adaptada al nuevo modelo
+              (lectura de ítems desde el Pedido).
    ================================================================ */
 
 import { Auth } from '../auth.js';
@@ -30,43 +30,31 @@ const Cuenta = (() => {
       mostrarToast('warning', 'No hay ninguna mesa abierta.');
       return;
     }
-    if (!mesa.items || mesa.items.length === 0) {
+
+    const pedido = Comanda.obtenerPedidoActivo();
+    if (!pedido || !pedido.items || pedido.items.length === 0) {
       mostrarToast('warning', 'La mesa no tiene consumos para cobrar.');
       return;
     }
 
     mesa.estado = 'cuenta';
     const obsInput = document.getElementById('comandaObs');
-    if (obsInput) mesa.observaciones = obsInput.value;
+    if (obsInput) pedido.observaciones = obsInput.value;
 
-    // Persistir en DB
-    try {
-      DB.saveMesas();
-    } catch (e) {
-      Logger.error('[Cuenta] Error al persistir estado cuenta:', e);
-    }
+    try { DB.saveMesas(); DB.savePedidos(); } catch (e) { Logger.error('[Cuenta] Error al persistir:', e); }
 
-    // Despachar al Store
-    Store.despachar({
-      type: 'MESA_ACTUALIZAR',
-      payload: { numero: mesa.numero, cambios: { estado: 'cuenta' } }
-    });
-
+    Store.despachar({ type: 'MESA_ACTUALIZAR', payload: { numero: mesa.numero, cambios: { estado: 'cuenta' } } });
     EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: 'cuenta' });
 
     const badge = document.getElementById('modalEstadoBadge');
-    if (badge) {
-      badge.textContent = 'Cuenta';
-      badge.className = 'estado-badge cuenta';
-    }
+    if (badge) { badge.textContent = 'Cuenta'; badge.className = 'estado-badge cuenta'; }
 
-    const ticketHTML = Tickets.generarCuenta(mesa);
+    const ticketHTML = Tickets.generarCuenta({ ...mesa, ...pedido, items: pedido.items });
     Tickets.mostrar(ticketHTML, `Cuenta — Mesa ${mesa.numero}`);
     mostrarToast('info', `Cuenta generada para Mesa ${mesa.numero}`);
   }
 
   EventBus.on('cuenta:solicitada', pedirCuenta);
-
   return { pedirCuenta };
 })();
 

@@ -1,13 +1,14 @@
-/* ================================================================
+/* ==============================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-fusion.js
-   Versión: 1.0.5
+   Versión: 1.0.6
    Propósito: Lógica de fusión y liberación de mesas virtuales.
-              Incluye imports de Logger y EventBus.
-   ================================================================ */
+              v1.0.6: agregado import de mesaVacia desde db-core.js.
+   ========================================================== */
 
 import { Logger } from './lib/logger.js';
 import { EventBus } from './lib/eventBus.js';
+import { mesaVacia } from './db-core.js';
 
 export const DBFusion = (function() {
   const module = {};

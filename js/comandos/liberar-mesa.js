@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — COMANDO JS (ES6)
    Archivo: js/comandos/liberar-mesa.js
-   Versión: 1.0.3
+   Versión: 1.0.4
    Propósito: Liberar una mesa después del pago.
-              Con imports explícitos. PedidoManager importado correctamente.
+              v1.0.4: corregido getTurnoActual → obtenerTurnoActual.
    ================================================================ */
 
 import { CommandBus } from '../lib/command-bus.js';
@@ -22,10 +22,10 @@ export function crearComandoLiberarMesa(datos) {
 async function handleLiberarMesa(comando) {
   const { numeroMesa } = comando.datos;
 
-  if (!PedidoManager || !PedidoManager.getTurnoActual) {
+  if (!PedidoManager || !PedidoManager.obtenerTurnoActual) {
     throw new Error('Sistema de turnos no disponible');
   }
-  const turno = PedidoManager.getTurnoActual();
+  const turno = PedidoManager.obtenerTurnoActual();
   if (!turno || turno.estado !== 'abierto') {
     throw new Error('No hay turno abierto');
   }

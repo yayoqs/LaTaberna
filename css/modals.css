@@ -1,11 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/modals.css
-   Versión: 1.2.1
+   Versión: 1.2.3
    Propósito: Modales pequeños, modal dual, cierre de mesa, ticket,
-              config, modal de confirmación y modal de entrada.
-              v1.2.1: Refuerzo de reglas base para evitar conflicto
-              con estilos de vistas específicas.
+              modal de confirmación y modal de entrada.
+              v1.2.3: Eliminado bloque de estilos de Configuración
+              (duplicado de config.css).
    ================================================================ */
 
 /* ── MODAL OVERLAY ──────────────────────────────────────────── */
@@ -30,6 +30,42 @@
   max-width: 460px;
   box-shadow: var(--shadow);
 }
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.modal-header h3 {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modal-header h3 i {
+  color: var(--color-accent);
+}
+
+.modal-close {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 20px;
+  cursor: pointer;
+  transition: var(--t);
+  line-height: 1;
+}
+
+.modal-close:hover {
+  color: var(--color-text);
+}
+
 .modal-small-body {
   padding: 20px 24px;
   display: flex;
@@ -226,176 +262,6 @@
   border: 1px solid rgba(34,197,94,.25);
   border-radius: var(--radius-sm);
 }
-
-/* ── MODAL CONFIG ──────────────────────────────────────────── */
-.config-grid {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px 24px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  align-content: start;
-}
-.config-card {
-  background: var(--color-card);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-.config-card h3 {
-  font-size: 15px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid var(--color-border);
-}
-.config-card h3 i { color: var(--color-accent); }
-
-.productos-config-lista {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  max-height: 380px;
-  overflow-y: auto;
-}
-.prod-config-group-title {
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--color-text-muted);
-  text-transform: uppercase;
-  letter-spacing: .5px;
-  padding: 6px 0 2px;
-}
-.prod-config-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: var(--color-panel);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-}
-.prod-config-item.inactivo { opacity: .5; }
-.prod-config-nombre { flex: 1; font-weight: 500; font-size: 13px; }
-.prod-config-precio { color: var(--color-accent); font-weight: 700; font-size: 13px; white-space: nowrap; }
-.prod-config-cat {
-  font-size: 10px;
-  padding: 2px 8px;
-  border-radius: 99px;
-  background: var(--color-hover);
-  color: var(--color-text-muted);
-  white-space: nowrap;
-}
-
-.btn-icon-sm {
-  background: transparent;
-  border: 1px solid var(--color-border);
-  color: var(--color-text-sec);
-  border-radius: var(--radius-xs);
-  width: 28px;
-  height: 28px;
-  cursor: pointer;
-  transition: var(--t);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  flex-shrink: 0;
-}
-.btn-icon-sm.edit:hover { border-color: var(--color-accent); color: var(--color-accent); }
-.btn-icon-sm.del:hover  { border-color: var(--color-danger);  color: var(--color-danger); }
-
-.impresoras-config { display: flex; flex-direction: column; gap: 14px; }
-.impresora-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  padding: 12px;
-  background: var(--color-panel);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-}
-.impresora-label {
-  font-weight: 600;
-  font-size: 13px;
-  min-width: 155px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.impresora-item input[type="text"],
-.impresora-item select {
-  background: var(--color-hover);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  color: var(--color-text);
-  padding: 7px 10px;
-  font-size: 12px;
-  outline: none;
-}
-.impresora-item input[type="text"] { flex: 1; min-width: 120px; }
-
-.btn-test {
-  background: rgba(99,102,241,.15);
-  border: 1px solid rgba(99,102,241,.3);
-  color: var(--color-primary);
-  border-radius: var(--radius-sm);
-  padding: 7px 14px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: var(--t);
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
-}
-.btn-test:hover { background: var(--color-primary); color: #fff; }
-
-.info-box {
-  display: flex;
-  gap: 12px;
-  background: rgba(59,130,246,.08);
-  border: 1px solid rgba(59,130,246,.2);
-  border-radius: var(--radius-sm);
-  padding: 12px 14px;
-  width: 100%;
-}
-.info-box i  { color: var(--color-info); flex-shrink: 0; margin-top: 2px; }
-.info-box p  { font-size: 12px; color: var(--color-text-sec); line-height: 1.5; }
-
-.local-config { display: flex; flex-direction: column; gap: 8px; }
-.local-config label {
-  font-size: 11px;
-  color: var(--color-text-muted);
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .5px;
-}
-.local-config input[type="text"],
-.local-config input[type="number"] {
-  background: var(--color-panel);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  color: var(--color-text);
-  padding: 9px 12px;
-  font-size: 13px;
-  outline: none;
-  transition: var(--t);
-  width: 100%;
-}
-.local-config input:focus { border-color: var(--color-accent); }
-
-.config-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-#modalLogin .modal-small { max-width: 360px; }
-#modalLogin .btn-primary { width: 100%; }
 
 /* ── MODAL DE CONFIRMACIÓN (mostrarConfirmacion) ────────────── */
 .modal-confirm-overlay {

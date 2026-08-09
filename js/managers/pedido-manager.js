@@ -1,16 +1,14 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/managers/pedido-manager.js
-   Versión: 1.1.0
-   Propósito: Gestor de pedidos de mesa y delivery, turnos y auditoría.
-              Métodos getTurnoActual y getAuditLog renombrados a español.
-              Corrección: migración var→let/const.
+   Versión: 1.2.1
+   Propósito: Gestor de pedidos de mesa, turnos y auditoría.
+              Eliminado repo redundante en comando crearPedidoMesa.
    ================================================================ */
 
 import { Logger } from '../lib/logger.js';
 import { EventBus } from '../lib/eventBus.js';
 import { CommandBus } from '../lib/command-bus.js';
-import { DB } from '../db.js';
 import { Auth } from '../auth.js';
 import { PedidoRepositoryLocal } from '../repositorios/pedido-repository.js';
 
@@ -100,7 +98,7 @@ export const PedidoManager = (() => {
     try {
       const resultado = await CommandBus.ejecutar({
         type: 'crearPedidoMesa',
-        datos: { numeroMesa, mozo, comensales, repo: _pedidoRepo }
+        datos: { numeroMesa, mozo, comensales }
       });
       if (resultado.exito) return resultado.data;
       Logger.error('[PedidoManager] Error vía CommandBus:', resultado.error);
@@ -109,40 +107,6 @@ export const PedidoManager = (() => {
       Logger.error('[PedidoManager] Error al crear pedido:', e);
       return null;
     }
-  }
-
-  function crearPedidoDelivery(datos) {
-    const nuevo = {
-      id: 'deliv_' + Date.now(),
-      direccion: datos.direccion,
-      telefono: datos.telefono || '',
-      items: datos.items || [],
-      total: datos.total || 0,
-      estado: 'pendiente',
-      repartidor: datos.repartidor || '',
-      creadoEn: new Date().toISOString(),
-      observaciones: datos.observaciones || ''
-    };
-    if (DB.pedidosDelivery) {
-      DB.pedidosDelivery.push(nuevo);
-      DB.savePedidosDelivery();
-    }
-    _registrarAuditoria('delivery:creado', { id: nuevo.id });
-    return nuevo;
-  }
-
-  function enviarPedidoDeliveryACocina(deliveryId) {
-    if (!DB.pedidosDelivery) return false;
-    const pedido = DB.pedidosDelivery.find(p => p.id === deliveryId);
-    if (!pedido) return false;
-    if (pedido.estado !== 'pendiente') return false;
-
-    pedido.estado = 'en_preparacion';
-    DB.savePedidosDelivery();
-
-    EventBus.emit('delivery:enviado_a_cocina', { deliveryId, items: pedido.items });
-    _registrarAuditoria('delivery:enviado_a_cocina', { deliveryId });
-    return true;
   }
 
   function finalizarTurno() {
@@ -154,8 +118,6 @@ export const PedidoManager = (() => {
     obtenerTurnoActual: () => turnoActual,
     obtenerAuditoria: () => auditLog,
     crearPedidoMesa,
-    crearPedidoDelivery,
-    enviarPedidoDeliveryACocina,
     registrar: _registrarAuditoria,
     finalizarTurno
   };

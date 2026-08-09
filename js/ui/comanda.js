@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/comanda.js
-   Versión: 2.0.11
-   Propósito: Gestión de la comanda actual.
-              Corrección: referencia interna a obtenerMesaActiva().
+   Versión: 2.1.1
+   Propósito: Gestión de la comanda actual. _inicializarSincroniaStore
+              se llama desde activar() en lugar de ejecutarse al
+              importar el módulo.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -15,59 +16,49 @@ import { DB } from '../db.js';
 
 const Comanda = (() => {
   let _mesaActiva = null;
+  let _pedidoActivo = null;
+  let _inicializado = false;
 
-  function _mesasIguales(a, b) {
-    if (!a || !b) return a === b;
-    const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
-    for (const key of keys) {
-      if (key === 'personaActiva') continue;
-      const va = a[key];
-      const vb = b[key];
-      if (va !== vb) {
-        if (typeof va === 'object' && typeof vb === 'object') {
-          if (JSON.stringify(va) !== JSON.stringify(vb)) return false;
-        } else {
-          return false;
-        }
-      }
-    }
-    return true;
+  /* ── Helpers del nuevo modelo ───────────────────────── */
+  function _obtenerPedidoActivo(mesa) {
+    if (!mesa || !mesa.pedidoId) return null;
+    const pedidos = Store.obtenerEstado().pedidos || [];
+    return pedidos.find(p => p.id === mesa.pedidoId) || null;
   }
 
-  function _syncMesaStoreADB(mesaActualizada) {
-    if (!mesaActualizada) return;
+  function _syncPedidoADB(pedido) {
+    if (!pedido) return;
     try {
-      const idx = DB.mesas.findIndex(m => m.numero == mesaActualizada.numero);
+      const idx = DB.pedidos.findIndex(p => p.id === pedido.id);
       if (idx >= 0) {
-        if (!_mesasIguales(DB.mesas[idx], mesaActualizada)) {
-          DB.mesas[idx] = mesaActualizada;
-          if (typeof DB.saveMesas === 'function') {
-            DB.saveMesas();
-          }
-          Logger.debug('[Comanda] Mesa sincronizada a DB:', mesaActualizada.numero);
+        DB.pedidos[idx] = pedido;
+        if (typeof DB.savePedidos === 'function') {
+          DB.savePedidos();
         }
+        Logger.debug('[Comanda] Pedido sincronizado a DB:', pedido.id);
       }
     } catch (e) {
-      Logger.error('[Comanda] Error al sincronizar mesa con DB:', e);
+      Logger.error('[Comanda] Error al sincronizar pedido con DB:', e);
     }
   }
 
+  /* ── Sincronización con el Store ───────────────────── */
   function _inicializarSincroniaStore() {
     try {
       Store.suscribir((state, action) => {
         if (!action || !action.type) return;
         if (!['COMANDA_ITEM_AGREGAR', 'COMANDA_ITEM_CAMBIAR', 'COMANDA_ITEM_QUITAR'].includes(action.type)) return;
-        if (!_mesaActiva) return;
+        if (!_mesaActiva || !_pedidoActivo) return;
 
-        const mesaStore = state.mesas.find(m => m.numero == _mesaActiva.numero);
-        if (!mesaStore) return;
+        const pedidoStore = (state.pedidos || []).find(p => p.id === _pedidoActivo.id);
+        if (!pedidoStore) return;
 
-        _syncMesaStoreADB(mesaStore);
-        _mesaActiva = mesaStore;
+        _syncPedidoADB(pedidoStore);
+        _pedidoActivo = pedidoStore;
         EventBus.emit('mesa:actualizada', { mesa: _mesaActiva.numero, estado: _mesaActiva.estado });
         EventBus.emit('comanda:total_actualizado', {
           mesa: _mesaActiva.numero,
-          total: mesaStore.total || _mesaActiva.total || 0
+          total: pedidoStore.total || 0
         });
         _render();
       });
@@ -76,16 +67,24 @@ const Comanda = (() => {
     }
   }
 
-  _inicializarSincroniaStore();
+  function activar() {
+    if (_inicializado) return;
+    _inicializado = true;
+    _inicializarSincroniaStore();
+    _inicializarEscuchadores();
+    Logger.info('[Comanda] Módulo activado (v2.1.1).');
+  }
 
+  /* ── API de la comanda ─────────────────────────────── */
   function establecerMesaActiva(mesa) {
     _mesaActiva = mesa;
+    _pedidoActivo = _obtenerPedidoActivo(mesa);
     _render();
     _sincronizarCamposHeader();
   }
 
   function _sincronizarCamposHeader() {
-    if (!_mesaActiva) return;
+    if (!_mesaActiva || !_pedidoActivo) return;
     const selMozo = document.getElementById('comandaMozo');
     const inpComensales = document.getElementById('comandaComensales');
     const inpObs = document.getElementById('comandaObs');
@@ -98,13 +97,13 @@ const Comanda = (() => {
           const nombre = m.nombre || m;
           const activo = m.activo !== false;
           if (!activo) return '';
-          return `<option value="${nombre}" ${nombre === _mesaActiva.mozo ? 'selected' : ''}>${nombre}</option>`;
+          return `<option value="${nombre}" ${nombre === _pedidoActivo.mozo ? 'selected' : ''}>${nombre}</option>`;
         }).join('');
       }
       selMozo.innerHTML = opcionesHTML;
     }
-    if (inpComensales) inpComensales.value = _mesaActiva.comensales || 1;
-    if (inpObs) inpObs.value = _mesaActiva.observaciones || '';
+    if (inpComensales) inpComensales.value = _pedidoActivo.comensales || 1;
+    if (inpObs) inpObs.value = _pedidoActivo.observaciones || '';
 
     _renderSelectorPersona();
   }
@@ -112,12 +111,12 @@ const Comanda = (() => {
   function _renderSelectorPersona() {
     const container = document.getElementById('personaActivaContainer');
     if (!container) return;
-    const personas = _mesaActiva.personas || [];
+    const personas = _pedidoActivo?.personas || _mesaActiva.personas || [];
     if (personas.length === 0) {
-      _mesaActiva.personas = ['General'];
+      if (_pedidoActivo) _pedidoActivo.personas = ['General'];
     }
-    const personaActual = _mesaActiva.personaActiva || 'General';
-    const opciones = _mesaActiva.personas.map(p => `<option value="${p}" ${p === personaActual ? 'selected' : ''}>${p}</option>`).join('');
+    const personaActual = _pedidoActivo?.personaActiva || 'General';
+    const opciones = personas.map(p => `<option value="${p}" ${p === personaActual ? 'selected' : ''}>${p}</option>`).join('');
     container.innerHTML = `
       <i class="fas fa-user"></i>
       <select id="personaActivaSelect">
@@ -133,24 +132,21 @@ const Comanda = (() => {
   }
 
   function establecerPersonaActiva(nombre) {
-    if (_mesaActiva) {
-      _mesaActiva.personaActiva = nombre;
+    if (_pedidoActivo) {
+      _pedidoActivo.personaActiva = nombre;
     }
   }
 
   async function agregarPersona() {
     try {
-      const nombre = await mostrarEntrada(
-        'Agregar persona',
-        'Nombre de la persona:',
-        { placeholder: 'Ej: Juan' }
-      );
+      const nombre = await mostrarEntrada('Agregar persona', 'Nombre de la persona:', { placeholder: 'Ej: Juan' });
       if (!nombre) return;
-      if (!_mesaActiva.personas) _mesaActiva.personas = [];
-      if (!_mesaActiva.personas.includes(nombre)) {
-        _mesaActiva.personas.push(nombre);
+      if (!_pedidoActivo) return;
+      if (!_pedidoActivo.personas) _pedidoActivo.personas = [];
+      if (!_pedidoActivo.personas.includes(nombre)) {
+        _pedidoActivo.personas.push(nombre);
       }
-      _mesaActiva.personaActiva = nombre;
+      _pedidoActivo.personaActiva = nombre;
       _renderSelectorPersona();
     } catch (e) {
       Logger.error('[Comanda] Error al agregar persona:', e);
@@ -158,8 +154,8 @@ const Comanda = (() => {
   }
 
   function agregarItem(producto) {
-    if (!_mesaActiva) return;
-    const persona = _mesaActiva.personaActiva || 'General';
+    if (!_pedidoActivo) return;
+    const persona = _pedidoActivo.personaActiva || 'General';
     const item = {
       prodId: producto.id,
       nombre: producto.nombre,
@@ -176,138 +172,110 @@ const Comanda = (() => {
     try {
       Store.despachar({
         type: 'COMANDA_ITEM_AGREGAR',
-        payload: { numeroMesa: _mesaActiva.numero, item }
+        payload: { pedidoId: _pedidoActivo.id, item }
       });
     } catch (e) {
-      Logger.error('[Comanda] Error al agregar ítem a la comanda:', e);
+      Logger.error('[Comanda] Error al agregar ítem:', e);
     }
   }
 
   function cambiarCantidad(idx, delta) {
-    if (!_mesaActiva) return;
-    const item = _mesaActiva.items[idx];
+    if (!_pedidoActivo) return;
+    const item = _pedidoActivo.items?.[idx];
     if (!item) return;
     if (item.enviado && !Auth.puede('eliminarItemEnviado')) {
       mostrarToast('error', 'No tienes permiso para modificar ítems ya enviados');
       return;
     }
-    const nuevaCantidad = Math.max(1, item.qty + delta);
+    const nuevaCantidad = Math.max(1, (item.qty || 1) + delta);
     try {
       Store.despachar({
         type: 'COMANDA_ITEM_CAMBIAR',
-        payload: { numeroMesa: _mesaActiva.numero, index: idx, cambios: { qty: nuevaCantidad } }
+        payload: { pedidoId: _pedidoActivo.id, index: idx, cambios: { qty: nuevaCantidad } }
       });
     } catch (e) {
-      Logger.error('[Comanda] Error al cambiar cantidad del ítem:', e);
+      Logger.error('[Comanda] Error al cambiar cantidad:', e);
     }
   }
 
   function establecerObservacion(idx, valor) {
-    if (_mesaActiva?.items[idx]) {
-      try {
-        Store.despachar({
-          type: 'COMANDA_ITEM_CAMBIAR',
-          payload: { numeroMesa: _mesaActiva.numero, index: idx, cambios: { obs: valor } }
-        });
-      } catch (e) {
-        Logger.error('[Comanda] Error al establecer observación del ítem:', e);
-      }
+    if (!_pedidoActivo?.items?.[idx]) return;
+    try {
+      Store.despachar({
+        type: 'COMANDA_ITEM_CAMBIAR',
+        payload: { pedidoId: _pedidoActivo.id, index: idx, cambios: { obs: valor } }
+      });
+    } catch (e) {
+      Logger.error('[Comanda] Error al establecer observación:', e);
     }
   }
 
   function quitarItem(idx) {
-    if (!_mesaActiva) return;
-    const item = _mesaActiva.items[idx];
-    if (item.enviado && !Auth.puede('eliminarItemEnviado')) {
+    if (!_pedidoActivo) return;
+    const item = _pedidoActivo.items?.[idx];
+    if (item?.enviado && !Auth.puede('eliminarItemEnviado')) {
       mostrarToast('error', 'Solo administrador puede eliminar ítems enviados');
       return;
     }
     try {
       Store.despachar({
         type: 'COMANDA_ITEM_QUITAR',
-        payload: { numeroMesa: _mesaActiva.numero, index: idx }
+        payload: { pedidoId: _pedidoActivo.id, index: idx }
       });
     } catch (e) {
-      Logger.error('[Comanda] Error al quitar ítem de la comanda:', e);
+      Logger.error('[Comanda] Error al quitar ítem:', e);
     }
   }
 
   function establecerMozo(mozo) {
-    if (_mesaActiva) {
-      _mesaActiva.mozo = mozo;
-      try {
-        DB.saveMesas();
-      } catch (e) {
-        Logger.error('[Comanda] Error al guardar mozo en DB:', e);
-      }
+    if (_pedidoActivo) {
+      _pedidoActivo.mozo = mozo;
+      _syncPedidoADB(_pedidoActivo);
     }
   }
 
   function establecerComensales(cant) {
-    if (_mesaActiva) {
-      _mesaActiva.comensales = parseInt(cant) || 1;
-      try {
-        DB.saveMesas();
-      } catch (e) {
-        Logger.error('[Comanda] Error al guardar comensales en DB:', e);
-      }
+    if (_pedidoActivo) {
+      _pedidoActivo.comensales = parseInt(cant) || 1;
+      _syncPedidoADB(_pedidoActivo);
     }
   }
 
   function establecerObservacionGeneral(obs) {
-    if (_mesaActiva) {
-      _mesaActiva.observaciones = obs;
+    if (_pedidoActivo) {
+      _pedidoActivo.observaciones = obs;
     }
   }
 
-  function render() {
-    _render();
-  }
+  function render() { _render(); }
 
   function _render() {
     const contenedor = document.getElementById('comandaItems');
     const subtotalEl = document.getElementById('subtotalDisplay');
-    if (!contenedor || !_mesaActiva) return;
+    if (!contenedor || !_pedidoActivo) return;
 
     const state = Store.obtenerEstado();
-    const mesaDelStore = state.mesas.find(m => m.numero == _mesaActiva.numero);
-    const items = mesaDelStore ? mesaDelStore.items : _mesaActiva.items;
+    const pedidoStore = (state.pedidos || []).find(p => p.id === _pedidoActivo.id);
+    const items = pedidoStore?.items || _pedidoActivo.items || [];
 
     if (!items.length) {
-      contenedor.innerHTML = `
-        <div class="comanda-vacia">
-          <i class="fas fa-utensils"></i>
-          <p>La comanda está vacía</p>
-          <p style="font-size:11px">Tocá un producto para agregar</p>
-        </div>`;
+      contenedor.innerHTML = `<div class="comanda-vacia"><i class="fas fa-utensils"></i><p>La comanda está vacía</p></div>`;
       if (subtotalEl) subtotalEl.textContent = '$0';
       return;
     }
 
     contenedor.innerHTML = items.map((item, idx) => _htmlItem(item, idx)).join('');
-    if (subtotalEl) subtotalEl.textContent = formatearDinero(mesaDelStore?.total || _mesaActiva.total || 0);
+    if (subtotalEl) subtotalEl.textContent = formatearDinero(pedidoStore?.total || _pedidoActivo.total || 0);
     _renderSelectorPersona();
 
     contenedor.querySelectorAll('.qty-btn').forEach(btn => {
-      btn.addEventListener('click', function() {
-        const idx = parseInt(this.dataset.idx);
-        const delta = parseInt(this.dataset.delta);
-        if (!isNaN(idx) && !isNaN(delta)) cambiarCantidad(idx, delta);
-      });
+      btn.addEventListener('click', () => cambiarCantidad(parseInt(btn.dataset.idx), parseInt(btn.dataset.delta)));
     });
-
     contenedor.querySelectorAll('.item-obs-input').forEach(input => {
-      input.addEventListener('input', function() {
-        const idx = parseInt(this.dataset.idx);
-        if (!isNaN(idx)) establecerObservacion(idx, this.value);
-      });
+      input.addEventListener('input', () => establecerObservacion(parseInt(input.dataset.idx), input.value));
     });
-
     contenedor.querySelectorAll('.item-remove').forEach(btn => {
-      btn.addEventListener('click', function() {
-        const idx = parseInt(this.dataset.idx);
-        if (!isNaN(idx)) quitarItem(idx);
-      });
+      btn.addEventListener('click', () => quitarItem(parseInt(btn.dataset.idx)));
     });
   }
 
@@ -319,17 +287,15 @@ const Comanda = (() => {
       <div class="comanda-item${enviado ? ' enviado' : ''}">
         <div class="item-qty-controls">
           <button class="qty-btn" data-idx="${idx}" data-delta="-1" ${disabledAttr}>−</button>
-          <span class="item-qty">${item.qty}</span>
+          <span class="item-qty">${item.qty || 1}</span>
           <button class="qty-btn" data-idx="${idx}" data-delta="1" ${disabledAttr}>+</button>
         </div>
         <div class="item-info">
           <div class="item-nombre">${item.nombre} ${personaBadge}</div>
           <input class="item-obs-input" data-idx="${idx}" placeholder="Aclaración..." value="${item.obs || ''}" ${disabledAttr}>
         </div>
-        <span class="item-precio">${formatearDinero(item.precio * item.qty)}</span>
-        <button class="item-remove" data-idx="${idx}">
-          <i class="fas fa-times"></i>
-        </button>
+        <span class="item-precio">${formatearDinero((item.precio || 0) * (item.qty || 1))}</span>
+        <button class="item-remove" data-idx="${idx}"><i class="fas fa-times"></i></button>
       </div>`;
   }
 
@@ -364,9 +330,8 @@ const Comanda = (() => {
     });
   }
 
-  _inicializarEscuchadores();
-
   return {
+    activar,
     establecerMesaActiva,
     establecerMozo,
     establecerComensales,
@@ -378,7 +343,8 @@ const Comanda = (() => {
     establecerObservacion,
     quitarItem,
     render,
-    obtenerMesaActiva: () => _mesaActiva
+    obtenerMesaActiva: () => _mesaActiva,
+    obtenerPedidoActivo: () => _pedidoActivo
   };
 })();
 

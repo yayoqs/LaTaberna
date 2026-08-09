@@ -1,10 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-core.js
-   Versión: 1.0.9
+   Versión: 1.1.1
    Propósito: Núcleo de datos: mesas, pedidos, productos, proveedores,
-              persistencia local. Métodos auxiliares de validación
-              ahora son privados del módulo.
+              persistencia local.
+              v1.1.1: Logger.warn en _cargarPedidosDeliveryLocal para
+                      pedidos descartados por ID nulo.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -22,7 +23,7 @@ export const DBCore = (function() {
   module.pedidosDelivery = [];
   module.proveedores = [];
 
-  // ══ FUNCIONES AUXILIARES PRIVADAS (no expuestas) ══
+  // ══ FUNCIONES AUXILIARES PRIVADAS ══
 
   function _validarId(val, prefijo) {
     if (typeof val === 'string' && val.length > 0) return val;
@@ -72,18 +73,13 @@ export const DBCore = (function() {
   module._normalizarMesa = function(m) {
     const estado = _validarEstadoMesa(m.estado);
     return {
-      numero: _validarNumero(m.numero, 0),
+      numero: _validarString(m.numero, '0'),
       estado: estado,
       pedidoId: m.pedidoId || null,
-      items: Array.isArray(m.items) ? m.items : [],
-      mozo: _validarString(m.mozo, ''),
       comensales: _validarNumero(m.comensales, 1),
-      abiertaEn: m.abiertaEn || null,
-      observaciones: _validarString(m.observaciones, ''),
       mesasFusionadas: m.mesasFusionadas || null,
       esVirtual: m.esVirtual || false,
-      zona: _validarString(m.zona, (this.config.zonas && this.config.zonas[0]?.nombre) || 'salon'),
-      permite_prepedidos: (estado === 'libre') ? false : _validarBooleano(m.permite_prepedidos, false)
+      zona: _validarString(m.zona, (this.config.zonas && this.config.zonas[0]?.nombre) || 'salon')
     };
   };
 
@@ -155,7 +151,7 @@ export const DBCore = (function() {
       const nuevas = [];
       zonas.forEach(zona => {
         for (let i = 0; i < zona.cantidad; i++) {
-          nuevas.push({ ...mesaVacia(numero, zona.nombre), numero });
+          nuevas.push({ ...mesaVacia(String(numero), zona.nombre), numero: String(numero) });
           numero++;
         }
       });
@@ -173,7 +169,7 @@ export const DBCore = (function() {
       });
 
       const nuevasMesas = [];
-      let maxNumero = Math.max(0, ...mesasReales.map(m => m.numero));
+      let maxNumero = Math.max(0, ...mesasReales.map(m => parseInt(m.numero) || 0));
 
       zonas.forEach(z => {
         const zonaData = porZona[z.nombre] || { deseado: z.cantidad, actuales: [], libres: [] };
@@ -184,13 +180,13 @@ export const DBCore = (function() {
         if (diferencia > 0) {
           for (let i = 0; i < diferencia; i++) {
             maxNumero++;
-            const nueva = { ...mesaVacia(maxNumero, z.nombre), numero: maxNumero };
+            const nueva = { ...mesaVacia(String(maxNumero), z.nombre), numero: String(maxNumero) };
             nuevasMesas.push(nueva);
             actuales.push(nueva);
           }
         } else if (diferencia < 0) {
           const aEliminar = Math.min(-diferencia, libres.length);
-          libres.sort((a,b) => b.numero - a.numero);
+          libres.sort((a,b) => parseInt(b.numero) - parseInt(a.numero));
           for (let i = 0; i < aEliminar; i++) {
             const mesa = libres[i];
             const idx = actuales.indexOf(mesa);
@@ -202,7 +198,7 @@ export const DBCore = (function() {
 
       const mapaFinal = new Map();
       nuevasMesas.forEach(m => mapaFinal.set(m.numero, m));
-      this.mesas = Array.from(mapaFinal.values()).sort((a,b) => a.numero - b.numero);
+      this.mesas = Array.from(mapaFinal.values()).sort((a,b) => parseInt(a.numero) - parseInt(b.numero));
     }
 
     this.saveMesas();
@@ -234,10 +230,22 @@ export const DBCore = (function() {
     const raw = localStorage.getItem('pubpos_pedidos_delivery');
     if (raw) {
       try {
-        this.pedidosDelivery = JSON.parse(raw)
+        const parseados = JSON.parse(raw);
+        const descartados = [];
+        this.pedidosDelivery = parseados
           .map(pd => this._normalizarPedidoDelivery(pd))
-          .filter(pd => pd && pd.id);
+          .filter(pd => {
+            if (!pd || !pd.id) {
+              descartados.push(pd);
+              return false;
+            }
+            return true;
+          });
+        if (descartados.length > 0) {
+          Logger.warn('[DBCore] _cargarPedidosDeliveryLocal: ' + descartados.length + ' pedido(s) descartado(s) por ID nulo o inválido.', descartados);
+        }
       } catch (e) {
+        Logger.error('[DBCore] Error al parsear pedidos delivery locales:', e);
         this.pedidosDelivery = [];
       }
     } else {
@@ -298,6 +306,8 @@ export const DBCore = (function() {
     const nuevo = {
       id: 'ped_' + Date.now(),
       mesa, mozo, comensales,
+      tipo: 'salon',
+      origen: 'staff',
       estado: 'abierta',
       items: '[]',
       total: 0,
@@ -330,7 +340,7 @@ export const DBCore = (function() {
     return this.mesas.find(m => m.numero == num);
   };
 
-  /* ── GESTIÓN DE DELIVERY ─────────────────────────────────── */
+  /* ── GESTIÓN DE DELIVERY (compatibilidad temporal) ───────── */
   module.crearPedidoDelivery = function(datos) {
     const nuevo = this._normalizarPedidoDelivery({
       ...datos,
@@ -362,15 +372,10 @@ export const DBCore = (function() {
 
 export function mesaVacia(num, zona = 'salon') {
   return {
-    numero: num,
+    numero: String(num),
     estado: 'libre',
     pedidoId: null,
-    items: [],
-    mozo: '',
     comensales: 1,
-    abiertaEn: null,
-    observaciones: '',
-    zona: zona,
-    permite_prepedidos: false
+    zona: zona
   };
 }

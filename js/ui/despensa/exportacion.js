@@ -1,18 +1,18 @@
 /* ================================================================
    LaTaberna - PubPOS — DESPENSA SUBMÓDULO (ES6)
    Archivo: js/ui/despensa/exportacion.js
-   Versión: 1.0.3
+   Versión: 1.0.4
    Propósito: Exportación del inventario a CSV y PDF.
-              v1.0.3: elimina window.open, descarga archivo HTML.
+              v1.0.4: lee insumos del Store.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
 
 export function exportarCSV() {
-  const ing = Store.obtenerEstado().ingredientes || [];
-  let csv = 'Nombre,Categoría,Stock,Unidad,Stock Mínimo,Ubicación,Valor Unitario,Valor Total\n';
+  const ing = Store.obtenerEstado().insumos || [];
+  let csv = 'Nombre,Categoría,Stock,Unidad,Stock Mínimo,Ubicación,Tipo\n';
   ing.forEach(i => {
-    csv += `"${i.nombre}","${i.categoria || ''}",${i.stock},"${i.unidad}",${i.stock_minimo},"${i.ubicacion || ''}",${i.valor_unitario || 0},${i.stock * (i.valor_unitario || 0)}\n`;
+    csv += `"${i.nombre}","${i.categoria || ''}",${i.stock},"${i.unidad}",${i.stock_minimo},"${i.ubicacion || ''}","${i.tipo || ''}"\n`;
   });
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
@@ -24,7 +24,7 @@ export function exportarCSV() {
 }
 
 export function exportarPDF() {
-  const ingredientes = Store.obtenerEstado().ingredientes || [];
+  const insumos = Store.obtenerEstado().insumos || [];
 
   const html = `<!DOCTYPE html>
 <html lang="es">
@@ -42,9 +42,9 @@ export function exportarPDF() {
 <body>
   <h1>Inventario — ${new Date().toLocaleDateString()}</h1>
   <table>
-    <thead><tr><th>Ingrediente</th><th>Cat.</th><th>Stock</th><th>Uni.</th><th>Mín.</th><th>Ubicación</th><th>Valor Un.</th><th>Valor Total</th></tr></thead>
+    <thead><tr><th>Insumo</th><th>Cat.</th><th>Stock</th><th>Uni.</th><th>Mín.</th><th>Ubicación</th><th>Tipo</th></tr></thead>
     <tbody>
-      ${ingredientes.map(i => `
+      ${insumos.map(i => `
         <tr>
           <td>${i.nombre}</td>
           <td>${i.categoria || ''}</td>
@@ -52,8 +52,7 @@ export function exportarPDF() {
           <td>${i.unidad}</td>
           <td>${i.stock_minimo}</td>
           <td>${i.ubicacion || ''}</td>
-          <td>${i.valor_unitario || ''}</td>
-          <td>${(i.stock * (i.valor_unitario || 0)).toFixed(2)}</td>
+          <td>${i.tipo || ''}</td>
         </tr>`).join('')}
     </tbody>
   </table>
@@ -61,7 +60,6 @@ export function exportarPDF() {
 </body>
 </html>`;
 
-  // ✅ Sin window.open: descargamos como archivo HTML
   const blob = new Blob([html], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');

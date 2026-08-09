@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — DESPENSA SUBMÓDULO (ES6)
    Archivo: js/ui/despensa/modal-proveedor.js
-   Versión: 1.0.1
-   Propósito: Modal para crear y editar proveedores.
-              v1.0.1: solo nombre y notas (texto libre).
+   Versión: 1.1.0
+   Propósito: Modal para crear y editar proveedores con todos los campos.
+              v1.1.0: adaptado a laTaberna_Proveedores ampliada.
    ================================================================ */
 
 import { crearProveedorRepo } from '../../repositorios/proveedor-repository.js';
@@ -31,8 +31,25 @@ export function mostrar(proveedor = null, onGuardado = null) {
         <div class="modal-header"><h3 id="provTitulo">${titulo}</h3><button class="modal-close" id="btnCerrarModalProv"><i class="fas fa-times"></i></button></div>
         <div class="modal-small-body">
           <input type="hidden" id="provId">
-          <label>Nombre</label><input type="text" id="provNombre" placeholder="Ej: Distribuidora Norte">
-          <label>Notas</label><textarea id="provNotas" rows="3" placeholder="Dirección, teléfono, horario, referencias..."></textarea>
+          <label>Nombre *</label><input type="text" id="provNombre" placeholder="Ej: Distribuidora Norte">
+          <label>Tipo</label>
+          <select id="provTipo">
+            <option value="distribuidor">Distribuidor</option>
+            <option value="supermercado">Supermercado</option>
+            <option value="feria">Feria</option>
+            <option value="huerta">Huerta</option>
+            <option value="donacion">Donación</option>
+            <option value="otro">Otro</option>
+          </select>
+          <label>Contacto</label><input type="text" id="provContacto" placeholder="Nombre de la persona de contacto">
+          <label>Teléfono</label><input type="text" id="provTelefono" placeholder="+56 9 ...">
+          <label>Email</label><input type="email" id="provEmail" placeholder="proveedor@correo.com">
+          <label>Dirección</label><input type="text" id="provDireccion" placeholder="Calle, número, comuna">
+          <label>Rubro</label><input type="text" id="provRubro" placeholder="Ej: Lácteos, Bebidas, Abarrotes">
+          <label>Notas</label><textarea id="provNotas" rows="2" placeholder="Horario, referencias, condiciones..."></textarea>
+          <label style="display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" id="provActivo" checked style="width:auto;"> Proveedor activo
+          </label>
           <div class="modal-small-footer"><button class="btn-secondary" id="btnCancelarModalProv">Cancelar</button><button class="btn-primary" id="btnGuardarModalProv">Guardar</button></div>
         </div>
       </div>`;
@@ -45,7 +62,14 @@ export function mostrar(proveedor = null, onGuardado = null) {
 
   document.getElementById('provId').value = proveedor?.id || '';
   document.getElementById('provNombre').value = proveedor?.nombre || '';
+  document.getElementById('provTipo').value = proveedor?.tipo || 'otro';
+  document.getElementById('provContacto').value = proveedor?.contacto || '';
+  document.getElementById('provTelefono').value = proveedor?.telefono || '';
+  document.getElementById('provEmail').value = proveedor?.email || '';
+  document.getElementById('provDireccion').value = proveedor?.direccion || '';
+  document.getElementById('provRubro').value = proveedor?.rubro || '';
   document.getElementById('provNotas').value = proveedor?.notas || '';
+  document.getElementById('provActivo').checked = proveedor?.activo !== false;
   document.getElementById('provTitulo').textContent = titulo;
   modal.style.display = 'flex';
 }
@@ -64,7 +88,14 @@ async function guardar(onGuardado) {
   const datos = {
     id: id || null,
     nombre,
-    notas: document.getElementById('provNotas').value.trim()
+    tipo: document.getElementById('provTipo').value,
+    contacto: document.getElementById('provContacto').value.trim(),
+    telefono: document.getElementById('provTelefono').value.trim(),
+    email: document.getElementById('provEmail').value.trim(),
+    direccion: document.getElementById('provDireccion').value.trim(),
+    rubro: document.getElementById('provRubro').value.trim(),
+    notas: document.getElementById('provNotas').value.trim(),
+    activo: document.getElementById('provActivo').checked
   };
 
   try {

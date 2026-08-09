@@ -1,11 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — REPOSITORIO JS (ES6)
    Archivo: js/repositorios/receta-repository.js
-   Versión: 1.0.5
+   Versión: 1.1.0
    Propósito: Repositorio de recetas y productos (Appwrite + localStorage).
-              v1.0.5: usa 'Compuesto' como valor para el campo 'tipo'
-                      en productos. Omite stockActual en recetas hasta
-                      que la columna exista en Appwrite.
+              v1.1.0: agregados métodos guardarInsumo y actualizarStockInsumo.
    ================================================================ */
 
 import { Logger } from '../lib/logger.js';
@@ -40,7 +38,6 @@ export function crearRecetaRepo() {
             destino: receta.destino || 'cocina',
             ingredientes: Array.isArray(receta.ingredientes) ? JSON.stringify(receta.ingredientes) : '[]',
             instrucciones: receta.instrucciones || ''
-            // stockActual se omite hasta que Appwrite tenga la columna
           };
 
           if (receta.id) {
@@ -123,7 +120,7 @@ export function crearRecetaRepo() {
           const docParaAppwrite = {
             nombre: producto.nombre,
             activo: producto.activo !== false,
-            tipo: 'Compuesto',   // valor requerido por Appwrite (Simple | Compuesto)
+            tipo: 'Compuesto',
             destino: producto.destino || 'cocina'
           };
 
@@ -230,25 +227,87 @@ export function crearRecetaRepo() {
       return this.guardarReceta(receta);
     },
 
-    async actualizarStockIngrediente(id, nuevoStock) {
-      const ingrediente = (DB.ingredientes || []).find(i => i.id === id);
-      if (!ingrediente) return null;
-      ingrediente.stock = nuevoStock;
-      localStorage.setItem('pubpos_ingredientes', JSON.stringify(DB.ingredientes));
+    async guardarInsumo(datos) {
+      const insumo = { ...datos };
+      let guardadoRemoto = false;
+
+      if (!DB.insumos) DB.insumos = [];
 
       if (DBAppwrite && DBAppwrite.habilitado) {
         try {
-          await DBAppwrite.actualizar('ingredientes', id, { stock: nuevoStock });
-          Logger.debug('[RecetaRepo] Stock actualizado en Appwrite:', id);
+          const docParaAppwrite = {
+            nombre: insumo.nombre,
+            stock: insumo.stock ?? 0,
+            unidad: insumo.unidad || 'u',
+            stock_minimo: insumo.stock_minimo || 0,
+            categoria: insumo.categoria || 'general',
+            ubicacion: insumo.ubicacion || '',
+            tipo: insumo.tipo || 'cocina',
+            costo_manual: insumo.costo_manual ?? null
+          };
+
+          if (insumo.id) {
+            try {
+              await DBAppwrite.actualizar('insumos', insumo.id, docParaAppwrite);
+              guardadoRemoto = true;
+            } catch (e) {
+              if (e.code === 404) {
+                const docRemoto = await DBAppwrite.crear('insumos', null, docParaAppwrite);
+                if (docRemoto && docRemoto.id) {
+                  insumo.id = docRemoto.id;
+                  guardadoRemoto = true;
+                }
+              } else {
+                Logger.warn('[RecetaRepo] Error al guardar insumo en Appwrite:', e);
+              }
+            }
+          } else {
+            const docRemoto = await DBAppwrite.crear('insumos', null, docParaAppwrite);
+            if (docRemoto && docRemoto.id) {
+              insumo.id = docRemoto.id;
+              guardadoRemoto = true;
+            }
+          }
+
+          if (guardadoRemoto) {
+            Logger.debug('[RecetaRepo] Insumo guardado en Appwrite:', insumo.id);
+          }
         } catch (e) {
-          Logger.warn('[RecetaRepo] Error al actualizar stock en Appwrite:', e);
+          Logger.warn('[RecetaRepo] No se pudo guardar insumo en Appwrite, usando fallback local:', e);
         }
       }
 
-      if (Store) {
-        Store.despachar({ type: 'INGREDIENTE_GUARDADO', payload: ingrediente });
+      if (!insumo.id) {
+        insumo.id = 'ins_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
       }
-      return ingrediente;
+
+      const idx = DB.insumos.findIndex(i => i.id === insumo.id);
+      if (idx >= 0) {
+        DB.insumos[idx] = insumo;
+      } else {
+        DB.insumos.push(insumo);
+      }
+      localStorage.setItem('pubpos_insumos', JSON.stringify(DB.insumos));
+
+      if (Store) {
+        Store.despachar({ type: 'INSUMO_GUARDADO', payload: insumo });
+      }
+
+      return insumo;
+    },
+
+    async actualizarStockInsumo(id, nuevoStock) {
+      const insumo = (DB.insumos || []).find(i => i.id === id);
+      if (!insumo) return null;
+      insumo.stock = nuevoStock;
+      return this.guardarInsumo(insumo);
+    },
+
+    async actualizarStockIngrediente(id, nuevoStock) {
+      const insumo = (DB.insumos || DB.ingredientes || []).find(i => i.id === id);
+      if (!insumo) return null;
+      insumo.stock = nuevoStock;
+      return this.guardarInsumo(insumo);
     }
   };
 }
