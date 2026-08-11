@@ -1,14 +1,12 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/kds.js
-   Versión: 5.0.3
+   Versión: 5.0.5
    Propósito: Vista del Jefe de Cocina/Barra. Gestión de comandas con
               pestañas de estado, filtros, progreso, checkeo de ítems,
               swipe entre pestañas, acceso rápido a receta (toque largo)
               y preparación para modo Ayudante (solo lectura).
-              Misión 2.2: Store.getState → Store.obtenerEstado,
-                          Store.dispatch → Store.despachar,
-                          Store.subscribe → Store.suscribir.
+              v5.0.5: validación defensiva en touchstart del swipe.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -126,11 +124,13 @@ function _construirVista(main) {
   let touchStartX = 0, touchStartY = 0;
   const lista = document.getElementById('kds-lista');
   lista.addEventListener('touchstart', e => {
+    if (!e.touches || !e.touches.length) return;
     touchStartX = e.touches[0].clientX;
     touchStartY = e.touches[0].clientY;
   }, { passive: true });
 
   lista.addEventListener('touchend', e => {
+    if (!e.changedTouches || !e.changedTouches.length) return;
     const dx = e.changedTouches[0].clientX - touchStartX;
     const dy = e.changedTouches[0].clientY - touchStartY;
     if (Math.abs(dx) > 50 && Math.abs(dy) < 30) {

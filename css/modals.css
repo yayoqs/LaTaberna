@@ -1,24 +1,24 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/modals.css
-   Versión: 1.2.3
+   Versión: 1.2.4
    Propósito: Modales pequeños, modal dual, cierre de mesa, ticket,
               modal de confirmación y modal de entrada.
-              v1.2.3: Eliminado bloque de estilos de Configuración
-              (duplicado de config.css).
+              v1.2.4: Eliminados !important en .modal-overlay para
+              permitir que JS controle la visibilidad del modal.
    ================================================================ */
 
 /* ── MODAL OVERLAY ──────────────────────────────────────────── */
 .modal-overlay {
-  position: fixed !important;
-  inset: 0 !important;
-  z-index: 999 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  padding: 12px !important;
-  background: rgba(0,0,0,.72) !important;
-  backdrop-filter: blur(4px) !important;
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background: rgba(0,0,0,.72);
+  backdrop-filter: blur(4px);
 }
 
 /* ── MODAL PEQUEÑO (base) ──────────────────────────────────── */

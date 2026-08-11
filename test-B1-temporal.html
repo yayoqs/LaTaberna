@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test B1 – Depuración: Insignia de Precarga (v2)</title>
+  <style>
+    body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
+    h1 { color: #f59e0b; }
+    .suite { margin-bottom: 24px; border-bottom: 1px solid #2e2e42; padding-bottom: 12px; }
+    .test { margin: 4px 0; padding: 4px 8px; border-radius: 4px; }
+    .pass { background: rgba(34,197,94,.2); }
+    .fail { background: rgba(239,68,68,.2); }
+    .log  { background: rgba(99,102,241,.2); }
+    .summary { margin-top: 20px; font-weight: bold; }
+    .info { color: #94a3b8; font-size: 12px; margin: 2px 0; }
+    .error { color: #ef4444; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test B1 – Depuración: Insignia de Precarga (v2)</h1>
+  <p class="info">Forzar renderGrid y ver notificaciones internas.</p>
+  <div id="results"></div>
+
+  <script src="/js/appwrite.min.js"></script>
+
+  <script type="module">
+    const { Logger }         = await import('/js/lib/logger.js');
+    const { EventBus }       = await import('/js/lib/eventBus.js');
+    const { Store }          = await import('/js/lib/store.js');
+    const { CommandBus }     = await import('/js/lib/command-bus.js');
+    const { DBAppwrite }     = await import('/js/db-appwrite.js');
+    const { DB }             = await import('/js/db.js');
+    const { Auth, inicializarAuth } = await import('/js/auth.js');
+    const { Mesas }          = await import('/js/ui/mesas.js');
+    const { Comanda }        = await import('/js/ui/comanda.js');
+    const { PrecargaControl }= await import('/js/modulos/interno/precarga-control.js');
+    const { PedidoManager }  = await import('/js/managers/pedido-manager.js');
+    const { PedidoRepositoryLocal } = await import('/js/repositorios/pedido-repository.js');
+    const { Deps }           = await import('/js/lib/deps.js');
+    // Importar funciones necesarias para depuración
+    const { renderGrid }     = await import('/js/ui/mesas/renderer.js');
+    const { getNotificaciones } = await import('/js/ui/mesas/notificaciones.js');
+
+    await import('/js/comandos/crear-pedido-mesa.js');
+
+    Logger.setLevel('DEBUG');
+    const resultsEl = document.getElementById('results');
+    const log = msg => { resultsEl.innerHTML += `<div class="test log">🔍 ${msg}</div>`; };
+    const pass = msg => { resultsEl.innerHTML += `<div class="test pass">✔ ${msg}</div>`; };
+    const fail = msg => { resultsEl.innerHTML += `<div class="test fail">✘ ${msg}</div>`; };
+    const esperar = ms => new Promise(r => setTimeout(r, ms));
+
+    try {
+      log('Inicializando Appwrite...');
+      if (!(await DBAppwrite.iniciar()) || !DBAppwrite.habilitado) throw new Error('Appwrite no disponible');
+
+      log('Autenticando master...');
+      await inicializarAuth();
+      await Auth.iniciarSesion('master', 'master123');
+
+      const espacioId = Auth.obtenerLocalActivo?.()?.id || 'lataberna';
+      await DB.init();
+      PedidoManager.init({ pedidoRepo: PedidoRepositoryLocal });
+      Deps.registrar('pedidoRepo', PedidoRepositoryLocal);
+
+      for (const m of (await DBAppwrite.listar('mesas')).filter(m => m.numero === '99')) {
+        await DBAppwrite.eliminar('mesas', m.id);
+      }
+      await DBAppwrite.crear('mesas', '99', { numero: '99', estado: 'libre', comensales: 1, zona: 'salon', esVirtual: false, espacioId });
+      DB.mesas = await DBAppwrite.listar('mesas');
+      Store.despachar({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
+
+      const prodId = (await DBAppwrite.crear('productos', 'unique()', {
+        nombre: 'Hamburguesa (test)', precio: 1500, categoria: 'platos', destino: 'cocina', activo: true, estado: 'disponible', espacioId
+      })).id;
+      Store.despachar({ type: 'PRODUCTOS_INICIALIZAR', payload: await DBAppwrite.listar('productos') });
+
+      Comanda.activar();
+      PrecargaControl.activar();
+      log('Módulos activados');
+
+      const main = document.createElement('main');
+      main.id = 'view-mesas';
+      main.innerHTML = '<div id="mesasGrid"></div><div id="popoverContainer"></div>';
+      document.body.appendChild(main);
+      EventBus.emit('vista:cambiada', 'mesas');
+      Mesas.render();
+      await esperar(300);
+      log('Vista de mesas renderizada');
+
+      // Emitir precarga
+      const precargaId = 'prec_test_' + Date.now();
+      log('Emitiendo cliente:precarga_enviada...');
+      EventBus.emit('cliente:precarga_enviada', {
+        id: precargaId,
+        mesa: 99,
+        items: [{ prodId, nombre: 'Hamburguesa (test)', precio: 1500, categoria: 'platos', destino: 'cocina', qty: 1, obs: '' }],
+        clienteId: 'cliente_test', observaciones: '', timestamp: Date.now()
+      });
+      await esperar(500);
+
+      // Mostrar estado interno de notificaciones
+      const notificaciones = getNotificaciones(99);
+      log(`Notificaciones para mesa 99: ${JSON.stringify(notificaciones)}`);
+
+      // Forzar renderGrid manualmente
+      log('Forzando renderGrid...');
+      renderGrid();
+      await esperar(200);
+
+      // Buscar el badge en el DOM
+      const badgeEl = document.querySelector('.precarga-badge');
+      if (badgeEl) {
+        pass('Insignia de precarga visible en el DOM');
+        log(`Contenido del badge: "${badgeEl.textContent.trim()}"`);
+      } else {
+        fail('Insignia de precarga NO visible en el DOM');
+        const grid = document.getElementById('mesasGrid');
+        log(`HTML de mesasGrid (primeros 500 caracteres): ${grid?.innerHTML?.substring(0, 500) || 'vacío'}`);
+      }
+
+    } catch (e) {
+      fail('ERROR: ' + e.message);
+      console.error(e);
+    } finally {
+      document.getElementById('view-mesas')?.remove();
+      log('🏁 Diagnóstico finalizado');
+    }
+  </script>
+</body>
+</html>

@@ -1,8 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS
    Archivo: css/cliente-inicio.css
-   Versión: 2.1.6
-   Propósito: Pantalla de inicio. Reglas encapsuladas en #view-inicio.
+   Versión: 2.1.7
+   Propósito: Pantalla de inicio con triángulo neón, cabecera,
+             vitrinas con imagen, títulos de sección y modal expansivo.
+             Corregido el fondo del botón del modal (scope de variables).
    ================================================================ */
 
 /* === Variables encapsuladas en la vista de inicio === */
@@ -24,6 +26,12 @@
   --t: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   --triangulo-ancho: 210px;
   --triangulo-alto: 210px;
+}
+
+/* === Variables para el modal (fuera de #view-inicio) === */
+#modalPortal {
+  --neon-amber: #f59e0b;
+  --neon-orange: #f97316;
 }
 
 /* === Reset local (solo dentro de #view-inicio) === */
@@ -282,7 +290,7 @@
 
 #modalPortal .modal-badge {
   position: absolute; top: 14px; left: 14px;
-  font-family: var(--font-ui);
+  font-family: var(--font-ui, 'Space Grotesk', sans-serif);
   font-size: 0.58rem; font-weight: 800;
   text-transform: uppercase; letter-spacing: 1px;
   padding: 4px 10px; border-radius: 20px;
@@ -293,16 +301,17 @@
   display: flex; justify-content: space-between; align-items: baseline;
   margin-bottom: 6px;
 }
-#modalPortal .modal-titulo { font-family: var(--font-ui); font-size: 1.4rem; font-weight: 700; color: #fff; }
-#modalPortal .modal-ingredientes { font-size: 0.72rem; color: var(--neon-amber); font-weight: 600; font-family: var(--font-ui); }
-#modalPortal .modal-lore { font-size: 0.82rem; color: var(--color-text-sec); line-height: 1.4; margin-bottom: 18px; }
+#modalPortal .modal-titulo { font-family: var(--font-ui, 'Space Grotesk', sans-serif); font-size: 1.4rem; font-weight: 700; color: #fff; }
+#modalPortal .modal-ingredientes { font-size: 0.72rem; color: var(--neon-amber); font-weight: 600; font-family: var(--font-ui, 'Space Grotesk', sans-serif); }
+#modalPortal .modal-lore { font-size: 0.82rem; color: var(--color-text-sec, #94a3b8); line-height: 1.4; margin-bottom: 18px; }
 
 #modalPortal .modal-btn-action {
-  width: 100%; background: linear-gradient(90deg, var(--neon-amber), var(--neon-orange));
+  width: 100%;
+  background: linear-gradient(90deg, var(--neon-amber), var(--neon-orange));
   border: none; padding: 12px; border-radius: 8px;
-  font-family: var(--font-ui); font-size: 0.85rem; font-weight: 700;
+  font-family: var(--font-ui, 'Space Grotesk', sans-serif); font-size: 0.85rem; font-weight: 700;
   color: #000; text-transform: uppercase; letter-spacing: 0.5px;
-  cursor: pointer; transition: var(--t);
+  cursor: pointer; transition: var(--t, all 0.25s ease);
 }
 #modalPortal .modal-btn-action:active { transform: scale(0.98); }
 

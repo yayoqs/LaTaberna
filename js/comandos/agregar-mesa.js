@@ -1,16 +1,16 @@
 /* ================================================================
    LaTaberna - PubPOS — COMANDO JS (ES6)
    Archivo: js/comandos/agregar-mesa.js
-   Versión: 1.0.5
+   Versión: 1.0.6
    Propósito: Comando para agregar una nueva mesa.
-              Sin validación de turno (operación administrativa).
-              Con imports explícitos.
+              v1.0.6: Asigna espacioId desde Auth.obtenerLocalActivo().
    ================================================================ */
 
 import { CommandBus } from '../lib/command-bus.js';
 import { Deps } from '../lib/deps.js';
 import { EventBus } from '../lib/eventBus.js';
 import { mesaVacia } from '../db-core.js';
+import { Auth } from '../auth.js';
 
 export function crearComandoAgregarMesa(datos) {
   return {
@@ -36,10 +36,12 @@ async function handleAgregarMesa(comando) {
     throw new Error('El repositorio no soporta la operación agregarMesa');
   }
 
+  const local = Auth.obtenerLocalActivo();
   const nuevaMesa = {
     ...mesaVacia(numero, zona),
     numero,
-    zona
+    zona,
+    espacioId: local ? local.id : 'lataberna'
   };
 
   try {

@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — REPOSITORIO JS (ES6)
    Archivo: js/repositorios/receta-repository.js
-   Versión: 1.1.0
+   Versión: 1.1.1
    Propósito: Repositorio de recetas y productos (Appwrite + localStorage).
-              v1.1.0: agregados métodos guardarInsumo y actualizarStockInsumo.
+              v1.1.1: eliminado campo 'tipo' de productos (ya no existe en el esquema).
    ================================================================ */
 
 import { Logger } from '../lib/logger.js';
@@ -120,7 +120,7 @@ export function crearRecetaRepo() {
           const docParaAppwrite = {
             nombre: producto.nombre,
             activo: producto.activo !== false,
-            tipo: 'Compuesto',
+            estado: 'disponible',
             destino: producto.destino || 'cocina'
           };
 
@@ -192,6 +192,91 @@ export function crearRecetaRepo() {
       return producto;
     },
 
+    async guardarInsumo(datos) {
+      const insumo = { ...datos };
+      let guardadoRemoto = false;
+      let errorEstructura = false;
+
+      if (DBAppwrite && DBAppwrite.habilitado) {
+        try {
+          const docParaAppwrite = {
+            nombre: insumo.nombre,
+            stock: insumo.stock || 0,
+            unidad: insumo.unidad || 'u',
+            stock_minimo: insumo.stock_minimo || 0,
+            categoria: insumo.categoria || 'general',
+            tipo: insumo.tipo || 'cocina',
+            ubicacion: insumo.ubicacion || ''
+          };
+
+          if (insumo.id) {
+            try {
+              await DBAppwrite.actualizar('insumos', insumo.id, docParaAppwrite);
+              guardadoRemoto = true;
+            } catch (e) {
+              if (e.code === 404) {
+                const docRemoto = await DBAppwrite.crear('insumos', null, docParaAppwrite);
+                if (docRemoto && docRemoto.id) {
+                  insumo.id = docRemoto.id;
+                  guardadoRemoto = true;
+                }
+              } else if (e.type === 'row_invalid_structure') {
+                errorEstructura = true;
+              } else {
+                throw e;
+              }
+            }
+          } else {
+            try {
+              const docRemoto = await DBAppwrite.crear('insumos', null, docParaAppwrite);
+              if (docRemoto && docRemoto.id) {
+                insumo.id = docRemoto.id;
+                guardadoRemoto = true;
+              }
+            } catch (e) {
+              if (e.type === 'row_invalid_structure') {
+                errorEstructura = true;
+              } else {
+                throw e;
+              }
+            }
+          }
+
+          if (guardadoRemoto) {
+            Logger.debug('[RecetaRepo] Insumo guardado en Appwrite:', insumo.id);
+          }
+        } catch (e) {
+          Logger.warn('[RecetaRepo] Error al guardar insumo en Appwrite:', e);
+        }
+      }
+
+      if (!guardadoRemoto) {
+        insumo._pendiente_sync = true;
+        insumo._error_sync = errorEstructura ? 'estructura_invalida' : 'sin_conexion';
+        if (typeof DB.colaSync !== 'undefined') {
+          DB.colaSync.push({ tipo: 'guardarInsumo', datos: insumo });
+        }
+      }
+
+      if (!insumo.id) {
+        insumo.id = 'ins_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+      }
+
+      const idx = (DB.insumos || []).findIndex(i => i.id === insumo.id);
+      if (idx >= 0) {
+        DB.insumos[idx] = insumo;
+      } else {
+        DB.insumos.push(insumo);
+      }
+      localStorage.setItem('pubpos_insumos', JSON.stringify(DB.insumos));
+
+      if (Store) {
+        Store.despachar({ type: 'INSUMO_GUARDADO', payload: insumo });
+      }
+
+      return insumo;
+    },
+
     async eliminarReceta(id) {
       if (DBAppwrite && DBAppwrite.habilitado) {
         try {
@@ -227,87 +312,25 @@ export function crearRecetaRepo() {
       return this.guardarReceta(receta);
     },
 
-    async guardarInsumo(datos) {
-      const insumo = { ...datos };
-      let guardadoRemoto = false;
-
-      if (!DB.insumos) DB.insumos = [];
-
-      if (DBAppwrite && DBAppwrite.habilitado) {
-        try {
-          const docParaAppwrite = {
-            nombre: insumo.nombre,
-            stock: insumo.stock ?? 0,
-            unidad: insumo.unidad || 'u',
-            stock_minimo: insumo.stock_minimo || 0,
-            categoria: insumo.categoria || 'general',
-            ubicacion: insumo.ubicacion || '',
-            tipo: insumo.tipo || 'cocina',
-            costo_manual: insumo.costo_manual ?? null
-          };
-
-          if (insumo.id) {
-            try {
-              await DBAppwrite.actualizar('insumos', insumo.id, docParaAppwrite);
-              guardadoRemoto = true;
-            } catch (e) {
-              if (e.code === 404) {
-                const docRemoto = await DBAppwrite.crear('insumos', null, docParaAppwrite);
-                if (docRemoto && docRemoto.id) {
-                  insumo.id = docRemoto.id;
-                  guardadoRemoto = true;
-                }
-              } else {
-                Logger.warn('[RecetaRepo] Error al guardar insumo en Appwrite:', e);
-              }
-            }
-          } else {
-            const docRemoto = await DBAppwrite.crear('insumos', null, docParaAppwrite);
-            if (docRemoto && docRemoto.id) {
-              insumo.id = docRemoto.id;
-              guardadoRemoto = true;
-            }
-          }
-
-          if (guardadoRemoto) {
-            Logger.debug('[RecetaRepo] Insumo guardado en Appwrite:', insumo.id);
-          }
-        } catch (e) {
-          Logger.warn('[RecetaRepo] No se pudo guardar insumo en Appwrite, usando fallback local:', e);
-        }
-      }
-
-      if (!insumo.id) {
-        insumo.id = 'ins_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
-      }
-
-      const idx = DB.insumos.findIndex(i => i.id === insumo.id);
-      if (idx >= 0) {
-        DB.insumos[idx] = insumo;
-      } else {
-        DB.insumos.push(insumo);
-      }
-      localStorage.setItem('pubpos_insumos', JSON.stringify(DB.insumos));
-
-      if (Store) {
-        Store.despachar({ type: 'INSUMO_GUARDADO', payload: insumo });
-      }
-
-      return insumo;
-    },
-
     async actualizarStockInsumo(id, nuevoStock) {
       const insumo = (DB.insumos || []).find(i => i.id === id);
       if (!insumo) return null;
       insumo.stock = nuevoStock;
-      return this.guardarInsumo(insumo);
-    },
+      localStorage.setItem('pubpos_insumos', JSON.stringify(DB.insumos));
 
-    async actualizarStockIngrediente(id, nuevoStock) {
-      const insumo = (DB.insumos || DB.ingredientes || []).find(i => i.id === id);
-      if (!insumo) return null;
-      insumo.stock = nuevoStock;
-      return this.guardarInsumo(insumo);
+      if (DBAppwrite && DBAppwrite.habilitado) {
+        try {
+          await DBAppwrite.actualizar('insumos', id, { stock: nuevoStock });
+          Logger.debug('[RecetaRepo] Stock de insumo actualizado en Appwrite:', id);
+        } catch (e) {
+          Logger.warn('[RecetaRepo] Error al actualizar stock en Appwrite:', e);
+        }
+      }
+
+      if (Store) {
+        Store.despachar({ type: 'INSUMO_GUARDADO', payload: insumo });
+      }
+      return insumo;
     }
   };
 }

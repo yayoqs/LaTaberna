@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Test de Flujo Real - Appwrite (TablesDB)</title>
+  <title>Test de Flujo Real: Pedido → Comanda (TablesDB)</title>
   <style>
     body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
     h1 { color: #f59e0b; }
@@ -22,8 +22,7 @@
   <div id="results"></div>
   <button onclick="location.reload()">🔄 Ejecutar de nuevo</button>
 
-  <!-- Solo el SDK de Appwrite como script global -->
-  <script src="js/appwrite.min.js"></script>
+  <script src="/js/appwrite.min.js"></script>
 
   <script type="module">
     import { Logger } from './js/lib/logger.js';
@@ -31,13 +30,16 @@
     import { Store } from './js/lib/store.js';
     import { DBAppwrite } from './js/db-appwrite.js';
     import { DB } from './js/db.js';
+    import { Auth } from './js/auth.js';
+    import { inicializarAuth } from './js/auth.js';
+    import { PedidoManager } from './js/managers/pedido-manager.js';
 
     (function() {
-      var resultsEl = document.getElementById('results');
-      var passed = 0, failed = 0;
-      var TEST_MESA = 997;
-      var testPedidoId = null;
-      var testComandaId = null;
+      const resultsEl = document.getElementById('results');
+      let passed = 0, failed = 0;
+      const TEST_MESA = '997';
+      let testPedidoId = null;
+      let testComandaId = null;
 
       function assert(condition, msg) {
         if (condition) {
@@ -57,100 +59,142 @@
         resultsEl.innerHTML = '';
         Logger.setLevel('ERROR');
 
-        await DBAppwrite.iniciar();
-        if (!DBAppwrite.habilitado) {
+        // ── Autenticación ────────────────────────────────
+        await inicializarAuth();
+        const loginOk = await Auth.iniciarSesion('master', 'master123');
+        if (!loginOk) {
+          resultsEl.innerHTML += '<div class="fail">❌ No se pudo autenticar como master.</div>';
+          return;
+        }
+        assert(true, 'Autenticado como master');
+
+        // ── Inicializar Appwrite ────────────────────────
+        const appwriteOk = await DBAppwrite.iniciar();
+        if (!appwriteOk) {
           resultsEl.innerHTML += '<div class="fail">❌ Appwrite no habilitado.</div>';
           return;
         }
 
-        window.Auth = window.Auth || { getEspacioActivo: function() { return { id: 'esp_taberna' }; } };
-        window.PedidoManager = window.PedidoManager || { getTurnoActual: function() { return { id: 'test', estado: 'abierto' }; }, registrar: function() {} };
+        // ── Inicializar PedidoManager ──────────────────
+        const { PedidoRepositoryLocal } = await import('./js/repositorios/pedido-repository.js');
+        PedidoManager.init({ pedidoRepo: PedidoRepositoryLocal });
+        assert(true, 'PedidoManager inicializado con turno abierto');
+
         DB.config = { zonas: [{ nombre: 'salon', cantidad: 12 }] };
-        DB.mesas = [];
-        DB.pedidos = [];
-        DB.comandas = [];
 
-        // ── Paso 0: Limpiar mesa de prueba ──────────────
+        // ── Paso 0: Preparar entorno ────────────────────
         resultsEl.innerHTML += '<h2>Paso 0: Preparar entorno</h2>';
-        try { await DBAppwrite.eliminar('mesas', String(TEST_MESA)); } catch(e) {}
-        assert(true, 'Mesa ' + TEST_MESA + ' eliminada si existía');
+        try { await DBAppwrite.eliminar('mesas', TEST_MESA); } catch(e) {}
+        try { await DBAppwrite.eliminar('pedidos', testPedidoId); } catch(e) {}
+        try { await DBAppwrite.eliminar('comandas', testComandaId); } catch(e) {}
+        assert(true, 'Limpieza previa completada');
 
-        var mesaData = {
-          numero: TEST_MESA, estado: 'libre', pedidoId: '', items: '[]', mozo: '', comensales: 1,
-          abiertaEn: new Date().toISOString(), observaciones: '', zona: 'salon', mesasFusionadas: '', esVirtual: false
+        // Crear mesa con el nuevo esquema simplificado
+        const mesaData = {
+          numero: TEST_MESA,
+          estado: 'libre',
+          pedidoId: '',
+          comensales: 1,
+          zona: 'salon',
+          esVirtual: false
         };
-        var mesaCreada = await DBAppwrite.crear('mesas', String(TEST_MESA), mesaData);
-        assert(!!mesaCreada, 'Mesa ' + TEST_MESA + ' creada libre');
+        const mesaCreada = await DBAppwrite.crear('mesas', TEST_MESA, mesaData);
+        assert(!!mesaCreada, 'Mesa ' + TEST_MESA + ' creada (nuevo esquema simplificado)');
 
         // ── Paso 1: Abrir mesa ──────────────────────────
         resultsEl.innerHTML += '<h2>Paso 1: Abrir Mesa ' + TEST_MESA + '</h2>';
         testPedidoId = 'ped_test_' + Date.now();
-        var pedidoData = {
-          mesa: TEST_MESA, mozo: 'TestFlujo', comensales: 4, estado: 'abierta',
-          items: '[]', total: 0, observaciones: 'Pedido de prueba'
+        const pedidoData = {
+          mesa: TEST_MESA,
+          tipo: 'local',
+          origen: 'staff',
+          mozo: 'TestFlujo',
+          comensales: 4,
+          estado: 'abierta',
+          items: '[]',
+          total: 0,
+          transacciones: '[]'
         };
-        var pedidoCreado = await DBAppwrite.crear('pedidos', testPedidoId, pedidoData);
+        const pedidoCreado = await DBAppwrite.crear('pedidos', testPedidoId, pedidoData);
         assert(!!pedidoCreado, 'Pedido creado: ' + testPedidoId);
+        assert(pedidoCreado.tipo === 'local', 'Pedido tipo = local');
+        assert(pedidoCreado.origen === 'staff', 'Pedido origen = staff');
 
-        await DBAppwrite.actualizar('mesas', String(TEST_MESA), {
-          estado: 'ocupada', pedidoId: testPedidoId, mozo: 'TestFlujo', comensales: 4,
-          abiertaEn: new Date().toISOString()
+        // Actualizar mesa: solo estado y pedidoId (campos existentes)
+        await DBAppwrite.actualizar('mesas', TEST_MESA, {
+          estado: 'ocupada',
+          pedidoId: testPedidoId,
+          comensales: 4
         });
 
-        var mesaLeida = await DBAppwrite.listar('mesas').then(l => l.find(m => m.numero == TEST_MESA));
-        var pedidoLeido = await DBAppwrite.listar('pedidos').then(l => l.find(p => p.id === testPedidoId));
+        const mesaLeida = await DBAppwrite.listar('mesas').then(l => l.find(m => m.numero == TEST_MESA));
+        const pedidoLeido = await DBAppwrite.listar('pedidos').then(l => l.find(p => p.id === testPedidoId));
         assert(mesaLeida.estado === 'ocupada', 'Mesa ' + TEST_MESA + ' está OCUPADA');
         assert(mesaLeida.pedidoId === testPedidoId, 'Mesa tiene pedidoId correcto');
+        assert(mesaLeida.comensales === 4, 'Mesa tiene 4 comensales');
+        assert(mesaLeida.items === undefined, 'Mesa NO tiene campo items (eliminado)');
+        assert(mesaLeida.mozo === undefined, 'Mesa NO tiene campo mozo (eliminado)');
         assert(!!pedidoLeido, 'Pedido existe en Appwrite');
         assert(pedidoLeido.estado === 'abierta', 'Pedido está ABIERTO');
-        logSection('Mesa ' + TEST_MESA + ' después de abrir', mesaLeida);
+        logSection('Mesa ' + TEST_MESA + ' (nuevo esquema)', mesaLeida);
         logSection('Pedido ' + testPedidoId, pedidoLeido);
 
         // ── Paso 2: Enviar comanda ──────────────────────
         resultsEl.innerHTML += '<h2>Paso 2: Enviar Comanda</h2>';
         testComandaId = 'com_test_' + Date.now();
-        var itemsComanda = [
+        const itemsComanda = [
           { prodId: 'prod_test', nombre: 'Hamburguesa', precio: 1500, qty: 2, destino: 'cocina', obs: '', enviado: true, enviadoA: 'cocina', enviadoTs: Date.now() }
         ];
-        var comandaData = {
-          mesa: String(TEST_MESA), mozo: 'TestFlujo', destino: 'cocina',
-          items: JSON.stringify(itemsComanda), observaciones: 'Sin cebolla', estado: 'nueva', ts: Date.now(), deliveryId: ''
+        const comandaData = {
+          mesa: TEST_MESA,
+          pedidoId: testPedidoId,
+          mozo: 'TestFlujo',
+          destino: 'cocina',
+          items: JSON.stringify(itemsComanda),
+          observaciones: 'Sin cebolla',
+          estado: 'nueva',
+          ts: Date.now(),
+          subcomandas: '{}'
         };
-        var comandaCreada = await DBAppwrite.crear('comandas', testComandaId, comandaData);
+        const comandaCreada = await DBAppwrite.crear('comandas', testComandaId, comandaData);
         assert(!!comandaCreada, 'Comanda creada: ' + testComandaId);
+        assert(comandaCreada.pedidoId === testPedidoId, 'Comanda vinculada al pedido');
 
-        var totalPedido = itemsComanda.reduce((sum, it) => sum + it.precio * it.qty, 0);
+        const totalPedido = itemsComanda.reduce((sum, it) => sum + it.precio * it.qty, 0);
         await DBAppwrite.actualizar('pedidos', testPedidoId, {
-          items: JSON.stringify(itemsComanda), total: totalPedido, estado: 'en_proceso'
+          items: JSON.stringify(itemsComanda),
+          total: totalPedido,
+          estado: 'en_proceso'
         });
 
-        var mesaLeida2 = await DBAppwrite.listar('mesas').then(l => l.find(m => m.numero == TEST_MESA));
-        var pedidoLeido2 = await DBAppwrite.listar('pedidos').then(l => l.find(p => p.id === testPedidoId));
-        var comandaLeida = await DBAppwrite.listar('comandas').then(l => l.find(c => c.id === testComandaId));
+        const mesaLeida2 = await DBAppwrite.listar('mesas').then(l => l.find(m => m.numero == TEST_MESA));
+        const pedidoLeido2 = await DBAppwrite.listar('pedidos').then(l => l.find(p => p.id === testPedidoId));
+        const comandaLeida = await DBAppwrite.listar('comandas').then(l => l.find(c => c.id === testComandaId));
         assert(mesaLeida2.estado === 'ocupada', 'Mesa sigue OCUPADA');
         assert(!!pedidoLeido2, 'Pedido existe');
         assert(pedidoLeido2.estado === 'en_proceso', 'Pedido en EN_PROCESO');
         assert(pedidoLeido2.total === totalPedido, 'Total del pedido: ' + totalPedido);
         assert(!!comandaLeida, 'Comanda existe');
         assert(comandaLeida.estado === 'nueva', 'Comanda NUEVA');
-        logSection('Mesa ' + TEST_MESA + ' después de comanda', mesaLeida2);
-        logSection('Pedido ' + testPedidoId + ' después de comanda', pedidoLeido2);
         logSection('Comanda ' + testComandaId, comandaLeida);
 
         // ── Paso 3: Comanda LISTA ───────────────────────
         resultsEl.innerHTML += '<h2>Paso 3: Comanda LISTA</h2>';
         await DBAppwrite.actualizar('comandas', testComandaId, { estado: 'lista' });
-        var comandaLista = await DBAppwrite.listar('comandas').then(l => l.find(c => c.id === testComandaId));
+        const comandaLista = await DBAppwrite.listar('comandas').then(l => l.find(c => c.id === testComandaId));
         assert(comandaLista.estado === 'lista', 'Comanda marcada LISTA');
 
         // ── Paso 4: Cerrar pedido y liberar mesa ─────────
         resultsEl.innerHTML += '<h2>Paso 4: Cerrar Pedido y Liberar Mesa</h2>';
         await DBAppwrite.actualizar('pedidos', testPedidoId, { estado: 'cerrada' });
-        await DBAppwrite.actualizar('mesas', String(TEST_MESA), {
-          estado: 'libre', pedidoId: '', mozo: '', items: '[]', comensales: 1, observaciones: ''
+        // Mesa solo actualiza estado y pedidoId (campos existentes en el nuevo esquema)
+        await DBAppwrite.actualizar('mesas', TEST_MESA, {
+          estado: 'libre',
+          pedidoId: '',
+          comensales: 1
         });
-        var mesaFinal = await DBAppwrite.listar('mesas').then(l => l.find(m => m.numero == TEST_MESA));
-        var pedidoFinal = await DBAppwrite.listar('pedidos').then(l => l.find(p => p.id === testPedidoId));
+        const mesaFinal = await DBAppwrite.listar('mesas').then(l => l.find(m => m.numero == TEST_MESA));
+        const pedidoFinal = await DBAppwrite.listar('pedidos').then(l => l.find(p => p.id === testPedidoId));
         assert(mesaFinal.estado === 'libre', 'Mesa vuelve a LIBRE');
         assert(pedidoFinal.estado === 'cerrada', 'Pedido CERRADO');
         logSection('Mesa ' + TEST_MESA + ' final', mesaFinal);
@@ -160,13 +204,13 @@
         resultsEl.innerHTML += '<h2>Paso 5: Limpiar</h2>';
         try { await DBAppwrite.eliminar('comandas', testComandaId); } catch(e) {}
         try { await DBAppwrite.eliminar('pedidos', testPedidoId); } catch(e) {}
-        try { await DBAppwrite.eliminar('mesas', String(TEST_MESA)); } catch(e) {}
+        try { await DBAppwrite.eliminar('mesas', TEST_MESA); } catch(e) {}
         assert(true, 'Datos de prueba eliminados');
 
         resultsEl.innerHTML += '<h2>Resultado Final</h2>';
         resultsEl.innerHTML += '<p>' + passed + ' pasaron, ' + failed + ' fallaron.</p>';
         if (failed === 0) {
-          resultsEl.innerHTML += '<div class="pass">✔ El flujo completo funciona correctamente.</div>';
+          resultsEl.innerHTML += '<div class="pass">✔ El flujo completo funciona correctamente con el nuevo modelo de datos.</div>';
         }
       }
 

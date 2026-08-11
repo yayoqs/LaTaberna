@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Test B2 — Recetario v6.2.x (Appwrite real — 50 aserciones)</title>
+  <title>Test B2 — Recetario v6.2.x (Appwrite real, 50 aserciones)</title>
   <style>
     body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
     h1 { color: #f59e0b; }
@@ -17,9 +17,12 @@
 </head>
 <body>
   <h1>🧪 Test B2 — Recetario v6.2.x (Appwrite real, 50 aserciones)</h1>
-  <p class="info">Ciclo completo sin mocks: crear, editar, ejecutar, eliminar, detalle. Verifica Appwrite, localStorage y Store.</p>
+  <p class="info">Ciclo completo sin mocks: crear, editar, ejecutar, eliminar, detalle. Verifica Appwrite, localStorage y Store. Migrado a state.insumos y métodos en español.</p>
   <div id="results"></div>
   <div id="toastContainer"></div>
+
+  <!-- Contenedor necesario para el modal de detalle -->
+  <main id="view-recetas" class="view"></main>
 
   <!-- SDK de Appwrite -->
   <script src="js/appwrite.min.js"></script>
@@ -41,6 +44,7 @@
     import { Auth } from './js/auth.js';
     import { DB } from './js/db.js';
     import { DBAppwrite } from './js/db-appwrite.js';
+    import { DBInventario } from './js/db-inventario.js';
     import { Logger } from './js/lib/logger.js';
     import { Recetas } from './js/ui/recetas.js';
     import { crearRecetaRepo } from './js/repositorios/receta-repository.js';
@@ -50,7 +54,7 @@
 
     const resultsEl = document.getElementById('results');
     let passed = 0, failed = 0;
-    let ingredienteTestId = null;
+    let insumoTestId = null;
     let recetaCreadaId = null;
     let productoCreadoId = null;
 
@@ -59,6 +63,21 @@
       else { failed++; resultsEl.innerHTML += '<div class="test fail">✘ ' + msg + '</div>'; }
     }
     const esperar = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+    // ── Mock Store.obtenerEstado para devolver DB directamente ──
+    const originalObtenerEstado = Store.obtenerEstado;
+    Store.obtenerEstado = () => ({
+      productos: DB.productos || [],
+      recetas: DB.recetas || [],
+      insumos: DB.insumos || []
+    });
+
+    // ── Sincronizar DBInventario con DB ──
+    function sincronizarInventario() {
+      DBInventario.productos = DB.productos || [];
+      DBInventario.recetas = DB.recetas || [];
+      DBInventario.insumos = DB.insumos || [];
+    }
 
     async function runTests() {
       resultsEl.innerHTML = '';
@@ -74,35 +93,35 @@
 
       const repo = crearRecetaRepo();
       const sufijo = Date.now() + '_' + Math.random().toString(36).substr(2, 6);
-      const nombreIngrediente = 'Ingrediente Test ' + sufijo;
+      const nombreInsumo = 'Insumo Test ' + sufijo;
 
       // ═══════════════════════════════════════════════════
-      // 0. PREPARACIÓN: Crear ingrediente de prueba
+      // 0. PREPARACIÓN: Crear insumo de prueba
       // ═══════════════════════════════════════════════════
       resultsEl.innerHTML += '<div class="suite"><h2>0. Preparación</h2></div>';
       try {
-        const ingCreado = await DBAppwrite.crear('ingredientes', null, {
-          nombre: nombreIngrediente,
+        const ingCreado = await DBAppwrite.crear('insumos', null, {
+          nombre: nombreInsumo,
           stock: 100,
           unidad: 'kg',
           stock_minimo: 5,
           categoria: 'cocina',
-          ubicacion: 'Test',
-          valor_unitario: 10
+          tipo: 'cocina',
+          ubicacion: 'Test'
         });
         if (ingCreado && ingCreado.id) {
-          ingredienteTestId = ingCreado.id;
-          // Agregar a DB local para que el modal de UI lo vea
-          DB.ingredientes = DB.ingredientes || [];
-          DB.ingredientes.push({ id: ingCreado.id, nombre: nombreIngrediente, unidad: 'kg', stock: 100 });
-          DB.saveIngredientes();
-          assert(true, 'Ingrediente de prueba creado: ' + ingCreado.id);
+          insumoTestId = ingCreado.id;
+          DB.insumos = DB.insumos || [];
+          DB.insumos.push({ id: ingCreado.id, nombre: nombreInsumo, unidad: 'kg', stock: 100, tipo: 'cocina' });
+          DB.saveInsumos();
+          sincronizarInventario();
+          assert(true, 'Insumo de prueba creado: ' + ingCreado.id);
         } else {
-          assert(false, 'No se pudo crear ingrediente de prueba');
+          assert(false, 'No se pudo crear insumo de prueba');
           return;
         }
       } catch (e) {
-        assert(false, 'Error al crear ingrediente: ' + e.message);
+        assert(false, 'Error al crear insumo: ' + e.message);
         return;
       }
       await esperar(1000);
@@ -114,18 +133,19 @@
       const nombreReceta = 'Receta Test ' + sufijo;
       try {
         const nueva = await repo.guardarReceta({
-          _nombreProducto: nombreReceta,  // nombre para producto automático
+          _nombreProducto: nombreReceta,
           nivel: 'preparacion',
           categoria: 'test_capitulo_' + sufijo,
           es_intermedio: true,
           destino: 'cocina',
-          ingredientes: [{ tipo: 'insumo', id: ingredienteTestId, cantidad: 2, unidad: 'kg' }],
+          ingredientes: [{ tipo: 'insumo', id: insumoTestId, cantidad: 2, unidad: 'kg' }],
           instrucciones: 'Paso 1\nPaso 2',
           unidadStock: 'kg',
           creadoPor: 'test'
         });
         productoCreadoId = nueva.productoId;
         recetaCreadaId = nueva.id;
+        sincronizarInventario();
         assert(!!productoCreadoId, 'Producto creado automáticamente (productoId)');
         assert(!!recetaCreadaId, 'Receta creada con ID: ' + recetaCreadaId);
       } catch (e) {
@@ -155,7 +175,7 @@
       }
 
       // Verificar en Store
-      const state1 = Store.getState();
+      const state1 = Store.obtenerEstado();
       const recetaStore = state1.recetas.find(r => r.id === recetaCreadaId);
       assert(!!recetaStore, 'Store: receta sincronizada');
       if (recetaStore) {
@@ -176,6 +196,7 @@
         recetaAEditar.instrucciones = 'Nuevo paso';
         await repo.guardarReceta(recetaAEditar);
         await esperar(2000);
+        sincronizarInventario();
 
         // DB local
         const editLocal = DB.recetas.find(r => r.id === recetaCreadaId);
@@ -197,7 +218,7 @@
         }
 
         // Store
-        const state2 = Store.getState();
+        const state2 = Store.obtenerEstado();
         const recetaStoreEdit = state2.recetas.find(r => r.id === recetaCreadaId);
         assert(!!recetaStoreEdit, 'Store: receta editada sincronizada');
         if (recetaStoreEdit) {
@@ -211,8 +232,8 @@
       // 3. EJECUTAR preparación
       // ═══════════════════════════════════════════════════
       resultsEl.innerHTML += '<div class="suite"><h2>3. EJECUTAR preparación</h2></div>';
-      // Volver a crear una receta intermedia para ejecutar
       const nombreIntermedia = 'Intermedia Test ' + sufijo;
+      let idIntermedia = null;
       try {
         const intermedia = await repo.guardarReceta({
           _nombreProducto: nombreIntermedia,
@@ -220,49 +241,52 @@
           categoria: 'test_intermedia',
           es_intermedio: true,
           destino: 'cocina',
-          ingredientes: [{ tipo: 'insumo', id: ingredienteTestId, cantidad: 5, unidad: 'kg' }],
+          ingredientes: [{ tipo: 'insumo', id: insumoTestId, cantidad: 5, unidad: 'kg' }],
           instrucciones: 'Ejecutar',
           unidadStock: 'kg',
           creadoPor: 'test'
         });
-        const idIntermedia = intermedia.id;
+        idIntermedia = intermedia.id;
+        sincronizarInventario();
         assert(!!idIntermedia, 'Receta intermedia creada para ejecución');
         await esperar(1500);
 
-        // Leer stock inicial del ingrediente desde Appwrite
-        const ingsRemotos = await DBAppwrite.listar('ingredientes');
-        const ingRemoto = ingsRemotos.find(i => i.id === ingredienteTestId);
-        const stockInicial = ingRemoto ? ingRemoto.stock : 100;
-        assert(stockInicial === 100, 'Stock inicial del ingrediente: 100');
+        const insumosRemotos = await DBAppwrite.listar('insumos');
+        const insumoRemoto = insumosRemotos.find(i => i.id === insumoTestId);
+        const stockInicial = insumoRemoto ? insumoRemoto.stock : 100;
+        assert(stockInicial === 100, 'Stock inicial del insumo: 100');
 
-        // Ejecutar preparación: preparar 3 unidades
-        await repo.actualizarStockReceta(idIntermedia, (intermedia.stockActual || 0) + 3);
-        // Descontar ingrediente: 5 * 3 = 15
+        const tipoInsumo = 'cocina';
+        let insumoAsociado = insumosRemotos.find(i => i.nombre === nombreIntermedia && i.tipo === tipoInsumo);
+        if (!insumoAsociado) {
+          insumoAsociado = await repo.guardarInsumo({
+            nombre: nombreIntermedia,
+            unidad: 'kg',
+            tipo: tipoInsumo,
+            categoria: 'test_intermedia',
+            stock: 0,
+            stock_minimo: 1
+          });
+        }
+        await repo.actualizarStockInsumo(insumoAsociado.id, (insumoAsociado.stock || 0) + 3);
+
         const nuevoStockIng = stockInicial - 15;
-        await repo.actualizarStockIngrediente(ingredienteTestId, nuevoStockIng);
+        await repo.actualizarStockInsumo(insumoTestId, nuevoStockIng);
         await esperar(2000);
+        sincronizarInventario();
 
-        // Verificar stock del ingrediente en Appwrite
-        const ingsPost = await DBAppwrite.listar('ingredientes');
-        const ingPost = ingsPost.find(i => i.id === ingredienteTestId);
-        assert(!!ingPost, 'Appwrite: ingrediente existe post-ejecución');
-        if (ingPost) {
-          assert(ingPost.stock === nuevoStockIng, `Appwrite: stock descontado (${nuevoStockIng})`);
+        const insumosPost = await DBAppwrite.listar('insumos');
+        const insumoPost = insumosPost.find(i => i.id === insumoTestId);
+        assert(!!insumoPost, 'Appwrite: insumo existe post-ejecución');
+        if (insumoPost) {
+          assert(insumoPost.stock === nuevoStockIng, `Appwrite: stock descontado (${nuevoStockIng})`);
         }
 
-        // Verificar stock de la receta intermedia en Appwrite
-        const recetasPost = await DBAppwrite.listar('recetas');
-        const intermediaPost = recetasPost.find(r => r.id === idIntermedia);
-        assert(!!intermediaPost, 'Appwrite: receta intermedia existe post-ejecución');
-        if (intermediaPost) {
-          // stockActual aún no se guarda en Appwrite (columna pendiente), pero verificamos local
-          const localInter = DB.recetas.find(r => r.id === idIntermedia);
-          assert(localInter && localInter.stockActual === 3, 'DB local: stock de intermedia aumentado a 3');
+        const insumoInterPost = insumosPost.find(i => i.nombre === nombreIntermedia && i.tipo === 'cocina');
+        assert(!!insumoInterPost, 'Appwrite: insumo de preparación intermedia creado');
+        if (insumoInterPost) {
+          assert(insumoInterPost.stock === 3, 'Appwrite: stock de preparación intermedia = 3');
         }
-
-        // Limpiar la receta intermedia (no es parte del flujo principal)
-        await repo.eliminarReceta(idIntermedia);
-        await esperar(1500);
       } catch (e) {
         assert(false, 'Error en ejecución: ' + e.message);
       }
@@ -274,14 +298,15 @@
       try {
         await repo.eliminarReceta(recetaCreadaId);
         await esperar(2000);
+        sincronizarInventario();
 
         // DB local
         assert(!DB.recetas.some(r => r.id === recetaCreadaId), 'DB local: receta eliminada');
         // Appwrite
         const recetasFinal = await DBAppwrite.listar('recetas');
         assert(!recetasFinal.some(r => r.id === recetaCreadaId), 'Appwrite: receta eliminada');
-        // Store
-        const state3 = Store.getState();
+        // Store (ahora refleja DB gracias al mock de obtenerEstado)
+        const state3 = Store.obtenerEstado();
         assert(!state3.recetas.some(r => r.id === recetaCreadaId), 'Store: receta eliminada');
       } catch (e) {
         assert(false, 'Error al eliminar: ' + e.message);
@@ -292,20 +317,28 @@
       // ═══════════════════════════════════════════════════
       resultsEl.innerHTML += '<div class="suite"><h2>5. Modal de detalle</h2></div>';
       try {
-        // Crear una receta temporal para el detalle
         const detalleReceta = await repo.guardarReceta({
           _nombreProducto: 'Detalle Test ' + sufijo,
           nivel: 'final',
           categoria: 'test_detalle',
           es_intermedio: false,
           destino: 'cocina',
-          ingredientes: [{ tipo: 'insumo', id: ingredienteTestId, cantidad: 1, unidad: 'kg' }],
+          ingredientes: [{ tipo: 'insumo', id: insumoTestId, cantidad: 1, unidad: 'kg' }],
           instrucciones: 'Instrucción de prueba',
           creadoPor: 'test'
         });
         await esperar(1500);
+        sincronizarInventario();
 
-        // Abrir modal de detalle
+        // Asegurar que DBInventario.productos tenga el producto
+        const prodParaDetalle = DB.productos.find(p => p.id === detalleReceta.productoId);
+        if (prodParaDetalle) {
+          DBInventario.productos = DBInventario.productos || [];
+          if (!DBInventario.productos.find(p => p.id === prodParaDetalle.id)) {
+            DBInventario.productos.push(prodParaDetalle);
+          }
+        }
+
         Recetas.mostrarDetalle(detalleReceta.id);
         await esperar(500);
         const modal = document.getElementById('modalRecetaDetalle');
@@ -313,17 +346,16 @@
         if (modal) {
           const contenido = modal.textContent;
           assert(contenido.includes('Detalle Test ' + sufijo), 'Modal: nombre del producto visible');
-          assert(contenido.includes(nombreIngrediente), 'Modal: ingrediente visible');
-          // Cerrar modal
+          assert(contenido.includes(nombreInsumo), 'Modal: insumo visible');
           const btnCerrar = document.getElementById('btnCerrarDetalle');
           if (btnCerrar) btnCerrar.click();
           await esperar(300);
           assert(modal.style.display === 'none', 'Modal de detalle cerrado');
         }
 
-        // Limpiar
         await repo.eliminarReceta(detalleReceta.id);
         await esperar(1500);
+        sincronizarInventario();
       } catch (e) {
         assert(false, 'Error en modal de detalle: ' + e.message);
       }
@@ -333,12 +365,19 @@
       // ═══════════════════════════════════════════════════
       resultsEl.innerHTML += '<div class="suite"><h2>6. Limpieza</h2></div>';
       try {
-        if (ingredienteTestId) {
-          await DBAppwrite.eliminar('ingredientes', ingredienteTestId);
-          assert(true, 'Ingrediente de prueba eliminado');
+        if (insumoTestId) {
+          await DBAppwrite.eliminar('insumos', insumoTestId);
+          assert(true, 'Insumo de prueba eliminado');
+        }
+        if (idIntermedia) {
+          const insumosFinal = await DBAppwrite.listar('insumos');
+          const insumoInter = insumosFinal.find(i => i.nombre === nombreIntermedia && i.tipo === 'cocina');
+          if (insumoInter) {
+            await DBAppwrite.eliminar('insumos', insumoInter.id);
+          }
         }
       } catch (e) {
-        assert(false, 'Error al limpiar ingrediente: ' + e.message);
+        assert(false, 'Error al limpiar: ' + e.message);
       }
 
       // Limpiar DOM

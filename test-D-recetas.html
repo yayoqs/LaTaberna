@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Test Verificar Colección Menus</title>
+  <title>Test Verificar Colección Menus (v3.0.1-fix)</title>
   <style>
     body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
     h1 { color: #f59e0b; }
@@ -13,11 +13,10 @@
   </style>
 </head>
 <body>
-  <h1>🧪 Test de verificación – Colección menus</h1>
+  <h1>🧪 Test de verificación – Colección menus (v3.0.1-fix)</h1>
   <div id="resultado"></div>
 
-  <!-- Cargar SDK de Appwrite y scripts necesarios -->
-  <script src="/js/appwrite.min.js"></script>
+  <script src="js/appwrite.min.js"></script>
 
   <script type="module">
     import { Logger } from './js/lib/logger.js';
@@ -34,11 +33,12 @@
     async function runTest() {
       log('🧪 Iniciando verificación de la colección menus...');
 
-      // 1. Verificar que la colección existe en COLECCIONES
-      const existeEnModulo = DBAppwrite.COLECCIONES.menus === 'Menus';
-      log(`1. ¿Está en COLECCIONES?: ${existeEnModulo ? '✅' : '❌'} (${DBAppwrite.COLECCIONES.menus})`, existeEnModulo ? 'pass' : 'fail');
+      // 1. Verificar mapeo en COLECCIONES (acepta ambos nombres)
+      const nombreMapeado = DBAppwrite.COLECCIONES.menus;
+      const esValido = nombreMapeado === 'Menus' || nombreMapeado === 'laTaberna_Menus';
+      log(`1. Mapeo en COLECCIONES: ${esValido ? '✅' : '❌'} (${nombreMapeado})`, esValido ? 'pass' : 'fail');
 
-      // 2. Inicializar Appwrite (sesión anónima)
+      // 2. Inicializar Appwrite
       try {
         const ok = await DBAppwrite.iniciar();
         log(`2. ¿DBAppwrite.iniciar() exitoso?: ${ok ? '✅' : '❌'}`, ok ? 'pass' : 'fail');
@@ -51,31 +51,43 @@
         return;
       }
 
-      // 3. Intentar listar
+      // 3. Listar documentos
       try {
         const lista = await DBAppwrite.listar('menus');
         const esArray = Array.isArray(lista);
         log(`3. ¿listar() retorna array?: ${esArray ? '✅' : '❌'}`, esArray ? 'pass' : 'fail');
         log(`   Documentos: ${lista.length}`, 'info');
-        if (lista.length > 0) {
-          log(`   <pre>${JSON.stringify(lista.slice(0, 2), null, 2)}</pre>`, 'info');
-        }
       } catch (e) {
-        log(`3. ❌ Error al listar menus: ${e.message} (código: ${e.code}, tipo: ${e.type})`, 'fail');
+        log(`3. ❌ Error al listar menus: ${e.message}`, 'fail');
       }
 
-      // 4. Intentar crear un documento de prueba y luego eliminarlo
+      // 4. CRUD completo con nuevos campos
       try {
-        const creado = await DBAppwrite.crear('menus', 'unique()', {
-          nombre: 'Test de verificación',
-          activo: true,
+        const creado = await DBAppwrite.crear('menus', null, {
+          nombre: 'Test v3.0.1-fix',
+          estado: 'borrador',
           productos: '[]',
+          fondo: '#1a1a2e',
+          tipografia: "'Inter', sans-serif",
+          grilla: false,
           creadoPor: 'Sistema'
         });
         const crearOk = creado && creado.id;
         log(`4. ¿crear() exitoso?: ${crearOk ? '✅' : '❌'} ${creado?.id || ''}`, crearOk ? 'pass' : 'fail');
 
         if (creado && creado.id) {
+          // Verificar campos nuevos
+          const listaVerif = await DBAppwrite.listar('menus');
+          const docVerif = listaVerif.find(m => m.id === creado.id);
+          if (docVerif) {
+            const estadoOk = docVerif.estado === 'borrador';
+            const fondoOk = docVerif.fondo === '#1a1a2e';
+            const tipografiaOk = docVerif.tipografia === "'Inter', sans-serif";
+            const grillaOk = docVerif.grilla === false;
+            const camposOk = estadoOk && fondoOk && tipografiaOk && grillaOk;
+            log(`   ¿Campos nuevos correctos?: ${camposOk ? '✅' : '❌'} (estado:${estadoOk} fondo:${fondoOk} tipografia:${tipografiaOk} grilla:${grillaOk})`, camposOk ? 'pass' : 'fail');
+          }
+
           const eliminado = await DBAppwrite.eliminar('menus', creado.id);
           log(`   ¿eliminar() exitoso?: ${eliminado ? '✅' : '❌'}`, eliminado ? 'pass' : 'fail');
         }

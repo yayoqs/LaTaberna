@@ -11,6 +11,7 @@
     .pass { background: rgba(34,197,94,.2); }
     .fail { background: rgba(239,68,68,.2); }
     .info { color: #94a3b8; font-size: 12px; margin: 2px 0; }
+    .test { margin: 4px 0; padding: 4px 8px; border-radius: 4px; }
   </style>
 </head>
 <body>
@@ -20,44 +21,57 @@
     <p>⏳ Iniciando Appwrite...</p>
   </div>
 
-  <!-- Scripts globales -->
-  <script src="/js/utils.js"></script>
   <script src="/js/appwrite.min.js"></script>
 
-  <!-- Módulo de prueba -->
   <script type="module">
     import { Logger } from './js/lib/logger.js';
     import { DBAppwrite } from './js/db-appwrite.js';
+    import { Auth } from './js/auth.js';
+    import { inicializarAuth } from './js/auth.js';
 
     (async function() {
-      var resultado = document.getElementById('resultado');
+      const resultado = document.getElementById('resultado');
       Logger.setLevel('ERROR');
 
       try {
-        var ok = await DBAppwrite.iniciar();
+        // Autenticación
+        await inicializarAuth();
+        const loginOk = await Auth.iniciarSesion('master', 'master123');
+        if (!loginOk) {
+          resultado.innerHTML = '<p class="fail">❌ No se pudo autenticar como master.</p>';
+          return;
+        }
+        resultado.innerHTML += '<p class="pass">✔ Autenticado como master.</p>';
+
+        // Iniciar Appwrite
+        const ok = await DBAppwrite.iniciar();
         if (!ok) {
-          resultado.innerHTML = '<p class="fail">❌ No se pudo iniciar DBAppwrite. Revisá la conexión.</p>';
+          resultado.innerHTML += '<p class="fail">❌ No se pudo iniciar DBAppwrite. Revisá la conexión.</p>';
           return;
         }
         resultado.innerHTML += '<p class="pass">✔ DBAppwrite.iniciar() exitoso.</p>';
 
-        var colecciones = [
-          'productos','pedidos','mesas','comandas','ingredientes','recetas',
-          'pedidos_delivery','usuarios','configuracion','precargas_cliente','eventos_en_vivo'
+        // Colecciones activas
+        const colecciones = [
+          'productos', 'pedidos', 'mesas', 'comandas',
+          'insumos', 'recetas', 'staff', 'configuracion',
+          'eventos_en_vivo', 'menus', 'proveedores',
+          'entradas', 'comensales',
+          'global_perfiles', 'global_puntos', 'global_eventos', 'global_espacios'
         ];
 
-        for (var i = 0; i < colecciones.length; i++) {
-          var col = colecciones[i];
+        for (let i = 0; i < colecciones.length; i++) {
+          const col = colecciones[i];
           try {
-            var datos = await DBAppwrite.listar(col);
+            const datos = await DBAppwrite.listar(col);
             resultado.innerHTML += '<h2>' + col + ' (' + datos.length + ' documentos)</h2>';
             if (datos.length > 0) {
               resultado.innerHTML += '<pre>' + JSON.stringify(datos.slice(0, 2), null, 2) + '</pre>';
-              var primero = datos[0];
+              const primero = datos[0];
               if (primero.creadoEn && primero.actualizadoEn) {
-                resultado.innerHTML += '<p class="pass">✔ Timestamps en español presentes.</p>';
+                resultado.innerHTML += '<p class="test pass">✔ Timestamps en español presentes.</p>';
               } else {
-                resultado.innerHTML += '<p class="fail">❌ Faltan creadoEn/actualizadoEn.</p>';
+                resultado.innerHTML += '<p class="test fail">❌ Faltan creadoEn/actualizadoEn.</p>';
               }
             } else {
               resultado.innerHTML += '<p class="info">(colección vacía)</p>';

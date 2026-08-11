@@ -1,9 +1,12 @@
 /* ================================================================
    LaTaberna - PubPOS — MESAS SUBMÓDULO (ES6)
    Archivo: js/ui/mesas/ciclo-vida.js
-   Versión: 1.1.0
+   Versión: 1.1.1
    Propósito: Ciclo de vida (activar/limpiar) con AbortController.
               Suscripción a vista:cambiada para render condicional.
+              v1.1.1: listener de cliente:mesa_ingresada despacha
+                      acción al Store para que MesaDetalles pueda
+                      leer la notificación.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -52,6 +55,11 @@ export function activar() {
   _desuscripciones.push(EventBus.on('cliente:mesa_ingresada', (data) => {
     if (data && data.mesa) {
       addNotificacion(data.mesa, 'esperando', {});
+      // Despachar al Store para que MesaDetalles pueda leer la notificación
+      Store.despachar({
+        type: 'MESA_AGREGAR_NOTIFICACION',
+        payload: { numero: data.mesa, tipo: 'esperando', datos: {} }
+      });
       Logger.debug('[Mesas] Cliente esperando en mesa ' + data.mesa + ' - estado: ' + 
         (Store.obtenerEstado().mesas.find(m => m.numero == data.mesa)?.estado || '?') + 
         ', permite_prepedidos: ' + (Store.obtenerEstado().mesas.find(m => m.numero == data.mesa)?.permite_prepedidos || false));
@@ -71,7 +79,6 @@ export function activar() {
     clearBadge(data.mesa);
   }));
 
-  // Render condicional: activar/desactivar según la vista actual
   _desuscripciones.push(EventBus.on('vista:cambiada', (vista) => {
     setVistaActiva(vista === 'mesas');
   }));

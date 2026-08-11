@@ -1,7 +1,7 @@
 # 📦 COLECCIONES.md — Estructura de la Base de Datos "EkyzD"
 
-**Versión:** 3.0.0 (Final)
-**Fecha:** 7 de agosto de 2026
+**Versión:** 3.0.1 (Final)
+**Fecha:** 9 de agosto de 2026
 **Base de datos:** `EkyzD` (ID: `6a0275cb0022ebf7d30d`)
 **Propósito:** Especificación canónica de colecciones, columnas, configuración y permisos para Appwrite Cloud.
 
@@ -234,7 +234,7 @@ Los permisos se asignan mediante **Labels** de Appwrite. Cada rol tiene asociado
 **Name:** laTaberna_Pedidos
 **Table ID:** laTaberna_Pedidos
 
-Colección unificada para todos los tipos de pedido: salón, delivery, retiro y precargas de clientes.
+Colección unificada para todos los tipos de pedido: local, reparto, retiro y precargas de clientes.
 
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
 |---------|------|:----------:|-------------------|---------|
@@ -442,7 +442,7 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 
 **Name:** laTaberna_Entradas
 **Table ID:** laTaberna_Entradas
-**Propósito:** Registro de cada recepción de mercadería. Reemplaza la lógica de precios y proveedores que antes estaba en Insumos.
+**Propósito:** Registro de cada recepción de mercadería.
 
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
 |---------|------|:----------:|-------------------|---------|
@@ -464,7 +464,7 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 
 **Name:** laTaberna_Comensales
 **Table ID:** laTaberna_Comensales
-**Propósito:** Registro de personas en una mesa, con o sin cuenta del ecosistema. Soporta identificación gradual y split bill.
+**Propósito:** Registro de personas en una mesa, con o sin cuenta del ecosistema.
 
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
 |---------|------|:----------:|-------------------|---------|
@@ -478,15 +478,6 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 
 **Índices:** `mesaId`, `usuarioId`
 
-**Flujo de registro gradual:**
-1. Al abrir la mesa, el mesero ingresa la cantidad de personas. El sistema crea registros anónimos (`nombre = "Comensal 1"`, `usuarioId = null`).
-2. Si un cliente se identifica (QR, app, número de mesa), el sistema actualiza su registro anónimo con `usuarioId` y `nombre` real.
-3. El mesero puede editar estos registros manualmente si es necesario.
-
-**Split bill:**
-- Los items de la comanda no se asignan a una persona al pedir. El mesero toma el pedido sin fricción.
-- Al momento del pago, el cajero puede arrastrar items a cada comensal. Si no se divide, los items quedan sin asignar.
-
 ---
 
 ## 📋 Colecciones obsoletas
@@ -495,15 +486,8 @@ Las siguientes colecciones han sido reemplazadas por `laTaberna_Pedidos` unifica
 
 | Colección | Reemplazada por |
 |-----------|-----------------|
-| `laTaberna_Pedidos_delivery` | `laTaberna_Pedidos` con `tipo = delivery` |
+| `laTaberna_Pedidos_delivery` | `laTaberna_Pedidos` con `tipo = reparto` |
 | `laTaberna_Precargas_cliente` | `laTaberna_Pedidos` con `estado = precarga` y `origen = cliente` |
-
-**Flujo de precargas unificado:**
-1. **Una precarga activa por persona por mesa.** Si ya existe una precarga no revisada para ese `usuarioId` en esa mesa, el cliente solo puede editarla.
-2. **Validación de mesa real.** El cliente solo puede enviar precargas a una mesa que existe, está ocupada y tiene un pedido activo.
-3. **Identificación del cliente.** La precarga se asocia al `usuarioId` del cliente o a un identificador anónimo.
-4. **El mesero siempre autoriza.** La precarga no se convierte en comanda automáticamente. El mesero revisa, modifica si es necesario, y solo entonces la envía a cocina/barra.
-5. **Límite de items por precarga.** Pendiente para futura implementación.
 
 ---
 
@@ -515,7 +499,7 @@ Las siguientes colecciones han sido reemplazadas por `laTaberna_Pedidos` unifica
 
 **Name:** global_Perfiles
 **Table ID:** global_Perfiles
-**Propósito:** Perfil de usuario del ecosistema (avatar, nivel, XP). Compartido entre todas las apps.
+**Propósito:** Perfil de usuario del ecosistema (avatar, nivel, XP).
 
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
 |---------|------|:----------:|-------------------|---------|

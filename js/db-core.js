@@ -1,11 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-core.js
-   Versión: 1.1.1
+   Versión: 1.1.2
    Propósito: Núcleo de datos: mesas, pedidos, productos, proveedores,
               persistencia local.
-              v1.1.1: Logger.warn en _cargarPedidosDeliveryLocal para
-                      pedidos descartados por ID nulo.
+              v1.1.2: mesaVacia incluye esVirtual: false.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -306,7 +305,7 @@ export const DBCore = (function() {
     const nuevo = {
       id: 'ped_' + Date.now(),
       mesa, mozo, comensales,
-      tipo: 'salon',
+      tipo: 'local',
       origen: 'staff',
       estado: 'abierta',
       items: '[]',
@@ -376,6 +375,7 @@ export function mesaVacia(num, zona = 'salon') {
     estado: 'libre',
     pedidoId: null,
     comensales: 1,
-    zona: zona
+    zona: zona,
+    esVirtual: false
   };
 }

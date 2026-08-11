@@ -1,102 +1,104 @@
 /* ================================================================
-   LaTaberna - PubPOS — MÓDULO INTERNO (ES6)
+   LaTaberna - PubPOS — MÓDULO INTERNO JS (ES6)
    Archivo: js/modulos/interno/precarga-control.js
-   Versión: 2.2.1
-   Propósito: Precargas adaptadas al nuevo modelo.
-              Corrección: Hallazgo 14 — verificar existencia del
-              documento antes de actualizar en Appwrite.
+   Versión: 2.2.2
+   Propósito: Control de precargas del cliente. Escucha eventos de
+              precarga y permite al mesero revisarlas y cargarlas
+              en el pedido activo.
+              v2.2.2: Adaptado al modelo unificado de pedidos.
+                      Busca el pedido con estado=precarga asociado
+                      a la mesa si el precargaId no coincide.
    ================================================================ */
 
 import { EventBus } from '../../lib/eventBus.js';
 import { Logger } from '../../lib/logger.js';
-import { Auth } from '../../auth.js';
 import { CommandBus } from '../../lib/command-bus.js';
+import { Store } from '../../lib/store.js';
 import { DBAppwrite } from '../../db-appwrite.js';
+import { DB } from '../../db.js';
 import { mostrarToast } from '../../utils.js';
 
-const PrecargaControl = (() => {
-  const _precargas = new Map();
-  let _activado = false;
-  let _desuscripcionPrecarga = null;
-  let _desuscripcionBadge = null;
+export const PrecargaControl = (() => {
+  let _precargasCache = [];
 
   function _onPrecargaEnviada(data) {
-    if (!data?.id || !data.mesa || !Array.isArray(data.items)) {
-      Logger.warn('[PrecargaControl] Payload inválido:', data);
-      return;
-    }
-    _precargas.set(data.id, { mesa: data.mesa, items: data.items, data });
-    EventBus.emit('precarga:nueva', { mesa: data.mesa, cantidad: data.items.length, precargaId: data.id });
-    Logger.info(`[PrecargaControl] Precarga ${data.id} para mesa ${data.mesa}`);
+    Logger.info('[PrecargaControl] Precarga recibida:', data);
+    _precargasCache.push(data);
+    EventBus.emit('precarga:nueva', {
+      mesa: data.mesa,
+      cantidad: _precargasCache.filter(p => p.mesa === data.mesa).length,
+      precargaId: data.id || data.precargaId
+    });
   }
 
-  async function _onBadgeClick(payload) {
-    const precarga = _precargas.get(payload.precargaId);
-    if (!precarga) { Logger.warn('[PrecargaControl] Precarga no encontrada'); return; }
+  async function _revisarPrecarga(datos) {
+    const { precargaId, mesa, revisadoPor } = datos;
+    Logger.info('[PrecargaControl] Revisando precarga:', precargaId, 'mesa:', mesa);
 
-    EventBus.emit('precarga:items_listos', { mesa: payload.mesa, items: precarga.items, precargaId: payload.precargaId });
-
-    const resultado = await CommandBus.ejecutar({ type: 'precarga:revisar', datos: { precargaId: payload.precargaId, revisadoPor: 'Garzón' } });
-    if (resultado.exito) {
-      mostrarToast('success', `Precarga cargada en mesa ${payload.mesa}.`);
-      _precargas.delete(payload.precargaId);
-    } else {
-      mostrarToast('error', 'No se pudo actualizar la precarga.');
-      Logger.error('[PrecargaControl] Error:', resultado.error);
-    }
-  }
-
-  async function _documentoExiste(coleccion, id) {
     try {
-      const resultado = await DBAppwrite.listar(coleccion, { filtro: `$id=${id}`, limite: 1 });
-      return resultado && resultado.length > 0;
+      // Buscar el pedido de precarga: primero por ID directo, luego por mesa + estado + origen
+      let pedidoPrecarga = null;
+      const todosPedidos = await DBAppwrite.listar('pedidos');
+      
+      // Buscar por ID directo (compatibilidad con IDs reales de Appwrite)
+      pedidoPrecarga = todosPedidos.find(p => p.id === precargaId);
+      
+      // Si no se encuentra por ID, buscar por mesa + estado precarga + origen cliente
+      if (!pedidoPrecarga) {
+        pedidoPrecarga = todosPedidos.find(p => 
+          p.mesa === String(mesa) && 
+          p.estado === 'precarga' && 
+          p.origen === 'cliente' &&
+          p.id_usuario === datos.id_usuario
+        );
+      }
+      
+      if (!pedidoPrecarga) {
+        Logger.warn('[PrecargaControl] No se encontró el pedido de precarga para mesa ' + mesa);
+        mostrarToast('warning', 'No se encontró la precarga. Es posible que ya haya sido revisada.');
+        return { exito: false, error: 'Precarga no encontrada.' };
+      }
+
+      // Marcar como revisado
+      await DBAppwrite.actualizar('pedidos', pedidoPrecarga.id, {
+        estado: 'revisado',
+        nombre_comensal: datos.nombre_comensal || pedidoPrecarga.nombre_comensal,
+        revisadoPor: revisadoPor
+      });
+
+      Logger.info('[PrecargaControl] Precarga ' + pedidoPrecarga.id + ' marcada como revisada.');
+
+      // Emitir evento con los ítems para cargar en el pedido activo
+      let items = [];
+      try {
+        items = typeof pedidoPrecarga.items === 'string' 
+          ? JSON.parse(pedidoPrecarga.items) 
+          : (pedidoPrecarga.items || []);
+      } catch (e) {
+        Logger.warn('[PrecargaControl] Error al parsear items de la precarga:', e);
+      }
+
+      EventBus.emit('precarga:items_listos', {
+        mesa: mesa,
+        items: items,
+        precargaId: pedidoPrecarga.id
+      });
+
+      // Limpiar caché local
+      _precargasCache = _precargasCache.filter(p => p.id !== precargaId && p.precargaId !== precargaId);
+
+      return { exito: true, precargaId: pedidoPrecarga.id };
     } catch (e) {
-      Logger.warn('[PrecargaControl] No se pudo verificar existencia del documento:', e);
-      return false;
+      Logger.error('[PrecargaControl] Error al revisar precarga:', e);
+      return { exito: false, error: e.message };
     }
   }
 
   function activar() {
-    if (_activado) return;
-    _activado = true;
-
-    CommandBus.registrar('precarga:revisar', async (datos) => {
-      try {
-        const userId = await Auth.obtenerIdUsuarioAppwrite();
-        const permisos = userId ? [`read("user:${userId}")`, `update("user:${userId}")`] : null;
-
-        // Hallazgo 14: verificar existencia antes de actualizar
-        const existe = await _documentoExiste('pedidos', datos.precargaId);
-        if (!existe) {
-          Logger.warn('[PrecargaControl] Documento no encontrado en Appwrite:', datos.precargaId);
-          return { exito: false, error: 'El documento no existe en Appwrite' };
-        }
-
-        await DBAppwrite.actualizar('pedidos', datos.precargaId, {
-          estado: 'revisado',
-          revisadoPor: datos.revisadoPor
-        }, permisos);
-        EventBus.emit('precarga:revisada', { precargaId: datos.precargaId, revisadoPor: datos.revisadoPor, timestamp: Date.now() });
-        return { exito: true };
-      } catch (error) {
-        Logger.error('[PrecargaControl] Error en comando:', error);
-        return { exito: false, error: error.message };
-      }
-    });
-
-    _desuscripcionPrecarga = EventBus.on('cliente:precarga_enviada', _onPrecargaEnviada);
-    _desuscripcionBadge = EventBus.on('mesa:badge_click', _onBadgeClick);
-    Logger.info('[PrecargaControl] v2.2.1 inicializado.');
+    EventBus.on('cliente:precarga_enviada', _onPrecargaEnviada);
+    CommandBus.registrar('precarga:revisar', _revisarPrecarga);
+    Logger.info('[PrecargaControl] Módulo activado.');
   }
 
-  function limpiar() {
-    _desuscripcionPrecarga?.(); _desuscripcionPrecarga = null;
-    _desuscripcionBadge?.(); _desuscripcionBadge = null;
-    _activado = false;
-  }
-
-  activar();
-  return { _precargas, activar, limpiar };
+  return { activar };
 })();
-
-export { PrecargaControl };

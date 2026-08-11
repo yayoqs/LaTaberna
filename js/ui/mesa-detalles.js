@@ -1,10 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/mesa-detalles.js
-   Versión: 3.1.1
-   Propósito: Centro de operaciones de mesa. Corrección:
-              - Hallazgo 11: despachar CLIENTE_PERMISO_PREPEDIDOS en
-                aceptarVinculacion.
+   Versión: 3.1.7
+   Propósito: Centro de operaciones de mesa.
+              Forzar visibilidad de sección de espera al abrir.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -16,6 +15,7 @@ import { Cobro } from './cobro.js';
 import { CommandBus } from '../lib/command-bus.js';
 import { Auth } from '../auth.js';
 import { DB } from '../db.js';
+import { DBAppwrite } from '../db-appwrite.js';
 import { mostrarToast } from '../utils.js';
 
 const MesaDetalles = (() => {
@@ -107,6 +107,35 @@ const MesaDetalles = (() => {
     });
   }
 
+  function _mostrarSeccionEspera(infoAtencion, mesa) {
+    const seccion = document.getElementById('seccionEspera');
+    if (!seccion) return;
+
+    if (infoAtencion?.tipo === 'esperando' && mesa.estado === 'libre') {
+      seccion.style.display = 'flex';
+      seccion.className = 'seccion-atencion';
+      seccion.innerHTML = `
+        <div class="atencion-avatar">${infoAtencion.iniciales || '?'}</div>
+        <div class="atencion-texto">
+          <strong>${infoAtencion.nombre || 'Cliente'}</strong><br>quiere unirse a la Mesa ${mesa.numero}
+        </div>
+        <button class="btn-atender" data-num-mesa="${mesa.numero}">Aceptar</button>
+      `;
+    } else if (infoAtencion?.tipo === 'precarga') {
+      seccion.style.display = 'flex';
+      seccion.className = 'seccion-atencion precarga';
+      seccion.innerHTML = `
+        <div class="atencion-avatar">${infoAtencion.iniciales || '?'}</div>
+        <div class="atencion-texto">
+          <strong>${infoAtencion.nombre || 'Cliente'}</strong><br>quiere añadir un pedido
+        </div>
+        <button class="btn-atender precarga" data-precarga-id="${infoAtencion.precargaId}">Cargar</button>
+      `;
+    } else {
+      seccion.style.display = 'none';
+    }
+  }
+
   function _renderizarEstado(mesa) {
     _mesaActual = mesa;
     _pedidoActual = _obtenerPedidoDeMesa(mesa);
@@ -154,18 +183,7 @@ const MesaDetalles = (() => {
     }
 
     const infoAtencion = Mesas.getBadgeAtencion(mesa.numero);
-    const seccionEspera = document.getElementById('seccionEspera');
-    if (infoAtencion?.tipo === 'esperando' && estado === 'libre') {
-      seccionEspera.style.display = 'flex';
-      seccionEspera.className = 'seccion-atencion';
-      seccionEspera.innerHTML = `<div class="atencion-avatar">${infoAtencion.iniciales || '?'}</div><div class="atencion-texto"><strong>${infoAtencion.nombre || 'Cliente'}</strong><br>quiere unirse a la Mesa ${mesa.numero}</div><button class="btn-atender" data-num-mesa="${mesa.numero}">Aceptar</button>`;
-    } else if (infoAtencion?.tipo === 'precarga') {
-      seccionEspera.style.display = 'flex';
-      seccionEspera.className = 'seccion-atencion precarga';
-      seccionEspera.innerHTML = `<div class="atencion-avatar">${infoAtencion.iniciales || '?'}</div><div class="atencion-texto"><strong>${infoAtencion.nombre || 'Cliente'}</strong><br>quiere añadir un pedido</div><button class="btn-atender precarga" data-precarga-id="${infoAtencion.precargaId}">Cargar</button>`;
-    } else {
-      seccionEspera.style.display = 'none';
-    }
+    _mostrarSeccionEspera(infoAtencion, mesa);
 
     _renderizarAcciones(estado);
     _modoApertura = false;
@@ -264,6 +282,11 @@ const MesaDetalles = (() => {
     _renderizarEstado(mesa);
     document.getElementById('modalMesaDetalles').style.display = 'flex';
     _panelVisible = true;
+    // Forzar la visibilidad de la sección de espera si hay notificación
+    const info = Mesas.getBadgeAtencion(numMesa);
+    if (info) {
+      _mostrarSeccionEspera(info, mesa);
+    }
     EventBus.emit('mesa-detalle:abierto');
   }
   function cerrar() {
@@ -274,24 +297,49 @@ const MesaDetalles = (() => {
   function pedirCuenta() { cerrar(); Cuenta?.pedirCuenta(); }
   function cerrarMesa() { cerrar(); Cobro?.abrirModalCierre(); }
 
-  function aceptarVinculacion(numMesa) {
+  async function aceptarVinculacion(numMesa) {
     const mesa = Store.obtenerEstado().mesas.find(m => m.numero == numMesa);
     if (!mesa) return;
 
-    // Persistir en DB
-    const mesaDB = DB.mesas.find(m => m.numero == numMesa);
-    if (mesaDB) { mesaDB.estado = 'ocupada'; try { DB.saveMesas(); } catch (e) { Logger.error('[MesaDetalles] Error al persistir vinculación:', e); } }
+    // 1) Crear pedido (con la mesa libre)
+    let pedidoId = null;
+    try {
+      const resultado = await CommandBus.ejecutar({
+        type: 'crearPedidoMesa',
+        datos: { numeroMesa: numMesa, mozo: 'Mozo', comensales: 2 }
+      });
+      if (resultado.exito) {
+        pedidoId = resultado.data.id;
+      } else {
+        mostrarToast('error', 'No se pudo abrir la mesa: ' + resultado.error);
+        return;
+      }
+    } catch (e) {
+      Logger.error('[MesaDetalles] Error al ejecutar crearPedidoMesa:', e);
+      mostrarToast('error', 'Error inesperado al abrir la mesa.');
+      return;
+    }
 
-    // Actualizar Store
-    Store.despachar({ type: 'MESA_ACTUALIZAR', payload: { numero: numMesa, cambios: { estado: 'ocupada' } } });
+    // 2) Sincronizar con Appwrite
+    try {
+      await DBAppwrite.actualizar('mesas', String(numMesa), { estado: 'ocupada', pedidoId });
+    } catch (e) {
+      Logger.error('[MesaDetalles] Error al actualizar Appwrite en vinculación:', e);
+    }
 
-    // Hallazgo 11: despachar CLIENTE_PERMISO_PREPEDIDOS para activar el menú digital del cliente
+    // 3) Actualizar Store
+    Store.despachar({ type: 'MESA_ACTUALIZAR', payload: { numero: numMesa, cambios: { estado: 'ocupada', pedidoId } } });
+
+    // 4) Despachar permiso de prepedidos
     Store.despachar({ type: 'CLIENTE_PERMISO_PREPEDIDOS', payload: true });
 
-    // Emitir evento para el cliente (Célula C)
+    // 5) Emitir evento para el cliente (Célula C)
     EventBus.emit('mesas:actualizada', { numero: numMesa, estado: 'ocupada', permite_prepedidos: true });
 
     Mesas.clearBadgeAtencion(numMesa);
+
+    // 6) Emitir evento para abrir el modal de pedido
+    EventBus.emit('mesa:tomar_pedido', { mesa: numMesa });
 
     _mesaActual = Store.obtenerEstado().mesas.find(m => m.numero == numMesa);
     if (_mesaActual) _renderizarEstado(_mesaActual);
@@ -304,7 +352,7 @@ const MesaDetalles = (() => {
 
   EventBus.on('mesa:seleccionada', (numMesa) => { if (!_panelVisible) abrir(numMesa); });
 
-  Logger.info('[MesaDetalles] Módulo inicializado v3.1.1.');
+  Logger.info('[MesaDetalles] Módulo inicializado v3.1.7.');
 
   return { abrir, cerrar, pedirCuenta, cerrarMesa, aceptarVinculacion, cargarPrecarga, _mesaActual: null };
 })();

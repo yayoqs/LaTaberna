@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MESAS SUBMÓDULO (ES6)
    Archivo: js/ui/mesas/acciones-mesa.js
-   Versión: 1.0.1
-   Propósito: Funciones de acción sobre mesas (agregar, badges,
-              zonas, labels). Migración a nuevos nombres en español
-              de utils y store.
+   Versión: 1.0.2
+   Propósito: Funciones de acción sobre mesas. Corrección:
+             getBadgeAtencion ya no verifica permite_prepedidos
+             (campo eliminado en el nuevo modelo).
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -67,7 +67,9 @@ function getBadgeAtencion(numMesa) {
   const espera = notificaciones.find(n => n.tipo === 'esperando');
   if (espera) {
     const mesa = (Store.obtenerEstado().mesas || []).find(m => m.numero == numMesa);
-    if (mesa && mesa.estado === 'libre' && mesa.permite_prepedidos === false) {
+    // En el nuevo modelo, solo verificamos que la mesa esté libre.
+    // El campo permite_prepedidos ya no existe en laTaberna_Mesas.
+    if (mesa && mesa.estado === 'libre') {
       return { tipo: 'esperando', nombre: 'Cliente', iniciales: 'C' };
     }
   }

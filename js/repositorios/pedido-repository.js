@@ -1,11 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — REPOSITORIO JS (ES6)
    Archivo: js/repositorios/pedido-repository.js
-   Versión: 1.1.1
+   Versión: 1.1.4
    Propósito: Implementación local del repositorio de pedidos con
               sincronización directa a Appwrite.
-              v1.1.1: enviarComanda lee items/mozo/comensales del pedido
-                      activo, no de la mesa (campos eliminados en Mesas).
+              v1.1.4: abrirMesa recarga la mesa desde Appwrite si no
+                      existe en DB.mesas local.
    ================================================================ */
 
 import { DB } from '../db.js';
@@ -69,7 +69,8 @@ const PedidoRepositoryLocal = (() => {
     delete data.id;
     if (Array.isArray(data.items)) data.items = JSON.stringify(data.items).substring(0, 5000);
     else data.items = String(data.items || '[]').substring(0, 5000);
-    if (!data.subcomandas) data.subcomandas = '{}';
+    // Siempre serializar subcomandas como string JSON
+    data.subcomandas = typeof data.subcomandas === 'string' ? data.subcomandas : JSON.stringify(data.subcomandas || {});
     return data;
   }
 
@@ -110,7 +111,24 @@ const PedidoRepositoryLocal = (() => {
 
   async function abrirMesa(numeroMesa, mozo, comensales) {
     if (!DB || !DB.getMesa) throw new Error('DB.core no disponible');
-    const mesa = DB.getMesa(numeroMesa);
+    let mesa = DB.getMesa(numeroMesa);
+    
+    // Si la mesa no existe localmente, recargarla desde Appwrite
+    if (!mesa && DBAppwrite && DBAppwrite.habilitado) {
+      Logger.info('[Repo] Mesa ' + numeroMesa + ' no encontrada localmente, recargando desde Appwrite...');
+      try {
+        const mesasRemotas = await DBAppwrite.listar('mesas');
+        const mesaRemota = mesasRemotas.find(m => m.numero == numeroMesa);
+        if (mesaRemota) {
+          mesa = DB._normalizarMesa(mesaRemota);
+          DB.mesas.push(mesa);
+          Logger.info('[Repo] Mesa ' + numeroMesa + ' cargada desde Appwrite.');
+        }
+      } catch (e) {
+        Logger.warn('[Repo] No se pudo recargar la mesa desde Appwrite:', e.message);
+      }
+    }
+    
     if (!mesa) throw new Error(`La mesa ${numeroMesa} no existe`);
     if (mesa.estado !== 'libre') throw new Error(`La mesa ${numeroMesa} no está libre`);
 
@@ -122,7 +140,7 @@ const PedidoRepositoryLocal = (() => {
     const pedidoLocal = await DB.crearPedido(numeroMesa, mozo, comensales);
     if (!pedidoLocal) throw new Error('No se pudo crear el pedido localmente');
     pedidoLocal.transacciones = [];
-    pedidoLocal.tipo = 'salon';
+    pedidoLocal.tipo = 'local';
     pedidoLocal.origen = 'staff';
     mesa.pedidoId = pedidoLocal.id;
     DB.saveMesas();
@@ -197,7 +215,7 @@ const PedidoRepositoryLocal = (() => {
     const pedidoLocal = await DB.crearPedido(datos.mesa, datos.mozo, datos.comensales);
     if (!pedidoLocal) throw new Error('No se pudo crear el pedido localmente');
     pedidoLocal.transacciones = [];
-    pedidoLocal.tipo = datos.tipo || 'salon';
+    pedidoLocal.tipo = datos.tipo || 'local';
     pedidoLocal.origen = datos.origen || 'staff';
     await _syncPedido(pedidoLocal, true);
     return pedidoLocal;

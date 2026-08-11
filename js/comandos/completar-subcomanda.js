@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — COMANDO JS (ES6)
    Archivo: js/comandos/completar-subcomanda.js
-   Versión: 1.0.5
+   Versión: 1.0.6
    Propósito: Marcar una subcomanda como completada.
-              v1.0.5: usa pedidoId y columna subcomandas en lugar
-                      de parsear el campo en cada actualización.
+              v1.0.6: corregida lógica de ambasListas para comandas
+                      con un solo destino (ej. solo cocina).
    ================================================================ */
 
 import { CommandBus } from '../lib/command-bus.js';
@@ -55,9 +55,10 @@ CommandBus.registrar('completarSubcomanda', async function(payload) {
 
     subcomandas[destino] = 'completada';
 
-    const ambasListas =
-      subcomandas.cocina === 'completada' &&
-      subcomandas.barra === 'completada';
+    // Si la comanda tiene un solo destino, ambasListas es true automáticamente.
+    // Si tiene ambos, verifica que los dos estén completados.
+    const destinosComanda = comanda.destino === 'ambos' ? ['cocina', 'barra'] : [comanda.destino];
+    const ambasListas = destinosComanda.every(d => subcomandas[d] === 'completada');
 
     await DBAppwrite.actualizar('comandas', idOriginal, {
       subcomandas: JSON.stringify(subcomandas),

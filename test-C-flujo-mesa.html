@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Test Flujo de Validación de Mesa — Célula C (v2.0.2)</title>
+  <title>Test Flujo de Validación de Mesa — Célula C (v3.0.1)</title>
   <style>
     body { font-family: system-ui, sans-serif; padding: 20px; background: #0f0f14; color: #f1f5f9; }
     h1 { color: #f59e0b; }
@@ -18,20 +18,19 @@
   </style>
 </head>
 <body>
-  <h1>Test — Flujo de Validación de Mesa (v2.0.2)</h1>
+  <h1>Test — Flujo de Validación de Mesa (v3.0.1)</h1>
   <p>Simula el ciclo: cliente ingresa mesa → espera → garzón activa → acceso al menú.</p>
 
   <div id="controles">
-    <button id="btnPaso1">1. Renderizar PantallaBienvenida</button>
+    <button id="btnPaso1">1. Mostrar PantallaBienvenida</button>
     <button id="btnPaso2">2. Ingresar mesa</button>
     <button id="btnPaso3">3. Simular activación del garzón</button>
     <button id="btnPaso4">4. Verificar acceso al menú</button>
   </div>
 
   <div id="resultados"></div>
-  <div id="panelTest"><p style="color:#64748b;">La vista renderizada aparecerá aquí...</p></div>
+  <div id="panelTest"><p style="color:#64748b;">La vista aparecerá aquí...</p></div>
 
-  <!-- Cargar el núcleo real -->
   <script type="module" src="/js/lib/logger.js"></script>
   <script type="module" src="/js/lib/eventBus.js"></script>
   <script type="module" src="/js/lib/store.js"></script>
@@ -46,9 +45,8 @@
     import { EventBus } from '../js/lib/eventBus.js';
     
     await inicializarAuth();
-    await Auth.login('cliente', 'cliente');
+    await Auth.iniciarSesion('cliente', 'cliente');
 
-    // Ahora los módulos importarán Store y EventBus reales
     import { PantallaBienvenida } from '../js/modulos/cliente/pantalla-bienvenida.js';
 
     const resultados = document.getElementById('resultados');
@@ -73,15 +71,11 @@
       }
     }
 
-    // ── Paso 1: Renderizar ────────────────────────────────
+    // ── Paso 1: Mostrar ──────────────────────────────────
     document.getElementById('btnPaso1').addEventListener('click', () => {
-      log('info', '── Paso 1: Renderizar PantallaBienvenida ──');
+      log('info', '── Paso 1: Mostrar PantallaBienvenida ──');
       panelTest.innerHTML = '';
 
-      // Inicializar Store con mesas vacías
-      Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: [] });
-
-      PantallaBienvenida.render();
       PantallaBienvenida.mostrar();
 
       const vista = document.getElementById('view-bienvenida');
@@ -99,7 +93,7 @@
       assert(btnVincular !== null, 'Botón Vincular existe');
 
       panelTest.appendChild(vista);
-      log('accion', '✅ Vista renderizada correctamente.');
+      log('accion', '✅ Vista mostrada correctamente.');
     });
 
     // ── Paso 2: Ingresar mesa ─────────────────────────────
@@ -112,9 +106,6 @@
         log('fallo', '❌ No se encontró el input o el botón. Ejecutá el Paso 1 primero.');
         return;
       }
-
-      // Poblar el Store con la mesa 5
-      Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: [{ numero: 5, permite_prepedidos: false }] });
 
       inputMesa.value = '5';
       btnVincular.click();
@@ -144,8 +135,24 @@
         return;
       }
 
-      // Actualizar la mesa en el Store para activarla
-      Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: [{ numero: mesa, permite_prepedidos: true }] });
+      // Simular que el garzón abrió la mesa: agregar un pedido activo al Store
+      Store.despachar({
+        type: 'PEDIDO_CREADO',
+        payload: {
+          id: 'ped_test',
+          mesa: String(mesa),
+          estado: 'abierta',
+          tipo: 'salon',
+          origen: 'staff',
+          mozo: 'Carlos',
+          comensales: 2,
+          items: [],
+          total: 0,
+          observaciones: ''
+        }
+      });
+
+      // Emitir evento de mesas (no pedidos) para que la vista reaccione
       EventBus.emit('mesas:actualizada', { numero: mesa, estado: 'ocupada' });
 
       const heroTitulo = document.querySelector('.hero-estado h1');

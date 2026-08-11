@@ -1,10 +1,13 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/auth.js
-   Versión: 1.6.2
+   Versión: 1.6.3
    Propósito: Autenticación con Appwrite Account nativo + fallback local.
               API pública completamente en español.
-              v1.6.2: USUARIOS_POR_DEFECTO se importa desde config-appwrite.js.
+              v1.6.3: Corrección de cierre de modal de login.
+                      - Listener para cerrar al hacer clic fuera del modal.
+                      - Reasignación segura de listeners de botones.
+                      - Logs de diagnóstico en cerrarModalLogin.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -21,6 +24,7 @@ export const Auth = (() => {
   let _usuarioActual = null;
   let _rolSimulado = null;
   let _appwriteUserId = null;
+  let _listenersAsignados = false; // Control para asignar listeners una sola vez
 
   async function _sha256(texto) {
     const encoder = new TextEncoder();
@@ -175,6 +179,7 @@ export const Auth = (() => {
 
           sessionStorage.setItem('usuarioActual', JSON.stringify(_usuarioActual));
           aplicarRestriccionesUI();
+          Logger.debug('[Auth] Login exitoso, cerrando modal...');
           cerrarModalLogin();
           mostrarToast('success', 'Bienvenido/a ' + usuario.nombre + ' (' + usuario.rol + ')');
           const vistaInicial = obtenerVistaPorDefecto();
@@ -203,6 +208,7 @@ export const Auth = (() => {
       _rolSimulado = null;
       sessionStorage.setItem('usuarioActual', JSON.stringify(_usuarioActual));
       aplicarRestriccionesUI();
+      Logger.debug('[Auth] Login local exitoso, cerrando modal...');
       cerrarModalLogin();
       mostrarToast('success', 'Bienvenido/a ' + usuario.nombre + ' (' + usuario.rol + ')');
       const vistaInicial = obtenerVistaPorDefecto();
@@ -289,16 +295,31 @@ export const Auth = (() => {
           </div>
         </div>`;
       document.body.appendChild(loginModal);
+    } else {
+      loginModal.style.display = 'flex';
+      _mostrarLoginPanel();
+    }
 
+    // Asignar listeners una sola vez para evitar duplicados
+    if (!_listenersAsignados) {
       document.getElementById('btnCerrarModalLogin').addEventListener('click', cerrarModalLogin);
       document.getElementById('btnModalIngresar').addEventListener('click', _iniciarSesionDesdeModal);
       document.getElementById('btnModalRegistrarse').addEventListener('click', _mostrarRegistro);
       document.getElementById('btnVolverLogin').addEventListener('click', _mostrarLoginPanel);
       document.getElementById('btnModalCrearCuenta').addEventListener('click', _registrarDesdeModal);
-    } else {
-      loginModal.style.display = 'flex';
-      _mostrarLoginPanel();
+      
+      // Listener para cerrar el modal al hacer clic fuera de la tarjeta
+      loginModal.addEventListener('click', function(e) {
+        if (e.target === loginModal) {
+          Logger.debug('[Auth] Clic fuera del modal detectado, cerrando...');
+          cerrarModalLogin();
+        }
+      });
+
+      _listenersAsignados = true;
+      Logger.debug('[Auth] Listeners del modal asignados.');
     }
+
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   }
 
@@ -312,7 +333,10 @@ export const Auth = (() => {
     document.getElementById('registroPanel').style.display = '';
   }
 
-  function cerrarModalLogin() { if (loginModal) loginModal.style.display = 'none'; }
+  function cerrarModalLogin() {
+    Logger.debug('[Auth] cerrando modal de login');
+    if (loginModal) loginModal.style.display = 'none';
+  }
 
   async function _iniciarSesionDesdeModal() {
     const usuario = document.getElementById('loginUsuario')?.value.trim() || '';

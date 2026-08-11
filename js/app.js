@@ -1,10 +1,12 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/app.js
-   Versión: 1.3.3
+   Versión: 1.3.4
    Propósito: Punto de entrada modular. Control de vistas con ciclo
               de vida (limpiar/activar).
-              Corregido: referencia redundante a Auth.esMasterReal.
+              v1.3.4: Cambia validación de sesión en showView de
+              Auth.obtenerRol() a Auth.obtenerUsuarioActual() para
+              evitar reapertura del modal de login.
    ================================================================ */
 
 // ── Utilidades y librerías ────────────────────────────────
@@ -205,7 +207,7 @@ export const App = {
     }
 
     // ── Control de autenticación ──────────────────────
-    if (!this._vistasPublicas.includes(nombre) && !Auth.obtenerRol()) {
+    if (!this._vistasPublicas.includes(nombre) && !Auth.obtenerUsuarioActual()) {
       Auth.mostrarLogin();
       return;
     }

@@ -5,16 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>La Taberna</title>
 
-  <!-- FontAwesome desde CDN -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-
-  <!-- Google Fonts: Monoton (Célula C) -->
   <link href="https://fonts.googleapis.com/css2?family=Monoton&display=swap" rel="stylesheet">
-
-  <!-- SDK de Appwrite (cargado desde local) -->
   <script src="js/appwrite.min.js"></script>
 
-  <!-- CSS Modular -->
   <link rel="stylesheet" href="css/vars.css">
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/layout.css">
@@ -39,10 +33,15 @@
   <link rel="stylesheet" href="css/cliente-eventos.css">
   <link rel="stylesheet" href="css/eventos-en-vivo.css">
   <link rel="stylesheet" href="css/responsive.css">
-  <!-- Estilos extra (anteriormente inline) -->
   <link rel="stylesheet" href="css/extra.css">
 </head>
 <body>
+
+  <!-- Toast y modal loader DEBEN estar antes que cualquier otro contenedor para quedar por encima en el contexto de apilamiento -->
+  <div id="toastContainer" class="toast-container" aria-live="polite"></div>
+
+  <!-- PUNTO DE ENTRADA MODULAR ÚNICO -->
+  <script type="module" src="js/app.js"></script>
 
   <!-- HEADER FIJO -->
   <header class="app-header">
@@ -133,10 +132,5 @@
   <!-- Popover global (usado por mesas) -->
   <div id="popoverContainer" style="display:none; position:fixed; z-index:9999;"></div>
 
-  <!-- Toast container global -->
-  <div id="toastContainer" class="toast-container" aria-live="polite"></div>
-
-  <!-- ========== PUNTO DE ENTRADA MODULAR ÚNICO ========== -->
-  <script type="module" src="js/app.js"></script>
 </body>
 </html>

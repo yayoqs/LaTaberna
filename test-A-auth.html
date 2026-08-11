@@ -19,7 +19,7 @@
 </head>
 <body>
   <h1>🧪 Test A — Autenticación (Appwrite Auth)</h1>
-  <p class="info">Verifica el flujo completo: registro, login, cambio de contraseña, cambio de rol y eliminación de cuentas.</p>
+  <p class="info">Verifica el flujo completo: registro, inicio de sesión, cambio de contraseña, cambio de rol y eliminación de cuentas.</p>
   <div id="results"></div>
   <button onclick="location.reload()">🔄 Ejecutar de nuevo</button>
 
@@ -31,11 +31,11 @@
     import { DBAppwrite } from './js/db-appwrite.js';
 
     (function() {
-      var resultsEl = document.getElementById('results');
-      var passed = 0, failed = 0;
-      var TEST_USER = 'test_auth_' + Date.now();
-      var TEST_PASS = 'test123456';
-      var TEST_NEW_PASS = 'nuevapass789';
+      const resultsEl = document.getElementById('results');
+      let passed = 0, failed = 0;
+      const TEST_USER = 'test_auth_' + Date.now();
+      const TEST_PASS = 'test123456';
+      const TEST_NEW_PASS = 'nuevapass789';
 
       function assert(condition, msg) {
         if (condition) {
@@ -53,7 +53,7 @@
 
       async function limpiarSesion() {
         try {
-          await Auth.logout();
+          await Auth.cerrarSesion();
         } catch(e) {}
       }
 
@@ -65,41 +65,41 @@
 
         // ── 1. Inicializar Appwrite ──────────────────
         resultsEl.innerHTML += '<h2>1. Inicializar Appwrite</h2>';
-        var appwriteOk = await DBAppwrite.iniciar();
+        const appwriteOk = await DBAppwrite.iniciar();
         assert(appwriteOk === true, 'DBAppwrite.iniciar() exitoso');
         assert(DBAppwrite.habilitado === true, 'DBAppwrite.habilitado = true');
         if (!appwriteOk) return;
 
         await limpiarSesion();
 
-        // ── 2. Login como Master ─────────────────────
-        resultsEl.innerHTML += '<h2>2. Login como Master</h2>';
-        var loginMaster = await Auth.login('master', 'master123');
-        assert(loginMaster === true, 'Login Master exitoso');
+        // ── 2. Iniciar Sesión como Master ────────────
+        resultsEl.innerHTML += '<h2>2. Iniciar Sesión como Master</h2>';
+        const loginMaster = await Auth.iniciarSesion('master', 'master123');
+        assert(loginMaster === true, 'Inicio de sesión Master exitoso');
         assert(Auth.esMasterReal() === true, 'Rol Master confirmado');
         logSection('Datos del Master', Auth.obtenerUsuarioActual());
 
         // ── 3. Registrar Cliente Nuevo ───────────────
         resultsEl.innerHTML += '<h2>3. Registrar Nuevo Cliente</h2>';
-        var resultadoReg = await Auth.registrarCliente(TEST_USER, TEST_PASS);
+        const resultadoReg = await Auth.registrarCliente(TEST_USER, TEST_PASS);
         assert(resultadoReg.exito === true, 'Registro de cliente exitoso: ' + TEST_USER);
 
-        // ── 4. Login con el Nuevo Cliente ───────────
-        resultsEl.innerHTML += '<h2>4. Login del Nuevo Cliente</h2>';
+        // ── 4. Iniciar Sesión con el Nuevo Cliente ───
+        resultsEl.innerHTML += '<h2>4. Iniciar Sesión del Nuevo Cliente</h2>';
         await limpiarSesion();
-        var loginCliente = await Auth.login(TEST_USER, TEST_PASS);
-        assert(loginCliente === true, 'Login del cliente exitoso');
-        var usuarioActual = Auth.obtenerUsuarioActual();
+        const loginCliente = await Auth.iniciarSesion(TEST_USER, TEST_PASS);
+        assert(loginCliente === true, 'Inicio de sesión del cliente exitoso');
+        const usuarioActual = Auth.obtenerUsuarioActual();
         assert(usuarioActual && usuarioActual.nombre === TEST_USER, 'Nombre de usuario coincide');
         assert(usuarioActual && usuarioActual.rol === 'cliente', 'Rol por defecto asignado: cliente');
         logSection('Perfil Cliente Creado', usuarioActual);
 
         // ── 5. Cliente Edita su Nombre y Perfil ──────
         resultsEl.innerHTML += '<h2>5. Cliente Edita su Nombre y Perfil</h2>';
-        var nombreEditado = TEST_USER + '_editado';
+        const nombreEditado = TEST_USER + '_editado';
         try {
           await DBAppwrite.cuenta.updateName(nombreEditado);
-          var perfilId = usuarioActual._appwriteUserId || (await Auth.obtenerIdUsuarioAppwrite());
+          const perfilId = await Auth.obtenerIdUsuarioAppwrite();
           if (perfilId) {
             await DBAppwrite.actualizar('global_perfiles', perfilId, { nombre: nombreEditado });
           }
@@ -118,32 +118,32 @@
         }
 
         await limpiarSesion();
-        var loginClaveNueva = await Auth.login(TEST_USER, TEST_NEW_PASS);
-        assert(loginClaveNueva === true, 'Login exitoso con la NUEVA contraseña');
+        const loginClaveNueva = await Auth.iniciarSesion(TEST_USER, TEST_NEW_PASS);
+        assert(loginClaveNueva === true, 'Inicio de sesión exitoso con la NUEVA contraseña');
 
         await limpiarSesion();
-        var loginClaveVieja = await Auth.login(TEST_USER, TEST_PASS);
-        assert(loginClaveVieja === false, 'Login rechazado con la contraseña ANTIGUA');
+        const loginClaveVieja = await Auth.iniciarSesion(TEST_USER, TEST_PASS);
+        assert(loginClaveVieja === false, 'Inicio de sesión rechazado con la contraseña ANTIGUA');
 
         // ── 7. Master Cambia el Rol del Cliente ──────
         resultsEl.innerHTML += '<h2>7. Master Cambia el Rol del Cliente</h2>';
         await limpiarSesion();
-        await Auth.login('master', 'master123');
+        await Auth.iniciarSesion('master', 'master123');
         
-        var cambioRol = await Auth.cambiarRol(TEST_USER, 'mesero');
+        const cambioRol = await Auth.cambiarRol(TEST_USER, 'mesero');
         assert(cambioRol.exito === true, 'Invocación a cambiarRol exitosa');
 
         await limpiarSesion();
-        await Auth.login(TEST_USER, TEST_NEW_PASS);
-        var usuarioRolCambiado = Auth.obtenerUsuarioActual();
+        await Auth.iniciarSesion(TEST_USER, TEST_NEW_PASS);
+        const usuarioRolCambiado = Auth.obtenerUsuarioActual();
         assert(usuarioRolCambiado && usuarioRolCambiado.rol === 'mesero', 'Rol "mesero" confirmado al re-iniciar sesión');
 
         // ── 8. Eliminación de Perfil / Cuenta ────────
         resultsEl.innerHTML += '<h2>8. Eliminación de Perfil / Cuenta</h2>';
-        var idEliminar = await Auth.obtenerIdUsuarioAppwrite();
+        const idEliminar = await Auth.obtenerIdUsuarioAppwrite();
         
         await limpiarSesion();
-        await Auth.login('master', 'master123');
+        await Auth.iniciarSesion('master', 'master123');
 
         try {
           if (idEliminar) {
@@ -154,14 +154,14 @@
           assert(false, 'Error eliminando perfil global: ' + e.message);
         }
 
-        var usuariosLocales = JSON.parse(localStorage.getItem('pubpos_usuarios') || '[]');
-        var filtrados = usuariosLocales.filter(u => u.nombre !== TEST_USER);
+        const usuariosLocales = JSON.parse(localStorage.getItem('pubpos_usuarios') || '[]');
+        const filtrados = usuariosLocales.filter(u => u.nombre !== TEST_USER);
         localStorage.setItem('pubpos_usuarios', JSON.stringify(filtrados));
         assert(true, 'Registro local removido de localStorage');
 
         // ── 9. Verificar Perfil Global Master ────────
         resultsEl.innerHTML += '<h2>9. Verificar Perfil Global Master</h2>';
-        var usrMaster = Auth.obtenerUsuarioActual();
+        const usrMaster = Auth.obtenerUsuarioActual();
         if (usrMaster && usrMaster.perfil) {
           assert(!!usrMaster.perfil.usuarioId, 'Perfil global Master tiene usuarioId');
           logSection('Perfil Global Master', usrMaster.perfil);

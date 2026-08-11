@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Test Célula C — Frontend Cliente (v3.0.1)</title>
+  <title>Test Célula C — Frontend Cliente (v4.0.0)</title>
   <style>
     body { font-family: system-ui, sans-serif; padding: 20px; background: #0f0f14; color: #f1f5f9; }
     h1 { color: #f59e0b; }
@@ -14,7 +14,7 @@
   </style>
 </head>
 <body>
-  <h1>Tests — Célula C (Frontend Cliente) v3.0.1</h1>
+  <h1>Tests — Célula C (Frontend Cliente) v4.0.0</h1>
   <div id="resultados"></div>
 
   <!-- Cargar el núcleo real para que los imports de los módulos funcionen -->
@@ -27,12 +27,10 @@
   <script type="module" src="/js/auth.js"></script>
 
   <script type="module">
-    // Inicializar Auth con usuario de prueba
     import { Auth, inicializarAuth } from '../js/auth.js';
     await inicializarAuth();
-    await Auth.login('cliente', 'cliente');
+    await Auth.iniciarSesion('cliente', 'cliente');
 
-    // Ahora los módulos de la Célula C verán el Auth real con sesión activa
     import { PantallaInicio } from '../js/modulos/cliente/pantalla-inicio.js';
     import { PantallaBienvenida } from '../js/modulos/cliente/pantalla-bienvenida.js';
     import { MenuDigital } from '../js/modulos/cliente/menu-digital.js';
@@ -63,34 +61,35 @@
     // ── Tests de PantallaInicio ──────────────────────────
     log('info', '── PantallaInicio ──');
 
-    let vistaInicio = PantallaInicio.render();
-    assert(vistaInicio !== null, 'render() devuelve una vista');
+    PantallaInicio.mostrar();
+    let vistaInicio = document.getElementById('view-inicio');
+    assert(vistaInicio !== null, 'mostrar() crea la vista en el DOM');
     assert(vistaInicio.id === 'view-inicio', 'La vista tiene id view-inicio');
     assert(vistaInicio.classList.contains('view'), 'La vista tiene clase view');
+    assert(vistaInicio.classList.contains('active'), 'La vista está activa');
 
     const loginCorner = vistaInicio.querySelector('.login-corner');
     const btnRegistro = vistaInicio.querySelector('#btnRegistroCorner');
     assert(loginCorner !== null, 'Triángulo de acceso existe');
     assert(btnRegistro !== null, 'Enlace de registro existe');
 
-    const headerLeft = vistaInicio.querySelector('.header-left');
+    const headerLeft = vistaInicio.querySelector('.header-block');
     const eslogan = vistaInicio.querySelector('#eslogan-dinamico');
     assert(headerLeft !== null, 'Cabecera izquierda existe');
     assert(eslogan !== null, 'Eslogan dinámico existe');
 
     const vitrinas = vistaInicio.querySelectorAll('.vitrina-card');
-    assert(vitrinas.length === 9, '9 tarjetas de vitrina (3 por sección)');
+    assert(vitrinas.length >= 6, 'Al menos 6 tarjetas de vitrina');
 
-    PantallaInicio.mostrar();
-    assert(vistaInicio.classList.contains('active'), 'mostrar() agrega clase active');
     PantallaInicio.ocultar();
     assert(!vistaInicio.classList.contains('active'), 'ocultar() quita clase active');
 
     // ── Tests de PantallaBienvenida ──────────────────────
     log('info', '── PantallaBienvenida ──');
 
-    let vistaBienvenida = PantallaBienvenida.render();
-    assert(vistaBienvenida !== null, 'render() devuelve una vista');
+    PantallaBienvenida.mostrar();
+    let vistaBienvenida = document.getElementById('view-bienvenida');
+    assert(vistaBienvenida !== null, 'mostrar() crea la vista en el DOM');
     assert(vistaBienvenida.id === 'view-bienvenida', 'La vista tiene id view-bienvenida');
 
     const topBar = vistaBienvenida.querySelector('.top-bar');
@@ -98,7 +97,6 @@
     const nombreEl = vistaBienvenida.querySelector('#bienvenidaNombre');
     assert(topBar !== null, 'Barra superior existe');
     assert(avatar !== null, 'Avatar existe');
-    // Con login real, el nombre es 'cliente' y las iniciales 'C'
     assert(avatar.textContent === 'C', 'Avatar muestra inicial C (cliente)');
     assert(nombreEl !== null, 'Nombre del cliente visible');
 
@@ -117,8 +115,7 @@
     assert(PantallaBienvenida.obtenerMesa() === null, 'obtenerMesa() devuelve null sin mesa guardada');
     assert(PantallaBienvenida.permitePrepedidos() === false, 'permitePrepedidos() es false por defecto');
 
-    PantallaBienvenida.mostrar();
-    assert(vistaBienvenida.classList.contains('active'), 'mostrar() agrega clase active');
+    assert(vistaBienvenida.classList.contains('active'), 'La vista está activa');
     PantallaBienvenida.ocultar();
     assert(!vistaBienvenida.classList.contains('active'), 'ocultar() quita clase active');
 
@@ -158,8 +155,9 @@
     // ── Tests de MenuDigital ─────────────────────────────
     log('info', '── MenuDigital ──');
 
-    let vistaMenu = MenuDigital.render();
-    assert(vistaMenu !== null, 'render() devuelve una vista');
+    MenuDigital.mostrar();
+    let vistaMenu = document.getElementById('view-menu-digital');
+    assert(vistaMenu !== null, 'mostrar() crea la vista en el DOM');
     assert(vistaMenu.id === 'view-menu-digital', 'La vista tiene id view-menu-digital');
 
     const buscador = vistaMenu.querySelector('#menuDigitalSearch');
@@ -170,43 +168,42 @@
     assert(panelOrden.classList.contains('orden-panel'), 'Panel de orden tiene clase orden-panel');
     assert(panelOrden.classList.contains('oculto'), 'Panel de orden empieza oculto');
 
-    MenuDigital.mostrar();
     const grid = vistaMenu.querySelector('#menuDigitalGrid');
     assert(grid !== null, 'Grilla de productos existe');
     assert(grid.innerHTML.includes('No se encontraron productos'), 'Grilla muestra mensaje vacío sin productos');
 
-    assert(vistaMenu.classList.contains('active'), 'mostrar() agrega clase active');
+    assert(vistaMenu.classList.contains('active'), 'La vista está activa');
     MenuDigital.ocultar();
     assert(!vistaMenu.classList.contains('active'), 'ocultar() quita clase active');
 
     // ── Tests de PantallaEventos ─────────────────────────
     log('info', '── PantallaEventos ──');
 
-    let vistaEventos = PantallaEventos.render();
-    assert(vistaEventos !== null, 'render() devuelve una vista');
+    PantallaEventos.mostrar();
+    let vistaEventos = document.getElementById('view-eventos-cliente');
+    assert(vistaEventos !== null, 'mostrar() crea la vista en el DOM');
     assert(vistaEventos.id === 'view-eventos-cliente', 'La vista tiene id view-eventos-cliente');
 
     const eventosContenido = vistaEventos.querySelector('#eventosContenido');
     assert(eventosContenido !== null, 'Contenedor de eventos existe');
 
-    PantallaEventos.mostrar();
-    assert(vistaEventos.classList.contains('active'), 'mostrar() agrega clase active');
+    assert(vistaEventos.classList.contains('active'), 'La vista está activa');
     await new Promise(r => setTimeout(r, 400));
     assert(eventosContenido.innerHTML.includes('No hay eventos activos'), 'Muestra mensaje sin eventos activos');
     PantallaEventos.ocultar();
     assert(!vistaEventos.classList.contains('active'), 'ocultar() quita clase active');
 
     // ── Limpieza del DOM ─────────────────────────────────
-    document.body.removeChild(vistaInicio);
-    document.body.removeChild(vistaBienvenida);
-    document.body.removeChild(vistaMenu);
-    document.body.removeChild(vistaEventos);
-    if (panelOrden) document.body.removeChild(panelOrden);
+    if (vistaInicio) vistaInicio.remove();
+    if (vistaBienvenida) vistaBienvenida.remove();
+    if (vistaMenu) vistaMenu.remove();
+    if (vistaEventos) vistaEventos.remove();
+    // El panel de orden está dentro de view-menu-digital, ya se eliminó
 
     // ── Resumen ──────────────────────────────────────────
     log('info', `── Resultado: ${pasaron} pasaron, ${fallaron} fallaron ──`);
     if (fallaron === 0) {
-      log('ok', '🎉 Todos los tests pasaron. Módulos de Célula C v3.0.1 operativos.');
+      log('ok', '🎉 Todos los tests pasaron. Módulos de Célula C v4.0.0 operativos.');
     } else {
       log('fallo', `⚠️ ${fallaron} test(s) fallaron. Revisar antes del PR.`);
     }

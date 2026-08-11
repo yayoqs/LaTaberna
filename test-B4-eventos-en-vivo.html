@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test B4 – Eventos en Vivo (integración mínima)</title>
+  <style>
+    body { font-family: system-ui; background: #1a1a1a; color: #e0e0e0; padding: 30px; }
+    .ok { color: #22c55e; }
+    .fallo { color: #ef4444; }
+  </style>
+</head>
+<body>
+  <h1>Test B4 – Carga del módulo</h1>
+  <div id="resultados"></div>
+  <main id="view-eventos-en-vivo" class="view"></main>
+
+  <script>
+    // Mocks inline
+    const mockAuthCode = `export const Auth = { obtenerRol() { return 'artista'; }, obtenerNombre() { return 'Test'; } };`;
+    const mockLoggerCode = `export const Logger = { info:()=>{}, warn:()=>{}, error:()=>{} };`;
+    const mockUtilsCode = `export function mostrarToast(){};`;
+    const mockDBAppwriteCode = `export const DBAppwrite = { habilitado:true, COLECCIONES:{eventos_en_vivo:'ev'}, async crear(){return {id:'1'};}, async actualizar(){} };`;
+    const blobs = {
+      auth: new Blob([mockAuthCode], {type:'application/javascript'}),
+      logger: new Blob([mockLoggerCode], {type:'application/javascript'}),
+      utils: new Blob([mockUtilsCode], {type:'application/javascript'}),
+      db: new Blob([mockDBAppwriteCode], {type:'application/javascript'})
+    };
+    const map = { imports: {
+      "../../auth.js": URL.createObjectURL(blobs.auth),
+      "../../lib/logger.js": URL.createObjectURL(blobs.logger),
+      "../../utils.js": URL.createObjectURL(blobs.utils),
+      "../../db-appwrite.js": URL.createObjectURL(blobs.db)
+    }};
+    const scriptMap = document.createElement('script');
+    scriptMap.type = 'importmap';
+    scriptMap.textContent = JSON.stringify(map);
+    document.head.appendChild(scriptMap);
+  </script>
+
+  <script type="module">
+    const res = document.getElementById('resultados');
+    function log(ok, msg) {
+      const d = document.createElement('div');
+      d.className = ok ? 'ok' : 'fallo';
+      d.textContent = (ok ? '✔ ' : '✘ ') + msg;
+      res.appendChild(d);
+    }
+
+    try {
+      // Importar el módulo real y EventBus real
+      const { EventosEnVivo } = await import('./js/modulos/admin/eventos-en-vivo.js');
+      const { EventBus } = await import('./js/lib/eventBus.js');
+
+      // Activar la vista
+      const vista = document.getElementById('view-eventos-en-vivo');
+      vista.innerHTML = '';
+      EventBus.emit('vista:cambiada', 'eventos-en-vivo');
+      await new Promise(r => setTimeout(r, 200));
+
+      // Verificar existencia de elementos clave
+      const badge = document.getElementById('estadoEvento');
+      const sel = document.getElementById('selTipoEvento');
+      log(!!badge, 'Badge de estado presente');
+      log(!!sel, 'Selector de tipo de evento presente');
+
+      if (badge && sel) {
+        // Prueba rápida: crear evento de bingo
+        sel.value = 'bingo';
+        await EventosEnVivo.crearEvento();
+        log(badge.textContent.includes('bingo'), 'Evento de bingo creado');
+        log(badge.textContent.includes('configuracion'), 'Estado configuración');
+      } else {
+        log(false, 'No se pudo probar la funcionalidad porque la UI no se cargó completamente.');
+      }
+    } catch (e) {
+      log(false, 'Error al importar: ' + e.message);
+    }
+  </script>
+</body>
+</html>

@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/config.js
-   Versión: 2.0.2
+   Versión: 2.0.3
    Propósito: Vista de configuración del local: datos, zonas, impresoras,
               mozos y contraseñas.
-              v2.0.2: corrige verificación redundante de esMasterReal.
+              v2.0.3: despacha MOZOS_INICIALIZAR al agregar/eliminar mozo.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -210,7 +210,6 @@ const Config = (() => {
   }
 
   async function _mostrarCambiarPassword(nombreUsuario) {
-    // ✅ Corrección H11: verificación simple, sin redundancia
     if (!Auth.esMasterReal()) {
       mostrarToast('error', 'Solo el master puede cambiar contraseñas');
       return;
@@ -349,9 +348,12 @@ const Config = (() => {
   function agregarMozo() {
     const nombre = document.getElementById('nuevoMozoNombre').value.trim();
     if (!nombre) return;
-    DB.mozos.push({ id: 'mozo_' + Date.now(), nombre, activo: true });
+    const nuevoMozo = { id: 'mozo_' + Date.now(), nombre, activo: true };
+    DB.mozos.push(nuevoMozo);
     DB.saveMozos();
     document.getElementById('nuevoMozoNombre').value = '';
+    // ✅ Despachar acción para que el Store se actualice y la UI se refresque
+    Store.despachar({ type: 'MOZOS_INICIALIZAR', payload: [...DB.mozos] });
     mostrarToast('success', 'Mozo añadido');
   }
 
@@ -360,6 +362,8 @@ const Config = (() => {
     if (!confirmado) return;
     DB.mozos.splice(idx, 1);
     DB.saveMozos();
+    // ✅ Despachar acción para refrescar la UI
+    Store.despachar({ type: 'MOZOS_INICIALIZAR', payload: [...DB.mozos] });
     mostrarToast('warning', 'Mozo eliminado');
   }
 

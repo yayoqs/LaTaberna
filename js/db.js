@@ -1,11 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db.js
-   Versión: 1.1.0
+   Versión: 1.1.1
    Propósito: Orquestador de base de datos (Appwrite + localStorage).
-              v1.1.0: carga unificada de pedidos, eliminados métodos
-                      de delivery separados, adaptado a nuevo esquema
-                      de Mesas (numero varchar).
+              v1.1.1: corregido tipo: 'salon' → 'local' en crearPedido.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';

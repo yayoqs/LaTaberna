@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — Módulo (ES6)
    Archivo: js/modulos/cliente/pantalla-inicio.js
-   Versión: 2.1.5
+   Versión: 2.1.6
    Propósito: Pantalla de inicio con triángulo neón, cabecera,
              vitrinas con imagen, títulos de sección y modal expansivo.
-             Corregida la gestión del listener de cierre de login.
+             Botón del modal ahora llama a _mostrarLogin().
    ================================================================ */
 
 import { Auth } from '../../auth.js';
@@ -22,7 +22,7 @@ const PantallaInicio = (() => {
   ];
 
   let _cbLoginCorner, _cbModalClose, _cbModalAction;
-  let _cbCerrarModalLogin = null;  // ← nueva referencia para limpiar
+  let _cbCerrarModalLogin = null;
   let _modalCards = [];
 
   function _asegurarVista() {
@@ -214,7 +214,6 @@ const PantallaInicio = (() => {
       document.getElementById('btnLoginCorner').removeEventListener('click', _cbLoginCorner);
     }
 
-    // Eliminar listener del botón de cerrar modal de login
     if (_cbCerrarModalLogin) {
       const btnCerrar = document.getElementById('btnCerrarModalLogin');
       if (btnCerrar) btnCerrar.removeEventListener('click', _cbCerrarModalLogin);
@@ -271,11 +270,7 @@ const PantallaInicio = (() => {
 
     _cbModalAction = () => {
       modal.classList.remove('active');
-      const loginCorner = document.getElementById('btnLoginCorner');
-      if (loginCorner) {
-        loginCorner.style.transform = 'scale(1.1)';
-        setTimeout(() => { loginCorner.style.transform = 'scale(1)'; }, 300);
-      }
+      _mostrarLogin();  // ← Ahora abre el modal de login
     };
     mActionBtn.addEventListener('click', _cbModalAction);
   }
@@ -310,7 +305,6 @@ const PantallaInicio = (() => {
   function _mostrarLogin() {
     if (typeof Auth.mostrarLogin === 'function') Auth.mostrarLogin();
 
-    // Eliminar listener previo antes de agregar uno nuevo
     if (_cbCerrarModalLogin) {
       const btnCerrarPrev = document.getElementById('btnCerrarModalLogin');
       if (btnCerrarPrev) btnCerrarPrev.removeEventListener('click', _cbCerrarModalLogin);

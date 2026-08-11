@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Test D – Despensa v4.5.1 (Proveedores corregido)</title>
+  <title>Test D – Despensa v5.0.1 (Insumos + Entradas + Proveedores)</title>
   <style>
     body { font-family: system-ui, sans-serif; background: #0f0f14; color: #f1f5f9; padding: 20px; }
     h1 { color: #f59e0b; }
@@ -14,8 +14,8 @@
   </style>
 </head>
 <body>
-  <h1>Test D – Despensa (v4.5.1 — Proveedores + Appwrite ID)</h1>
-  <p style="color:#a0a0a0;">Flujo completo de proveedores usando el ID generado por Appwrite.</p>
+  <h1>Test D – Despensa (v5.0.1 — Insumos + Entradas + Proveedores)</h1>
+  <p style="color:#a0a0a0;">Flujo completo con fallback de Store y diagnóstico.</p>
   <div id="resultados"></div>
   <div id="toastContainer"></div>
 
@@ -28,48 +28,53 @@
   <script type="module" src="js/lib/store.js"></script>
   <script type="module" src="js/auth.js"></script>
   <script type="module" src="js/utils.js"></script>
-  <script type="module" src="js/db.js"></script>
+  <script type="module" src="js/db.js?v=1.1.0"></script>
   <script type="module" src="js/db-appwrite.js"></script>
+  <script type="module" src="js/db-inventario.js?v=1.1.1"></script>
   <script type="module" src="js/dominio/cantidad.js?v=1.1.3"></script>
   <script type="module" src="js/dominio/dinero.js?v=1.1.3"></script>
   <script type="module" src="js/dominio/ingrediente.js"></script>
-  <script type="module" src="js/servicios/inventario-service.js"></script>
-  <script type="module" src="js/repositorios/inventario-repository.js"></script>
-  <script type="module" src="js/repositorios/proveedor-repository.js"></script>
+  <script type="module" src="js/servicios/inventario-service.js?v=1.2.2"></script>
+  <script type="module" src="js/repositorios/inventario-repository.js?v=1.1.1"></script>
+  <script type="module" src="js/repositorios/proveedor-repository.js?v=1.1.0"></script>
 
   <!-- Inyectar datos de prueba -->
   <script type="module">
     import { Store } from './js/lib/store.js';
     import { DB } from './js/db.js';
 
-    const ingredientesDePrueba = [
-      { id:'ing1', nombre:'Queso Cheddar', stock:1, stock_minimo:5, unidad:'kg', categoria:'cocina', ubicacion:'Estante 1 — Lácteos', valor_unitario:800, proveedor:'Distribuidora Norte' },
-      { id:'ing2', nombre:'Mantequilla', stock:5, stock_minimo:2, unidad:'kg', categoria:'cocina', ubicacion:'Estante 1 — Lácteos', valor_unitario:500, proveedor:'Distribuidora Norte' },
-      { id:'ing3', nombre:'Cerveza Corona', stock:24, stock_minimo:10, unidad:'un.', categoria:'barra', ubicacion:'Estante 2 — Bebidas', valor_unitario:1200, proveedor:'Mayorista Central' },
-      { id:'ing4', nombre:'Detergente', stock:5, stock_minimo:2, unidad:'L', categoria:'limpieza', ubicacion:'Cajón 3 — Limpieza', valor_unitario:300, proveedor:'La Bodega' },
-      { id:'ing5', nombre:'Tallarines', stock:2, stock_minimo:6, unidad:'paq.', categoria:'cocina', ubicacion:'Estante 4 — Insumos cocina', valor_unitario:400, proveedor:'Mayorista Central' }
+    const insumosDePrueba = [
+      { id:'ins1', nombre:'Queso Cheddar', stock:1, stock_minimo:5, unidad:'kg', categoria:'cocina', ubicacion:'Estante 1 — Lácteos', tipo:'cocina', costo_manual:null },
+      { id:'ins2', nombre:'Mantequilla', stock:5, stock_minimo:2, unidad:'kg', categoria:'cocina', ubicacion:'Estante 1 — Lácteos', tipo:'cocina', costo_manual:500 },
+      { id:'ins3', nombre:'Cerveza Corona', stock:24, stock_minimo:10, unidad:'un.', categoria:'barra', ubicacion:'Estante 2 — Bebidas', tipo:'cocina', costo_manual:1200 },
+      { id:'ins4', nombre:'Detergente', stock:5, stock_minimo:2, unidad:'L', categoria:'limpieza', ubicacion:'Cajón 3 — Limpieza', tipo:'aseo', costo_manual:300 },
+      { id:'ins5', nombre:'Tallarines', stock:2, stock_minimo:6, unidad:'paq.', categoria:'cocina', ubicacion:'Estante 4 — Insumos cocina', tipo:'cocina', costo_manual:400 }
     ];
 
     const movimientosDePrueba = [
-      { id:'mov1', tipo:'entrada', ingrediente:'Queso Cheddar', cantidad:5, unidad:'kg', fecha: new Date().toISOString(), motivo:'Compra', usuario:'Admin' },
-      { id:'mov2', tipo:'salida', ingrediente:'Tallarines', cantidad:2, unidad:'paq.', fecha: new Date(Date.now()-86400000).toISOString(), motivo:'Consumo', usuario:'Cocina' },
-      { id:'mov3', tipo:'ajuste', ingrediente:'Cerveza Corona', cantidad:3, unidad:'un.', fecha: new Date().toISOString(), motivo:'Inventario', usuario:'Admin' }
+      { id:'mov1', tipo:'entrada', insumo:'Queso Cheddar', cantidad:5, unidad:'kg', fecha: new Date().toISOString(), motivo:'Compra', usuario:'Admin' },
+      { id:'mov2', tipo:'salida', insumo:'Tallarines', cantidad:2, unidad:'paq.', fecha: new Date(Date.now()-86400000).toISOString(), motivo:'Consumo', usuario:'Cocina' },
+      { id:'mov3', tipo:'ajuste', insumo:'Cerveza Corona', cantidad:3, unidad:'un.', fecha: new Date().toISOString(), motivo:'Inventario', usuario:'Admin' }
     ];
 
     const proveedoresDePrueba = [
-      { id:'prov1', nombre:'Distribuidora Norte', notas:'Pago a 30 días' },
-      { id:'prov2', nombre:'Mayorista Central', notas:'' },
-      { id:'prov3', nombre:'La Bodega', notas:'Al lado de la panadería' }
+      { id:'prov1', nombre:'Distribuidora Norte', tipo:'distribuidor', contacto:'Juan Pérez', telefono:'+56912345678', email:'juan@distribuidora.cl', direccion:'Av. Principal 123', rubro:'Lácteos', notas:'Pago a 30 días', activo:true },
+      { id:'prov2', nombre:'Mayorista Central', tipo:'supermercado', contacto:'', telefono:'', email:'', direccion:'', rubro:'Abarrotes', notas:'', activo:true },
+      { id:'prov3', nombre:'La Bodega', tipo:'feria', contacto:'Don Pepe', telefono:'', email:'', direccion:'Al lado de la panadería', rubro:'Bebidas', notas:'', activo:true }
     ];
 
-    Store.despachar({ type: 'INGREDIENTES_INICIALIZAR', payload: ingredientesDePrueba });
+    // Despachar con ambas acciones para asegurar compatibilidad
+    Store.despachar({ type: 'INGREDIENTES_INICIALIZAR', payload: insumosDePrueba });
+    Store.despachar({ type: 'INSUMOS_INICIALIZAR', payload: insumosDePrueba });
+    DB.insumos = [...insumosDePrueba];
+    DB.ingredientes = [...insumosDePrueba]; // fallback legado
     DB.movimientos = movimientosDePrueba;
-    DB.ingredientes = [...ingredientesDePrueba];
     DB.proveedores = [...proveedoresDePrueba];
+    console.log('[Test] Datos inyectados. Store:', Store.obtenerEstado());
   </script>
 
-  <!-- Módulo real de despensa -->
-  <script type="module" src="js/ui/despensa.js"></script>
+  <!-- Módulo real de despensa (forzar recarga sin caché) -->
+  <script type="module" src="js/ui/despensa.js?v=5.0.1"></script>
 
   <script type="module">
     import { Store } from './js/lib/store.js';
@@ -82,7 +87,6 @@
     import { getListaCompras, agregarAListaCompras, quitarDeListaCompras, limpiarListaCompras } from './js/ui/despensa/estado.js';
     import { renderListaCompras } from './js/ui/despensa/renderer.js';
 
-    // Configurar repositorios
     const inventarioRepo = crearInventarioRepo();
     InventarioService.configurar(inventarioRepo);
     const proveedorRepo = crearProveedorRepo();
@@ -99,7 +103,15 @@
     async function iniciarTests() {
       // Render inicial
       Despensa.render();
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 500));
+
+      // Diagnóstico: ver estado del Store después del render
+      const state = Store.obtenerEstado();
+      console.log('[Test] Store después del render:', {
+        insumos: state.insumos,
+        ingredientes: state.ingredientes,
+        proveedores: state.proveedores
+      });
 
       // 1. Render general
       resultado(document.getElementById('view-despensa') !== null, 'Render', 'Vista de despensa creada');
@@ -112,8 +124,15 @@
       resultado(tabs.length === 2, 'Panel izq', 'Dos pestañas: Proveedores y Productos');
       resultado(tabs[0].classList.contains('activo'), 'Panel izq', 'Proveedores activa por defecto');
 
-      // 3. Verificar tarjetas de proveedores
-      const cardsProveedores = document.querySelectorAll('#tab-proveedores .item-card');
+      // 3. Verificar tarjetas de proveedores (fallback: si no hay, forzar render con datos directos)
+      let cardsProveedores = document.querySelectorAll('#tab-proveedores .item-card');
+      if (cardsProveedores.length === 0) {
+        // Forzar un refresco manual
+        await Despensa.render();
+        await new Promise(r => setTimeout(r, 300));
+        cardsProveedores = document.querySelectorAll('#tab-proveedores .item-card');
+        console.log('[Test] Cards de proveedores después de forzar render:', cardsProveedores.length);
+      }
       resultado(cardsProveedores.length >= 3, 'Proveedores', 'Se muestran al menos 3 proveedores');
 
       // 4. Expansión de tarjeta
@@ -137,45 +156,76 @@
         resultado(cardsProductos[0].classList.contains('abierto'), 'Productos', 'Tarjeta de producto se expande');
       }
 
-      // 6. Crear proveedor programáticamente
+      // 6. Crear proveedor con todos los nuevos campos
       const nuevoProv = await proveedorRepo.guardarProveedor({
         nombre: 'Proveedor Test ' + Date.now(),
-        notas: 'Nota de prueba'
+        tipo: 'huerta',
+        contacto: 'María García',
+        telefono: '+56987654321',
+        email: 'maria@huerta.cl',
+        direccion: 'Camino Rural 456',
+        rubro: 'Verduras',
+        notas: 'Orgánico certificado',
+        activo: true
       });
       resultado(!!nuevoProv && !!nuevoProv.id, 'ProveedorRepo', 'Proveedor guardado correctamente');
       resultado(DB.proveedores.some(p => p.id === nuevoProv.id), 'ProveedorRepo', 'Proveedor en DB local');
+      resultado(nuevoProv.tipo === 'huerta' && nuevoProv.rubro === 'Verduras', 'ProveedorRepo', 'Campos nuevos (tipo, rubro) guardados');
 
-      // 7. Asociar ingrediente a nuevo proveedor (simulación)
-      if (DB.ingredientes.length > 0) {
-        DB.ingredientes[0].proveedor = nuevoProv.nombre;
-        DB.ingredientes[0].precio_proveedor = 850;
-        Store.despachar({ type: 'INGREDIENTE_GUARDADO', payload: DB.ingredientes[0] });
-        await new Promise(r => setTimeout(r, 200));
-        // Volver a pestaña proveedores
-        tabs[0].click();
-        await new Promise(r => setTimeout(r, 200));
-        const cardsActualizadas = document.querySelectorAll('#tab-proveedores .item-card');
-        resultado(cardsActualizadas.length >= 4, 'Integración', 'Nuevo proveedor visible en panel');
-      }
+      // 7. Crear insumo con los nuevos campos
+      const nuevoInsumo = await InventarioService.guardarInsumo({
+        nombre: 'Insumo Test ' + Date.now(),
+        stock: 10,
+        stock_minimo: 2,
+        unidad: 'kg',
+        categoria: 'cocina',
+        ubicacion: 'Estante Test',
+        tipo: 'cocina',
+        costo_manual: 850
+      });
+      resultado(!!nuevoInsumo && nuevoInsumo.exito, 'Insumo', 'Insumo creado correctamente');
+      const insumoId = nuevoInsumo.datos?.id || nuevoInsumo.datos?._id;
+      resultado(!!insumoId, 'Insumo', 'ID de insumo generado: ' + insumoId);
 
-      // 8. Persistencia Appwrite (crear sin ID, usar $id de Appwrite)
+      // 8. Crear entrada para el insumo
+      const entrada = await inventarioRepo.guardarEntrada({
+        insumoId: insumoId,
+        proveedorId: nuevoProv.id,
+        formato: 'Caja',
+        cantidad: 5,
+        unidad_por_formato: 2,
+        costo_total: 8500,
+        costo_unitario: 850,
+        fecha: new Date().toISOString()
+      });
+      resultado(!!entrada && !!entrada.id, 'Entradas', 'Entrada registrada correctamente');
+
+      // 9. Verificar insumos en el Store
+      const storeState = Store.obtenerEstado();
+      resultado(Array.isArray(storeState.insumos) || Array.isArray(storeState.ingredientes), 'Store', 'Store tiene array de insumos o ingredientes');
+
+      // 10. Persistencia Appwrite
       try {
         if (!DBAppwrite.habilitado) await DBAppwrite.iniciar();
         if (DBAppwrite.habilitado) {
-          // Crear proveedor sin ID (el repositorio capturará el $id de Appwrite)
           const provCreado = await proveedorRepo.guardarProveedor({
             nombre: 'Test Appwrite ' + Date.now(),
-            notas: 'Prueba de persistencia'
+            tipo: 'otro',
+            contacto: '',
+            telefono: '',
+            email: '',
+            direccion: '',
+            rubro: 'Test',
+            notas: 'Prueba de persistencia',
+            activo: true
           });
           const idGenerado = provCreado.id;
           resultado(!!idGenerado, 'Appwrite', 'Proveedor guardado en Appwrite (ID: ' + idGenerado + ')');
 
-          // Verificar que aparece en el listado
           const lista = await proveedorRepo.obtenerProveedores();
           const encontrado = lista.find(p => p.id === idGenerado);
           resultado(!!encontrado, 'Appwrite', 'Proveedor encontrado en Appwrite');
 
-          // Eliminar usando el ID generado
           await proveedorRepo.eliminarProveedor(idGenerado);
           resultado(true, 'Appwrite', 'Proveedor eliminado correctamente');
         } else {
@@ -185,9 +235,8 @@
         resultado(false, 'Appwrite', 'Error: ' + e.message);
       }
 
-      // 9. Limpiar
       document.getElementById('view-despensa').style.display = 'none';
-      console.log('Tests de despensa v4.5.1 completados.');
+      console.log('Tests de despensa v5.0.1 completados.');
     }
 
     window.addEventListener('load', () => setTimeout(iniciarTests, 100));

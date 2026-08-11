@@ -22,7 +22,6 @@
   <div id="results"></div>
   <button onclick="location.reload()">🔄 Ejecutar de nuevo</button>
 
-  <!-- Solo el SDK de Appwrite como script global -->
   <script src="/js/appwrite.min.js"></script>
 
   <script type="module">
@@ -31,10 +30,12 @@
     import { Store } from './js/lib/store.js';
     import { DBAppwrite } from './js/db-appwrite.js';
     import { DB } from './js/db.js';
+    import { Auth } from './js/auth.js';
+    import { inicializarAuth } from './js/auth.js';
 
     (function() {
-      var resultsEl = document.getElementById('results');
-      var passed = 0, failed = 0;
+      const resultsEl = document.getElementById('results');
+      let passed = 0, failed = 0;
 
       function assert(condition, msg) {
         if (condition) {
@@ -46,13 +47,28 @@
         }
       }
 
+      function logInfo(msg) {
+        resultsEl.innerHTML += '<div class="info">' + msg + '</div>';
+      }
+
       async function runTests() {
         resultsEl.innerHTML = '';
         Logger.setLevel('ERROR');
 
+        // ── Suite 0: Autenticación ───────────────────────
+        resultsEl.innerHTML += '<h2>0. Autenticación (master)</h2>';
+        await inicializarAuth();
+        const loginOk = await Auth.iniciarSesion('master', 'master123');
+        assert(loginOk === true, 'Login como master exitoso');
+        if (!loginOk) {
+          resultsEl.innerHTML += '<div class="fail">No se pudo autenticar como master.</div>';
+          return;
+        }
+        assert(Auth.obtenerRol() === 'master', 'Rol master confirmado');
+
         // ── Suite 1: Iniciar DBAppwrite ──────────────────
         resultsEl.innerHTML += '<h2>1. Iniciar DBAppwrite (TablesDB)</h2>';
-        var appwriteOk = await DBAppwrite.iniciar();
+        const appwriteOk = await DBAppwrite.iniciar();
         assert(appwriteOk === true, 'DBAppwrite.iniciar() exitoso');
         assert(DBAppwrite.habilitado === true, 'DBAppwrite.habilitado = true');
         if (!appwriteOk) {
@@ -60,23 +76,17 @@
           return;
         }
 
-        // Mock de Auth con los nombres actuales de las funciones
-        window.Auth = {
-          obtenerEspacioActivo: function() { return { id: 'esp_taberna' }; },
-          getEspacioActivo: function() { return { id: 'esp_taberna' }; } // alias por si acaso
-        };
-
-        // ── Suite 2: Listar colecciones (paralelo) ───────
-        resultsEl.innerHTML += '<h2>2. Listar colecciones (paralelo)</h2>';
-        var colecciones = [
+        // ── Suite 2: Listar colecciones activas ──────────
+        resultsEl.innerHTML += '<h2>2. Listar colecciones activas (14)</h2>';
+        const colecciones = [
           'productos', 'pedidos', 'mesas', 'comandas',
-          'ingredientes', 'recetas', 'pedidos_delivery',
-          'usuarios', 'configuracion', 'precargas_cliente',
+          'insumos', 'recetas', 'staff', 'configuracion',
           'eventos_en_vivo', 'menus', 'proveedores',
+          'entradas', 'comensales',
           'global_perfiles', 'global_puntos', 'global_eventos', 'global_espacios'
         ];
 
-        var resultados = {};
+        const resultados = {};
         await Promise.all(colecciones.map(function(col) {
           return DBAppwrite.listar(col).then(function(lista) {
             resultados[col] = lista;
@@ -85,9 +95,9 @@
           });
         }));
 
-        for (var i = 0; i < colecciones.length; i++) {
-          var col = colecciones[i];
-          var lista = resultados[col];
+        for (let i = 0; i < colecciones.length; i++) {
+          const col = colecciones[i];
+          const lista = resultados[col];
           if (lista && Array.isArray(lista)) {
             assert(true, col + ': ' + lista.length + ' documentos');
           } else {
@@ -95,61 +105,88 @@
           }
         }
 
-        // ── Suite 3: CRUD básico ─────────────────────────
-        resultsEl.innerHTML += '<h2>3. CRUD básico en pedidos</h2>';
+        // ── Suite 3: CRUD básico en pedidos ─────────────
+        resultsEl.innerHTML += '<h2>3. CRUD básico en pedidos (nuevo modelo)</h2>';
         try {
-          var doc = {
-            mesa: 999, mozo: 'Test', comensales: 1, estado: 'abierta',
-            items: '[]', total: 0
+          const doc = {
+            mesa: '999',
+            tipo: 'local',
+            origen: 'staff',
+            mozo: 'Test',
+            comensales: 1,
+            estado: 'abierta',
+            items: '[]',
+            total: 0,
+            transacciones: '[]'
           };
-          var creado = await DBAppwrite.crear('pedidos', 'unique()', doc);
-          assert(!!creado && !!creado.id, 'Documento creado: ' + (creado ? creado.id : 'falló'));
-          var leido = await DBAppwrite.listar('pedidos').then(l => l.find(p => p.id === creado.id));
-          assert(leido && leido.mesa === 999, 'Lectura correcta');
+          const creado = await DBAppwrite.crear('pedidos', 'unique()', doc);
+          assert(!!creado && !!creado.id, 'Pedido creado: ' + (creado ? creado.id : 'falló'));
+          const leido = await DBAppwrite.listar('pedidos').then(l => l.find(p => p.id === creado.id));
+          assert(leido && leido.tipo === 'local', 'Lectura correcta (tipo = local)');
+          assert(leido && leido.origen === 'staff', 'Lectura correcta (origen = staff)');
           await DBAppwrite.eliminar('pedidos', creado.id);
-          assert(true, 'Documento eliminado');
+          assert(true, 'Pedido eliminado');
         } catch(e) {
           assert(false, 'Error CRUD: ' + e.message);
         }
 
         // ── Suite 4: Integración con Store ───────────────
         resultsEl.innerHTML += '<h2>4. Integración Appwrite → Store</h2>';
-        // El mock de Auth ya está definido arriba
-        window.PedidoManager = window.PedidoManager || { getTurnoActual: function() { return { id: 'test', estado: 'abierto' }; }, registrar: function() {} };
 
-        var productos = resultados.productos || [];
-        var pedidos = resultados.pedidos || [];
-        var mesas = resultados.mesas || [];
-        var ingredientes = resultados.ingredientes || [];
-        var recetas = resultados.recetas || [];
+        const productos = resultados.productos || [];
+        const pedidos = resultados.pedidos || [];
+        const mesas = resultados.mesas || [];
+        const insumos = resultados.insumos || [];
+        const recetas = resultados.recetas || [];
 
         DB.productos = productos.map(p => DB._normalizarProducto(p));
         DB.pedidos = pedidos;
         DB.mesas = mesas.length ? mesas.map(m => DB._normalizarMesa(m)) : DB.mesas;
-        DB.ingredientes = ingredientes.map(i => DB._normalizarIngrediente(i));
+        DB.insumos = insumos.map(i => DB._normalizarInsumo(i));
         DB.recetas = recetas;
 
-        Store.dispatch({ type: 'PRODUCTOS_INICIALIZAR', payload: DB.productos });
-        Store.dispatch({ type: 'PEDIDOS_INICIALIZAR', payload: DB.pedidos });
-        Store.dispatch({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
-        Store.dispatch({ type: 'INGREDIENTES_INICIALIZAR', payload: DB.ingredientes });
-        Store.dispatch({ type: 'RECETAS_INICIALIZAR', payload: DB.recetas });
+        Store.despachar({ type: 'PRODUCTOS_INICIALIZAR', payload: DB.productos });
+        Store.despachar({ type: 'PEDIDOS_INICIALIZAR', payload: DB.pedidos });
+        Store.despachar({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
+        Store.despachar({ type: 'INGREDIENTES_INICIALIZAR', payload: DB.insumos });
+        Store.despachar({ type: 'RECETAS_INICIALIZAR', payload: DB.recetas });
 
-        var state = Store.getState();
+        const state = Store.obtenerEstado();
         assert(state.productos.length === productos.length, 'Store tiene ' + state.productos.length + ' productos');
         assert(state.pedidos.length === pedidos.length, 'Store tiene ' + state.pedidos.length + ' pedidos');
-        assert(state.ingredientes.length === ingredientes.length, 'Store tiene ingredientes');
-        assert(state.recetas.length === recetas.length, 'Store tiene recetas');
+        assert(state.ingredientes.length === insumos.length, 'Store tiene ' + state.ingredientes.length + ' insumos');
+        assert(state.recetas.length === recetas.length, 'Store tiene ' + state.recetas.length + ' recetas');
 
         if (productos.length === 0 && pedidos.length === 0 && mesas.length === 0) {
-          resultsEl.innerHTML += '<div class="info">⚠️ Todas las colecciones están vacías. ¿Ejecutaste la migración inicial?</div>';
+          logInfo('⚠️ Todas las colecciones están vacías. ¿Ejecutaste la migración inicial?');
         }
+
+        // ── Suite 5: Verificar colecciones nuevas ────────
+        resultsEl.innerHTML += '<h2>5. Colecciones nuevas (post-migración)</h2>';
+        const entradas = resultados.entradas || [];
+        const comensales = resultados.comensales || [];
+        assert(Array.isArray(entradas), 'entradas: ' + entradas.length + ' documentos');
+        assert(Array.isArray(comensales), 'comensales: ' + comensales.length + ' documentos');
+
+        const staff = resultados.staff || [];
+        assert(Array.isArray(staff), 'staff: ' + staff.length + ' documentos');
+
+        // ── Suite 6: Verificar colecciones globales ──────
+        resultsEl.innerHTML += '<h2>6. Colecciones globales</h2>';
+        const perfiles = resultados.global_perfiles || [];
+        const puntos = resultados.global_puntos || [];
+        const eventosGlobales = resultados.global_eventos || [];
+        const espacios = resultados.global_espacios || [];
+        assert(Array.isArray(perfiles), 'global_perfiles: ' + perfiles.length + ' perfiles');
+        assert(Array.isArray(puntos), 'global_puntos: ' + puntos.length + ' registros');
+        assert(Array.isArray(eventosGlobales), 'global_eventos: ' + eventosGlobales.length + ' eventos');
+        assert(Array.isArray(espacios), 'global_espacios: ' + espacios.length + ' espacios');
 
         // ── Resumen ──────────────────────────────────────
         resultsEl.innerHTML += '<h2>Resultado</h2>';
         resultsEl.innerHTML += '<p>' + passed + ' pasaron, ' + failed + ' fallaron.</p>';
         if (failed === 0) {
-          resultsEl.innerHTML += '<div class="test pass">✔ Appwrite operativo y Store sincronizado.</div>';
+          resultsEl.innerHTML += '<div class="test pass">✔ Appwrite operativo, Store sincronizado y colecciones migradas.</div>';
         }
       }
 

@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test B2 — Temporal v3 (Store obtiene de DB, DBInventario sincronizado)</title>
+  <style>
+    body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
+    h1 { color: #f59e0b; }
+    .suite { margin-bottom: 24px; border-bottom: 1px solid #2e2e42; padding-bottom: 12px; }
+    .test { margin: 4px 0; padding: 4px 8px; border-radius: 4px; }
+    .pass { background: rgba(34,197,94,.2); }
+    .fail { background: rgba(239,68,68,.2); }
+    .diag { background: rgba(59,130,246,.2); color: #93c5fd; }
+    .summary { margin-top: 20px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>🔬 Test B2 — Temporal v3</h1>
+  <p style="color:#94a3b8;">Store.obtenerEstado devuelve DB. DBInventario sincronizado antes del modal.</p>
+  <div id="results"></div>
+  <div id="toastContainer"></div>
+  <main id="view-recetas" class="view"></main>
+
+  <script src="js/appwrite.min.js"></script>
+  <script type="module" src="js/lib/logger.js"></script>
+  <script type="module" src="js/lib/eventBus.js"></script>
+  <script type="module" src="js/lib/store.js"></script>
+  <script type="module" src="js/auth.js"></script>
+  <script type="module" src="js/utils.js"></script>
+  <script type="module" src="js/db.js"></script>
+  <script type="module" src="js/db-appwrite.js"></script>
+  <script type="module" src="js/ui/recetas.js"></script>
+  <script type="module" src="js/repositorios/receta-repository.js"></script>
+
+  <script type="module">
+    import { Store } from './js/lib/store.js';
+    import { DBAppwrite } from './js/db-appwrite.js';
+    import { DB } from './js/db.js';
+    import { DBInventario } from './js/db-inventario.js';
+    import { Logger } from './js/lib/logger.js';
+    import { Recetas } from './js/ui/recetas.js';
+    import { crearRecetaRepo } from './js/repositorios/receta-repository.js';
+
+    Logger.setLevel('ERROR');
+    window.Logger = Logger;
+
+    const resultsEl = document.getElementById('results');
+    let passed = 0, failed = 0;
+
+    function assert(condition, msg) {
+      if (condition) { passed++; resultsEl.innerHTML += `<div class="test pass">✔ ${msg}</div>`; }
+      else { failed++; resultsEl.innerHTML += `<div class="test fail">✘ ${msg}</div>`; }
+    }
+    function log(msg, tipo = 'diag') {
+      resultsEl.innerHTML += `<div class="test ${tipo}">${msg}</div>`;
+    }
+
+    // ── Mock Store.obtenerEstado para devolver DB ──
+    const originalObtenerEstado = Store.obtenerEstado;
+    Store.obtenerEstado = () => ({
+      productos: DB.productos || [],
+      recetas: DB.recetas || [],
+      insumos: DB.insumos || []
+    });
+
+    // ── Sincronizar DBInventario con DB ──
+    function sincronizarInventario() {
+      DBInventario.productos = DB.productos || [];
+      DBInventario.recetas = DB.recetas || [];
+      DBInventario.insumos = DB.insumos || [];
+    }
+
+    async function runTests() {
+      if (!document.getElementById('toastContainer')) {
+        const tc = document.createElement('div'); tc.id = 'toastContainer'; document.body.appendChild(tc);
+      }
+
+      if (!DBAppwrite.habilitado) await DBAppwrite.iniciar();
+      assert(DBAppwrite.habilitado, 'Appwrite inicializado');
+
+      const repo = crearRecetaRepo();
+      const sufijo = Date.now() + '_' + Math.random().toString(36).substr(2, 4);
+
+      // ── Preparación ──────────────────────────
+      const insumo = await DBAppwrite.crear('insumos', null, {
+        nombre: 'Insumo Tmp ' + sufijo, stock: 50, unidad: 'kg', stock_minimo: 2,
+        categoria: 'cocina', tipo: 'cocina', ubicacion: 'Test'
+      });
+      DB.insumos = DB.insumos || [];
+      DB.insumos.push({ id: insumo.id, nombre: 'Insumo Tmp ' + sufijo, unidad: 'kg', stock: 50, tipo: 'cocina' });
+      sincronizarInventario();
+      assert(true, 'Insumo creado: ' + insumo.id);
+
+      // ── Crear receta ─────────────────────────
+      const nueva = await repo.guardarReceta({
+        _nombreProducto: 'Tmp Receta ' + sufijo,
+        nivel: 'test', categoria: 'tmp_cat', es_intermedio: false, destino: 'cocina',
+        ingredientes: [{ tipo: 'insumo', id: insumo.id, cantidad: 1, unidad: 'kg' }],
+        instrucciones: 'Test', creadoPor: 'test'
+      });
+      sincronizarInventario();
+      const recetaId = nueva.id;
+      assert(true, 'Receta creada: ' + recetaId);
+
+      // ═══════════════════════════════════════════
+      // TEST A: Store tras eliminación
+      // ═══════════════════════════════════════════
+      log('🧪 TEST A — Store tras eliminar', 'diag');
+      let state = Store.obtenerEstado();
+      log('  Recetas en Store antes: ' + (state.recetas || []).length, 'diag');
+
+      await repo.eliminarReceta(recetaId);
+      await new Promise(r => setTimeout(r, 500));
+      sincronizarInventario();
+
+      state = Store.obtenerEstado();
+      const enStore = (state.recetas || []).some(r => r.id === recetaId);
+      assert(!enStore, 'Store no contiene la receta eliminada');
+
+      // ═══════════════════════════════════════════
+      // TEST B: Modal de detalle
+      // ═══════════════════════════════════════════
+      log('🧪 TEST B — Modal de detalle', 'diag');
+
+      const detalle = await repo.guardarReceta({
+        _nombreProducto: 'Tmp Detalle ' + sufijo,
+        nivel: 'test', categoria: 'tmp_det', es_intermedio: false, destino: 'cocina',
+        ingredientes: [{ tipo: 'insumo', id: insumo.id, cantidad: 1, unidad: 'kg' }],
+        instrucciones: 'Test detalle', creadoPor: 'test'
+      });
+      sincronizarInventario();
+
+      log('  DBInventario.productos: ' + (DBInventario.productos || []).length, 'diag');
+      log('  DBInventario.recetas: ' + (DBInventario.recetas || []).length, 'diag');
+      const recetaConProd = DBInventario.obtenerRecetaConProducto(detalle.id);
+      log('  obtenerRecetaConProducto: ' + (recetaConProd ? recetaConProd.nombre : 'NULL'), recetaConProd ? 'pass' : 'fail');
+
+      const vista = document.getElementById('view-recetas');
+      if (vista) vista.style.display = 'block';
+
+      Recetas.mostrarDetalle(detalle.id);
+      await new Promise(r => setTimeout(r, 600));
+
+      const modal = document.getElementById('modalRecetaDetalle');
+      assert(!!modal, 'Modal de detalle creado');
+      if (modal) {
+        assert(modal.style.display === 'flex', 'Modal de detalle abierto');
+        const btnCerrar = document.getElementById('btnCerrarDetalle');
+        if (btnCerrar) { btnCerrar.click(); await new Promise(r => setTimeout(r, 300)); }
+        assert(modal.style.display === 'none', 'Modal de detalle cerrado');
+      }
+
+      // ── Limpieza ──────────────────────────────
+      await repo.eliminarReceta(detalle.id);
+      sincronizarInventario();
+      await DBAppwrite.eliminar('insumos', insumo.id);
+      document.getElementById('view-recetas')?.remove();
+      document.querySelectorAll('.modal-overlay').forEach(o => o.remove());
+
+      resultsEl.innerHTML += `<div class="summary">${passed} pasaron, ${failed} fallaron</div>`;
+      if (failed === 0) resultsEl.innerHTML += '<div class="test pass">✔ Tests temporales pasaron.</div>';
+    }
+
+    window.addEventListener('load', () => setTimeout(runTests, 200));
+  </script>
+</body>
+</html>
