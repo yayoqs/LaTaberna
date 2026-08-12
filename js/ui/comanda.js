@@ -1,10 +1,10 @@
 /* ================================================================
-   LaTaberna - PubPOS — UI (ES6)
+   LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/comanda.js
-   Versión: 2.1.5
+   Versión: 2.1.6
    Propósito: Gestión de la comanda actual.
-              Corregido: normalización de items en agregarItem
-              para evitar error con .find() cuando items es string.
+              v2.1.6: Agregada función _normalizarItems para consumidores
+                      defensivos ante strings serializados en Appwrite.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -18,6 +18,13 @@ const Comanda = (() => {
   let _mesaActiva = null;
   let _pedidoActivo = null;
   let _inicializado = false;
+
+  function _normalizarItems(items) {
+    if (typeof items === 'string') {
+      try { return JSON.parse(items); } catch { return []; }
+    }
+    return Array.isArray(items) ? items : [];
+  }
 
   function _obtenerPedidoActivo(mesa) {
     if (!mesa || !mesa.pedidoId) return null;
@@ -70,7 +77,7 @@ const Comanda = (() => {
     _inicializado = true;
     _inicializarSincroniaStore();
     _inicializarEscuchadores();
-    Logger.info('[Comanda] Módulo activado (v2.1.5).');
+    Logger.info('[Comanda] Módulo activado (v2.1.6).');
   }
 
   function establecerMesaActiva(mesa) {
@@ -169,21 +176,11 @@ const Comanda = (() => {
     // 1) Persistir en DB.pedidos local
     const pedidoLocal = DB.pedidos.find(p => p.id === _pedidoActivo.id);
     if (pedidoLocal) {
-      // Normalizar items: si es string, parsearlo; si no es array, inicializarlo
-      if (typeof pedidoLocal.items === 'string') {
-        try {
-          pedidoLocal.items = JSON.parse(pedidoLocal.items);
-        } catch (e) {
-          pedidoLocal.items = [];
-        }
-      }
-      if (!Array.isArray(pedidoLocal.items)) {
-        pedidoLocal.items = [];
-      }
-      
-      const existente = pedidoLocal.items.find(it => it.prodId === item.prodId && !it.enviado);
+      const itemsNormalizados = _normalizarItems(pedidoLocal.items);
+      const existente = itemsNormalizados.find(it => it.prodId === item.prodId && !it.enviado);
       if (existente) existente.qty = (existente.qty || 1) + 1;
-      else pedidoLocal.items.push({ ...item, qty: 1 });
+      else itemsNormalizados.push({ ...item, qty: 1 });
+      pedidoLocal.items = itemsNormalizados;
     }
 
     // 2) Despachar al Store (para listeners)
@@ -274,7 +271,7 @@ const Comanda = (() => {
 
     const state = Store.obtenerEstado();
     const pedidoStore = (state.pedidos || []).find(p => p.id === _pedidoActivo.id);
-    const items = pedidoStore?.items || _pedidoActivo.items || [];
+    const items = _normalizarItems(pedidoStore?.items || _pedidoActivo.items || []);
 
     if (!items.length) {
       contenedor.innerHTML = `<div class="comanda-vacia"><i class="fas fa-utensils"></i><p>La comanda está vacía</p></div>`;

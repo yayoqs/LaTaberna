@@ -1,8 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/responsive.css
-   Versión: 1.0.0
+   Versión: 1.0.1
    Propósito: Ajustes responsive para móviles y tablets.
+              v1.0.1: Selector .mesas-grid encapsulado bajo #view-mesas.
    ================================================================ */
 
 /* Tablets y pantallas medianas */
@@ -25,6 +26,12 @@
   .config-grid {
     grid-template-columns: 1fr;
   }
+
+  #view-mesas .mesas-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 14px;
+    padding: 18px;
+  }
 }
 
 /* Móviles */
@@ -39,7 +46,7 @@
   }
 
   .header-info {
-    display: none; /* Ocultar fecha/hora en móviles para ganar espacio */
+    display: none;
   }
 
   .mozo-selector span {
@@ -47,7 +54,7 @@
   }
 
   .nav-btn span {
-    display: none; /* Solo íconos en móvil */
+    display: none;
   }
   .nav-btn i {
     margin: 0;
@@ -73,15 +80,13 @@
     flex-wrap: wrap;
   }
 
-  /* Botones de zona: más compactos y con texto visible */
   .zona-btn {
     padding: 6px 10px;
     font-size: 12px;
     white-space: nowrap;
   }
 
-  /* Grilla de mesas más compacta */
-  .mesas-grid {
+  #view-mesas .mesas-grid {
     grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
     gap: 12px;
     padding: 16px;
@@ -95,7 +100,6 @@
     font-size: 24px;
   }
 
-  /* Caja stats en columna */
   .caja-stats {
     grid-template-columns: 1fr 1fr;
     padding: 12px;
@@ -111,13 +115,11 @@
     font-size: 18px;
   }
 
-  /* KDS en móvil */
   .kds-grid {
     grid-template-columns: 1fr;
     padding: 12px;
   }
 
-  /* Config */
   .config-grid {
     padding: 12px;
     gap: 12px;

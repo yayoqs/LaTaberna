@@ -7,14 +7,16 @@
 Estandarizar los mensajes que cada Célula envía al Coordinador de Integración.  
 Toda comunicación con otras células pasa exclusivamente por el Coordinador. No se permite el contacto directo entre células para decisiones técnicas.
 
+
 ---
 
 ## Formato de Mensaje
 
-Cada comunicado debe respetar este encabezado y estructura.
-
+Cada comunicado debe respetar este encabezado y estructura.,
+Debe ir encapsulsdo en triple bscksticks pero no debe contenar triple bscksticks en su interior ya que segmenta el mensaje. si se requiere enviar fragmentos de codigo se usa identacion de 4 espacios.
+los archivos completos se envian aparte.
 ---
-
+```
 ┌──────────────────────────────────────────────────────────┐
 │ REMITENTE: Célula [A/B/C/D] — [Nombre del equipo]        │
 │ FECHA:     [AAAA-MM-DD HH:MM UTC]                        │
@@ -79,13 +81,13 @@ b) Solicitados (si aplica):
 3. Cada comunicado debe ser autónomo y completo. No se asume contexto de mensajes anteriores.
 4. Las solicitudes de nuevos atributos, eventos o métodos deben llegar a Core (Célula A) vía Coordinador.
 5. Ante cualquier duda, se consulta al Coordinador antes de implementar.
-
+```
 ---
 
 ## Ejemplo de REPORTE
 
 ---
-
+```
 ┌──────────────────────────────────────────────────────────┐
 │ REMITENTE: Célula A — Core                               │
 │ FECHA:     2026-06-17 01:30 UTC                          │
@@ -128,13 +130,13 @@ a) Modificados y entregados:
 
    · Ejecutaremos test de flujo real con Appwrite para validar las nuevas colecciones.
    · Quedamos a la espera de nuevas tareas.
-
+```
 ---
 
 ## Ejemplo de SOLICITUD
 
 ---
-
+```
 ┌──────────────────────────────────────────────────────────┐
 │ REMITENTE: Célula A — Core                               │
 │ FECHA:     2026-06-16 15:00 UTC                          │
@@ -174,9 +176,9 @@ b) Solicitados:
    · Al recibirlos, completaremos las tareas y reportaremos.
 
 ---
-
+```
 ## Mantenimiento de este documento
 
 - Responsable: Coordinador de Integración.
-- Última modificación: 2026-06-17.
-- Versión: 1.0.
+- Última modificación: 2026-08-11.
+- Versión: 1.1.

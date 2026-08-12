@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MESAS SUBMÓDULO (ES6)
    Archivo: js/ui/mesas/estado-comandas.js
-   Versión: 1.0.1
+   Versión: 1.0.2
    Propósito: Obtiene el estado más avanzado de las comandas.
-              Migración a Store.obtenerEstado.
+              Corregida inferencia de destino: respeta c.destino.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -16,19 +16,22 @@ export function getEstadoComandas(mesaNumero) {
     if (c.mesa != mesaNumero) return;
 
     let destino = c.destino;
-    if (c.id && c.id.endsWith('_cocina')) destino = 'cocina';
-    if (c.id && c.id.endsWith('_barra')) destino = 'barra';
+    if (!destino || !['cocina', 'barra', 'ambos'].includes(destino)) {
+      if (c.id && c.id.endsWith('_cocina')) destino = 'cocina';
+      else if (c.id && c.id.endsWith('_barra')) destino = 'barra';
+      else return; // no podemos determinar destino, omitimos
+    }
 
-    if (destino === 'cocina' || destino === 'ambos') {
-      if (c.estado === 'lista') estados.cocina = 'lista';
-      else if (c.estado === 'en-proceso' && estados.cocina !== 'lista') estados.cocina = 'en-proceso';
-      else if (c.estado === 'nueva' && estados.cocina === 'pendiente') estados.cocina = 'pendiente';
-    }
-    if (destino === 'barra' || destino === 'ambos') {
-      if (c.estado === 'lista') estados.barra = 'lista';
-      else if (c.estado === 'en-proceso' && estados.barra !== 'lista') estados.barra = 'en-proceso';
-      else if (c.estado === 'nueva' && estados.barra === 'pendiente') estados.barra = 'pendiente';
-    }
+    const destinos = destino === 'ambos' ? ['cocina', 'barra'] : [destino];
+
+    destinos.forEach(dest => {
+      if (c.estado === 'lista') {
+        estados[dest] = 'lista';
+      } else if (c.estado === 'en-proceso') {
+        if (estados[dest] !== 'lista') estados[dest] = 'en-proceso';
+      }
+      // 'nueva' no modifica el estado actual (queda pendiente)
+    });
   });
 
   return estados;

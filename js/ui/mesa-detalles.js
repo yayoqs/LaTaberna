@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/mesa-detalles.js
-   Versión: 3.1.7
+   Versión: 3.1.8
    Propósito: Centro de operaciones de mesa.
-              Forzar visibilidad de sección de espera al abrir.
+              Eliminada redundancia en _mostrarSeccionEspera al abrir.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -282,11 +282,6 @@ const MesaDetalles = (() => {
     _renderizarEstado(mesa);
     document.getElementById('modalMesaDetalles').style.display = 'flex';
     _panelVisible = true;
-    // Forzar la visibilidad de la sección de espera si hay notificación
-    const info = Mesas.getBadgeAtencion(numMesa);
-    if (info) {
-      _mostrarSeccionEspera(info, mesa);
-    }
     EventBus.emit('mesa-detalle:abierto');
   }
   function cerrar() {
@@ -352,7 +347,7 @@ const MesaDetalles = (() => {
 
   EventBus.on('mesa:seleccionada', (numMesa) => { if (!_panelVisible) abrir(numMesa); });
 
-  Logger.info('[MesaDetalles] Módulo inicializado v3.1.7.');
+  Logger.info('[MesaDetalles] Módulo inicializado v3.1.8.');
 
   return { abrir, cerrar, pedirCuenta, cerrarMesa, aceptarVinculacion, cargarPrecarga, _mesaActual: null };
 })();

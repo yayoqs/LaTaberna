@@ -1,11 +1,12 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-fusion.js
-   Versión: 1.0.7
+   Versión: 1.1.0
    Propósito: Lógica de fusión y liberación de mesas virtuales.
-              v1.0.7: sanitización de nombres de mesa virtual para
-                      cumplir con restricciones de Appwrite (máx. 36
-                      caracteres, solo a-z, A-Z, 0-9, ., -, _).
+              v1.1.0: consolida ítems, total y comensales desde los
+                      pedidos activos (DB.pedidos) en lugar de leer
+                      propiedades eliminadas de Mesas. Incluye
+                      sanitización de nombres de mesa virtual.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -68,14 +69,37 @@ export const DBFusion = (function() {
       if (original) original.estado = 'fusionada';
     });
 
+    // Consolidar ítems, total y comensales desde los pedidos activos
     let itemsConsolidados = [];
-    let pedidoIdUnico = null;
     let totalConsolidado = 0;
+    let comensalesTotales = 0;
+    let pedidoIdUnico = null;
 
     mesasSeleccionadas.forEach(m => {
-      if (m.items) itemsConsolidados.push(...m.items);
-      totalConsolidado += m.total || 0;
-      if (m.pedidoId) pedidoIdUnico = m.pedidoId;
+      // Sumar comensales
+      comensalesTotales += (m.comensales || 1);
+
+      if (m.pedidoId && this.pedidos) {
+        const pedido = this.pedidos.find(p => p.id === m.pedidoId);
+        if (pedido) {
+          // Establecer el pedidoId para la mesa virtual (usa el primero encontrado)
+          if (!pedidoIdUnico) pedidoIdUnico = pedido.id;
+
+          // Consolidar ítems
+          try {
+            const itemsPedido = typeof pedido.items === 'string'
+              ? JSON.parse(pedido.items)
+              : (pedido.items || []);
+            itemsConsolidados.push(...itemsPedido);
+          } catch (e) {
+            Logger.warn('[DBFusion] Error al parsear items del pedido ' + pedido.id + ':', e);
+          }
+
+          // Consolidar total
+          totalConsolidado += (pedido.total || 0);
+        }
+      }
+
       // Eliminar mesas virtuales intermedias
       if (m.esVirtual) {
         const idx = this.mesas.findIndex(mesa => mesa.numero === m.numero);
@@ -114,7 +138,7 @@ export const DBFusion = (function() {
       pedidoId: pedidoIdUnico,
       items: itemsConsolidados,
       mozo: mozo,
-      comensales: mesasSeleccionadas.reduce((sum, m) => sum + (m.comensales || 1), 0),
+      comensales: comensalesTotales,
       abiertaEn: Date.now(),
       observaciones: '',
       mesasFusionadas: todasOriginales,

@@ -1,10 +1,13 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-core.js
-   Versión: 1.1.2
+   Versión: 1.1.3
    Propósito: Núcleo de datos: mesas, pedidos, productos, proveedores,
               persistencia local.
-              v1.1.2: mesaVacia incluye esVirtual: false.
+              v1.1.3: items de pedidos siempre array en memoria.
+                      crearPedido inicializa items: [].
+                      actualizarPedido no serializa items a string.
+                      _cargarPedidosLocal normaliza strings antiguos.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -210,7 +213,20 @@ export const DBCore = (function() {
 
   module._cargarPedidosLocal = function() {
     const raw = localStorage.getItem('pubpos_pedidos');
-    this.pedidos = raw ? JSON.parse(raw) : [];
+    if (!raw) {
+      this.pedidos = [];
+      return;
+    }
+    try {
+      this.pedidos = JSON.parse(raw).map(p => ({
+        ...p,
+        items: Array.isArray(p.items) ? p.items : (() => {
+          try { return JSON.parse(p.items || '[]'); } catch { return []; }
+        })()
+      }));
+    } catch {
+      this.pedidos = [];
+    }
   };
 
   module._cargarMozosLocal = function() {
@@ -308,7 +324,7 @@ export const DBCore = (function() {
       tipo: 'local',
       origen: 'staff',
       estado: 'abierta',
-      items: '[]',
+      items: [],
       total: 0,
       creadoEn: new Date().toISOString(),
       actualizadoEn: new Date().toISOString()
@@ -321,8 +337,9 @@ export const DBCore = (function() {
   module.actualizarPedido = async function(id, cambios) {
     const idx = this.pedidos.findIndex(p => p.id === id);
     if (idx >= 0) {
-      if (cambios.items && Array.isArray(cambios.items)) {
-        cambios.items = JSON.stringify(cambios.items);
+      // Mantener items como array en memoria.
+      if (cambios.items !== undefined && !Array.isArray(cambios.items)) {
+        try { cambios.items = JSON.parse(cambios.items); } catch { cambios.items = []; }
       }
       cambios.actualizadoEn = new Date().toISOString();
       this.pedidos[idx] = { ...this.pedidos[idx], ...cambios };

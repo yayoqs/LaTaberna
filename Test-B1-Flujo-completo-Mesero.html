@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Test B1 – Gran Test Unificado del Mesero</title>
+  <title>Test B1 – Gran Test Unificado del Mesero (v4)</title>
   <style>
     body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
     h1 { color: #f59e0b; }
@@ -24,7 +24,6 @@
   <script src="/js/appwrite.min.js"></script>
 
   <script type="module">
-    // ── Imports ──────────────────────────────────────
     const { Logger }         = await import('/js/lib/logger.js');
     const { EventBus }       = await import('/js/lib/eventBus.js');
     const { Store }          = await import('/js/lib/store.js');
@@ -55,8 +54,11 @@
     const fail = msg => { failed++; resultsEl.innerHTML += `<div class="test fail">✘ ${msg}</div>`; };
     const esperar = ms => new Promise(r => setTimeout(r, ms));
 
+    const obtenerTarjeta = num => [...document.querySelectorAll('.mesa-card')].find(c => c.textContent.includes(String(num)));
+
     let prodIdA = null, prodIdB = null, recetaId = null;
     let pedidoId = null, precargaDocId = null;
+    let mesaVinculada = null; // IMPORTANTE: alcance de suite 2
 
     try {
       log('Inicializando Appwrite...');
@@ -73,8 +75,10 @@
       PedidoManager.init({ pedidoRepo: PedidoRepositoryLocal });
       Deps.registrar('pedidoRepo', PedidoRepositoryLocal);
 
-      // Limpiar residuos de ejecuciones anteriores
-      for (const m of (await DBAppwrite.listar('mesas')).filter(m => m.numero === '99')) {
+      // LIMPIEZA TOTAL de mesas para evitar residuos de ejecuciones anteriores
+      log('Limpiando todas las mesas...');
+      const todasAntes = await DBAppwrite.listar('mesas');
+      for (const m of todasAntes) {
         await DBAppwrite.eliminar('mesas', m.id);
       }
 
@@ -118,22 +122,21 @@
       // ════════════════════════════════════════════════
       resultsEl.innerHTML += '<div class="suite"><h2>0. Mapa de Mesas</h2></div>';
 
-      // Micro-insignias visibles
-      let microCocina = document.querySelector('.micro-cocina');
-      let microBarra = document.querySelector('.micro-barra');
-      if (microCocina) pass('Aparece micro-insignia de cocina');
-      else fail('No aparece micro-insignia de cocina');
-      if (microBarra) pass('Aparece micro-insignia de barra');
-      else fail('No aparece micro-insignia de barra');
+      let card = obtenerTarjeta(99);
+      if (card) pass('Tarjeta de mesa 99 existe'); else fail('No se encontró tarjeta de mesa 99');
+      if (!card) throw new Error('Sin tarjeta de mesa 99');
 
-      // Colores iniciales (gris)
+      let microCocina = card.querySelector('.micro-cocina');
+      let microBarra = card.querySelector('.micro-barra');
+      if (microCocina) pass('Aparece micro-insignia de cocina'); else fail('No aparece micro-insignia de cocina');
+      if (microBarra) pass('Aparece micro-insignia de barra'); else fail('No aparece micro-insignia de barra');
+
       const gris = 'rgb(156, 163, 175)';
       if (microCocina && microCocina.style.background === gris) pass('Cocina gris (pendiente) sin comandas');
       else fail('Cocina no está gris');
       if (microBarra && microBarra.style.background === gris) pass('Barra gris (pendiente) sin comandas');
       else fail('Barra no está gris');
 
-      // Agregar comanda en-proceso
       DB.comandas = [{
         id: 'com_1', mesa: '99', destino: 'cocina',
         items: [{ prodId: prodIdA, nombre: 'Hamburguesa (test)', qty: 1, obs: '', enviadoA: 'cocina' }],
@@ -142,23 +145,22 @@
       Store.despachar({ type: 'COMANDA_AGREGADA', payload: DB.comandas[0] });
       Mesas.render();
       await esperar(200);
-      microCocina = document.querySelector('.micro-cocina');
+
+      card = obtenerTarjeta(99);
+      microCocina = card?.querySelector('.micro-cocina');
       if (microCocina && microCocina.style.background === 'rgb(245, 158, 11)') pass('Cocina amarilla (en-proceso)');
       else fail('Cocina no cambió a amarillo');
 
-      // Cambiar a lista
       DB.comandas[0].estado = 'lista';
       Store.despachar({ type: 'COMANDA_ACTUALIZADA', payload: { id: 'com_1', cambios: { estado: 'lista' } } });
       Mesas.render();
       await esperar(200);
-      microCocina = document.querySelector('.micro-cocina');
+
+      card = obtenerTarjeta(99);
+      microCocina = card?.querySelector('.micro-cocina');
       if (microCocina && microCocina.style.background === 'rgb(34, 197, 94)') pass('Cocina verde (lista)');
       else fail('Cocina no cambió a verde');
 
-      // Long-press despliega popover
-      const card = document.querySelector('.mesa-card');
-      if (card) pass('Tarjeta de mesa existe');
-      else fail('No hay tarjeta de mesa');
       if (card) {
         card.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
         await esperar(450);
@@ -178,7 +180,6 @@
         }
       }
 
-      // Clic simple no despliega popover
       const popoverAntes = document.querySelector('#popoverContainer div');
       if (card) {
         card.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
@@ -190,7 +191,6 @@
         else if (!popoverAntes && popoverDespues) fail('Clic simple SÍ despliega popover');
       }
 
-      // Limpiar comandas para no interferir con el flujo
       DB.comandas = [];
       Store.despachar({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
       Mesas.render();
@@ -200,36 +200,44 @@
       // SUITE 1 – Vinculación de cliente
       // ════════════════════════════════════════════════
       resultsEl.innerHTML += '<div class="suite"><h2>1. Vinculación de cliente</h2></div>';
-      
+
       EventBus.emit('cliente:mesa_ingresada', { mesa: 99 });
       await esperar(200);
-      
+
       MesaDetalles.abrir(99);
       await esperar(300);
 
       const seccionEspera = document.getElementById('seccionEspera');
-      if (seccionEspera && seccionEspera.style.display === 'flex') {
-        pass('Sección de espera visible');
-      } else {
-        fail('Sección de espera NO visible');
-      }
+      if (seccionEspera && seccionEspera.style.display === 'flex') pass('Sección de espera visible');
+      else fail('Sección de espera NO visible');
 
       const btnAceptar = document.querySelector('#modalMesaDetalles .btn-atender[data-num-mesa="99"]');
       if (btnAceptar) {
         pass('Botón Aceptar presente');
         btnAceptar.click();
-        await esperar(500);
+        // Esperar activamente hasta que la mesa tenga pedidoId en Appwrite
+        mesaVinculada = await new Promise(async (resolve) => {
+          const timeout = Date.now() + 3000;
+          while (Date.now() < timeout) {
+            const mesas = await DBAppwrite.listar('mesas');
+            const mesa = mesas.find(m => m.numero === '99');
+            if (mesa && mesa.pedidoId) {
+              resolve(mesa);
+              return;
+            }
+            await esperar(100);
+          }
+          resolve(null);
+        });
+        if (mesaVinculada && mesaVinculada.estado === 'ocupada' && mesaVinculada.pedidoId) {
+          pass('Mesa 99 ocupada con pedidoId');
+          pedidoId = mesaVinculada.pedidoId;
+        } else {
+          fail('Mesa 99 NO tiene pedidoId');
+          throw new Error('Sin pedidoId no se puede continuar');
+        }
       } else {
         fail('Botón Aceptar NO encontrado');
-      }
-
-      const mesaVinculada = (await DBAppwrite.listar('mesas')).find(m => m.id === '99');
-      if (mesaVinculada && mesaVinculada.estado === 'ocupada' && mesaVinculada.pedidoId) {
-        pass('Mesa 99 ocupada con pedidoId');
-        pedidoId = mesaVinculada.pedidoId;
-      } else {
-        fail('Mesa 99 NO tiene pedidoId');
-        throw new Error('Sin pedidoId no se puede continuar');
       }
 
       // Cargar el pedido por ID
@@ -277,10 +285,10 @@
 
       const pedidoLocal = DB.pedidos.find(p => p.id === pedidoId);
       const items = pedidoLocal?.items || [];
-      
+
       if (items.length === 2) pass('Hay 2 ítems distintos en el pedido');
       else fail(`Ítems distintos: esperado 2, actual ${items.length}`);
-      
+
       const totalQty = items.reduce((s, i) => s + (i.qty || 1), 0);
       if (totalQty === 3) pass('Cantidad total = 3 (2 hamburguesas + 1 cerveza)');
       else fail(`Cantidad total: esperado 3, actual ${totalQty}`);
@@ -289,16 +297,16 @@
       // SUITE 3 – Enviar comanda
       // ════════════════════════════════════════════════
       resultsEl.innerHTML += '<div class="suite"><h2>3. Enviar comanda</h2></div>';
-      
+
       const pendientes = items.map(i => ({ ...i, enviado: false }));
       const resEnvio = await CommandBus.ejecutar({
         type: 'enviarComanda',
         datos: { mesa: mesaVinculada, mozo: 'Test', comensales: 2, observaciones: '', itemsPendientes: pendientes }
       });
-      
+
       if (resEnvio.exito) pass('Envío de comanda exitoso');
       else fail('Fallo el envío: ' + (resEnvio.error || ''));
-      
+
       if (DB.comandas.length >= 1) pass('Se creó al menos 1 comanda');
       else fail('No se crearon comandas');
 
@@ -310,7 +318,7 @@
       const precargaItems = [
         { prodId: prodIdA, nombre: 'Hamburguesa (test)', precio: 1500, categoria: 'platos', destino: 'cocina', qty: 1, obs: 'sin cebolla' }
       ];
-      
+
       const precargaDoc = await DBAppwrite.crear('pedidos', 'unique()', {
         mesa: '99', tipo: 'local', origen: 'cliente', estado: 'precarga', comensales: 1,
         items: JSON.stringify(precargaItems), total: 1500, id_usuario: 'cliente_test', espacioId
@@ -343,16 +351,16 @@
       });
 
       await esperar(500);
-      
+
       const pedidoFinal = await DBAppwrite.baseDeDatos.getRow({
         databaseId: DBAppwrite.idBaseDeDatos,
         tableId: DBAppwrite.COLECCIONES['pedidos'],
         rowId: pedidoId
       });
-      
+
       const itemsFinal = JSON.parse(pedidoFinal.items || '[]');
       const totalFinal = itemsFinal.reduce((s, i) => s + (i.qty || 1), 0);
-      
+
       if (totalFinal === 1) pass('Total de ítems tras precarga = 1');
       else fail(`Total tras precarga: esperado 1, actual ${totalFinal}`);
 

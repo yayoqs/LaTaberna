@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/pedido-ui.js
-   Versión: 2.2.3
-   Propósito: Modal de pedido. Corrección NC1: invoca Comanda.activar()
-              antes de usar los listeners de comanda.
+   Versión: 2.2.5
+   Propósito: Modal de pedido.
+              v2.2.5: Agregada normalización de items en cerrar.
    ================================================================ */
 
 import { CommandBus } from '../lib/command-bus.js';
@@ -20,10 +20,18 @@ import { Tickets } from './tickets.js';
 import { Auth } from '../auth.js';
 import { mesaVacia } from '../db-core.js';
 import { mostrarToast, $id, mostrarEntrada } from '../utils.js';
+import { DBAppwrite } from '../db-appwrite.js';
 
 const Pedido = (() => {
   let _comandasEnviadas = {};
   let _panelDetalleAbierto = false;
+
+  function _normalizarItems(items) {
+    if (typeof items === 'string') {
+      try { return JSON.parse(items); } catch { return []; }
+    }
+    return Array.isArray(items) ? items : [];
+  }
 
   function _asegurarModalPedido() {
     if ($id('modalPedido')) return;
@@ -76,7 +84,6 @@ const Pedido = (() => {
 
   function _abrirModalPedido(mesa) {
     _asegurarModalPedido();
-    // NC1: Activar los listeners de Comanda antes de usarlos
     Comanda.activar();
     document.getElementById('modalMesaTitulo').textContent = mesa.esVirtual ? 'Mesas ' + mesa.mesasFusionadas.join(', ') : 'Mesa ' + mesa.numero;
     const badge = document.getElementById('modalEstadoBadge');
@@ -95,18 +102,36 @@ const Pedido = (() => {
     _abrirModalPedido(mesa);
   }
 
-  function cerrar() {
+  async function cerrar() {
     Carta.limpiar();
     const modal = $id('modalPedido');
     if (modal) modal.style.display = 'none';
     const mesa = Comanda.obtenerMesaActiva();
     const pedido = Comanda.obtenerPedidoActivo();
-    if (mesa && mesa.estado === 'libre' && (!pedido || !pedido.items || pedido.items.length === 0)) {
+
+    const itemsPedido = pedido ? _normalizarItems(pedido.items) : [];
+    const pedidoVacio = pedido && itemsPedido.length === 0;
+    const mesaRecienAbierta = mesa && mesa.estado === 'ocupada' && pedidoVacio;
+
+    if (mesa && ((mesa.estado === 'libre' && pedidoVacio) || mesaRecienAbierta)) {
       if (mesa.esVirtual) {
         DB.liberarMesasFusionadas(mesa);
       } else {
         const idx = DB.mesas.findIndex(m => m.numero === mesa.numero);
-        if (idx >= 0) { DB.mesas[idx] = mesaVacia(mesa.numero); try { DB.saveMesas(); } catch (e) { Logger.error('[Pedido] Error al guardar:', e); } }
+        if (idx >= 0) {
+          DB.mesas[idx] = mesaVacia(mesa.numero);
+          try { DB.saveMesas(); } catch (e) { Logger.error('[Pedido] Error al guardar:', e); }
+        }
+        if (pedido && pedido.id) {
+          const pedidoIdx = DB.pedidos.findIndex(p => p.id === pedido.id);
+          if (pedidoIdx >= 0) {
+            DB.pedidos.splice(pedidoIdx, 1);
+            try { DB.savePedidos(); } catch (e) { Logger.error('[Pedido] Error al eliminar pedido local:', e); }
+          }
+          if (typeof DBAppwrite !== 'undefined' && DBAppwrite.habilitado) {
+            try { await DBAppwrite.eliminar('pedidos', pedido.id); } catch (e) { Logger.warn('[Pedido] No se pudo eliminar pedido en Appwrite:', e); }
+          }
+        }
         EventBus.emit('mesa:actualizada', { mesa: mesa.numero, estado: 'libre' });
         Mesas.render();
       }

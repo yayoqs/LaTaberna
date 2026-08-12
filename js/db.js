@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db.js
-   Versión: 1.1.2
+   Versión: 1.1.3
    Propósito: Orquestador de base de datos (Appwrite + localStorage).
-              v1.1.2: corregido bug en sincronizarMesasConConfig que
-                      asignaba todas las mesas a la primera zona.
+              v1.1.3: _procesarPedidos convierte items a array en
+                      memoria, no a string.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -124,7 +124,9 @@ export const DB = (function() {
     if (lista && Array.isArray(lista) && lista.length > 0) {
       this.pedidos = lista.map(p => ({
         ...p,
-        items: typeof p.items === 'string' ? p.items : JSON.stringify(p.items)
+        items: Array.isArray(p.items) ? p.items : (() => {
+          try { return JSON.parse(p.items || '[]'); } catch { return []; }
+        })()
       }));
     } else {
       this._cargarPedidosLocal();

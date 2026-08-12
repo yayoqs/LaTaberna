@@ -1,27 +1,28 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/config.js
-   Versión: 3.0.0
+   Versión: 3.0.4
    Propósito: Vista de configuración rediseñada con panel izquierdo,
               gestión de zonas, personal por roles, impresoras y
               contraseñas. Swipe y overlay en móvil.
+              v3.0.4: sección Personal delega en admin-roles.js pasando
+                      contenedorId 'sec-personal'.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
 import { EventBus } from '../lib/eventBus.js';
 import { Logger } from '../lib/logger.js';
 import { Auth } from '../auth.js';
-import { Roles } from '../roles.js';
 import { mostrarToast, mostrarConfirmacion, mostrarEntrada } from '../utils.js';
 import { DB } from '../db.js';
 import { DBAppwrite } from '../db-appwrite.js';
+import { renderTabAdmin } from './perfil/admin-roles.js';
 
 const Config = (() => {
   let _abortController = null;
   let _desuscripciones = [];
   let _observerHeader = null;
 
-  // ── CONSTRUCCIÓN DEL DOM ──────────────────────────────────
   function _asegurarVista() {
     let main = document.getElementById('view-config');
     if (!main) return;
@@ -50,9 +51,10 @@ const Config = (() => {
       </div>
       <div class="overlay" id="configOverlay"></div>
     `;
+
+    main.classList.add('active');
   }
 
-  // ── RENDERIZADO DE SECCIONES ──────────────────────────────
   function _renderSeccionLocal() {
     const config = Store.obtenerEstado().config || DB.config || {};
     const sec = document.getElementById('sec-local');
@@ -104,124 +106,10 @@ const Config = (() => {
   }
 
   function _renderSeccionPersonal() {
-    const sec = document.getElementById('sec-personal');
-    if (!sec) return;
-
     const usuarioActual = Auth.obtenerUsuarioActual();
     const esMaster = Auth.esMasterReal();
-
-    let todosUsuarios = [];
-    try {
-      const raw = localStorage.getItem('pubpos_usuarios');
-      if (raw) todosUsuarios = JSON.parse(raw);
-    } catch (e) { todosUsuarios = []; }
-
-    const rolesOperativos = Roles.lista.filter(r => r !== 'cliente' && r !== 'artista');
-    const usuariosFiltrados = todosUsuarios.filter(u => {
-      if (u.nombre === usuarioActual?.nombre) return false;
-      if (u.rol === 'master') return false;
-      if (!esMaster && u.rol === 'admin') return false;
-      return rolesOperativos.includes(u.rol) || (esMaster && u.rol === 'cliente');
-    });
-
-    const rolesAsignables = Roles.lista.filter(r => r !== 'master');
-    const rolesRestringidos = !esMaster ? ['admin'] : [];
-
-    sec.innerHTML = `
-      <h3><i class="fas fa-users"></i> Personal</h3>
-      <div class="search-box"><span>🔍</span><input type="text" id="buscarPersonalInput" placeholder="Buscar por nombre..."></div>
-      <div class="filtros-roles">
-        <button class="filtro-rol activo" data-filtro="todos">Todos</button>
-        ${rolesOperativos.map(r => `<button class="filtro-rol" data-filtro="${r}">${r.charAt(0).toUpperCase() + r.slice(1)}</button>`).join('')}
-      </div>
-      <div id="listaPersonalContainer">
-        ${usuariosFiltrados.length === 0 ? '<p style="color:var(--color-text-muted); font-size:12px;">No hay personal para administrar.</p>' : ''}
-      </div>
-      <button class="btn-primary" id="btnInvitarPersonal" style="margin-top:12px;"><i class="fas fa-user-plus"></i> Invitar como personal</button>
-    `;
-
-    const container = document.getElementById('listaPersonalContainer');
-    if (usuariosFiltrados.length > 0 && container) {
-      usuariosFiltrados.forEach(u => {
-        const fila = document.createElement('div');
-        fila.className = 'usuario-row';
-        fila.dataset.rol = u.rol;
-        fila.innerHTML = `
-          <div class="usuario-row-top">
-            <div class="av">${u.nombre.charAt(0).toUpperCase()}</div>
-            <strong>${u.nombre}</strong>
-            <span class="rol-actual">${u.rol}</span>
-          </div>
-          <div class="roles-checks">
-            ${rolesAsignables.map(rol => {
-              const tieneRol = u.rol === rol;
-              const restringido = rolesRestringidos.includes(rol);
-              return `
-                <label class="rol-check ${restringido ? 'bloqueado' : ''}">
-                  <input type="checkbox" ${tieneRol ? 'checked' : ''} ${restringido ? 'disabled' : ''} data-usuario="${u.nombre}" data-rol="${rol}">
-                  ${rol.charAt(0).toUpperCase() + rol.slice(1)}
-                </label>
-              `;
-            }).join('')}
-          </div>
-        `;
-        container.appendChild(fila);
-      });
-
-      container.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
-        checkbox.addEventListener('change', async function () {
-          const nombreUsuario = this.dataset.usuario;
-          const nuevoRol = this.checked ? this.dataset.rol : 'cliente';
-          const resultado = await Auth.cambiarRol(nombreUsuario, nuevoRol);
-          if (!resultado.exito) {
-            mostrarToast('error', resultado.error);
-            this.checked = !this.checked;
-            return;
-          }
-          mostrarToast('success', `Rol de ${nombreUsuario} actualizado a ${nuevoRol}`);
-          _renderSeccionPersonal();
-        });
-      });
-    }
-
-    // Filtros de rol
-    sec.querySelectorAll('.filtro-rol').forEach(btn => {
-      btn.addEventListener('click', () => {
-        sec.querySelectorAll('.filtro-rol').forEach(b => b.classList.remove('activo'));
-        btn.classList.add('activo');
-        const filtro = btn.dataset.filtro;
-        sec.querySelectorAll('.usuario-row').forEach(fila => {
-          fila.style.display = (filtro === 'todos' || fila.dataset.rol === filtro) ? '' : 'none';
-        });
-      });
-    });
-
-    // Búsqueda
-    document.getElementById('buscarPersonalInput')?.addEventListener('input', function () {
-      const termino = this.value.toLowerCase();
-      sec.querySelectorAll('.usuario-row').forEach(fila => {
-        const nombre = fila.querySelector('strong').textContent.toLowerCase();
-        fila.style.display = nombre.includes(termino) ? '' : 'none';
-      });
-    });
-
-    // Invitar
-    document.getElementById('btnInvitarPersonal')?.addEventListener('click', async () => {
-      const nombreCliente = await mostrarEntrada('Invitar como personal', 'Ingresa el nombre exacto del cliente a invitar:', { placeholder: 'Ej: juanperez' });
-      if (!nombreCliente) return;
-      const rolInicial = await mostrarEntrada('Asignar rol inicial', 'Elige el primer rol:', { valorPredefinido: 'mesero', placeholder: 'mesero, cocina, barra...' });
-      if (!rolInicial || !Roles.lista.includes(rolInicial.trim())) {
-        mostrarToast('error', 'Rol no válido.');
-        return;
-      }
-      const resultado = await Auth.cambiarRol(nombreCliente.trim(), rolInicial.trim());
-      if (resultado.exito) {
-        mostrarToast('success', `${nombreCliente} ahora es ${rolInicial}`);
-        _renderSeccionPersonal();
-      } else {
-        mostrarToast('error', resultado.error);
-      }
-    });
+    // ✅ Pasamos el ID del contenedor correcto
+    renderTabAdmin(usuarioActual, esMaster, 'sec-personal');
   }
 
   function _renderSeccionImpresoras() {
@@ -267,7 +155,6 @@ const Config = (() => {
     });
   }
 
-  // ── LÓGICA DE NEGOCIO ────────────────────────────────────
   async function _guardarConfig() {
     const zonasContainer = document.getElementById('zonasContainer');
     let config = Store.obtenerEstado().config || {};
@@ -366,9 +253,9 @@ const Config = (() => {
       mostrarToast('error', 'Solo el master puede cambiar contraseñas');
       return;
     }
-    const nueva = await mostrarEntrada('Cambiar contraseña', 'Nueva contraseña para ' + nombreUsuario + ':', { type: 'password' });
+    const nueva = await mostrarEntrada('Nueva contraseña', 'Nueva contraseña para ' + nombreUsuario + ':', { type: 'password' });
     if (!nueva || nueva.trim().length === 0) return;
-    const confirmacion = await mostrarEntrada('Cambiar contraseña', 'Confirma la nueva contraseña:', { type: 'password' });
+    const confirmacion = await mostrarEntrada('Confirmar contraseña', 'Confirma la nueva contraseña:', { type: 'password' });
     if (confirmacion !== nueva) {
       mostrarToast('error', 'Las contraseñas no coinciden');
       return;
@@ -381,7 +268,6 @@ const Config = (() => {
     }
   }
 
-  // ── CICLO DE VIDA ──────────────────────────────────────
   function activar() {
     limpiar();
     _abortController = new AbortController();
@@ -389,7 +275,6 @@ const Config = (() => {
 
     _asegurarVista();
 
-    // Navegación
     document.querySelectorAll('#view-config .nav-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         document.querySelectorAll('#view-config .nav-btn').forEach(b => b.classList.remove('activo'));
@@ -400,7 +285,6 @@ const Config = (() => {
       }, { signal });
     });
 
-    // Toggle panel
     document.getElementById('btnToggleMenuConfig')?.addEventListener('click', () => {
       const panel = document.getElementById('panelIzquierdoConfig');
       if (panel?.classList.contains('abierto')) _cerrarPanel();
@@ -409,17 +293,14 @@ const Config = (() => {
 
     document.getElementById('configOverlay')?.addEventListener('click', _cerrarPanel, { signal });
 
-    // Swipe
     _configurarSwipe(signal);
     _configurarAjusteHeader(signal);
 
-    // Mostrar/ocultar pestaña de contraseñas según rol
     const navContrasenas = document.getElementById('navContrasenas');
     if (navContrasenas) {
       navContrasenas.style.display = Auth.esMasterReal() ? 'flex' : 'none';
     }
 
-    // Renderizar todas las secciones
     _renderSeccionLocal();
     _renderSeccionZonas();
     _renderSeccionPersonal();
@@ -441,10 +322,9 @@ const Config = (() => {
     _desuscripciones.forEach(fn => fn());
     _desuscripciones = [];
     const main = document.getElementById('view-config');
-    if (main) { main.innerHTML = ''; main.classList.remove('active'); }
+    if (main) { main.innerHTML = ''; }
   }
 
-  // ── HELPERS DE UI ──────────────────────────────────────
   function _abrirPanel() {
     const panel = document.getElementById('panelIzquierdoConfig');
     if (panel) {
@@ -505,7 +385,8 @@ const Config = (() => {
 
   return {
     activar,
-    limpiar
+    limpiar,
+    cargar: activar
   };
 })();
 

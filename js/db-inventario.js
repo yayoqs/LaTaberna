@@ -1,15 +1,16 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-inventario.js
-   Versión: 1.1.2
+   Versión: 1.1.3
    Propósito: Gestión de insumos, recetas, stock y movimientos.
               Soporte para recetas anidadas (sub-recetas).
-              v1.1.2: reforzado fallback ingredienteId → insumoId en
-                      _normalizarMovimiento.
+              v1.1.3: obtenerRecetaConProducto obtiene productos
+                      desde Store en lugar de asumir this.productos.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
 import { EventBus } from './lib/eventBus.js';
+import { Store } from './lib/store.js';
 import { DBAppwrite } from './db-appwrite.js';
 import { Auth } from './auth.js';
 
@@ -292,14 +293,21 @@ export const DBInventario = (function() {
 
   /**
    * Obtiene una receta con el nombre del producto resuelto desde laTaberna_Productos.
+   * Usa Store como fuente de productos para evitar dependencia de this.productos.
    * @param {string} recetaId
    * @returns {object|null} Receta con campo `nombre` (del producto) agregado.
    */
   module.obtenerRecetaConProducto = function(recetaId) {
     const receta = this.recetas.find(r => r.id === recetaId);
     if (!receta) return null;
-    const producto = this.productos ? this.productos.find(p => p.id === receta.productoId) : null;
-    return { ...receta, nombre: producto ? producto.nombre : 'Sin producto' };
+    try {
+      const state = Store.obtenerEstado();
+      const producto = (state.productos || []).find(p => p.id === receta.productoId);
+      return { ...receta, nombre: producto ? producto.nombre : 'Sin producto' };
+    } catch (e) {
+      Logger.warn('[DBInventario] No se pudo obtener productos desde Store:', e);
+      return { ...receta, nombre: 'Sin producto' };
+    }
   };
 
   /* ── MÉTODOS DE CONSUMO ────────────────────────────────── */
