@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db.js
-   Versión: 1.1.1
+   Versión: 1.1.2
    Propósito: Orquestador de base de datos (Appwrite + localStorage).
-              v1.1.1: corregido tipo: 'salon' → 'local' en crearPedido.
+              v1.1.2: corregido bug en sincronizarMesasConConfig que
+                      asignaba todas las mesas a la primera zona.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -221,12 +222,17 @@ export const DB = (function() {
 
     if (libres.length < libresNecesarias) {
       const faltantes = libresNecesarias - libres.length;
-      for (let j = 0; j < faltantes; j++) {
-        maxNumero++;
-        const zonaNombre = zonas[0]?.nombre || 'salon';
-        const nueva = mesaVacia(maxNumero, zonaNombre);
-        libres.push(nueva);
-        nuevasMesas.push(nueva);
+      let numero = maxNumero + 1;
+      let creadas = 0;
+      for (const zona of zonas) {
+        for (let i = 0; i < zona.cantidad && creadas < faltantes; i++) {
+          const nueva = mesaVacia(numero, zona.nombre);
+          libres.push(nueva);
+          nuevasMesas.push(nueva);
+          numero++;
+          creadas++;
+        }
+        if (creadas >= faltantes) break;
       }
     }
 
@@ -252,7 +258,7 @@ export const DB = (function() {
           esVirtual: false
         };
         await appwrite.crear('mesas', mesa.numero, dataMesa);
-        Logger.info('[DB] Mesa ' + mesa.numero + ' creada en Appwrite.');
+        Logger.info('[DB] Mesa ' + mesa.numero + ' creada en Appwrite (zona: ' + mesa.zona + ').');
       } catch (e) {
         Logger.warn('[DB] Error al crear mesa ' + mesa.numero + ':', e);
       }

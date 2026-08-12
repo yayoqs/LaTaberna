@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test D – Zonas y Mesas (Diagnóstico detallado)</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #0f0f14; color: #f1f5f9; padding: 20px; }
+    h1 { color: #f59e0b; }
+    .resultado { background: #1a1a24; border-radius: 8px; padding: 12px 16px; margin: 8px 0; display: flex; align-items: center; gap: 12px; }
+    .ok { border-left: 4px solid #22c55e; }
+    .fallo { border-left: 4px solid #ef4444; }
+    .info { border-left: 4px solid #3b82f6; }
+    .seccion { color: #f59e0b; font-size: 13px; min-width: 100px; }
+    pre { background: #111; color: #94a3b8; padding: 8px; border-radius: 4px; font-size: 11px; margin: 4px 0; white-space: pre-wrap; word-wrap: break-word; }
+  </style>
+</head>
+<body>
+  <h1>Test D – Zonas y Mesas (Diagnóstico detallado)</h1>
+  <p style="color:#a0a0a0;">Verifica campo por campo qué se envía a Appwrite.</p>
+  <div id="resultados"></div>
+  <div id="toastContainer"></div>
+
+  <script src="js/appwrite.min.js"></script>
+  <script type="module" src="js/lib/logger.js"></script>
+  <script type="module" src="js/lib/eventBus.js"></script>
+  <script type="module" src="js/lib/store.js"></script>
+  <script type="module" src="js/auth.js"></script>
+  <script type="module" src="js/utils.js"></script>
+  <script type="module" src="js/db.js?v=1.1.0"></script>
+  <script type="module" src="js/db-appwrite.js"></script>
+
+  <script type="module">
+    import { DBAppwrite } from './js/db-appwrite.js';
+    import { DB } from './js/db.js';
+
+    function resultado(ok, seccion, mensaje) {
+      const div = document.createElement('div');
+      const clase = ok === 'info' ? 'info' : (ok ? 'ok' : 'fallo');
+      div.className = 'resultado ' + clase;
+      const icono = ok === 'info' ? 'ℹ' : (ok ? '✔' : '✘');
+      div.innerHTML = `<span>${icono}</span><span class="seccion">[${seccion}]</span><span>${mensaje}</span>`;
+      document.getElementById('resultados').appendChild(div);
+    }
+
+    async function esperar(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async function iniciarTest() {
+      if (!DBAppwrite.habilitado) await DBAppwrite.iniciar();
+      if (!DBAppwrite.habilitado) {
+        resultado(false, 'Inicio', 'No se pudo inicializar Appwrite');
+        return;
+      }
+      resultado(true, 'Inicio', 'Appwrite inicializado');
+
+      // 1. Limpiar todas las mesas existentes
+      try {
+        const mesasActuales = await DBAppwrite.listar('mesas');
+        for (const mesa of mesasActuales) {
+          await DBAppwrite.eliminar('mesas', mesa.id);
+        }
+        resultado(true, 'Limpieza', `Eliminadas ${mesasActuales.length} mesas`);
+        await esperar(1000);
+      } catch (e) {
+        resultado(false, 'Limpieza', `Error: ${e.message}`);
+        return;
+      }
+
+      // 2. Verificar qué campos tiene realmente la colección listando una mesa (si queda alguna)
+      const mesasPostLimpieza = await DBAppwrite.listar('mesas');
+      resultado(mesasPostLimpieza.length === 0, 'Limpieza', 'Confirmado: 0 mesas en Appwrite');
+
+      // 3. Crear UNA mesa manualmente con DBAppwrite.crear para ver la estructura
+      try {
+        const mesaManual = await DBAppwrite.crear('mesas', 'test_1', {
+          numero: 'test_1',
+          estado: 'libre',
+          pedidoId: '',
+          comensales: 1,
+          zona: 'test-zona',
+          esVirtual: false
+        });
+        resultado(!!mesaManual, 'Crear manual', `Mesa creada manualmente: ${mesaManual?.id}`);
+        
+        // Leerla de vuelta para ver qué campos devuelve
+        const mesasDespues = await DBAppwrite.listar('mesas');
+        const mesaLeida = mesasDespues.find(m => m.id === 'test_1');
+        if (mesaLeida) {
+          resultado('info', 'Campos', `Campos devueltos por Appwrite:`);
+          resultado('info', 'Campos', `<pre>${JSON.stringify(mesaLeida, null, 2)}</pre>`);
+          resultado(mesaLeida.zona === 'test-zona', 'Zona manual', 'El campo zona se guardó y recuperó correctamente');
+        }
+        
+        // Limpiar
+        await DBAppwrite.eliminar('mesas', 'test_1');
+        await esperar(500);
+      } catch (e) {
+        resultado(false, 'Crear manual', `Error: ${e.message}`);
+      }
+
+      // 4. Ahora probar con DB.sincronizarMesasConConfig
+      try {
+        DB.config = {
+          nombreLocal: 'Test',
+          direccion: '',
+          cuit: '',
+          pieTicket: '',
+          zonas: [
+            { nombre: 'comedor', cantidad: 2 },
+            { nombre: 'barra', cantidad: 1 }
+          ],
+          bloquearStockInsuficiente: true
+        };
+        
+        resultado('info', 'Sincro', 'Ejecutando DB.sincronizarMesasConConfig()...');
+        await DB.sincronizarMesasConConfig();
+        await esperar(1500);
+        
+        const mesasSincro = await DBAppwrite.listar('mesas');
+        resultado('info', 'Sincro', `Mesas después de sincronizar: ${mesasSincro.length}`);
+        
+        if (mesasSincro.length > 0) {
+          resultado('info', 'Sincro', `Primera mesa recibida:`);
+          resultado('info', 'Sincro', `<pre>${JSON.stringify(mesasSincro[0], null, 2)}</pre>`);
+          
+          // Contar por zona
+          const comedor = mesasSincro.filter(m => m.zona === 'comedor');
+          const barra = mesasSincro.filter(m => m.zona === 'barra');
+          resultado(comedor.length === 2, 'Sincro', `Zona "comedor": ${comedor.length} mesas (esperado 2)`);
+          resultado(barra.length === 1, 'Sincro', `Zona "barra": ${barra.length} mesas (esperado 1)`);
+          
+          if (comedor.length === 2) {
+            const nums = comedor.map(m => parseInt(m.numero)).sort((a,b) => a-b);
+            resultado(nums[0] > 0 && nums[1] === nums[0] + 1, 'Sincro nums', `Números comedor: ${nums.join(', ')}`);
+          }
+        }
+        
+        // Limpiar
+        for (const mesa of mesasSincro) {
+          await DBAppwrite.eliminar('mesas', mesa.id);
+        }
+        await esperar(500);
+      } catch (e) {
+        resultado(false, 'Sincro', `Error: ${e.message}`);
+      }
+
+      // 5. Restaurar
+      DB.config.zonas = [{ nombre: 'salon', cantidad: 3 }];
+      await DB.sincronizarMesasConConfig();
+      resultado(true, 'Restaurar', 'Restaurado a salón (3 mesas)');
+
+      console.log('Test detallado completado.');
+    }
+
+    window.addEventListener('load', () => setTimeout(iniciarTest, 100));
+  </script>
+</body>
+</html>

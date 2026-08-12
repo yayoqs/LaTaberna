@@ -1,13 +1,12 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO INTERNO JS (ES6)
    Archivo: js/modulos/interno/precarga-control.js
-   Versión: 2.2.2
+   Versión: 2.2.3
    Propósito: Control de precargas del cliente. Escucha eventos de
               precarga y permite al mesero revisarlas y cargarlas
               en el pedido activo.
-              v2.2.2: Adaptado al modelo unificado de pedidos.
-                      Busca el pedido con estado=precarga asociado
-                      a la mesa si el precargaId no coincide.
+              v2.2.3: Eliminada importación no utilizada de DB
+                      (deuda técnica OT-1).
    ================================================================ */
 
 import { EventBus } from '../../lib/eventBus.js';
@@ -15,7 +14,6 @@ import { Logger } from '../../lib/logger.js';
 import { CommandBus } from '../../lib/command-bus.js';
 import { Store } from '../../lib/store.js';
 import { DBAppwrite } from '../../db-appwrite.js';
-import { DB } from '../../db.js';
 import { mostrarToast } from '../../utils.js';
 
 export const PrecargaControl = (() => {
@@ -36,14 +34,11 @@ export const PrecargaControl = (() => {
     Logger.info('[PrecargaControl] Revisando precarga:', precargaId, 'mesa:', mesa);
 
     try {
-      // Buscar el pedido de precarga: primero por ID directo, luego por mesa + estado + origen
       let pedidoPrecarga = null;
       const todosPedidos = await DBAppwrite.listar('pedidos');
       
-      // Buscar por ID directo (compatibilidad con IDs reales de Appwrite)
       pedidoPrecarga = todosPedidos.find(p => p.id === precargaId);
       
-      // Si no se encuentra por ID, buscar por mesa + estado precarga + origen cliente
       if (!pedidoPrecarga) {
         pedidoPrecarga = todosPedidos.find(p => 
           p.mesa === String(mesa) && 
@@ -59,7 +54,6 @@ export const PrecargaControl = (() => {
         return { exito: false, error: 'Precarga no encontrada.' };
       }
 
-      // Marcar como revisado
       await DBAppwrite.actualizar('pedidos', pedidoPrecarga.id, {
         estado: 'revisado',
         nombre_comensal: datos.nombre_comensal || pedidoPrecarga.nombre_comensal,
@@ -68,7 +62,6 @@ export const PrecargaControl = (() => {
 
       Logger.info('[PrecargaControl] Precarga ' + pedidoPrecarga.id + ' marcada como revisada.');
 
-      // Emitir evento con los ítems para cargar en el pedido activo
       let items = [];
       try {
         items = typeof pedidoPrecarga.items === 'string' 
@@ -84,7 +77,6 @@ export const PrecargaControl = (() => {
         precargaId: pedidoPrecarga.id
       });
 
-      // Limpiar caché local
       _precargasCache = _precargasCache.filter(p => p.id !== precargaId && p.precargaId !== precargaId);
 
       return { exito: true, precargaId: pedidoPrecarga.id };

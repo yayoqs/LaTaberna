@@ -1,12 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MESAS SUBMÓDULO (ES6)
    Archivo: js/ui/mesas/ciclo-vida.js
-   Versión: 1.1.1
+   Versión: 1.1.2
    Propósito: Ciclo de vida (activar/limpiar) con AbortController.
-              Suscripción a vista:cambiada para render condicional.
-              v1.1.1: listener de cliente:mesa_ingresada despacha
-                      acción al Store para que MesaDetalles pueda
-                      leer la notificación.
+              Corregido: eliminado listener duplicado de btnAgregarMesa
+              para evitar doble ejecución del comando agregarMesa.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -26,7 +24,8 @@ export function activar() {
   _abortController = new AbortController();
   const { signal } = _abortController;
 
-  document.getElementById('btnAgregarMesa')?.addEventListener('click', agregarMesa, { signal });
+  // NOTA: El listener de btnAgregarMesa se asigna en renderer.js mediante callbacks.
+  // No lo duplicamos aquí para evitar doble ejecución del comando agregarMesa.
   document.getElementById('btnFusionar')?.addEventListener('click', toggleModoFusion, { signal });
   document.getElementById('btnConfirmarFusion')?.addEventListener('click', fusionarMesasSeleccionadas, { signal });
 
@@ -55,18 +54,13 @@ export function activar() {
   _desuscripciones.push(EventBus.on('cliente:mesa_ingresada', (data) => {
     if (data && data.mesa) {
       addNotificacion(data.mesa, 'esperando', {});
-      // Despachar al Store para que MesaDetalles pueda leer la notificación
       Store.despachar({
         type: 'MESA_AGREGAR_NOTIFICACION',
         payload: { numero: data.mesa, tipo: 'esperando', datos: {} }
       });
-      Logger.debug('[Mesas] Cliente esperando en mesa ' + data.mesa + ' - estado: ' + 
-        (Store.obtenerEstado().mesas.find(m => m.numero == data.mesa)?.estado || '?') + 
-        ', permite_prepedidos: ' + (Store.obtenerEstado().mesas.find(m => m.numero == data.mesa)?.permite_prepedidos || false));
+      Logger.debug('[Mesas] Cliente esperando en mesa ' + data.mesa);
       renderGrid();
-      Logger.info(`[Mesas] Cliente esperando en mesa ${data.mesa}`);
     }
-    Logger.debug('[Mesas] cliente:mesa_ingresada recibido:', data);
   }));
   _desuscripciones.push(EventBus.on('precarga:nueva', (data) => {
     setBadge(data.mesa, data.cantidad, data.precargaId);
@@ -78,7 +72,6 @@ export function activar() {
   _desuscripciones.push(EventBus.on('mesas:limpiar_badge', (data) => {
     clearBadge(data.mesa);
   }));
-
   _desuscripciones.push(EventBus.on('vista:cambiada', (vista) => {
     setVistaActiva(vista === 'mesas');
   }));

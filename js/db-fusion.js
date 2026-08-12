@@ -1,10 +1,12 @@
-/* ==============================================================
+/* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-fusion.js
-   Versión: 1.0.6
+   Versión: 1.0.7
    Propósito: Lógica de fusión y liberación de mesas virtuales.
-              v1.0.6: agregado import de mesaVacia desde db-core.js.
-   ========================================================== */
+              v1.0.7: sanitización de nombres de mesa virtual para
+                      cumplir con restricciones de Appwrite (máx. 36
+                      caracteres, solo a-z, A-Z, 0-9, ., -, _).
+   ================================================================ */
 
 import { Logger } from './lib/logger.js';
 import { EventBus } from './lib/eventBus.js';
@@ -12,6 +14,22 @@ import { mesaVacia } from './db-core.js';
 
 export const DBFusion = (function() {
   const module = {};
+
+  /**
+   * Sanitiza un nombre de mesa para que cumpla con las restricciones de Appwrite.
+   * Reglas: a-z, A-Z, 0-9, punto, guion, guion bajo. Máximo 36 caracteres.
+   * @param {string} nombre - Nombre a sanitizar
+   * @returns {string} Nombre sanitizado
+   */
+  function _sanitizarNombreMesa(nombre) {
+    if (!nombre || typeof nombre !== 'string') return '';
+    let sanitizado = nombre.trim().substring(0, 36);
+    sanitizado = sanitizado.replace(/[^a-zA-Z0-9._-]/g, '_');
+    if (sanitizado.startsWith('.') || sanitizado.startsWith('-') || sanitizado.startsWith('_')) {
+      sanitizado = 'm' + sanitizado.substring(0, 35);
+    }
+    return sanitizado || 'mesa_virtual';
+  }
 
   /**
    * Fusiona varias mesas en una mesa virtual.
@@ -84,8 +102,14 @@ export const DBFusion = (function() {
       numeroVirtual = todasOriginales.join('+');
     }
 
+    // Sanitizar el nombre para cumplir con restricciones de Appwrite
+    const numeroVirtualSanitizado = _sanitizarNombreMesa(numeroVirtual);
+    if (numeroVirtualSanitizado !== numeroVirtual) {
+      Logger.info('[DBFusion] Nombre de mesa virtual sanitizado: "' + numeroVirtual + '" → "' + numeroVirtualSanitizado + '"');
+    }
+
     const mesaVirtual = {
-      numero: numeroVirtual,
+      numero: numeroVirtualSanitizado,
       estado: itemsConsolidados.length > 0 ? 'ocupada' : 'libre',
       pedidoId: pedidoIdUnico,
       items: itemsConsolidados,

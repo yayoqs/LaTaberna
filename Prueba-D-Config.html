@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Prueba D – Config v3 (Roles + Swipe)</title>
+  <style>
+    :root {
+      --bg: #0f0f14; --panel: #1a1a24; --border: #2e2e42;
+      --text: #f1f5f9; --text-sec: #94a3b8; --accent: #f59e0b;
+      --danger: #ef4444; --success: #22c55e; --info: #3b82f6;
+      --radius: 12px; --radius-sm: 8px;
+      font-family: system-ui, sans-serif; background: var(--bg); color: var(--text);
+    }
+    body { margin: 0; display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; }
+
+    .header {
+      display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+      background: var(--panel); border-bottom: 1px solid var(--border); z-index: 20; flex-shrink: 0;
+    }
+    .header h2 { font-size: 16px; margin: 0; flex: 1; font-weight: 600; }
+    .header .icon-btn {
+      background: transparent; border: 1px solid var(--border); color: var(--text-sec);
+      border-radius: 8px; width: 36px; height: 36px; display: flex; align-items: center;
+      justify-content: center; cursor: pointer; font-size: 16px;
+    }
+
+    .main-layout { display: flex; flex: 1; overflow: hidden; position: relative; }
+
+    /* Panel izquierdo: navegación */
+    .panel-izquierdo {
+      width: 220px; flex-shrink: 0; background: var(--panel); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; padding: 12px; gap: 4px;
+      z-index: 30; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .nav-btn {
+      background: transparent; border: 1px solid transparent; color: var(--text-sec);
+      padding: 10px 12px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600;
+      cursor: pointer; display: flex; align-items: center; gap: 8px; transition: .2s; text-align: left;
+    }
+    .nav-btn:hover { background: #252535; color: var(--text); }
+    .nav-btn.activo { background: var(--accent); color: #000; border-color: var(--accent); }
+
+    /* Panel central */
+    .panel-central { flex: 1; overflow-y: auto; padding: 20px; background: var(--bg); }
+    .seccion {
+      background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+      padding: 20px; margin-bottom: 16px; display: none;
+    }
+    .seccion.activo { display: block; }
+    .seccion h3 { margin: 0 0 12px; font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .seccion h3 i { color: var(--accent); }
+
+    .campo { margin-bottom: 14px; }
+    .campo label { display: block; font-size: 11px; color: var(--text-sec); font-weight: 700; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
+    .campo input, .campo select {
+      width: 100%; background: #252535; border: 1px solid var(--border); color: var(--text);
+      padding: 10px 12px; border-radius: var(--radius-sm); font-size: 13px; outline: none;
+    }
+    .btn-primary {
+      background: var(--accent); border: none; color: #000; border-radius: 20px;
+      padding: 8px 16px; font-weight: 600; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+    }
+    .btn-secondary {
+      background: transparent; border: 1px solid var(--border); color: var(--text-sec);
+      border-radius: 20px; padding: 8px 16px; font-weight: 600; font-size: 13px; cursor: pointer;
+    }
+    .btn-danger {
+      background: var(--danger); border: none; color: #fff; border-radius: 20px;
+      padding: 8px 16px; font-weight: 600; font-size: 13px; cursor: pointer;
+    }
+
+    /* Zonas */
+    .zona-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
+    .zona-row input { flex: 1; }
+    .zona-row button { background: transparent; border: 1px solid var(--border); color: var(--text-sec); border-radius: 4px; cursor: pointer; }
+
+    /* Personal (roles) */
+    .filtros-roles { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+    .filtro-rol {
+      background: transparent; border: 1px solid var(--border); color: var(--text-sec);
+      border-radius: 20px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: .2s;
+    }
+    .filtro-rol.activo { background: var(--accent); color: #000; border-color: var(--accent); }
+    .usuario-row {
+      background: #252535; border: 1px solid var(--border); border-radius: var(--radius-sm);
+      padding: 12px; margin-bottom: 8px;
+    }
+    .usuario-row-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .usuario-row-top .av {
+      width: 32px; height: 32px; border-radius: 50%; background: var(--info);
+      display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; flex-shrink: 0;
+    }
+    .usuario-row-top strong { font-size: 13px; flex: 1; }
+    .usuario-row-top .rol-actual { font-size: 10px; color: var(--text-sec); }
+    .roles-checks { display: flex; flex-wrap: wrap; gap: 6px; }
+    .rol-check {
+      display: flex; align-items: center; gap: 5px; background: var(--bg); border: 1px solid var(--border);
+      border-radius: 16px; padding: 5px 10px; font-size: 11px; cursor: pointer;
+    }
+    .rol-check input { accent-color: var(--info); width: 13px; height: 13px; }
+    .rol-check.bloqueado { opacity: .35; cursor: not-allowed; }
+    .rol-check.bloqueado input { pointer-events: none; }
+    .search-box {
+      display: flex; align-items: center; gap: 8px; background: #252535;
+      border: 1px solid var(--border); border-radius: 20px; padding: 8px 12px; margin-bottom: 12px;
+    }
+    .search-box input { flex: 1; background: transparent; border: none; color: var(--text); font-size: 13px; outline: none; }
+
+    /* Overlay */
+    .overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 25;
+      display: none; opacity: 0; transition: opacity 0.3s;
+    }
+    .overlay.activo { display: block; opacity: 1; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .panel-izquierdo {
+        position: fixed; top: var(--header-h); left: 0; bottom: 0;
+        transform: translateX(-100%); height: calc(100% - var(--header-h));
+      }
+      .panel-izquierdo.abierto { transform: translateX(0); }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <button class="icon-btn" id="btnToggleMenu" title="Menú">☰</button>
+    <h2>⚙️ Configuración</h2>
+  </div>
+
+  <div class="main-layout" id="mainLayout">
+    <!-- Panel izquierdo -->
+    <div class="panel-izquierdo" id="panelIzquierdo">
+      <button class="nav-btn activo" data-seccion="local">🏠 Datos del Local</button>
+      <button class="nav-btn" data-seccion="zonas">📍 Zonas</button>
+      <button class="nav-btn" data-seccion="personal">👥 Personal</button>
+      <button class="nav-btn" data-seccion="impresoras">🖨️ Impresoras</button>
+      <button class="nav-btn" data-seccion="contrasenas">🔑 Contraseñas</button>
+    </div>
+
+    <!-- Panel central -->
+    <div class="panel-central">
+      <div class="seccion activo" id="sec-local">
+        <h3><i class="fas fa-store"></i> Datos del Local</h3>
+        <div class="campo"><label>Nombre del Local</label><input type="text" value="La Taberna"></div>
+        <div class="campo"><label>Dirección</label><input type="text" value="Av. Corrientes 1234"></div>
+        <div class="campo"><label>CUIT / RUT</label><input type="text" value="30-12345678-9"></div>
+        <div class="campo"><label>Pie de ticket</label><input type="text" value="¡Gracias por visitarnos!"></div>
+        <label style="display:flex; align-items:center; gap:8px; margin:12px 0;">
+          <input type="checkbox" checked> Bloquear envío si falta stock
+        </label>
+        <button class="btn-primary"><i class="fas fa-save"></i> Guardar</button>
+      </div>
+
+      <div class="seccion" id="sec-zonas">
+        <h3><i class="fas fa-map-marker-alt"></i> Zonas / Espacios</h3>
+        <div id="zonasContainer">
+          <div class="zona-row"><input type="text" value="salon" placeholder="Nombre"><input type="number" value="12" min="0" style="width:80px;"><button>🗑️</button></div>
+          <div class="zona-row"><input type="text" value="terraza" placeholder="Nombre"><input type="number" value="4" min="0" style="width:80px;"><button>🗑️</button></div>
+        </div>
+        <button class="btn-secondary" style="margin-top:8px;"><i class="fas fa-plus"></i> Añadir Zona</button>
+        <button class="btn-danger" style="margin-top:12px;"><i class="fas fa-sync-alt"></i> Resetear Mesas</button>
+      </div>
+
+      <div class="seccion" id="sec-personal">
+        <h3><i class="fas fa-users"></i> Personal</h3>
+        <div class="search-box"><span>🔍</span><input type="text" placeholder="Buscar por nombre..."></div>
+        <div class="filtros-roles">
+          <button class="filtro-rol activo">Todos</button>
+          <button class="filtro-rol">Meseros</button>
+          <button class="filtro-rol">Cocina</button>
+          <button class="filtro-rol">Barra</button>
+          <button class="filtro-rol">Admin</button>
+        </div>
+        <div class="usuario-row">
+          <div class="usuario-row-top"><div class="av">P</div><strong>Pedro Soto</strong><span class="rol-actual">mesero</span></div>
+          <div class="roles-checks">
+            <label class="rol-check"><input type="checkbox" checked>Mesero</label>
+            <label class="rol-check"><input type="checkbox">Barra</label>
+            <label class="rol-check"><input type="checkbox">Cocina</label>
+            <label class="rol-check"><input type="checkbox">Admin</label>
+          </div>
+        </div>
+        <div class="usuario-row">
+          <div class="usuario-row-top"><div class="av">V</div><strong>Valentina Muñoz</strong><span class="rol-actual">barra, cocina</span></div>
+          <div class="roles-checks">
+            <label class="rol-check"><input type="checkbox">Mesero</label>
+            <label class="rol-check"><input type="checkbox" checked>Barra</label>
+            <label class="rol-check"><input type="checkbox" checked>Cocina</label>
+            <label class="rol-check"><input type="checkbox">Admin</label>
+          </div>
+        </div>
+        <button class="btn-primary" style="margin-top:12px;"><i class="fas fa-user-plus"></i> Invitar como personal</button>
+      </div>
+
+      <div class="seccion" id="sec-impresoras">
+        <h3><i class="fas fa-print"></i> Impresoras</h3>
+        <div class="campo"><label>Cocina</label><input type="text" value="192.168.1.100"></div>
+        <div class="campo"><label>Barra</label><input type="text" value="192.168.1.101"></div>
+        <div class="campo"><label>Caja</label><input type="text" value="192.168.1.102"></div>
+        <p style="font-size:11px; color:var(--text-sec);">Para impresión directa instalá QZ Tray.</p>
+      </div>
+
+      <div class="seccion" id="sec-contrasenas">
+        <h3><i class="fas fa-key"></i> Contraseñas de Usuarios</h3>
+        <p style="font-size:12px; color:var(--text-sec); margin-bottom:12px;">Solo el master puede cambiar contraseñas.</p>
+        <div class="usuario-row">
+          <div class="usuario-row-top"><div class="av">A</div><strong>admin</strong></div>
+          <button class="btn-secondary">🔑 Cambiar contraseña</button>
+        </div>
+        <div class="usuario-row">
+          <div class="usuario-row-top"><div class="av">C</div><strong>cocina</strong></div>
+          <button class="btn-secondary">🔑 Cambiar contraseña</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="overlay"></div>
+
+  <script>
+    const panelIzq = document.getElementById('panelIzquierdo');
+    const overlay = document.getElementById('overlay');
+    const mainLayout = document.getElementById('mainLayout');
+
+    // Navegación
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('activo'));
+        document.querySelectorAll('.seccion').forEach(s => s.classList.remove('activo'));
+        btn.classList.add('activo');
+        document.getElementById('sec-' + btn.dataset.seccion).classList.add('activo');
+        // En móvil, cerrar el panel al seleccionar
+        if (window.innerWidth <= 768) cerrarPanel();
+      });
+    });
+
+    // Filtros de roles
+    document.querySelectorAll('.filtro-rol').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.filtro-rol').forEach(b => b.classList.remove('activo'));
+        btn.classList.add('activo');
+      });
+    });
+
+    // Toggle del panel
+    document.getElementById('btnToggleMenu').addEventListener('click', () => {
+      if (panelIzq.classList.contains('abierto')) cerrarPanel();
+      else abrirPanel();
+    });
+
+    overlay.addEventListener('click', cerrarPanel);
+
+    function abrirPanel() {
+      _ajustarPosicionPanel(panelIzq);
+      panelIzq.classList.add('abierto');
+      overlay.classList.add('activo');
+    }
+
+    function cerrarPanel() {
+      panelIzq.classList.remove('abierto');
+      overlay.classList.remove('activo');
+    }
+
+    // Gestos swipe
+    let touchStartX = 0, touchStartY = 0;
+    mainLayout.addEventListener('touchstart', (e) => {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    });
+
+    mainLayout.addEventListener('touchend', (e) => {
+      const dx = e.changedTouches[0].clientX - touchStartX;
+      const dy = e.changedTouches[0].clientY - touchStartY;
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
+        if (dx > 0 && touchStartX < 40) abrirPanel();
+        else if (dx < 0 && panelIzq.classList.contains('abierto')) cerrarPanel();
+      }
+    });
+
+    // Ajuste dinámico por header global
+    function _calcularTopPanel() {
+      return 'var(--header-h)';
+    }
+
+    function _ajustarPosicionPanel(panel) {
+      if (!panel || window.innerWidth > 768) return;
+      const top = _calcularTopPanel();
+      panel.style.top = top;
+      panel.style.height = top === '0' ? '100%' : `calc(100% - ${top})`;
+    }
+  </script>
+</body>
+</html>

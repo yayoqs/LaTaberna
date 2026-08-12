@@ -1,42 +1,89 @@
 /* ================================================================
    LaTaberna - PubPOS — MESAS SUBMÓDULO (ES6)
    Archivo: js/ui/mesas/acciones-mesa.js
-   Versión: 1.0.2
-   Propósito: Funciones de acción sobre mesas. Corrección:
-             getBadgeAtencion ya no verifica permite_prepedidos
-             (campo eliminado en el nuevo modelo).
+   Versión: 1.0.7
+   Propósito: Funciones de acción sobre mesas.
+              Workaround temporal: crea la mesa directamente en
+              Appwrite hasta que el comando funcione correctamente.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
 import { EventBus } from '../../lib/eventBus.js';
 import { Logger } from '../../lib/logger.js';
 import { DB } from '../../db.js';
+import { DBAppwrite } from '../../db-appwrite.js';
+import { Auth } from '../../auth.js';
 import { CommandBus } from '../../lib/command-bus.js';
 import { mostrarToast } from '../../utils.js';
 import { LABELS } from './constantes.js';
 import { getNotificaciones, addNotificacion, removeNotificacion, clearNotificaciones } from './notificaciones.js';
 import { renderGrid, renderZoneButtons, setZonaActiva } from './renderer.js';
 
-function agregarMesa() {
-  const zonas = (Store.obtenerEstado().config && Store.obtenerEstado().config.zonas) || DB.config.zonas || [];
-  const zona = zonas.length > 0 ? zonas[0].nombre : 'salon';
-  const mesas = Store.obtenerEstado().mesas;
-  const maxNum = mesas.reduce((max, m) => Math.max(max, typeof m.numero === 'number' ? m.numero : 0), 0);
-  const nuevoNum = maxNum + 1;
+let _agregandoMesa = false;
 
-  CommandBus.ejecutar({
-    type: 'agregarMesa',
-    datos: { numero: nuevoNum, zona }
-  }).then(resultado => {
+async function agregarMesa() {
+  if (_agregandoMesa) {
+    Logger.warn('[Mesas] Ya hay una operación de agregar mesa en curso.');
+    return;
+  }
+  _agregandoMesa = true;
+
+  try {
+    const zonas = (Store.obtenerEstado().config && Store.obtenerEstado().config.zonas) || DB.config.zonas || [];
+    const zona = zonas.length > 0 ? zonas[0].nombre : 'salon';
+    const local = Auth.obtenerLocalActivo?.() || {};
+    const espacioId = local.id || 'lataberna';
+    
+    let mesas = Store.obtenerEstado().mesas;
+    if (!mesas || mesas.length === 0) {
+      try {
+        mesas = await DBAppwrite.listar('mesas');
+      } catch (e) {
+        mesas = DB.mesas || [];
+      }
+    }
+    
+    let maxNum = 0;
+    for (const m of mesas) {
+      const num = parseInt(m.numero);
+      if (!isNaN(num) && num > maxNum) {
+        maxNum = num;
+      }
+    }
+    const nuevoNum = maxNum + 1;
+
+    // Ejecutar comando (actualiza Store y grilla)
+    const resultado = await CommandBus.ejecutar({
+      type: 'agregarMesa',
+      datos: { numero: nuevoNum, zona }
+    });
+
+    // WORKAROUND: crear directamente en Appwrite
+    try {
+      await DBAppwrite.crear('mesas', String(nuevoNum), {
+        numero: String(nuevoNum),
+        estado: 'libre',
+        comensales: 1,
+        zona,
+        esVirtual: false,
+        espacioId
+      });
+      Logger.info(`[Mesas] Mesa ${nuevoNum} creada en Appwrite (workaround).`);
+    } catch (e) {
+      Logger.error('[Mesas] Error al crear mesa en Appwrite:', e);
+    }
+
     if (resultado.exito) {
       mostrarToast('success', `Mesa ${nuevoNum} agregada (${zona})`);
     } else {
       mostrarToast('error', resultado.error || 'Error al agregar mesa');
     }
-  }).catch(err => {
+  } catch (err) {
     Logger.error('[Mesas] Error al ejecutar comando agregarMesa:', err);
     mostrarToast('error', 'Error inesperado al agregar mesa');
-  });
+  } finally {
+    _agregandoMesa = false;
+  }
 }
 
 function labelEstado(estado) { return LABELS[estado] || estado; }
@@ -67,8 +114,6 @@ function getBadgeAtencion(numMesa) {
   const espera = notificaciones.find(n => n.tipo === 'esperando');
   if (espera) {
     const mesa = (Store.obtenerEstado().mesas || []).find(m => m.numero == numMesa);
-    // En el nuevo modelo, solo verificamos que la mesa esté libre.
-    // El campo permite_prepedidos ya no existe en laTaberna_Mesas.
     if (mesa && mesa.estado === 'libre') {
       return { tipo: 'esperando', nombre: 'Cliente', iniciales: 'C' };
     }

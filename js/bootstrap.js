@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/bootstrap.js
-   Versión: 1.0.15
+   Versión: 1.0.16
    Propósito: Secuencia de arranque: Auth, DB, Store, dependencias.
-              Auth.init() → Auth.iniciar().
+              Importa y registra PedidoRepositoryLocal correctamente.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -20,6 +20,7 @@ import { TurnoManager } from './managers/turno-manager.js';
 import { PedidoManager } from './managers/pedido-manager.js';
 import { App } from './app.js';
 import { crearInventarioRepo } from './repositorios/inventario-repository.js';
+import { PedidoRepositoryLocal } from './repositorios/pedido-repository.js';
 
 const Bootstrap = (() => {
 
@@ -29,7 +30,7 @@ const Bootstrap = (() => {
 
     // 1. Inicializar autenticación
     try {
-      Auth.iniciar();  // ← actualizado
+      Auth.iniciar();
       Logger.info('[Bootstrap] Auth listo.');
     } catch (e) {
       Logger.error('[Bootstrap] Error en Auth:', e);
@@ -59,7 +60,7 @@ const Bootstrap = (() => {
     Logger.info('[Bootstrap] Store poblado con datos iniciales.');
 
     // 4. Configurar repositorios y servicios
-    let pedidoRepo = typeof PedidoRepositoryLocal !== 'undefined' ? PedidoRepositoryLocal : null;
+    const pedidoRepo = PedidoRepositoryLocal;
 
     const deliveryRepo = {
       async crearDelivery(datos) { return DB.crearPedidoDelivery(datos); },

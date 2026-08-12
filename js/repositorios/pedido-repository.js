@@ -1,11 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — REPOSITORIO JS (ES6)
    Archivo: js/repositorios/pedido-repository.js
-   Versión: 1.1.4
+   Versión: 1.1.7
    Propósito: Implementación local del repositorio de pedidos con
               sincronización directa a Appwrite.
-              v1.1.4: abrirMesa recarga la mesa desde Appwrite si no
-                      existe en DB.mesas local.
+              v1.1.7: _syncMesa valida y normaliza el ID antes de
+                      crear/actualizar. Agrega logs de diagnóstico.
    ================================================================ */
 
 import { DB } from '../db.js';
@@ -49,7 +49,8 @@ const PedidoRepositoryLocal = (() => {
       comensales: Number(m.comensales) || 1,
       zona: String(m.zona || 'salon').substring(0, 50),
       mesasFusionadas: Array.isArray(m.mesasFusionadas) ? JSON.stringify(m.mesasFusionadas).substring(0, 500) : String(m.mesasFusionadas || '').substring(0, 500),
-      esVirtual: Boolean(m.esVirtual)
+      esVirtual: Boolean(m.esVirtual),
+      espacioId: String(m.espacioId || '').substring(0, 100)
     };
   }
 
@@ -69,7 +70,6 @@ const PedidoRepositoryLocal = (() => {
     delete data.id;
     if (Array.isArray(data.items)) data.items = JSON.stringify(data.items).substring(0, 5000);
     else data.items = String(data.items || '[]').substring(0, 5000);
-    // Siempre serializar subcomandas como string JSON
     data.subcomandas = typeof data.subcomandas === 'string' ? data.subcomandas : JSON.stringify(data.subcomandas || {});
     return data;
   }
@@ -96,7 +96,35 @@ const PedidoRepositoryLocal = (() => {
 
   async function _syncMesa(mesa) {
     if (!mesa || mesa.esVirtual) return;
-    await _guardarEnAppwrite('mesas', mesa.numero, _sanitizarMesa(mesa), false);
+    
+    let rowId = String(mesa.numero || '');
+    // Validar y normalizar el rowId según las reglas de Appwrite
+    // Reglas: a-z, A-Z, 0-9, punto, guion, guion bajo. Máx. 36 caracteres.
+    if (!rowId || rowId.length > 36 || /[^a-zA-Z0-9._-]/.test(rowId)) {
+      Logger.warn('[Repo] _syncMesa: rowId inválido detectado, normalizando. Original: "' + rowId + '" (longitud: ' + rowId.length + ')');
+      // Truncar a 36 caracteres y reemplazar caracteres no permitidos
+      rowId = rowId.substring(0, 36).replace(/[^a-zA-Z0-9._-]/g, '_');
+      if (!rowId) {
+        Logger.error('[Repo] _syncMesa: no se pudo generar un rowId válido a partir de mesa.numero. Omitiendo sincronización.');
+        return;
+      }
+    }
+    
+    const datos = _sanitizarMesa(mesa);
+    if (!DBAppwrite || !DBAppwrite.habilitado) return;
+    
+    Logger.debug('[Repo] _syncMesa: sincronizando mesa ' + rowId + ' (estado: ' + mesa.estado + ')');
+    try {
+      await DBAppwrite.crear('mesas', rowId, datos);
+    } catch (e) {
+      if (e.code === 409) {
+        try { await DBAppwrite.actualizar('mesas', rowId, datos); } catch (e2) {
+          Logger.error('[Repo] Error al actualizar mesa existente:', e2);
+        }
+      } else {
+        Logger.error('[Repo] Error al crear mesa en Appwrite:', e);
+      }
+    }
   }
 
   async function _syncPedido(pedido, esNuevo) {
@@ -113,7 +141,6 @@ const PedidoRepositoryLocal = (() => {
     if (!DB || !DB.getMesa) throw new Error('DB.core no disponible');
     let mesa = DB.getMesa(numeroMesa);
     
-    // Si la mesa no existe localmente, recargarla desde Appwrite
     if (!mesa && DBAppwrite && DBAppwrite.habilitado) {
       Logger.info('[Repo] Mesa ' + numeroMesa + ' no encontrada localmente, recargando desde Appwrite...');
       try {
@@ -153,7 +180,6 @@ const PedidoRepositoryLocal = (() => {
   async function enviarComanda(mesa, itemsPendientes, mozo, comensales, observaciones) {
     if (!DB || !DB.comandas || !DB.pedidos) throw new Error('DB no disponible');
 
-    // Obtener datos del pedido activo, no de la mesa
     const pedidoActivo = mesa.pedidoId ? DB.pedidos.find(p => p.id === mesa.pedidoId) : null;
     const itemsActuales = pedidoActivo ? (() => {
       try { return typeof pedidoActivo.items === 'string' ? JSON.parse(pedidoActivo.items) : (pedidoActivo.items || []); }
