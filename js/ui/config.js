@@ -1,12 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/config.js
-   Versión: 3.0.4
+   Versión: 3.1.0
    Propósito: Vista de configuración rediseñada con panel izquierdo,
-              gestión de zonas, personal por roles, impresoras y
-              contraseñas. Swipe y overlay en móvil.
-              v3.0.4: sección Personal delega en admin-roles.js pasando
-                      contenedorId 'sec-personal'.
+              gestión de zonas delegada a B1, personal por roles,
+              impresoras y contraseñas. Swipe y overlay en móvil.
+              v3.1.0: Zonas extraídas a js/ui/mesas/admin-zonas.js
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -17,6 +16,7 @@ import { mostrarToast, mostrarConfirmacion, mostrarEntrada } from '../utils.js';
 import { DB } from '../db.js';
 import { DBAppwrite } from '../db-appwrite.js';
 import { renderTabAdmin } from './perfil/admin-roles.js';
+import { renderZonas } from './mesas/admin-zonas.js';
 
 const Config = (() => {
   let _abortController = null;
@@ -74,41 +74,13 @@ const Config = (() => {
   }
 
   function _renderSeccionZonas() {
-    const config = Store.obtenerEstado().config || {};
-    const zonas = config.zonas || [{ nombre: 'salon', cantidad: 12 }];
-    const sec = document.getElementById('sec-zonas');
-    if (!sec) return;
-    sec.innerHTML = `
-      <h3><i class="fas fa-map-marker-alt"></i> Zonas / Espacios</h3>
-      <div id="zonasContainer"></div>
-      <button class="btn-secondary" id="btnAgregarZona" style="margin-top:8px;"><i class="fas fa-plus"></i> Añadir Zona</button>
-      <button class="btn-danger" id="btnResetearMesas" style="margin-top:12px;"><i class="fas fa-sync-alt"></i> Resetear Mesas</button>
-    `;
-    _renderFilasZonas(zonas);
-    document.getElementById('btnAgregarZona')?.addEventListener('click', _agregarZona);
-    document.getElementById('btnResetearMesas')?.addEventListener('click', _resetearMesas);
-  }
-
-  function _renderFilasZonas(zonas) {
-    const container = document.getElementById('zonasContainer');
-    if (!container) return;
-    container.innerHTML = zonas.map((z, idx) => `
-      <div class="zona-row">
-        <input type="text" value="${z.nombre}" placeholder="Nombre zona" data-idx="${idx}" data-campo="nombre">
-        <input type="number" value="${z.cantidad}" min="0" step="1" style="width:80px;" data-idx="${idx}" data-campo="cantidad">
-        <button class="btn-icon-sm del" data-idx="${idx}"><i class="fas fa-trash"></i></button>
-      </div>
-    `).join('');
-
-    container.querySelectorAll('.btn-icon-sm.del').forEach(btn => {
-      btn.addEventListener('click', () => _eliminarZona(parseInt(btn.dataset.idx)));
-    });
+    // Delegado al módulo de B1
+    renderZonas('sec-zonas');
   }
 
   function _renderSeccionPersonal() {
     const usuarioActual = Auth.obtenerUsuarioActual();
     const esMaster = Auth.esMasterReal();
-    // ✅ Pasamos el ID del contenedor correcto
     renderTabAdmin(usuarioActual, esMaster, 'sec-personal');
   }
 
@@ -156,21 +128,7 @@ const Config = (() => {
   }
 
   async function _guardarConfig() {
-    const zonasContainer = document.getElementById('zonasContainer');
     let config = Store.obtenerEstado().config || {};
-
-    if (zonasContainer) {
-      const filas = zonasContainer.querySelectorAll('.zona-row');
-      const zonasNuevas = Array.from(filas).map(fila => {
-        const inputs = fila.querySelectorAll('input');
-        return { nombre: inputs[0]?.value.trim() || 'sin_nombre', cantidad: parseInt(inputs[1]?.value) || 0 };
-      });
-      if (zonasNuevas.length === 0) {
-        mostrarToast('error', 'Debe existir al menos una zona.');
-        return;
-      }
-      config.zonas = zonasNuevas;
-    }
 
     config = {
       ...config,
@@ -189,10 +147,6 @@ const Config = (() => {
     DB.saveConfig();
     DB.saveMesas();
 
-    if (typeof DB.sincronizarMesasConConfig === 'function') {
-      await DB.sincronizarMesasConConfig();
-    }
-
     EventBus.emit('config:actualizada');
     mostrarToast('success', '<i class="fas fa-check-circle"></i> Configuración guardada');
 
@@ -209,42 +163,6 @@ const Config = (() => {
       } catch (e) {
         Logger.warn('[Config] No se pudo sincronizar configuración con Appwrite:', e);
       }
-    }
-  }
-
-  async function _agregarZona() {
-    const nombre = await mostrarEntrada('Nueva zona', 'Nombre de la nueva zona:', { placeholder: 'Terraza' });
-    if (!nombre) return;
-    const cantidadStr = await mostrarEntrada('Nueva zona', 'Cantidad de mesas inicial:', { type: 'number', placeholder: '0' });
-    const cantidad = parseInt(cantidadStr || '0');
-    if (isNaN(cantidad)) return;
-    const config = Store.obtenerEstado().config || {};
-    if (!config.zonas) config.zonas = [];
-    config.zonas.push({ nombre: nombre.trim(), cantidad });
-    _renderFilasZonas(config.zonas);
-  }
-
-  async function _eliminarZona(idx) {
-    const config = Store.obtenerEstado().config || {};
-    if (!config.zonas || config.zonas.length <= 1) {
-      mostrarToast('error', 'Debe existir al menos una zona.');
-      return;
-    }
-    const confirmado = await mostrarConfirmacion('Eliminar zona', `¿Eliminar la zona "${config.zonas[idx].nombre}"?`);
-    if (!confirmado) return;
-    config.zonas.splice(idx, 1);
-    _renderFilasZonas(config.zonas);
-  }
-
-  async function _resetearMesas() {
-    const confirmado = await mostrarConfirmacion('Resetear mesas', '¿Resetear todas las mesas? Se recrearán según las zonas configuradas.');
-    if (!confirmado) return;
-    if (typeof DB.resetearMesas === 'function') {
-      await DB.resetearMesas();
-      EventBus.emit('config:actualizada');
-      mostrarToast('success', 'Mesas reseteadas correctamente');
-    } else {
-      mostrarToast('error', 'Función no disponible');
     }
   }
 

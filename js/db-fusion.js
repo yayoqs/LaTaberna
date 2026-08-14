@@ -1,45 +1,34 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-fusion.js
-   Versión: 1.1.0
+   Versión: 1.1.3
    Propósito: Lógica de fusión y liberación de mesas virtuales.
-              v1.1.0: consolida ítems, total y comensales desde los
-                      pedidos activos (DB.pedidos) en lugar de leer
-                      propiedades eliminadas de Mesas. Incluye
-                      sanitización de nombres de mesa virtual.
+              v1.1.3: al fusionar, las mesas originales se marcan
+                      como fusionadas también en Appwrite.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
 import { EventBus } from './lib/eventBus.js';
 import { mesaVacia } from './db-core.js';
+import { DBAppwrite } from './db-appwrite.js';
+import { Auth } from './auth.js';
 
 export const DBFusion = (function() {
   const module = {};
 
-  /**
-   * Sanitiza un nombre de mesa para que cumpla con las restricciones de Appwrite.
-   * Reglas: a-z, A-Z, 0-9, punto, guion, guion bajo. Máximo 36 caracteres.
-   * @param {string} nombre - Nombre a sanitizar
-   * @returns {string} Nombre sanitizado
-   */
-  function _sanitizarNombreMesa(nombre) {
-    if (!nombre || typeof nombre !== 'string') return '';
-    let sanitizado = nombre.trim().substring(0, 36);
-    sanitizado = sanitizado.replace(/[^a-zA-Z0-9._-]/g, '_');
-    if (sanitizado.startsWith('.') || sanitizado.startsWith('-') || sanitizado.startsWith('_')) {
-      sanitizado = 'm' + sanitizado.substring(0, 35);
-    }
-    return sanitizado || 'mesa_virtual';
+  function _normalizarIdAppwrite(texto) {
+    if (!texto || typeof texto !== 'string') return 'mesa_virtual';
+    let id = texto
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/ñ/g, 'n')
+      .replace(/Ñ/g, 'N');
+    id = id.trim().substring(0, 36).replace(/[^a-zA-Z0-9._-]/g, '_');
+    if (/^[._-]/.test(id)) id = 'm' + id.substring(0, 35);
+    return id || 'mesa_virtual';
   }
 
-  /**
-   * Fusiona varias mesas en una mesa virtual.
-   * @param {number[]} numeros - Números de las mesas a fusionar
-   * @param {string} mozo - Mozo asignado a la mesa virtual
-   * @param {string} [nombrePersonalizado] - Nombre opcional para la mesa virtual
-   * @returns {object|null} La mesa virtual creada o null si falla
-   */
-  module.fusionarMesas = function(numeros, mozo, nombrePersonalizado) {
+  module.fusionarMesas = async function(numeros, mozo, nombrePersonalizado) {
     const mesasSeleccionadas = numeros.map(num => this.getMesa(num)).filter(m => m);
     if (mesasSeleccionadas.length !== numeros.length) {
       Logger.warn('[DBFusion] Algunas mesas no existen.');
@@ -52,7 +41,6 @@ export const DBFusion = (function() {
       return null;
     }
 
-    // Recolectar todas las mesas originales involucradas
     let todasOriginales = [];
     mesasSeleccionadas.forEach(m => {
       if (m.esVirtual && m.mesasFusionadas) {
@@ -61,31 +49,36 @@ export const DBFusion = (function() {
         todasOriginales.push(m.numero);
       }
     });
-    todasOriginales = [...new Set(todasOriginales)].sort((a,b) => a-b);
+    todasOriginales = [...new Set(todasOriginales)].sort((a, b) => a - b);
 
-    // Marcar las originales como fusionadas
-    todasOriginales.forEach(num => {
-      const original = this.mesas.find(m => m.numero === num && !m.esVirtual);
+    // Marcar las originales como fusionadas localmente y en Appwrite
+    for (const num of todasOriginales) {
+      const original = this.mesas.find(m => String(m.numero) === String(num) && !m.esVirtual);
       if (original) original.estado = 'fusionada';
-    });
 
-    // Consolidar ítems, total y comensales desde los pedidos activos
+      if (DBAppwrite && DBAppwrite.habilitado) {
+        try {
+          await DBAppwrite.actualizar('mesas', String(num), { estado: 'fusionada' });
+          Logger.info('[DBFusion] Mesa original ' + num + ' marcada como fusionada en Appwrite.');
+        } catch (e) {
+          Logger.warn('[DBFusion] Error al marcar mesa original ' + num + ' en Appwrite:', e);
+        }
+      }
+    }
+
     let itemsConsolidados = [];
     let totalConsolidado = 0;
     let comensalesTotales = 0;
     let pedidoIdUnico = null;
 
     mesasSeleccionadas.forEach(m => {
-      // Sumar comensales
       comensalesTotales += (m.comensales || 1);
 
       if (m.pedidoId && this.pedidos) {
         const pedido = this.pedidos.find(p => p.id === m.pedidoId);
         if (pedido) {
-          // Establecer el pedidoId para la mesa virtual (usa el primero encontrado)
           if (!pedidoIdUnico) pedidoIdUnico = pedido.id;
 
-          // Consolidar ítems
           try {
             const itemsPedido = typeof pedido.items === 'string'
               ? JSON.parse(pedido.items)
@@ -95,45 +88,28 @@ export const DBFusion = (function() {
             Logger.warn('[DBFusion] Error al parsear items del pedido ' + pedido.id + ':', e);
           }
 
-          // Consolidar total
           totalConsolidado += (pedido.total || 0);
         }
       }
 
-      // Eliminar mesas virtuales intermedias
       if (m.esVirtual) {
         const idx = this.mesas.findIndex(mesa => mesa.numero === m.numero);
         if (idx >= 0) this.mesas.splice(idx, 1);
       }
     });
 
-    // Determinar el identificador de la mesa virtual
-    let numeroVirtual;
+    const nombreVisible = (nombrePersonalizado && nombrePersonalizado.trim()) || todasOriginales.join('+');
+    const rowId = _normalizarIdAppwrite(nombreVisible);
 
-    if (nombrePersonalizado && nombrePersonalizado.trim() !== '') {
-      const nombre = nombrePersonalizado.trim();
-
-      // Validar que no exista otra mesa con ese identificador
-      const existe = this.mesas.some(m => String(m.numero) === nombre);
-      if (existe) {
-        Logger.warn('[DBFusion] Ya existe una mesa con el identificador: ' + nombre);
-        return null;
-      }
-
-      numeroVirtual = nombre;
-    } else {
-      // Formato automático: "1+2"
-      numeroVirtual = todasOriginales.join('+');
-    }
-
-    // Sanitizar el nombre para cumplir con restricciones de Appwrite
-    const numeroVirtualSanitizado = _sanitizarNombreMesa(numeroVirtual);
-    if (numeroVirtualSanitizado !== numeroVirtual) {
-      Logger.info('[DBFusion] Nombre de mesa virtual sanitizado: "' + numeroVirtual + '" → "' + numeroVirtualSanitizado + '"');
+    const existe = this.mesas.some(m => String(m.numero) === rowId || String(m.numero) === nombreVisible);
+    if (existe) {
+      Logger.warn('[DBFusion] Ya existe una mesa con el identificador: ' + nombreVisible);
+      return null;
     }
 
     const mesaVirtual = {
-      numero: numeroVirtualSanitizado,
+      numero: nombreVisible,
+      _rowId: rowId,
       estado: itemsConsolidados.length > 0 ? 'ocupada' : 'libre',
       pedidoId: pedidoIdUnico,
       items: itemsConsolidados,
@@ -149,14 +125,31 @@ export const DBFusion = (function() {
 
     this.mesas.push(mesaVirtual);
     this.saveMesas();
+
+    if (DBAppwrite && DBAppwrite.habilitado) {
+      try {
+        const local = Auth.obtenerLocalActivo ? Auth.obtenerLocalActivo() : null;
+        const datosMesa = {
+          numero: mesaVirtual.numero,
+          estado: mesaVirtual.estado,
+          pedidoId: mesaVirtual.pedidoId || '',
+          comensales: mesaVirtual.comensales,
+          zona: mesaVirtual.zona || 'salon',
+          esVirtual: true,
+          mesasFusionadas: JSON.stringify(todasOriginales),
+          espacioId: local ? local.id : ''
+        };
+        await DBAppwrite.crear('mesas', rowId, datosMesa);
+        Logger.info('[DBFusion] Mesa virtual persistida en Appwrite con rowId ' + rowId);
+      } catch (e) {
+        Logger.error('[DBFusion] Error al persistir mesa virtual en Appwrite:', e);
+      }
+    }
+
     EventBus.emit('mesas:guardadas', this.mesas);
     return mesaVirtual;
   };
 
-  /**
-   * Libera las mesas que estaban fusionadas en una mesa virtual.
-   * @param {object} mesaVirtual - La mesa virtual a liberar
-   */
   module.liberarMesasFusionadas = function(mesaVirtual) {
     if (!mesaVirtual.esVirtual || !mesaVirtual.mesasFusionadas) return;
 

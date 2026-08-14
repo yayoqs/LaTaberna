@@ -1,11 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — REPOSITORIO JS (ES6)
    Archivo: js/repositorios/pedido-repository.js
-   Versión: 1.1.7
+   Versión: 1.1.9
    Propósito: Implementación local del repositorio de pedidos con
               sincronización directa a Appwrite.
-              v1.1.7: _syncMesa valida y normaliza el ID antes de
-                      crear/actualizar. Agrega logs de diagnóstico.
+              v1.1.9: _syncMesa usa _rowId si existe (mesas virtuales).
    ================================================================ */
 
 import { DB } from '../db.js';
@@ -96,23 +95,18 @@ const PedidoRepositoryLocal = (() => {
 
   async function _syncMesa(mesa) {
     if (!mesa || mesa.esVirtual) return;
-    
-    let rowId = String(mesa.numero || '');
-    // Validar y normalizar el rowId según las reglas de Appwrite
-    // Reglas: a-z, A-Z, 0-9, punto, guion, guion bajo. Máx. 36 caracteres.
+    const rowIdRaw = mesa._rowId || mesa.numero;
+    let rowId = String(rowIdRaw || '');
     if (!rowId || rowId.length > 36 || /[^a-zA-Z0-9._-]/.test(rowId)) {
       Logger.warn('[Repo] _syncMesa: rowId inválido detectado, normalizando. Original: "' + rowId + '" (longitud: ' + rowId.length + ')');
-      // Truncar a 36 caracteres y reemplazar caracteres no permitidos
       rowId = rowId.substring(0, 36).replace(/[^a-zA-Z0-9._-]/g, '_');
       if (!rowId) {
         Logger.error('[Repo] _syncMesa: no se pudo generar un rowId válido a partir de mesa.numero. Omitiendo sincronización.');
         return;
       }
     }
-    
     const datos = _sanitizarMesa(mesa);
     if (!DBAppwrite || !DBAppwrite.habilitado) return;
-    
     Logger.debug('[Repo] _syncMesa: sincronizando mesa ' + rowId + ' (estado: ' + mesa.estado + ')');
     try {
       await DBAppwrite.crear('mesas', rowId, datos);
@@ -140,7 +134,6 @@ const PedidoRepositoryLocal = (() => {
   async function abrirMesa(numeroMesa, mozo, comensales) {
     if (!DB || !DB.getMesa) throw new Error('DB.core no disponible');
     let mesa = DB.getMesa(numeroMesa);
-    
     if (!mesa && DBAppwrite && DBAppwrite.habilitado) {
       Logger.info('[Repo] Mesa ' + numeroMesa + ' no encontrada localmente, recargando desde Appwrite...');
       try {
@@ -155,7 +148,6 @@ const PedidoRepositoryLocal = (() => {
         Logger.warn('[Repo] No se pudo recargar la mesa desde Appwrite:', e.message);
       }
     }
-    
     if (!mesa) throw new Error(`La mesa ${numeroMesa} no existe`);
     if (mesa.estado !== 'libre') throw new Error(`La mesa ${numeroMesa} no está libre`);
 
@@ -397,7 +389,6 @@ const PedidoRepositoryLocal = (() => {
     if (existente) throw new Error(`Ya existe una mesa con el número ${datosMesa.numero}`);
     DB.mesas.push(datosMesa);
     DB.saveMesas();
-    Store.despachar({ type: 'MESA_AGREGAR', payload: datosMesa });
     await _syncMesa(datosMesa);
     return datosMesa;
   }

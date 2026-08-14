@@ -1,18 +1,16 @@
 /* ================================================================
    LaTaberna - PubPOS — MESAS SUBMÓDULO (ES6)
    Archivo: js/ui/mesas/acciones-mesa.js
-   Versión: 1.0.9
+   Versión: 1.1.2
    Propósito: Funciones de acción sobre mesas.
-              v1.0.9: Corregida llamada a DB.listar inexistente.
-                      Ahora usa DBAppwrite.listar con fallback local.
+              v1.1.2: Retirado workaround de resincronizado manual.
+                      Core ahora despacha MESA_AGREGAR una sola vez.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
 import { EventBus } from '../../lib/eventBus.js';
 import { Logger } from '../../lib/logger.js';
 import { DB } from '../../db.js';
-import { DBAppwrite } from '../../db-appwrite.js';
-import { Auth } from '../../auth.js';
 import { CommandBus } from '../../lib/command-bus.js';
 import { mostrarToast } from '../../utils.js';
 import { LABELS } from './constantes.js';
@@ -23,21 +21,8 @@ async function agregarMesa() {
   try {
     const zonas = (Store.obtenerEstado().config && Store.obtenerEstado().config.zonas) || DB.config.zonas || [];
     const zona = zonas.length > 0 ? zonas[0].nombre : 'salon';
-    
-    let mesas = Store.obtenerEstado().mesas;
-    if (!mesas || mesas.length === 0) {
-      if (DBAppwrite && DBAppwrite.habilitado) {
-        try {
-          mesas = await DBAppwrite.listar('mesas');
-        } catch (e) {
-          Logger.warn('[Mesas] No se pudo listar mesas desde Appwrite, usando local:', e);
-          mesas = DB.mesas || [];
-        }
-      } else {
-        mesas = DB.mesas || [];
-      }
-    }
-    
+
+    const mesas = DB.mesas || [];
     let maxNum = 0;
     for (const m of mesas) {
       const num = parseInt(m.numero);
@@ -47,13 +32,15 @@ async function agregarMesa() {
     }
     const nuevoNum = maxNum + 1;
 
-    // Ejecutar comando (actualiza Store, DB local y Appwrite)
     const resultado = await CommandBus.ejecutar({
       type: 'agregarMesa',
       datos: { numero: nuevoNum, zona }
     });
 
     if (resultado.exito) {
+      // renderGrid() se dispara automáticamente por el listener del Store
+      // al despacharse MESA_AGREGAR. Se mantiene por robustez.
+      renderGrid();
       mostrarToast('success', `Mesa ${nuevoNum} agregada (${zona})`);
     } else {
       mostrarToast('error', resultado.error || 'Error al agregar mesa');

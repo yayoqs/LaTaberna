@@ -2,22 +2,22 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Test B1 – Micro-insignias y Popover</title>
+  <title>Test B1 – Cazador de Mesas Cero</title>
   <style>
     body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
     h1 { color: #f59e0b; }
-    .suite { margin-bottom: 24px; border-bottom: 1px solid #2e2e42; padding-bottom: 12px; }
+    .suite { margin-bottom: 20px; border-bottom: 1px solid #2e2e42; padding-bottom: 12px; }
     .test { margin: 4px 0; padding: 4px 8px; border-radius: 4px; }
     .pass { background: rgba(34,197,94,.2); }
     .fail { background: rgba(239,68,68,.2); }
-    .log  { background: rgba(99,102,241,.2); }
+    .log { background: rgba(99,102,241,.2); }
     .summary { margin-top: 20px; font-weight: bold; }
     .info { color: #94a3b8; font-size: 12px; margin: 2px 0; }
   </style>
 </head>
 <body>
-  <h1>🧪 Test B1 – Micro-insignias y Popover</h1>
-  <p class="info">Verifica color de micro-insignias y contenido del popover en Mesa 99.</p>
+  <h1>🧪 Test B1 – Cazador de Mesas Cero</h1>
+  <p class="info">Ejecuta acciones variadas y vigila si aparece mesa número 0.</p>
   <div id="results"></div>
 
   <script src="/js/appwrite.min.js"></script>
@@ -26,15 +26,21 @@
     const { Logger }         = await import('/js/lib/logger.js');
     const { EventBus }       = await import('/js/lib/eventBus.js');
     const { Store }          = await import('/js/lib/store.js');
+    const { CommandBus }     = await import('/js/lib/command-bus.js');
     const { DBAppwrite }     = await import('/js/db-appwrite.js');
     const { DB }             = await import('/js/db.js');
     const { Auth, inicializarAuth } = await import('/js/auth.js');
     const { Mesas }          = await import('/js/ui/mesas.js');
+    const { agregarMesa }    = await import('/js/ui/mesas/acciones-mesa.js');
+    const { PedidoManager }  = await import('/js/managers/pedido-manager.js');
+    const { PedidoRepositoryLocal } = await import('/js/repositorios/pedido-repository.js');
+    const { Deps }           = await import('/js/lib/deps.js');
 
     await import('/js/comandos/agregar-mesa.js');
     await import('/js/comandos/crear-pedido-mesa.js');
-    await import('/js/comandos/enviar-comanda.js');
     await import('/js/comandos/liberar-mesa.js');
+    await import('/js/comandos/enviar-comanda.js');
+    await import('/js/comandos/completar-subcomanda.js');
 
     Logger.setLevel('ERROR');
     const resultsEl = document.getElementById('results');
@@ -44,7 +50,31 @@
     const fail = msg => { failed++; resultsEl.innerHTML += `<div class="test fail">✘ ${msg}</div>`; };
     const esperar = ms => new Promise(r => setTimeout(r, ms));
 
-    const obtenerTarjeta99 = () => [...document.querySelectorAll('.mesa-card')].find(c => c.textContent.includes('99'));
+    const obtenerNumerosDOM = () => [...document.querySelectorAll('.mesa-card .mesa-numero')].map(el => el.textContent.trim());
+
+    const imprimirEstado = async (etapa) => {
+      const dbMesas = (DB.mesas || []).map(m => `${m.numero}:${m.zona}:${m.estado}${m.esVirtual ? ':virtual' : ''}`).sort((a,b)=>a.localeCompare(b, undefined, {numeric:true}));
+      const storeMesas = (Store.obtenerEstado().mesas || []).map(m => `${m.numero}:${m.zona}:${m.estado}${m.esVirtual ? ':virtual' : ''}`).sort((a,b)=>a.localeCompare(b, undefined, {numeric:true}));
+      const appwriteMesas = (await DBAppwrite.listar('mesas')).map(m => `${m.numero}:${m.zona}:${m.estado}${m.esVirtual ? ':virtual' : ''}`).sort((a,b)=>a.localeCompare(b, undefined, {numeric:true}));
+      const domMesas = obtenerNumerosDOM().sort((a,b)=>a.localeCompare(b, undefined, {numeric:true}));
+
+      log(`--- ${etapa} ---`);
+      log(`DB.mesas: [${dbMesas.join(', ')}]`);
+      log(`Store.mesas: [${storeMesas.join(', ')}]`);
+      log(`Appwrite: [${appwriteMesas.join(', ')}]`);
+      log(`DOM: [${domMesas.join(', ')}]`);
+
+      const hayCeroDB = dbMesas.some(s => s.startsWith('0:'));
+      const hayCeroStore = storeMesas.some(s => s.startsWith('0:'));
+      const hayCeroAppwrite = appwriteMesas.some(s => s.startsWith('0:'));
+      const hayCeroDOM = domMesas.includes('0');
+
+      if (hayCeroDB || hayCeroStore || hayCeroAppwrite || hayCeroDOM) {
+        fail(`Detectada mesa 0 en ${etapa}`);
+      } else {
+        pass(`Sin mesa 0 en ${etapa}`);
+      }
+    };
 
     try {
       log('Inicializando Appwrite...');
@@ -54,94 +84,95 @@
       await inicializarAuth();
       if (!(await Auth.iniciarSesion('master', 'master123'))) throw new Error('Auth falló');
 
-      const espacioId = Auth.obtenerLocalActivo?.()?.id || 'lataberna';
       await DB.init();
+      PedidoManager.init({ pedidoRepo: PedidoRepositoryLocal });
+      Deps.registrar('pedidoRepo', PedidoRepositoryLocal);
 
+      // Limpieza previa total
       log('Limpiando todas las mesas...');
-      const todasAntes = await DBAppwrite.listar('mesas');
-      for (const m of todasAntes) {
-        await DBAppwrite.eliminar('mesas', m.id);
+      const todasPrevias = await DBAppwrite.listar('mesas');
+      for (const m of todasPrevias) {
+        if (/^\d+$/.test(m.numero) || m.numero === '0' || m.numero === 'cumpleaños') await DBAppwrite.eliminar('mesas', m.id).catch(()=>{});
       }
+      localStorage.removeItem('pubpos_mesas');
+      localStorage.removeItem('pubpos_config');
+      DB.mesas = [];
 
-      log('Creando mesa 99...');
-      await DBAppwrite.crear('mesas', '99', {
-        numero: '99', estado: 'libre', comensales: 1, zona: 'salon', esVirtual: false, espacioId
-      });
-      DB.mesas = await DBAppwrite.listar('mesas');
+      // Crear zona con 12 mesas
+      const zonas = [{ nombre: 'zona1', cantidad: 12 }];
+      DB.config = { ...DB.config, zonas };
+      DB.saveConfig();
+      await DB.sincronizarMesasConConfig();
       Store.despachar({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
 
       const main = document.createElement('main');
       main.id = 'view-mesas';
-      main.innerHTML = '<div id="mesasGrid"></div><div id="popoverContainer"></div>';
+      main.className = 'view active';
       document.body.appendChild(main);
       EventBus.emit('vista:cambiada', 'mesas');
       Mesas.render();
       await esperar(300);
 
-      let card = obtenerTarjeta99();
-      if (card) pass('Tarjeta de mesa 99 existe');
-      else { fail('No se encontró tarjeta de mesa 99'); throw new Error('Sin tarjeta'); }
+      await imprimirEstado('1. Después de crear 12 mesas');
 
-      // --- Estado inicial ---
-      let microCocina = card.querySelector('.micro-cocina');
-      let microBarra = card.querySelector('.micro-barra');
-      if (microCocina) pass('Aparece micro-insignia de cocina'); else fail('No aparece micro-insignia de cocina');
-      if (microBarra) pass('Aparece micro-insignia de barra'); else fail('No aparece micro-insignia de barra');
-
-      if (microCocina && microCocina.style.background === 'rgb(156, 163, 175)') pass('Cocina gris inicial'); else fail('Cocina no gris: ' + (microCocina?.style.background || 'null'));
-      if (microBarra && microBarra.style.background === 'rgb(156, 163, 175)') pass('Barra gris inicial'); else fail('Barra no gris: ' + (microBarra?.style.background || 'null'));
-
-      // --- Agregar comanda en-proceso ---
-      log('Agregando comanda en-proceso...');
-      DB.comandas = [{
-        id: 'com_1', mesa: '99', destino: 'cocina',
-        items: [], estado: 'en-proceso', ts: Date.now(), mozo: 'Carlos', observaciones: ''
-      }];
-      Store.despachar({ type: 'COMANDA_AGREGADA', payload: DB.comandas[0] });
+      // Agregar mesa nueva
+      await agregarMesa();
+      await esperar(1000);
       Mesas.render();
-      await esperar(200);
+      await esperar(300);
+      await imprimirEstado('2. Después de agregar mesa 13');
 
-      card = obtenerTarjeta99();  // ✅ re-obtener tarjeta fresca
-      microCocina = card.querySelector('.micro-cocina');
-      if (microCocina && microCocina.style.background === 'rgb(245, 158, 11)') pass('Cocina amarilla (en-proceso)');
-      else fail('Cocina no cambió a amarillo: ' + (microCocina?.style.background || 'null'));
-
-      // --- Cambiar a lista ---
-      log('Cambiando a lista...');
-      DB.comandas[0].estado = 'lista';
-      Store.despachar({ type: 'COMANDA_ACTUALIZADA', payload: { id: 'com_1', cambios: { estado: 'lista' } } });
+      // Fusionar 3+5+6 como cumpleaños
+      await DB.fusionarMesas(['3','5','6'], 'Mozo Test', 'cumpleaños');
+      await esperar(1000);
+      Store.despachar({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
       Mesas.render();
-      await esperar(200);
+      await esperar(300);
+      await imprimirEstado('3. Después de fusionar 3+5+6 como cumpleaños');
 
-      card = obtenerTarjeta99();  // ✅ re-obtener tarjeta fresca
-      microCocina = card.querySelector('.micro-cocina');
-      if (microCocina && microCocina.style.background === 'rgb(34, 197, 94)') pass('Cocina verde (lista)');
-      else fail('Cocina no cambió a verde: ' + (microCocina?.style.background || 'null'));
+      // Agregar otra mesa
+      await agregarMesa();
+      await esperar(1000);
+      Mesas.render();
+      await esperar(300);
+      await imprimirEstado('4. Después de agregar mesa 14');
 
-      // --- Popover ---
-      log('Probando popover...');
-      card.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-      await esperar(450);
-      card.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-      await esperar(200);
-
-      const popover = document.querySelector('#popoverContainer div');
-      if (popover) {
-        pass('Popover aparece');
-        const texto = popover.textContent;
-        if (texto.includes('Mesa 99')) pass('Popover muestra número de mesa'); else fail('Popover no muestra número de mesa');
-        if (texto.includes('lista')) pass('Popover muestra estado lista'); else fail('Popover no muestra estado lista');
-        popover.querySelector('button')?.click();
+      // Liberar mesa virtual (probar si genera 0)
+      const mesaVirtual = DB.mesas.find(m => m.numero === 'cumpleaños');
+      if (mesaVirtual && mesaVirtual.esVirtual) {
+        log('Liberando mesa virtual cumpleaños...');
+        DB.liberarMesasFusionadas(mesaVirtual);
+        await esperar(800);
+        Store.despachar({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
+        Mesas.render();
+        await esperar(300);
+        await imprimirEstado('5. Después de liberar mesa virtual');
       } else {
-        fail('Popover no apareció');
+        log('No se encontró mesa virtual para liberar.');
+      }
+
+      // Resetear mesas si DB.resetearMesas está disponible
+      if (typeof DB.resetearMesas === 'function') {
+        log('Reseteando mesas...');
+        await DB.resetearMesas();
+        await esperar(1000);
+        Store.despachar({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
+        Mesas.render();
+        await esperar(300);
+        await imprimirEstado('6. Después de resetear mesas');
       }
 
       resultsEl.innerHTML += `<div class="summary">${passed} pasaron, ${failed} fallaron</div>`;
-
     } catch (e) {
       fail('ERROR: ' + e.message);
       console.error(e);
     } finally {
+      try {
+        const todasFinal = await DBAppwrite.listar('mesas');
+        for (const m of todasFinal) {
+          if (/^\d+$/.test(m.numero) || m.numero === '0' || m.numero === 'cumpleaños') await DBAppwrite.eliminar('mesas', m.id).catch(()=>{});
+        }
+      } catch {}
       document.getElementById('view-mesas')?.remove();
       log('🏁 Test finalizado');
     }

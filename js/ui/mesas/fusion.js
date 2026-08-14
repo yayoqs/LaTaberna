@@ -1,16 +1,15 @@
 /* ================================================================
    LaTaberna - PubPOS — MESAS SUBMÓDULO (ES6)
    Archivo: js/ui/mesas/fusion.js
-   Versión: 1.0.3
+   Versión: 1.0.4
    Propósito: Modo fusión (toggle, selección, confirmar).
-              Migración a mostrarToast.
+              v1.0.4: usa await con DB.fusionarMesas async.
    ================================================================ */
 
 import { EventBus } from '../../lib/eventBus.js';
 import { DB } from '../../db.js';
 import { mostrarToast, mostrarEntrada } from '../../utils.js';
-import { isModoSeleccion, setModoSeleccion, getMesasSeleccionadas, limpiarSeleccion } from './renderer.js';
-import { renderGrid } from './renderer.js';
+import { isModoSeleccion, setModoSeleccion, getMesasSeleccionadas, limpiarSeleccion, renderGrid } from './renderer.js';
 
 export function toggleModoFusion() {
   setModoSeleccion(!isModoSeleccion());
@@ -34,11 +33,8 @@ export function toggleModoFusion() {
 
 export function toggleSeleccionMesa(num, isChecked) {
   const seleccionadas = getMesasSeleccionadas();
-  if (isChecked) {
-    seleccionadas.add(num);
-  } else {
-    seleccionadas.delete(num);
-  }
+  if (isChecked) seleccionadas.add(num);
+  else seleccionadas.delete(num);
 }
 
 export async function fusionarMesasSeleccionadas() {
@@ -47,11 +43,13 @@ export async function fusionarMesasSeleccionadas() {
     mostrarToast('warning', 'Selecciona al menos dos mesas para fusionar.');
     return;
   }
+
   const numeros = Array.from(seleccionadas).sort((a, b) => {
-    const numA = typeof a === 'number' ? a : parseInt(a);
-    const numB = typeof b === 'number' ? b : parseInt(b);
+    const numA = parseInt(a);
+    const numB = parseInt(b);
     return numA - numB;
   });
+
   const mozo = document.getElementById('mozoActivo')?.value || 'Mozo';
   const nombrePersonalizado = await mostrarEntrada(
     'Fusionar Mesas',
@@ -60,7 +58,8 @@ export async function fusionarMesasSeleccionadas() {
   );
   const nombreFinal = nombrePersonalizado || '';
 
-  const mesaVirtual = DB.fusionarMesas(numeros, mozo, nombreFinal);
+  const mesaVirtual = await DB.fusionarMesas(numeros, mozo, nombreFinal);
+
   if (mesaVirtual) {
     mostrarToast('success', `Mesas fusionadas: ${mesaVirtual.numero}`);
     toggleModoFusion();

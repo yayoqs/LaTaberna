@@ -1,9 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — MESAS SUBMÓDULO (ES6)
    Archivo: js/ui/mesas/renderer.js
-   Versión: 1.2.2
+   Versión: 1.3.1
    Propósito: Renderizado de la grilla, tarjetas, popover.
-              Corrección NC2: pasar evento a mostrarPopover.
+              v1.3.1: Orden estable de tarjetas por número.
+                      Se elimina botón de bandeja (solo gesto).
+                      La construcción de la vista no conecta botones.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -86,13 +88,14 @@ export function renderGrid() {
   if (_zonaActiva !== 'todas') {
     mesas = mesas.filter(m => m.zona === _zonaActiva);
   }
+
   mesas.sort((a, b) => {
     const numA = a.esVirtual && a.mesasFusionadas && a.mesasFusionadas.length > 0
-      ? Math.min(...a.mesasFusionadas)
-      : (typeof a.numero === 'number' ? a.numero : 9999);
+      ? Math.min(...a.mesasFusionadas.map(Number))
+      : (parseInt(a.numero) || 9999);
     const numB = b.esVirtual && b.mesasFusionadas && b.mesasFusionadas.length > 0
-      ? Math.min(...b.mesasFusionadas)
-      : (typeof b.numero === 'number' ? b.numero : 9999);
+      ? Math.min(...b.mesasFusionadas.map(Number))
+      : (parseInt(b.numero) || 9999);
     return numA - numB;
   });
 
@@ -220,7 +223,7 @@ function _htmlMesa(mesa, puedeSeleccionar, colorZona) {
   const microBarra = `<span class="micro-badge micro-barra" style="background:${colorEstado(estados.barra)};" title="Barra: ${estados.barra}"><i class="fas fa-glass-martini-alt"></i></span>`;
 
   const icono = ICONOS[mesa.estado] || 'fa-chair';
-  const numeroMostrado = mesa.esVirtual && mesa.mesasFusionadas ? mesa.mesasFusionadas.join(' + ') : mesa.numero;
+  const numeroMostrado = mesa.numero;
 
   if (puedeSeleccionar) {
     const checked = _mesasSeleccionadas.has(mesa.numero) ? 'checked' : '';
@@ -257,6 +260,8 @@ export function mostrarPopover(mesa, card, event) {
   const comandas = Store.obtenerEstado().comandas || [];
   const mesaComandas = comandas.filter(c => c.mesa == mesa.numero);
 
+  const numeroVisible = mesa.numero;
+
   let itemsHTML = '';
   mesaComandas.forEach(c => {
     const destino = (c.id && c.id.endsWith('_barra')) ? 'barra' : (c.id && c.id.endsWith('_cocina')) ? 'cocina' : c.destino;
@@ -268,7 +273,7 @@ export function mostrarPopover(mesa, card, event) {
 
   cont.innerHTML = `
     <div style="background:#1a1a2e;border:1px solid #2e2e42;border-radius:8px;padding:12px;color:#f1f5f9;font-size:12px;min-width:180px;pointer-events:auto;position:fixed;top:${clientY}px;left:${clientX}px;z-index:9999;" id="popoverContent">
-      <strong>Mesa ${mesa.numero}</strong>
+      <strong>Mesa ${numeroVisible}</strong>
       <div style="margin-top:4px;"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${colorEstado(estados.cocina)};margin-right:4px;"></span> Cocina: ${estados.cocina}</div>
       <div><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${colorEstado(estados.barra)};margin-right:4px;"></span> Barra: ${estados.barra}</div>
       <div style="margin-top:6px;border-top:1px solid #2e2e42;padding-top:4px;">${itemsHTML || '<span style="color:#9ca3af;">Sin comandas</span>'}</div>
@@ -303,7 +308,7 @@ export function mostrarPopover(mesa, card, event) {
   }
 }
 
-export function asegurarVista(callbacks = {}) {
+export function asegurarVista() {
   const main = document.getElementById('view-mesas');
   if (main && main.querySelector('.mesas-grid')) return;
 
@@ -313,14 +318,14 @@ export function asegurarVista(callbacks = {}) {
     nuevoMain.className = 'view active';
     const referencia = document.getElementById('toastContainer') || document.body.lastChild;
     document.body.insertBefore(nuevoMain, referencia);
-    _construirContenido(nuevoMain, callbacks);
+    _construirContenido(nuevoMain);
     return;
   }
 
-  _construirContenido(main, callbacks);
+  _construirContenido(main);
 }
 
-function _construirContenido(contenedor, callbacks) {
+function _construirContenido(contenedor) {
   contenedor.innerHTML = `
     <div class="view-toolbar">
       <h2><i class="fas fa-grip"></i> Salón — Mapa de Mesas</h2>
@@ -345,15 +350,6 @@ function _construirContenido(contenedor, callbacks) {
     </div>
     <div id="mesasGrid" class="mesas-grid"></div>
     <div id="popoverContainer" style="position:fixed;z-index:9999;pointer-events:none;"></div>
+    <div id="bandejaAtencionOverlay" class="bandeja-overlay" style="display:none;"></div>
   `;
-
-  document.getElementById('btnAgregarMesa')?.addEventListener('click', () => {
-    if (callbacks.onAgregarMesa) callbacks.onAgregarMesa();
-  });
-  document.getElementById('btnFusionar')?.addEventListener('click', () => {
-    if (callbacks.onToggleFusion) callbacks.onToggleFusion();
-  });
-  document.getElementById('btnConfirmarFusion')?.addEventListener('click', () => {
-    if (callbacks.onConfirmarFusion) callbacks.onConfirmarFusion();
-  });
 }

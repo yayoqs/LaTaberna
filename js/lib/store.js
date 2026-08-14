@@ -1,10 +1,13 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/lib/store.js
-   Versión: 2.0.6
+   Versión: 2.0.7
    Propósito: Estado centralizado con slices 'cliente', 'menus' y
-              'precargas_cliente'. Métodos públicos migrados al español.
-              Se mantienen alias en inglés por una iteración.
+              'precargas_cliente'. Métodos públicos en español.
+              Se mantienen alias en inglés por compatibilidad.
+              v2.0.7: mesasReducer ignora MESA_AGREGAR si ya existe
+                      una mesa con el mismo número. Evita duplicados
+                      en Store causados por dobles despachos.
    ================================================================ */
 
 import { EventBus } from './eventBus.js';
@@ -24,7 +27,7 @@ const Store = (() => {
     espacios: [],
     espacioActivo: null,
     menus: [],
-    precargas_cliente: [],   // ← nuevo slice
+    precargas_cliente: [],
     cliente: { permitePrepedidos: false, mesa: null }
   };
 
@@ -85,7 +88,7 @@ const Store = (() => {
     newState.espacios           = espaciosReducer(newState.espacios, action, newState);
     newState.espacioActivo      = espacioActivoReducer(newState.espacioActivo, action, newState);
     newState.menus              = menusReducer(newState.menus, action);
-    newState.precargas_cliente  = precargasClienteReducer(newState.precargas_cliente, action);  // ← nuevo reducer
+    newState.precargas_cliente  = precargasClienteReducer(newState.precargas_cliente, action);
     newState.cliente            = clienteReducer(newState.cliente, action);
 
     return newState;
@@ -96,20 +99,29 @@ const Store = (() => {
   function mesasReducer(mesas, action) {
     switch (action.type) {
       case 'MESAS_INICIALIZAR': return action.payload || [];
+      case 'MESA_AGREGAR': {
+        const nueva = action.payload;
+        if (!nueva || !nueva.numero) return mesas;
+        // Protección anti-duplicados: si ya existe el número, no agregar.
+        if (mesas.some(m => String(m.numero) === String(nueva.numero))) {
+          Logger.warn('[Store] MESA_AGREGAR duplicada ignorada para mesa ' + nueva.numero);
+          return mesas;
+        }
+        return [...mesas, nueva];
+      }
       case 'MESA_CAMBIAR_ESTADO': {
         const { numero, estado } = action.payload;
-        return mesas.map(m => m.numero === numero ? { ...m, estado } : m);
+        return mesas.map(m => String(m.numero) === String(numero) ? { ...m, estado } : m);
       }
-      case 'MESA_AGREGAR': return [...mesas, action.payload];
-      case 'MESA_ELIMINAR': return mesas.filter(m => m.numero !== action.payload);
+      case 'MESA_ELIMINAR': return mesas.filter(m => String(m.numero) !== String(action.payload));
       case 'MESA_ACTUALIZAR': {
         const { numero, cambios } = action.payload;
-        return mesas.map(m => m.numero === numero ? { ...m, ...cambios } : m);
+        return mesas.map(m => String(m.numero) === String(numero) ? { ...m, ...cambios } : m);
       }
       case 'COMANDA_ITEM_AGREGAR': {
         const { numeroMesa, item } = action.payload;
         return mesas.map(m => {
-          if (m.numero != numeroMesa) return m;
+          if (String(m.numero) !== String(numeroMesa)) return m;
           const items = m.items || [];
           const nuevoItem = { ...item, qty: 1, obs: item.obs || '', enviado: false };
           return { ...m, items: [...items, nuevoItem] };
@@ -118,7 +130,7 @@ const Store = (() => {
       case 'COMANDA_ITEM_CAMBIAR': {
         const { numeroMesa, index, cambios } = action.payload;
         return mesas.map(m => {
-          if (m.numero != numeroMesa) return m;
+          if (String(m.numero) !== String(numeroMesa)) return m;
           const items = (m.items || []).map((item, i) => i === index ? { ...item, ...cambios } : item);
           return { ...m, items };
         });
@@ -126,7 +138,7 @@ const Store = (() => {
       case 'COMANDA_ITEM_QUITAR': {
         const { numeroMesa, index } = action.payload;
         return mesas.map(m => {
-          if (m.numero != numeroMesa) return m;
+          if (String(m.numero) !== String(numeroMesa)) return m;
           const items = (m.items || []).filter((_, i) => i !== index);
           return { ...m, items };
         });
@@ -138,7 +150,11 @@ const Store = (() => {
   function pedidosReducer(pedidos, action) {
     switch (action.type) {
       case 'PEDIDOS_INICIALIZAR': return action.payload || [];
-      case 'PEDIDO_CREADO': return [...pedidos, action.payload];
+      case 'PEDIDO_CREADO': {
+        const nuevo = action.payload;
+        if (pedidos.some(p => p.id === nuevo.id)) return pedidos;
+        return [...pedidos, nuevo];
+      }
       case 'PEDIDO_ACTUALIZADO': {
         const { id, cambios } = action.payload;
         return pedidos.map(p => p.id === id ? { ...p, ...cambios } : p);
@@ -156,7 +172,11 @@ const Store = (() => {
       case 'PEDIDOSDELIVERY_INICIALIZAR':
       case 'DELIVERY_INICIALIZAR':
         return action.payload || [];
-      case 'DELIVERY_CREADO': return [...deliveries, action.payload];
+      case 'DELIVERY_CREADO': {
+        const nuevo = action.payload;
+        if (deliveries.some(d => d.id === nuevo.id)) return deliveries;
+        return [...deliveries, nuevo];
+      }
       case 'DELIVERY_ACTUALIZADO': {
         const { id, cambios } = action.payload;
         return deliveries.map(d => d.id === id ? { ...d, ...cambios } : d);
@@ -168,7 +188,11 @@ const Store = (() => {
 
   function comandasReducer(comandas, action) {
     switch (action.type) {
-      case 'COMANDA_AGREGADA': return [...comandas, action.payload];
+      case 'COMANDA_AGREGADA': {
+        const nueva = action.payload;
+        if (comandas.some(c => c.id === nueva.id)) return comandas;
+        return [...comandas, nueva];
+      }
       case 'COMANDA_ACTUALIZADA': {
         const { id, cambios } = action.payload;
         return comandas.map(c => c.id === id ? { ...c, ...cambios } : c);
@@ -223,7 +247,8 @@ const Store = (() => {
   function espaciosReducer(espacios, action) {
     switch (action.type) {
       case 'ESPACIOS_INICIALIZAR': return action.payload || [];
-      case 'ESPACIO_AGREGADO': return [...espacios, action.payload];
+      case 'ESPACIO_AGREGADO':
+        return [...espacios, action.payload];
       default: return espacios;
     }
   }
@@ -242,7 +267,7 @@ const Store = (() => {
     }
   }
 
-  function precargasClienteReducer(precargas, action) {   // ← nuevo reducer
+  function precargasClienteReducer(precargas, action) {
     switch (action.type) {
       case 'PRECARGAS_CLIENTE_ACTUALIZAR':
         return action.payload || [];
@@ -266,7 +291,6 @@ const Store = (() => {
     obtenerEstado,
     despachar,
     suscribir,
-    // Alias temporales (una iteración)
     getState: obtenerEstado,
     dispatch: despachar,
     subscribe: suscribir

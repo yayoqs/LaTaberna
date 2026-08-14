@@ -1,9 +1,9 @@
 /* ================================================================
-   LaTaberna - PubPOS — CSS
+   LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/mesas.css
-   Versión: 1.0.6
-   Propósito: Estilos para el mapa de mesas. Reglas expandidas
-              sin anidamiento SCSS.
+   Versión: 1.1.1
+   Propósito: Estilos para el mapa de mesas.
+              v1.1.1: Bandeja de atención sin contador. Encapsulada.
    ================================================================ */
 
 /* ── GRID DE MESAS ──────────────────────────────────── */
@@ -73,6 +73,8 @@
   font-size: 18px;
   font-weight: 800;
   color: var(--color-text);
+  text-align: center;
+  word-break: break-word;
 }
 
 #view-mesas .mesa-estado-label {
@@ -178,4 +180,133 @@
 @keyframes esperando-pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,.4); }
   50%      { box-shadow: 0 0 0 6px rgba(59,130,246,0); }
+}
+
+/* ── BANDEJA DE ATENCIÓN (encapsulada en #view-mesas) ── */
+#view-mesas .bandeja-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,.6);
+  z-index: 1200;
+  display: none;
+  align-items: stretch;
+  justify-content: flex-end;
+}
+
+#view-mesas .bandeja-overlay[style*="display: flex"] {
+  display: flex;
+}
+
+#view-mesas .bandeja-panel {
+  width: 340px;
+  max-width: 90%;
+  background: var(--color-card);
+  border-left: 1px solid var(--color-border);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: bandeja-in .25s ease;
+}
+
+@keyframes bandeja-in {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+#view-mesas .bandeja-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 12px;
+}
+
+#view-mesas .bandeja-cerrar {
+  background: var(--color-hover);
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--color-text-sec);
+}
+
+#view-mesas .bandeja-lista {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+#view-mesas .bandeja-item {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#view-mesas .bandeja-icono {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: #000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+#view-mesas .bandeja-info {
+  flex: 1;
+  min-width: 0;
+}
+
+#view-mesas .bandeja-info strong {
+  font-size: 14px;
+}
+
+#view-mesas .bandeja-info p {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin: 2px 0 0;
+}
+
+#view-mesas .bandeja-acciones {
+  display: flex;
+  gap: 4px;
+}
+
+#view-mesas .bandeja-item .btn-mini {
+  background: var(--color-accent);
+  border: none;
+  color: #000;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+#view-mesas .bandeja-item .btn-mini.secundario {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-sec);
+}
+
+#view-mesas .bandeja-vacia {
+  text-align: center;
+  color: var(--color-text-muted);
+  padding: 40px 20px;
 }

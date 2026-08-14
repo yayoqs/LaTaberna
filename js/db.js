@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db.js
-   Versión: 1.1.3
+   Versión: 1.1.4
    Propósito: Orquestador de base de datos (Appwrite + localStorage).
-              v1.1.3: _procesarPedidos convierte items a array en
-                      memoria, no a string.
+              v1.1.4: sincronizarMesasConConfig delega en resetearMesas
+                      y despacha MESAS_INICIALIZAR una sola vez.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -189,89 +189,8 @@ export const DB = (function() {
 
   combined.sincronizarMesasConConfig = async function() {
     if (!appwrite || !appwrite.habilitado) return;
-
-    const zonas = this.config.zonas || [{ nombre: 'salon', cantidad: 12 }];
-
-    let totalDeseado = 0;
-    for (let i = 0; i < zonas.length; i++) {
-      totalDeseado += zonas[i].cantidad;
-    }
-
-    const virtuales = this.mesas.filter(function(m) { return m.esVirtual; });
-    let reales = this.mesas.filter(function(m) { return !m.esVirtual; });
-
-    const ocupadas = reales.filter(function(m) { return m.estado !== 'libre'; });
-    let libres = reales.filter(function(m) { return m.estado === 'libre'; });
-
-    Logger.info('[DB] Sincronizando mesas. Deseadas: ' + totalDeseado + ', Actuales: ' + reales.length + ', Ocupadas: ' + ocupadas.length);
-
-    const libresNecesarias = Math.max(0, totalDeseado - ocupadas.length);
-
-    const nuevasMesas = [];
-    let mesasAEliminar = [];
-    let maxNumero = 0;
-
-    if (reales.length > 0) {
-      maxNumero = Math.max.apply(null, reales.map(function(m) { return parseInt(m.numero) || 0; }));
-    }
-
-    if (libres.length > libresNecesarias) {
-      const sobrantes = libres.length - libresNecesarias;
-      libres.sort(function(a, b) { return parseInt(b.numero) - parseInt(a.numero); });
-      mesasAEliminar = libres.slice(0, sobrantes);
-      libres = libres.slice(sobrantes);
-    }
-
-    if (libres.length < libresNecesarias) {
-      const faltantes = libresNecesarias - libres.length;
-      let numero = maxNumero + 1;
-      let creadas = 0;
-      for (const zona of zonas) {
-        for (let i = 0; i < zona.cantidad && creadas < faltantes; i++) {
-          const nueva = mesaVacia(numero, zona.nombre);
-          libres.push(nueva);
-          nuevasMesas.push(nueva);
-          numero++;
-          creadas++;
-        }
-        if (creadas >= faltantes) break;
-      }
-    }
-
-    for (let i = 0; i < mesasAEliminar.length; i++) {
-      const mesa = mesasAEliminar[i];
-      try {
-        await appwrite.eliminar('mesas', mesa.numero);
-        Logger.info('[DB] Mesa ' + mesa.numero + ' eliminada (sobrante).');
-      } catch (e) {
-        Logger.warn('[DB] Error al eliminar mesa ' + mesa.numero + ':', e);
-      }
-    }
-
-    for (let i = 0; i < nuevasMesas.length; i++) {
-      const mesa = nuevasMesas[i];
-      try {
-        const dataMesa = {
-          numero: mesa.numero,
-          estado: 'libre',
-          pedidoId: '',
-          comensales: 1,
-          zona: mesa.zona || 'salon',
-          esVirtual: false
-        };
-        await appwrite.crear('mesas', mesa.numero, dataMesa);
-        Logger.info('[DB] Mesa ' + mesa.numero + ' creada en Appwrite (zona: ' + mesa.zona + ').');
-      } catch (e) {
-        Logger.warn('[DB] Error al crear mesa ' + mesa.numero + ':', e);
-      }
-    }
-
-    this.mesas = [].concat(ocupadas, libres, virtuales);
-    this.mesas.sort(function(a, b) { return parseInt(a.numero) - parseInt(b.numero); });
-
-    this.saveMesas();
-    EventBus.emit('mesas:guardadas', this.mesas);
-    Logger.info('[DB] Sincronización de mesas completada. Total: ' + this.mesas.length);
+    Logger.info('[DB] Sincronizar mesas con config: delegando en resetearMesas.');
+    await this.resetearMesas();
   };
 
   combined.resetearMesas = async function() {
@@ -343,6 +262,8 @@ export const DB = (function() {
     this.mesas.sort(function(a, b) { return parseInt(a.numero) - parseInt(b.numero); });
 
     this.saveMesas();
+    // Reemplazar completamente la lista de mesas en Store (sin duplicados)
+    Store.despachar({ type: 'MESAS_INICIALIZAR', payload: this.mesas });
     EventBus.emit('mesas:guardadas', this.mesas);
     Logger.info('[DB] Reseteo de mesas completado. Total: ' + this.mesas.length);
   };

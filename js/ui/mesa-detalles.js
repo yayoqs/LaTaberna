@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/mesa-detalles.js
-   Versión: 3.1.8
+   Versión: 3.2.1
    Propósito: Centro de operaciones de mesa.
-              Eliminada redundancia en _mostrarSeccionEspera al abrir.
+              v3.2.1: Deshacer Fusión es acción adicional en mesas
+                      virtuales, manteniendo acciones operativas.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -16,7 +17,7 @@ import { CommandBus } from '../lib/command-bus.js';
 import { Auth } from '../auth.js';
 import { DB } from '../db.js';
 import { DBAppwrite } from '../db-appwrite.js';
-import { mostrarToast } from '../utils.js';
+import { mostrarToast, mostrarConfirmacion } from '../utils.js';
 
 const MesaDetalles = (() => {
   let _panelVisible = false;
@@ -87,6 +88,10 @@ const MesaDetalles = (() => {
     document.getElementById('columnaDerecha').addEventListener('click', (e) => {
       const actionCard = e.target.closest('.action-card');
       if (actionCard) {
+        if (actionCard.classList.contains('virtual')) {
+          deshacerFusion();
+          return;
+        }
         if (actionCard.classList.contains('primaria')) {
           if (_mesaActual?.estado === 'libre') activarModoApertura();
           else { cerrar(); EventBus.emit('mesa:tomar_pedido', { mesa: _mesaActual.numero }); }
@@ -141,7 +146,7 @@ const MesaDetalles = (() => {
     _pedidoActual = _obtenerPedidoDeMesa(mesa);
     const estado = mesa.estado;
 
-    document.getElementById('mdTitulo').textContent = mesa.esVirtual ? `Mesas ${mesa.mesasFusionadas.join(' + ')}` : `Mesa ${mesa.numero}`;
+    document.getElementById('mdTitulo').textContent = mesa.esVirtual ? `Mesas ${mesa.numero}` : `Mesa ${mesa.numero}`;
     const badge = document.getElementById('mdEstado');
     badge.textContent = Mesas.labelEstado(estado);
     badge.className = `badge-estado ${estado}`;
@@ -228,15 +233,33 @@ const MesaDetalles = (() => {
   function _renderizarAcciones(estado) {
     const container = document.getElementById('accionesContainer');
     if (!container) return;
+
+    let html = '';
+
     if (estado === 'pagada') {
-      container.innerHTML = `<div class="action-card roja"><div class="action-icon"><i class="fas fa-door-open"></i></div><div class="action-details"><h4>Forzar Apertura</h4><p>La mesa está pagada pero no liberada.</p></div><div class="action-arrow"><i class="fas fa-angle-right"></i></div></div>`;
+      html = `<div class="action-card roja"><div class="action-icon"><i class="fas fa-door-open"></i></div><div class="action-details"><h4>Forzar Apertura</h4><p>La mesa está pagada pero no liberada.</p></div><div class="action-arrow"><i class="fas fa-angle-right"></i></div></div>`;
     } else if (estado === 'libre') {
-      container.innerHTML = _modoApertura ? '' : `<div class="action-card primaria"><div class="action-icon"><i class="fas fa-door-open"></i></div><div class="action-details"><h4>Abrir Mesa</h4><p>Asignar mozo y comensales</p></div><div class="action-arrow"><i class="fas fa-angle-right"></i></div></div>`;
+      html = _modoApertura ? '' : `<div class="action-card primaria"><div class="action-icon"><i class="fas fa-door-open"></i></div><div class="action-details"><h4>Abrir Mesa</h4><p>Asignar mozo y comensales</p></div><div class="action-arrow"><i class="fas fa-angle-right"></i></div></div>`;
     } else {
-      container.innerHTML = `<div class="action-card primaria"><div class="action-icon"><i class="fas fa-utensils"></i></div><div class="action-details"><h4>Tomar Pedido</h4><p>Agregar ítems a la comanda</p></div><div class="action-arrow"><i class="fas fa-angle-right"></i></div></div>
+      html = `<div class="action-card primaria"><div class="action-icon"><i class="fas fa-utensils"></i></div><div class="action-details"><h4>Tomar Pedido</h4><p>Agregar ítems a la comanda</p></div><div class="action-arrow"><i class="fas fa-angle-right"></i></div></div>
         <div class="action-card verde"><div class="action-icon"><i class="fas fa-file-invoice-dollar"></i></div><div class="action-details"><h4>Pedir Cuenta</h4><p>Generar pre-cuenta</p></div><div class="action-arrow"><i class="fas fa-angle-right"></i></div></div>
         <div class="action-card roja"><div class="action-icon"><i class="fas fa-check-circle"></i></div><div class="action-details"><h4>Cerrar Mesa</h4><p>Procesar pago y liberar</p></div><div class="action-arrow"><i class="fas fa-angle-right"></i></div></div>`;
     }
+
+    // Si es mesa virtual, agregar acción Deshacer Fusión al final
+    if (_mesaActual && _mesaActual.esVirtual) {
+      html += `
+        <div class="action-card virtual" style="margin-top:10px; border-color: rgba(139,92,246,.4); background: rgba(139,92,246,.06);">
+          <div class="action-icon" style="color: #8b5cf6;"><i class="fas fa-link-slash"></i></div>
+          <div class="action-details">
+            <h4>Deshacer Fusión</h4>
+            <p>Restaurar mesas originales y eliminar la mesa virtual</p>
+          </div>
+          <div class="action-arrow"><i class="fas fa-angle-right"></i></div>
+        </div>`;
+    }
+
+    container.innerHTML = html;
   }
 
   function activarModoApertura() {
@@ -284,11 +307,13 @@ const MesaDetalles = (() => {
     _panelVisible = true;
     EventBus.emit('mesa-detalle:abierto');
   }
+
   function cerrar() {
     document.getElementById('modalMesaDetalles').style.display = 'none';
     _panelVisible = false;
     EventBus.emit('mesa-detalle:cerrado');
   }
+
   function pedirCuenta() { cerrar(); Cuenta?.pedirCuenta(); }
   function cerrarMesa() { cerrar(); Cobro?.abrirModalCierre(); }
 
@@ -296,7 +321,6 @@ const MesaDetalles = (() => {
     const mesa = Store.obtenerEstado().mesas.find(m => m.numero == numMesa);
     if (!mesa) return;
 
-    // 1) Crear pedido (con la mesa libre)
     let pedidoId = null;
     try {
       const resultado = await CommandBus.ejecutar({
@@ -315,25 +339,16 @@ const MesaDetalles = (() => {
       return;
     }
 
-    // 2) Sincronizar con Appwrite
     try {
       await DBAppwrite.actualizar('mesas', String(numMesa), { estado: 'ocupada', pedidoId });
     } catch (e) {
       Logger.error('[MesaDetalles] Error al actualizar Appwrite en vinculación:', e);
     }
 
-    // 3) Actualizar Store
     Store.despachar({ type: 'MESA_ACTUALIZAR', payload: { numero: numMesa, cambios: { estado: 'ocupada', pedidoId } } });
-
-    // 4) Despachar permiso de prepedidos
     Store.despachar({ type: 'CLIENTE_PERMISO_PREPEDIDOS', payload: true });
-
-    // 5) Emitir evento para el cliente (Célula C)
     EventBus.emit('mesas:actualizada', { numero: numMesa, estado: 'ocupada', permite_prepedidos: true });
-
     Mesas.clearBadgeAtencion(numMesa);
-
-    // 6) Emitir evento para abrir el modal de pedido
     EventBus.emit('mesa:tomar_pedido', { mesa: numMesa });
 
     _mesaActual = Store.obtenerEstado().mesas.find(m => m.numero == numMesa);
@@ -345,11 +360,57 @@ const MesaDetalles = (() => {
     cerrar();
   }
 
+  async function deshacerFusion() {
+    if (!_mesaActual || !_mesaActual.esVirtual) return;
+
+    const confirmado = await mostrarConfirmacion(
+      'Deshacer Fusión',
+      `¿Deseas deshacer la fusión de la mesa "${_mesaActual.numero}"?`,
+      { textoConfirmar: 'Deshacer', textoCancelar: 'Cancelar' }
+    );
+    if (!confirmado) return;
+
+    const originales = Array.isArray(_mesaActual.mesasFusionadas) ? _mesaActual.mesasFusionadas : [];
+    let virtualRowId = _mesaActual._rowId;
+
+    if (!virtualRowId && DBAppwrite && DBAppwrite.habilitado) {
+      try {
+        const mesasAppwrite = await DBAppwrite.listar('mesas');
+        const virtualAppwrite = mesasAppwrite.find(m => m.numero === _mesaActual.numero);
+        if (virtualAppwrite) virtualRowId = virtualAppwrite.id;
+      } catch (e) {
+        Logger.warn('[MesaDetalles] No se pudo obtener rowId de la virtual:', e);
+      }
+    }
+    if (!virtualRowId) virtualRowId = _mesaActual.numero;
+
+    try {
+      DB.liberarMesasFusionadas(_mesaActual);
+
+      if (DBAppwrite && DBAppwrite.habilitado) {
+        for (const num of originales) {
+          await DBAppwrite.actualizar('mesas', String(num), { estado: 'libre', pedidoId: '' })
+            .catch(e => Logger.warn(`[MesaDetalles] Error al restaurar mesa ${num}:`, e));
+        }
+        await DBAppwrite.eliminar('mesas', String(virtualRowId))
+          .catch(e => Logger.warn('[MesaDetalles] Error al eliminar mesa virtual:', e));
+      }
+
+      Store.despachar({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
+      Mesas.render();
+      cerrar();
+      mostrarToast('success', 'Fusión deshecha correctamente');
+    } catch (e) {
+      Logger.error('[MesaDetalles] Error al deshacer fusión:', e);
+      mostrarToast('error', 'No se pudo deshacer la fusión');
+    }
+  }
+
   EventBus.on('mesa:seleccionada', (numMesa) => { if (!_panelVisible) abrir(numMesa); });
 
-  Logger.info('[MesaDetalles] Módulo inicializado v3.1.8.');
+  Logger.info('[MesaDetalles] Módulo inicializado v3.2.1.');
 
-  return { abrir, cerrar, pedirCuenta, cerrarMesa, aceptarVinculacion, cargarPrecarga, _mesaActual: null };
+  return { abrir, cerrar, pedirCuenta, cerrarMesa, aceptarVinculacion, cargarPrecarga, deshacerFusion, _mesaActual: null };
 })();
 
 export { MesaDetalles };

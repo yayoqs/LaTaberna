@@ -1,13 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-core.js
-   Versión: 1.1.3
+   Versión: 1.1.4
    Propósito: Núcleo de datos: mesas, pedidos, productos, proveedores,
               persistencia local.
-              v1.1.3: items de pedidos siempre array en memoria.
-                      crearPedido inicializa items: [].
-                      actualizarPedido no serializa items a string.
-                      _cargarPedidosLocal normaliza strings antiguos.
+              v1.1.4: _normalizarMesa parsea mesasFusionadas si viene
+                      como string JSON.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -74,12 +72,16 @@ export const DBCore = (function() {
 
   module._normalizarMesa = function(m) {
     const estado = _validarEstadoMesa(m.estado);
+    let mesasFusionadas = m.mesasFusionadas || null;
+    if (typeof mesasFusionadas === 'string' && mesasFusionadas.trim()) {
+      try { mesasFusionadas = JSON.parse(mesasFusionadas); } catch { mesasFusionadas = null; }
+    }
     return {
       numero: _validarString(m.numero, '0'),
       estado: estado,
       pedidoId: m.pedidoId || null,
       comensales: _validarNumero(m.comensales, 1),
-      mesasFusionadas: m.mesasFusionadas || null,
+      mesasFusionadas: mesasFusionadas,
       esVirtual: m.esVirtual || false,
       zona: _validarString(m.zona, (this.config.zonas && this.config.zonas[0]?.nombre) || 'salon')
     };
@@ -337,7 +339,6 @@ export const DBCore = (function() {
   module.actualizarPedido = async function(id, cambios) {
     const idx = this.pedidos.findIndex(p => p.id === id);
     if (idx >= 0) {
-      // Mantener items como array en memoria.
       if (cambios.items !== undefined && !Array.isArray(cambios.items)) {
         try { cambios.items = JSON.parse(cambios.items); } catch { cambios.items = []; }
       }

@@ -1,11 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/mesas.js
-   Versión: 2.2.2
+   Versión: 2.3.0
    Propósito: Fachada del mapa de mesas. Reexporta desde submódulos
               para mantener API pública sin cambios.
-              Sin window, sin onclick.
-              Agrega import de AvisosMesero para el indicador visual.
+              v2.3.0: expone BandejaAtencion.
    ================================================================ */
 
 import { EventBus } from '../lib/eventBus.js';
@@ -21,14 +20,13 @@ import {
   clearBadgeAtencion,
   setZona
 } from './mesas/acciones-mesa.js';
-
 import { renderGrid, renderZoneButtons, asegurarVista } from './mesas/renderer.js';
 import { toggleModoFusion, toggleSeleccionMesa, fusionarMesasSeleccionadas } from './mesas/fusion.js';
 import { activar, limpiar } from './mesas/ciclo-vida.js';
+import { BandejaAtencion } from './mesas/bandeja-atencion.js';
 import { AvisosMesero } from '../modulos/interno/avisos-mesero.js';
 
 const Mesas = (() => {
-
   function render() {
     asegurarVista();
     renderZoneButtons();
@@ -43,7 +41,6 @@ const Mesas = (() => {
     }
   }
 
-  // Inicializar el ciclo de vida al importar
   activar();
 
   return {
@@ -62,7 +59,8 @@ const Mesas = (() => {
     setClienteEsperando,
     clearClienteEsperando,
     getBadgeAtencion,
-    clearBadgeAtencion
+    clearBadgeAtencion,
+    BandejaAtencion
   };
 })();
 

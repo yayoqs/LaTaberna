@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MESAS SUBMÓDULO (ES6)
    Archivo: js/ui/mesas/ciclo-vida.js
-   Versión: 1.1.2
+   Versión: 1.2.1
    Propósito: Ciclo de vida (activar/limpiar) con AbortController.
-              Corregido: eliminado listener duplicado de btnAgregarMesa
-              para evitar doble ejecución del comando agregarMesa.
+              v1.2.1: Conexión robusta de botones. Sin botón bandeja.
+                      La bandeja se despliega solo por gesto.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -14,6 +14,7 @@ import { renderGrid, renderZoneButtons, asegurarVista, setVistaActiva } from './
 import { addNotificacion } from './notificaciones.js';
 import { toggleModoFusion, fusionarMesasSeleccionadas } from './fusion.js';
 import { agregarMesa, setBadge, clearBadge } from './acciones-mesa.js';
+import { BandejaAtencion } from './bandeja-atencion.js';
 
 let _abortController = null;
 let _desuscripciones = [];
@@ -24,8 +25,11 @@ export function activar() {
   _abortController = new AbortController();
   const { signal } = _abortController;
 
-  // NOTA: El listener de btnAgregarMesa se asigna en renderer.js mediante callbacks.
-  // No lo duplicamos aquí para evitar doble ejecución del comando agregarMesa.
+  // Asegurar la vista ANTES de conectar botones
+  asegurarVista();
+
+  // Conexión directa y robusta de botones
+  document.getElementById('btnAgregarMesa')?.addEventListener('click', agregarMesa, { signal });
   document.getElementById('btnFusionar')?.addEventListener('click', toggleModoFusion, { signal });
   document.getElementById('btnConfirmarFusion')?.addEventListener('click', fusionarMesasSeleccionadas, { signal });
 
@@ -40,17 +44,14 @@ export function activar() {
   _desuscripciones.push(unsubscribeStore);
 
   _desuscripciones.push(EventBus.on('db:inicializada', () => {
-    asegurarVista({
-      onAgregarMesa: agregarMesa,
-      onToggleFusion: () => toggleModoFusion(),
-      onConfirmarFusion: () => fusionarMesasSeleccionadas()
-    });
     renderZoneButtons();
     renderGrid();
   }));
+
   _desuscripciones.push(EventBus.on('comanda:enviada', () => renderGrid()));
   _desuscripciones.push(EventBus.on('comanda:lista', () => renderGrid()));
   _desuscripciones.push(EventBus.on('mesa:actualizada', () => renderGrid()));
+
   _desuscripciones.push(EventBus.on('cliente:mesa_ingresada', (data) => {
     if (data && data.mesa) {
       addNotificacion(data.mesa, 'esperando', {});
@@ -58,23 +59,28 @@ export function activar() {
         type: 'MESA_AGREGAR_NOTIFICACION',
         payload: { numero: data.mesa, tipo: 'esperando', datos: {} }
       });
-      Logger.debug('[Mesas] Cliente esperando en mesa ' + data.mesa);
       renderGrid();
     }
   }));
+
   _desuscripciones.push(EventBus.on('precarga:nueva', (data) => {
     setBadge(data.mesa, data.cantidad, data.precargaId);
   }));
+
   _desuscripciones.push(EventBus.on('config:actualizada', () => {
     renderZoneButtons();
     renderGrid();
   }));
+
   _desuscripciones.push(EventBus.on('mesas:limpiar_badge', (data) => {
     clearBadge(data.mesa);
   }));
+
   _desuscripciones.push(EventBus.on('vista:cambiada', (vista) => {
     setVistaActiva(vista === 'mesas');
   }));
+
+  BandejaAtencion.activar();
 }
 
 export function limpiar() {
@@ -84,4 +90,6 @@ export function limpiar() {
   }
   _desuscripciones.forEach(fn => fn());
   _desuscripciones = [];
+
+  BandejaAtencion.limpiar();
 }
