@@ -1,13 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/lib/store.js
-   Versión: 2.0.7
-   Propósito: Estado centralizado con slices 'cliente', 'menus' y
-              'precargas_cliente'. Métodos públicos en español.
-              Se mantienen alias en inglés por compatibilidad.
-              v2.0.7: mesasReducer ignora MESA_AGREGAR si ya existe
-                      una mesa con el mismo número. Evita duplicados
-                      en Store causados por dobles despachos.
+   Versión: 2.0.8
+   Propósito: Estado centralizado con slices 'cliente', 'menus',
+              'precargas_cliente' y 'usuario'. Métodos en español.
+              v2.0.8: Agrega slice 'usuario' y reducer para sesión.
    ================================================================ */
 
 import { EventBus } from './eventBus.js';
@@ -28,6 +25,7 @@ const Store = (() => {
     espacioActivo: null,
     menus: [],
     precargas_cliente: [],
+    usuario: null,   // ← nuevo slice
     cliente: { permitePrepedidos: false, mesa: null }
   };
 
@@ -89,6 +87,7 @@ const Store = (() => {
     newState.espacioActivo      = espacioActivoReducer(newState.espacioActivo, action, newState);
     newState.menus              = menusReducer(newState.menus, action);
     newState.precargas_cliente  = precargasClienteReducer(newState.precargas_cliente, action);
+    newState.usuario            = usuarioReducer(newState.usuario, action);   // ← nuevo reducer
     newState.cliente            = clienteReducer(newState.cliente, action);
 
     return newState;
@@ -102,7 +101,6 @@ const Store = (() => {
       case 'MESA_AGREGAR': {
         const nueva = action.payload;
         if (!nueva || !nueva.numero) return mesas;
-        // Protección anti-duplicados: si ya existe el número, no agregar.
         if (mesas.some(m => String(m.numero) === String(nueva.numero))) {
           Logger.warn('[Store] MESA_AGREGAR duplicada ignorada para mesa ' + nueva.numero);
           return mesas;
@@ -247,8 +245,7 @@ const Store = (() => {
   function espaciosReducer(espacios, action) {
     switch (action.type) {
       case 'ESPACIOS_INICIALIZAR': return action.payload || [];
-      case 'ESPACIO_AGREGADO':
-        return [...espacios, action.payload];
+      case 'ESPACIO_AGREGADO': return [...espacios, action.payload];
       default: return espacios;
     }
   }
@@ -273,6 +270,17 @@ const Store = (() => {
         return action.payload || [];
       default:
         return precargas;
+    }
+  }
+
+  function usuarioReducer(usuario, action) {
+    switch (action.type) {
+      case 'USUARIO_ACTUALIZAR':
+        return action.payload || null;
+      case 'USUARIO_LIMPIAR':
+        return null;
+      default:
+        return usuario;
     }
   }
 

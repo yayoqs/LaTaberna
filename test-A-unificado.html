@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test A — Unificado Core</title>
+  <style>
+    body { font-family: monospace; background: #111827; color: #f9fafb; padding: 30px; line-height: 1.5; }
+    h1 { color: #f59e0b; }
+    h2 { color: #60a5fa; margin-top: 20px; }
+    .test { margin: 6px 0; padding: 8px 12px; border-radius: 6px; }
+    .pass { background: rgba(16,185,129,.15); border-left: 4px solid #10b981; }
+    .fail { background: rgba(239,68,68,.15); border-left: 4px solid #ef4444; }
+    .info { background: rgba(59,130,246,.15); border-left: 4px solid #3b82f6; }
+    .summary { margin-top: 20px; padding: 12px; background: #1f2937; border: 1px solid #374151; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test A — Unificado Core</h1>
+  <p>Batería completa: sanidad, autenticación, registro, jerarquía de roles, staff, mesas, comandas, factories y dominio.</p>
+  <div id="results"></div>
+
+  <script src="/js/appwrite.min.js"></script>
+
+  <script type="module">
+    import { Logger } from './js/lib/logger.js';
+    import { EventBus } from './js/lib/eventBus.js';
+    import { Store } from './js/lib/store.js';
+    import { CommandBus } from './js/lib/command-bus.js';
+    import { Deps } from './js/lib/deps.js';
+    import { DBAppwrite } from './js/db-appwrite.js';
+    import { DB } from './js/db.js';
+    import { Auth } from './js/auth.js';
+    import { inicializarAuth } from './js/auth.js';
+    import { Roles } from './js/roles.js';
+    import { PedidoManager } from './js/managers/pedido-manager.js';
+    import { PedidoRepositoryLocal } from './js/repositorios/pedido-repository.js';
+    import { DBCore, mesaVacia } from './js/db-core.js';
+    import { PedidoAgregado, reconstruirPedidoAgregado } from './js/dominio/pedido.js';
+    import { Delivery, reconstruirDelivery } from './js/dominio/delivery.js';
+    import { Cantidad, crearCantidad } from './js/dominio/cantidad.js';
+    import { Dinero, crearDinero } from './js/dominio/dinero.js';
+    import { Resultado } from './js/dominio/resultado.js';
+    import { $id, formatearDinero, mostrarToast, calcularTotal, formatearHoraCorta } from './js/utils.js';
+    import './js/comandos/agregar-mesa.js';
+    import './js/comandos/crear-pedido-mesa.js';
+    import './js/comandos/enviar-comanda.js';
+    import './js/comandos/liberar-mesa.js';
+    import './js/comandos/completar-subcomanda.js';
+
+    window.crearCantidad = crearCantidad;
+
+    const resultsEl = document.getElementById('results');
+    let passed = 0, failed = 0;
+
+    function assert(cond, msg) {
+      if (cond) { passed++; resultsEl.innerHTML += `<div class="test pass">✔ ${msg}</div>`; }
+      else { failed++; resultsEl.innerHTML += `<div class="test fail">✘ ${msg}</div>`; }
+    }
+
+    function info(msg) { resultsEl.innerHTML += `<div class="test info">ℹ️ ${msg}</div>`; }
+
+    const esperar = ms => new Promise(r => setTimeout(r, ms));
+
+    const idsCreados = { mesas: [], pedidos: [], comandas: [], staff: [], perfiles: [] };
+
+    async function limpiarSesion() { try { await Auth.cerrarSesion(); } catch {} }
+
+    async function limpiarHuella() {
+      for (const id of idsCreados.comandas) { try { await DBAppwrite.eliminar('comandas', id); } catch {} }
+      for (const id of idsCreados.pedidos) { try { await DBAppwrite.eliminar('pedidos', id); } catch {} }
+      for (const id of idsCreados.mesas) { try { await DBAppwrite.eliminar('mesas', id); } catch {} }
+      for (const id of idsCreados.staff) { try { await DBAppwrite.eliminar('staff', id); } catch {} }
+      for (const id of idsCreados.perfiles) { try { await DBAppwrite.eliminar('global_perfiles', id); } catch {} }
+      idsCreados.mesas = [];
+      idsCreados.pedidos = [];
+      idsCreados.comandas = [];
+      idsCreados.staff = [];
+      idsCreados.perfiles = [];
+    }
+
+    async function registrarYRegistrarPerfil(nombre, password) {
+      const reg = await Auth.registrarUsuario(nombre, password);
+      if (!reg.exito) return null;
+      const perfil = await DBAppwrite.obtenerPerfilPorUsuarioId(reg.usuarioId);
+      if (perfil) idsCreados.perfiles.push(perfil.id);
+      return { nombre, password, usuarioId: reg.usuarioId, perfilId: perfil?.id || null };
+    }
+
+    async function crearStaffYRegistrar(datos) {
+      const resultado = await DB.crearOActualizarStaff(datos);
+      if (resultado?.id) idsCreados.staff.push(resultado.id);
+      return resultado;
+    }
+
+    async function run() {
+      Logger.setLevel('ERROR');
+      resultsEl.innerHTML = '';
+
+      // ── Suite 0: Sanidad de módulos y utilidades ──────
+      resultsEl.innerHTML += '<h2>0. Sanidad de módulos y utilidades</h2>';
+      info('Verificando que todos los módulos y utilidades estén definidos.');
+
+      assert(typeof window.Appwrite !== 'undefined', 'SDK Appwrite cargado');
+      assert(typeof Logger !== 'undefined', 'Logger existe');
+      assert(typeof EventBus !== 'undefined', 'EventBus existe');
+      assert(typeof Store !== 'undefined', 'Store existe');
+      assert(typeof CommandBus !== 'undefined', 'CommandBus existe');
+      assert(typeof Deps !== 'undefined', 'Deps existe');
+      assert(typeof DB !== 'undefined', 'DB existe');
+      assert(typeof DBAppwrite !== 'undefined', 'DBAppwrite existe');
+      assert(typeof Roles !== 'undefined', 'Roles existe');
+      assert(typeof PedidoManager !== 'undefined', 'PedidoManager existe');
+      assert(typeof PedidoRepositoryLocal !== 'undefined', 'PedidoRepositoryLocal existe');
+      assert(typeof DBCore !== 'undefined', 'DBCore existe');
+      assert(typeof mesaVacia === 'function', 'mesaVacia es función');
+      assert(typeof $id === 'function', '$id es función');
+      assert(typeof formatearDinero === 'function', 'formatearDinero es función');
+      assert(typeof mostrarToast === 'function', 'mostrarToast es función');
+      assert(typeof calcularTotal === 'function', 'calcularTotal es función');
+      assert(typeof formatearHoraCorta === 'function', 'formatearHoraCorta es función');
+      assert(typeof crearCantidad === 'function', 'crearCantidad es función');
+      assert(typeof crearDinero === 'function', 'crearDinero es función');
+      assert(typeof Resultado !== 'undefined', 'Resultado existe');
+
+      // ── Autenticación e inicialización ─────────────────
+      info('Inicializando Auth y Appwrite...');
+      await inicializarAuth();
+      if (!(await DBAppwrite.iniciar())) {
+        assert(false, 'No se pudo inicializar Appwrite');
+        return;
+      }
+      await limpiarSesion();
+      if (!(await Auth.iniciarSesion('master', 'master123'))) {
+        assert(false, 'No se pudo autenticar como master');
+        return;
+      }
+      assert(true, 'Master autenticado');
+
+      await DB.init();
+      PedidoManager.init({ pedidoRepo: PedidoRepositoryLocal });
+      Deps.registrar('pedidoRepo', PedidoRepositoryLocal);
+      Deps.registrar('inventarioService', { validarStockParaArticulos: () => ({ ok: true, faltantes: [] }) });
+      info('DB y PedidoManager inicializados');
+
+      // ── Suite 1: Registro y perfil global ─────────────
+      resultsEl.innerHTML += '<h2>1. Registro y perfil global</h2>';
+      const nombreCliente = 'test_uni_' + Date.now();
+      const passwordCliente = 'pass12345';
+      const cliente = await registrarYRegistrarPerfil(nombreCliente, passwordCliente);
+      assert(cliente !== null, 'Usuario registrado mediante función');
+      assert(cliente?.usuarioId !== undefined, 'usuarioId devuelto');
+
+      await limpiarSesion();
+      assert(await Auth.iniciarSesion(nombreCliente, passwordCliente), 'Cliente inicia sesión');
+      assert(Auth.obtenerRolesEfectivos().includes('cliente'), 'Rol inicial cliente');
+      const perfilCliente = Auth.obtenerUsuarioActual()?.perfil;
+      assert(!!perfilCliente, 'Perfil global cargado');
+      assert(perfilCliente?.nombreUsuario === nombreCliente, 'Perfil con nombreUsuario correcto');
+      assert(perfilCliente?.nombre === nombreCliente, 'Perfil con nombre visible correcto');
+
+      const perfilAppwrite = await DBAppwrite.obtenerPerfilPorUsuarioId(cliente.usuarioId);
+      assert(!!perfilAppwrite, 'Perfil global existe en Appwrite');
+      assert(perfilAppwrite?.nombreUsuario === nombreCliente, 'Perfil en Appwrite con nombreUsuario correcto');
+
+      // ── Suite 2: Jerarquía de roles ───────────────────
+      resultsEl.innerHTML += '<h2>2. Jerarquía de roles</h2>';
+      await limpiarSesion();
+      await Auth.iniciarSesion('master', 'master123');
+
+      const adminUser = await registrarYRegistrarPerfil('test_admin_' + Date.now(), 'pass12345');
+      const adminStaff = await crearStaffYRegistrar({
+        nombre: 'Admin Test ' + adminUser.usuarioId,
+        usuarioId: adminUser.usuarioId,
+        espacioId: 'lataberna',
+        roles: ['admin'],
+        rolPrincipal: 'admin',
+        estado: 'activo',
+        tokenVinculacion: ''
+      });
+      assert(!!adminStaff, 'master asigna admin correctamente');
+
+      await limpiarSesion();
+      assert(await Auth.iniciarSesion(adminUser.nombre, adminUser.password), 'Admin inicia sesión');
+      assert(Auth.obtenerRolesEfectivos().includes('admin'), 'Admin tiene rol admin');
+      assert(Auth.puedeAsignarGerente() === true, 'Admin puede asignar gerente');
+      assert(Auth.puedeAsignarAdmin() === false, 'Admin NO puede asignar admin');
+      assert(Auth.puedeAsignarStaff() === true, 'Admin puede asignar staff');
+
+      const gerenteUser = await registrarYRegistrarPerfil('test_ger_' + Date.now(), 'pass12345');
+      const gerenteStaff = await crearStaffYRegistrar({
+        nombre: 'Gerente Test ' + gerenteUser.usuarioId,
+        usuarioId: gerenteUser.usuarioId,
+        espacioId: 'lataberna',
+        roles: ['gerente'],
+        rolPrincipal: 'gerente',
+        estado: 'activo',
+        tokenVinculacion: ''
+      });
+      assert(!!gerenteStaff, 'Admin asigna gerente correctamente');
+
+      await limpiarSesion();
+      assert(await Auth.iniciarSesion(gerenteUser.nombre, gerenteUser.password), 'Gerente inicia sesión');
+      assert(Auth.obtenerRolesEfectivos().includes('gerente'), 'Gerente tiene rol gerente');
+      assert(Auth.puedeAsignarStaff() === true, 'Gerente puede asignar staff');
+      assert(Auth.puedeAsignarGerente() === false, 'Gerente NO puede asignar gerente');
+      assert(Auth.puedeAsignarAdmin() === false, 'Gerente NO puede asignar admin');
+
+      const meseroUser = await registrarYRegistrarPerfil('test_mes_' + Date.now(), 'pass12345');
+      const meseroStaff = await crearStaffYRegistrar({
+        nombre: 'Mesero Test ' + meseroUser.usuarioId,
+        usuarioId: meseroUser.usuarioId,
+        espacioId: 'lataberna',
+        roles: ['mesero'],
+        rolPrincipal: 'mesero',
+        estado: 'activo',
+        tokenVinculacion: ''
+      });
+      assert(!!meseroStaff, 'Gerente asigna mesero correctamente');
+
+      await limpiarSesion();
+      assert(await Auth.iniciarSesion(meseroUser.nombre, meseroUser.password), 'Mesero inicia sesión');
+      assert(Auth.obtenerRolesEfectivos().includes('mesero'), 'Mesero tiene rol mesero');
+      assert(Auth.puedeAsignarStaff() === false, 'Mesero NO puede asignar staff');
+      assert(Auth.puedeAsignarGerente() === false, 'Mesero NO puede asignar gerente');
+      assert(Auth.puedeAsignarAdmin() === false, 'Mesero NO puede asignar admin');
+
+      await limpiarSesion();
+      await Auth.iniciarSesion(gerenteUser.nombre, gerenteUser.password);
+      let errorAsignacion = null;
+      try {
+        await crearStaffYRegistrar({
+          nombre: 'Admin No Permitido',
+          usuarioId: 'usr_invalido_' + Date.now(),
+          espacioId: 'lataberna',
+          roles: ['admin'],
+          rolPrincipal: 'admin',
+          estado: 'activo'
+        });
+      } catch (e) {
+        errorAsignacion = e.message;
+      }
+      assert(errorAsignacion !== null, 'Gerente no puede asignar admin (validación jerárquica)');
+
+      // ── Suite 3: Staff y token de vinculación ─────────
+      resultsEl.innerHTML += '<h2>3. Staff y token de vinculación</h2>';
+      await limpiarSesion();
+      await Auth.iniciarSesion('master', 'master123');
+
+      const tokenStaff = 'tk_uni_' + Date.now();
+      const staffVinculado = await crearStaffYRegistrar({
+        nombre: 'Staff Vinculado ' + cliente.usuarioId,
+        usuarioId: cliente.usuarioId,
+        espacioId: 'lataberna',
+        roles: ['mesero', 'barraAyudante'],
+        rolPrincipal: 'mesero',
+        estado: 'activo',
+        tokenVinculacion: tokenStaff
+      });
+      assert(!!staffVinculado, 'Staff con token creado');
+
+      await limpiarSesion();
+      assert(await Auth.iniciarSesion(nombreCliente, passwordCliente), 'Cliente inicia sesión para canje');
+      const resultadoVinculacion = await Auth.vincularCuentaStaff(tokenStaff);
+      assert(resultadoVinculacion.exito === true, 'Token canjeado correctamente');
+      const rolesFinales = Auth.obtenerRolesEfectivos();
+      assert(rolesFinales.includes('mesero') && rolesFinales.includes('barraAyudante'), 'Roles múltiples tras vinculación');
+      assert(Auth.obtenerRolPrincipal() === 'mesero', 'Rol principal correcto tras vinculación');
+
+      // ── Suite 4: Mesas, pedidos y comandas ────────────
+      resultsEl.innerHTML += '<h2>4. Mesas, pedidos y comandas</h2>';
+      await limpiarSesion();
+      await Auth.iniciarSesion('master', 'master123');
+
+      const numMesa = 'test_mesa_' + Date.now();
+      const rAgregar = await CommandBus.ejecutar({ type: 'agregarMesa', datos: { numero: numMesa, zona: 'salon' } });
+      assert(rAgregar.exito === true, 'Mesa creada');
+      idsCreados.mesas.push(numMesa);
+      await esperar(500);
+
+      const rPedido = await CommandBus.ejecutar({ type: 'crearPedidoMesa', datos: { numeroMesa: numMesa, mozo: 'Test', comensales: 2 } });
+      assert(rPedido.exito === true, 'Pedido creado en mesa');
+      const pedidoId = rPedido.data?.id;
+      if (pedidoId) idsCreados.pedidos.push(pedidoId);
+      await esperar(500);
+
+      const itemPrueba = { prodId: 'prod_test', nombre: 'Hamburguesa', precio: 1500, qty: 1, destino: 'cocina', obs: '', enviado: false };
+      await DB.actualizarPedido(pedidoId, { items: [itemPrueba] });
+      await esperar(300);
+      const mesaActual = (await DBAppwrite.listar('mesas')).find(m => m.numero === numMesa);
+      assert(!!mesaActual, 'Mesa existe en Appwrite');
+      assert(mesaActual?.estado === 'ocupada', 'Mesa ocupada');
+      assert(!!mesaActual?.pedidoId, 'Mesa con pedidoId');
+
+      const rEnviar = await CommandBus.ejecutar({ type: 'enviarComanda', datos: { mesa: mesaActual, mozo: 'Test', comensales: 2, observaciones: '', itemsPendientes: [itemPrueba] } });
+      assert(rEnviar.exito === true, 'Comanda enviada');
+      const comandasCreadas = rEnviar.data?.comandas || [];
+      comandasCreadas.forEach(c => idsCreados.comandas.push(c.id));
+      assert(comandasCreadas.length >= 1, 'Al menos una comanda creada');
+      await esperar(1500);
+
+      const comandaEnAppwrite = comandasCreadas.length ? (await DBAppwrite.listar('comandas')).find(c => c.id === comandasCreadas[0].id) : null;
+      assert(!!comandaEnAppwrite, 'Comanda en Appwrite');
+      assert(comandaEnAppwrite?.destino === 'cocina', 'Destino cocina correcto');
+
+      const rCompletar = await CommandBus.ejecutar({ type: 'completarSubcomanda', datos: { idOriginal: comandaEnAppwrite.id, destino: 'cocina' } });
+      assert(rCompletar.exito === true, 'Subcomanda completada');
+      assert(rCompletar.data?.ambasListas === true, 'Ambas listas');
+      await esperar(500);
+
+      const comandaCompletada = (await DBAppwrite.listar('comandas')).find(c => c.id === comandaEnAppwrite.id);
+      assert(comandaCompletada?.estado === 'completada', 'Comanda principal completada');
+
+      const rLiberar = await CommandBus.ejecutar({ type: 'liberarMesa', datos: { numeroMesa: numMesa } });
+      assert(rLiberar.exito === true, 'Mesa liberada');
+      await esperar(500);
+      const mesaLiberada = (await DBAppwrite.listar('mesas')).find(m => m.numero === numMesa);
+      assert(mesaLiberada?.estado === 'libre', 'Mesa libre');
+
+      // ── Suite 5: Normalización y fábrica ───────────────
+      resultsEl.innerHTML += '<h2>5. Normalización y fábrica</h2>';
+      const prod1 = DBCore._normalizarProducto({ nombre: 'Test', precio: 100 });
+      assert(prod1.activo === true, 'Producto sin campo activo → por defecto true');
+      assert(prod1.disponible === true, 'Producto sin campo disponible → por defecto true');
+
+      const mesaStr = DBCore._normalizarMesa({ numero: '1' });
+      assert(mesaStr.numero === '1', 'Mesa con numero string se conserva');
+      assert(mesaStr.estado === 'libre', 'Mesa sin estado → por defecto libre');
+      assert(mesaStr.items === undefined, 'Mesa NO tiene campo items (eliminado)');
+      assert(mesaStr.mozo === undefined, 'Mesa NO tiene campo mozo (eliminado)');
+
+      const nueva = mesaVacia(50, 'salon');
+      assert(nueva.numero === '50', 'mesaVacia: numero es string');
+      assert(nueva.estado === 'libre', 'mesaVacia: estado libre');
+      assert(nueva.esVirtual === false, 'mesaVacia: esVirtual = false');
+      assert(nueva.items === undefined, 'mesaVacia: sin campo items');
+      assert(nueva.mozo === undefined, 'mesaVacia: sin campo mozo');
+
+      // ── Suite 6: Factories ─────────────────────────────
+      resultsEl.innerHTML += '<h2>6. Factories</h2>';
+      const pedRec = reconstruirPedidoAgregado({
+        id: 'ped_recon_test', mesa: 1, mozo: 'Trini', comensales: 2,
+        items: [], descuento: 0, estado: 'abierto', observaciones: ''
+      });
+      assert(pedRec instanceof PedidoAgregado, 'reconstruirPedidoAgregado devuelve un PedidoAgregado');
+      assert(pedRec.estado === 'abierto', 'El estado del pedido reconstruido es correcto');
+
+      const delRec = reconstruirDelivery({
+        id: 'del_recon_test', direccion: { calle: 'Corrientes', numero: '1234' },
+        repartidor: 'Alex', items: [], estado: 'pendiente', observaciones: ''
+      });
+      assert(delRec instanceof Delivery, 'reconstruirDelivery devuelve un Delivery');
+      assert(delRec.estado === 'pendiente', 'El estado del delivery reconstruido es correcto');
+
+      // ── Suite 7: Dominio ───────────────────────────────
+      resultsEl.innerHTML += '<h2>7. Dominio</h2>';
+
+      // Cantidad
+      let c = crearCantidad(3);
+      assert(c !== null, 'crearCantidad(3) retorna instancia');
+      assert(c.valor === 3, 'Cantidad: valor es 3');
+      assert(crearCantidad(0) === null, 'crearCantidad(0) falla');
+      assert(crearCantidad(-1) === null, 'crearCantidad(-1) falla');
+      let c2 = c.sumar(new Cantidad(2));
+      assert(c2.valor === 5, 'Cantidad: 3 + 2 = 5');
+      assert(c.valor === 3, 'Cantidad: original sigue 3 (inmutable)');
+      assert(c.esMayorQue(new Cantidad(2)), 'Cantidad: 3 > 2');
+      assert(c.esMenorQue(new Cantidad(5)), 'Cantidad: 3 < 5');
+      assert(c.esIgual(new Cantidad(3)), 'Cantidad: 3 == 3');
+
+      // Dinero
+      let d = crearDinero(1500);
+      assert(d !== null, 'crearDinero(1500) retorna instancia');
+      assert(d.monto === 1500, 'Dinero: monto es 1500');
+      assert(crearDinero(-10) === null, 'crearDinero(-10) falla');
+      assert(crearDinero(NaN) === null, 'crearDinero(NaN) falla');
+      let d2 = d.sumar(new Dinero(300));
+      assert(d2.monto === 1800, 'Dinero: 1500 + 300 = 1800');
+      assert(d.monto === 1500, 'Dinero: original sigue 1500 (inmutable)');
+      let d3 = d.restar(new Dinero(2000));
+      assert(d3.monto === 0, 'Dinero: 1500 - 2000 = 0 (nunca negativo)');
+      let d4 = d.multiplicar(3);
+      assert(d4.monto === 4500, 'Dinero: 1500 * 3 = 4500');
+      assert(d.esMayorQue(new Dinero(1000)), 'Dinero: 1500 > 1000');
+      assert(d.esMenorQue(new Dinero(2000)), 'Dinero: 1500 < 2000');
+      assert(d.esIgual(new Dinero(1500)), 'Dinero: 1500 == 1500');
+      assert(!d.esCero(), 'Dinero: 1500 no es cero');
+      assert(d.toString().includes('1.500'), 'Dinero: formato incluye separador de miles');
+
+      // Resultado
+      let ok1 = Resultado.ok({ id: 5 });
+      assert(ok1.exito, 'Resultado: ok tiene exito=true');
+      assert(ok1.datos.id === 5, 'Resultado: ok conserva datos');
+      assert(ok1.error === null, 'Resultado: ok no tiene error');
+      let fail1 = Resultado.fallo('boom');
+      assert(!fail1.exito, 'Resultado: fallo tiene exito=false');
+      assert(fail1.error === 'boom', 'Resultado: fallo conserva error');
+      assert(fail1.datos === null, 'Resultado: fallo no tiene datos');
+      let chain = ok1.encadenar(data => Resultado.ok(data.id * 2));
+      assert(chain.exito, 'Resultado: encadenar ok retorna ok');
+      assert(chain.datos === 10, 'Resultado: encadenar transforma datos (5*2=10)');
+      let chainFail = fail1.encadenar(data => Resultado.ok(99));
+      assert(!chainFail.exito, 'Resultado: encadenar sobre fallo retorna fallo');
+      assert(chainFail.error === 'boom', 'Resultado: y mantiene el error original');
+      let chainEx = ok1.encadenar(() => { throw new Error('ups'); });
+      assert(!chainEx.exito, 'Resultado: encadenar captura excepción');
+      assert(chainEx.error === 'ups', 'Resultado: error es el mensaje de la excepción');
+
+      // ── Limpieza final ─────────────────────────────────
+      info('Limpiando huella...');
+      await limpiarSesion();
+      await Auth.iniciarSesion('master', 'master123');
+      await limpiarHuella();
+
+      resultsEl.innerHTML += `<div class="summary">${passed} pasaron, ${failed} fallaron</div>`;
+      if (failed === 0) resultsEl.innerHTML += `<div class="test pass">✔ Test unificado superado por completo.</div>`;
+    }
+
+    window.addEventListener('load', () => run().catch(e => {
+      resultsEl.innerHTML += `<div class="test fail">Error: ${e.message}</div>`;
+      console.error(e);
+    }));
+  </script>
+</body>
+</html>

@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/bootstrap.js
-   Versión: 1.0.16
+   Versión: 1.0.17
    Propósito: Secuencia de arranque: Auth, DB, Store, dependencias.
-              Importa y registra PedidoRepositoryLocal correctamente.
+              Integración con Auth v2.0.1. Sincroniza sesión con Store.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -32,6 +32,15 @@ const Bootstrap = (() => {
     try {
       Auth.iniciar();
       Logger.info('[Bootstrap] Auth listo.');
+
+      // Sincronizar sesión inicial con Store
+      const usuario = Auth.obtenerUsuarioActual();
+      if (usuario) {
+        Store.despachar({ type: 'USUARIO_ACTUALIZAR', payload: usuario });
+        Logger.info('[Bootstrap] Sesión de usuario sincronizada con Store.');
+      } else {
+        Store.despachar({ type: 'USUARIO_LIMPIAR' });
+      }
     } catch (e) {
       Logger.error('[Bootstrap] Error en Auth:', e);
       mostrarToast('error', 'Error crítico al iniciar autenticación');
@@ -116,7 +125,7 @@ const Bootstrap = (() => {
     }
 
     try {
-      if (Auth.obtenerRol()) {
+      if (Auth.obtenerUsuarioActual()) {
         const vistaDefecto = Auth.obtenerVistaPorDefecto();
         if (typeof App !== 'undefined' && App.showView) {
           App.showView(vistaDefecto);

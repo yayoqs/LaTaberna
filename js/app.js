@@ -1,12 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/app.js
-   Versión: 1.3.4
+   Versión: 1.3.6
    Propósito: Punto de entrada modular. Control de vistas con ciclo
               de vida (limpiar/activar).
-              v1.3.4: Cambia validación de sesión en showView de
-              Auth.obtenerRol() a Auth.obtenerUsuarioActual() para
-              evitar reapertura del modal de login.
+              v1.3.6: Validaciones de acceso migradas a
+              Auth.tienePermiso() / métodos de conveniencia actuales.
    ================================================================ */
 
 // ── Utilidades y librerías ────────────────────────────────
@@ -166,6 +165,14 @@ export const App = {
   _vistasPublicas: ['inicio'],
 
   showView(nombre) {
+    // ── Sincronizar sesión con Store ───────────────────
+    const usuario = Auth.obtenerUsuarioActual();
+    if (usuario) {
+      Store.despachar({ type: 'USUARIO_ACTUALIZAR', payload: usuario });
+    } else {
+      Store.despachar({ type: 'USUARIO_LIMPIAR' });
+    }
+
     // ── Ciclo de vida: limpiar vista anterior ──────────
     if (_vistaActual && modulosVista[_vistaActual] && typeof modulosVista[_vistaActual].limpiar === 'function') {
       try {
@@ -207,36 +214,47 @@ export const App = {
     }
 
     // ── Control de autenticación ──────────────────────
-    if (!this._vistasPublicas.includes(nombre) && !Auth.obtenerUsuarioActual()) {
+    if (!this._vistasPublicas.includes(nombre) && !usuario) {
       Auth.mostrarLogin();
       return;
     }
 
-    // Validaciones de permisos
-    if (nombre === 'caja' && !Auth.puedeAccederCaja()) { mostrarToast('error', 'No tienes permiso para acceder a Caja'); return; }
-    if (nombre === 'cocina' && !Auth.puedeAccederCocina()) { mostrarToast('error', 'No tienes permiso para acceder a Cocina'); return; }
-    if (nombre === 'config' && !Auth.esAdmin()) { mostrarToast('error', 'Solo administradores pueden acceder a Configuración'); return; }
-    if (nombre === 'despensa') {
-      if (!Auth.esAdmin() && !Auth.esCocina() && !Auth.esBarra() && !Auth.esDespensa()) {
-        mostrarToast('error', 'No tienes permiso para acceder a Despensa'); return;
-      }
+    // Validaciones de permisos con el sistema de Auth v2.1.3
+    if (nombre === 'caja' && !Auth.puedeAccederCaja()) {
+      mostrarToast('error', 'No tienes permiso para acceder a Caja');
+      return;
     }
-    if (nombre === 'recetas') {
-      if (!Auth.esCocina() && !Auth.esBarra() && !Auth.esAdmin() && !Auth.esMaster()) {
-        mostrarToast('error', 'No tienes permiso para acceder a Recetas'); return;
-      }
+    if (nombre === 'cocina' && !Auth.puedeAccederCocina()) {
+      mostrarToast('error', 'No tienes permiso para acceder a Cocina');
+      return;
     }
-    if (nombre === 'reparto') {
-      if (!Auth.puedeAccederReparto()) { mostrarToast('error', 'No tienes permiso para acceder a Reparto'); return; }
+    if (nombre === 'config' && !Auth.tienePermiso('verConfig')) {
+      mostrarToast('error', 'Solo administradores pueden acceder a Configuración');
+      return;
     }
-    if (nombre === 'menu') {
-      if (!Auth.puedeAccederMenu()) { mostrarToast('error', 'No tienes permiso para acceder al Menú'); return; }
+    if (nombre === 'despensa' && !Auth.tienePermiso('editarInventario')) {
+      mostrarToast('error', 'No tienes permiso para acceder a Despensa');
+      return;
     }
-    if (nombre === 'eventos') {
-      if (!Auth.puedeAccederEventos()) { mostrarToast('error', 'No tienes permiso para acceder a Eventos'); return; }
+    if (nombre === 'recetas' && !Auth.puedeAccederRecetas()) {
+      mostrarToast('error', 'No tienes permiso para acceder a Recetas');
+      return;
     }
-    if (nombre === 'perfil') {
-      if (!Auth.puedeAccederPerfil()) { mostrarToast('error', 'No tienes permiso para acceder a Perfil'); return; }
+    if (nombre === 'reparto' && !Auth.puedeAccederReparto()) {
+      mostrarToast('error', 'No tienes permiso para acceder a Reparto');
+      return;
+    }
+    if (nombre === 'menu' && !Auth.puedeAccederMenu()) {
+      mostrarToast('error', 'No tienes permiso para acceder al Menú');
+      return;
+    }
+    if (nombre === 'eventos' && !Auth.puedeAccederEventos()) {
+      mostrarToast('error', 'No tienes permiso para acceder a Eventos');
+      return;
+    }
+    if (nombre === 'perfil' && !Auth.puedeAccederPerfil()) {
+      mostrarToast('error', 'No tienes permiso para acceder a Perfil');
+      return;
     }
 
     document.querySelectorAll('.view').forEach(v => {

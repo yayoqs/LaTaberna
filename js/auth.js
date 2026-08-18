@@ -1,13 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/auth.js
-   Versión: 1.6.3
-   Propósito: Autenticación con Appwrite Account nativo + fallback local.
-              API pública completamente en español.
-              v1.6.3: Corrección de cierre de modal de login.
-                      - Listener para cerrar al hacer clic fuera del modal.
-                      - Reasignación segura de listeners de botones.
-                      - Logs de diagnóstico en cerrarModalLogin.
+   Versión: 2.1.3
+   Propósito: Autenticación con Appwrite Account nativo.
+              v2.1.3: corregido C2, C3 y permisos de barra.
+                      Sin backdoor de master por nombre de usuario.
+                      Vista por defecto de barra pasa a cocina.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -15,109 +13,32 @@ import { EventBus } from './lib/eventBus.js';
 import { mostrarToast } from './utils.js';
 import { Roles } from './roles.js';
 import { DBAppwrite } from './db-appwrite.js';
-import { USUARIOS_POR_DEFECTO } from './config-appwrite.js';
-
-const URL_FUNCION_ASIGNAR_ROL = 'https://6a6b3c8a003b634646cc.tor.appwrite.run';
+import { Deps } from './lib/deps.js';
+import { URL_FUNCION_REGISTRAR_USUARIO } from './config-appwrite.js';
 
 export const Auth = (() => {
-  let _usuarios = [];
   let _usuarioActual = null;
   let _rolSimulado = null;
   let _appwriteUserId = null;
-  let _listenersAsignados = false; // Control para asignar listeners una sola vez
+  let _listenersAsignados = false;
 
-  async function _sha256(texto) {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(texto);
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  function _emailDesdeNombre(nombreUsuario) {
+    return `${nombreUsuario.toLowerCase().replace(/\s+/g, '_')}@elisekai.com`;
   }
 
-  function _emailDesdeNombre(nombre) {
-    const prefijo = 'lataberna';
-    return `${nombre.toLowerCase().replace(/\s+/g, '_')}@${prefijo}.com`;
-  }
-
-  async function _crearPerfilGlobal(usuarioId, nombre) {
-    if (!DBAppwrite || !DBAppwrite.habilitado) return;
-    try {
-      await DBAppwrite.crear('global_perfiles', usuarioId, {
-        usuarioId,
-        nombre,
-        avatar: '',
-        nivel: 1,
-        xp: 0,
-        insignias: '[]',
-        racha: 0,
-        titulos: '[]'
-      });
-      Logger.info(`[Auth] Perfil global creado para: ${nombre}`);
-    } catch (e) {
-      if (e.code !== 409) {
-        Logger.warn('[Auth] No se pudo crear perfil global:', e.message);
-      }
-    }
+  function _obtenerDB() {
+    try { return Deps.obtener('db'); } catch { return null; }
   }
 
   async function _cargarPerfilGlobal(usuarioId) {
     if (!DBAppwrite || !DBAppwrite.habilitado) return null;
     try {
-      const perfiles = await DBAppwrite.listar('global_perfiles');
-      const perfil = perfiles.find(p => p.usuarioId === usuarioId);
-      return perfil || null;
+      return await DBAppwrite.obtenerPerfilPorUsuarioId(usuarioId);
     } catch (e) {
       Logger.warn('[Auth] No se pudo cargar perfil global:', e.message);
       return null;
     }
   }
-
-  async function _obtenerAppwriteUserIdPorNombre(nombre) {
-    const usuario = _usuarios.find(u => u.nombre === nombre);
-    if (usuario && usuario._appwriteUserId) return usuario._appwriteUserId;
-    try {
-      const perfiles = await DBAppwrite.listar('global_perfiles');
-      const perfil = perfiles.find(p => p.nombre === nombre);
-      return perfil ? perfil.usuarioId : null;
-    } catch (e) {
-      Logger.warn('[Auth] No se pudo buscar userId en global_perfiles:', e.message);
-      return null;
-    }
-  }
-
-  async function _cargarUsuarios() {
-    const guardados = localStorage.getItem('pubpos_usuarios');
-    if (guardados) {
-      try {
-        _usuarios = JSON.parse(guardados);
-        if (!Array.isArray(_usuarios) || _usuarios.length === 0) throw new Error('Array vacío');
-
-        for (const defUser of USUARIOS_POR_DEFECTO) {
-          const idx = _usuarios.findIndex(u => u.nombre === defUser.nombre);
-          if (idx === -1) {
-            const hash = await _sha256(defUser.password);
-            _usuarios.push({ nombre: defUser.nombre, hash, rol: defUser.rol, _migradoAAuth: false });
-          } else if (defUser.nombre === 'master') {
-            _usuarios[idx].rol = 'master';
-          }
-        }
-        _guardarUsuarios();
-        Logger.info('[Auth] Usuarios cargados desde localStorage.');
-        return;
-      } catch (e) {
-        Logger.warn('[Auth] Datos de usuarios corruptos, regenerando...');
-      }
-    }
-    Logger.info('[Auth] Creando usuarios iniciales con hash...');
-    _usuarios = [];
-    for (const u of USUARIOS_POR_DEFECTO) {
-      const hash = await _sha256(u.password);
-      _usuarios.push({ nombre: u.nombre, hash, rol: u.rol, _migradoAAuth: false });
-    }
-    localStorage.setItem('pubpos_usuarios', JSON.stringify(_usuarios));
-  }
-
-  function _guardarUsuarios() { localStorage.setItem('pubpos_usuarios', JSON.stringify(_usuarios)); }
 
   function iniciar() {
     const saved = sessionStorage.getItem('usuarioActual');
@@ -126,97 +47,107 @@ export const Auth = (() => {
   }
 
   function obtenerVistaPorDefecto() {
-    const rol = obtenerRolEfectivo();
-    if (rol === 'cocina' || rol === 'barra') return 'cocina';
+    const rol = obtenerRolPrincipal();
+
+    if (rol === 'chef' || rol === 'cocinaAyudante') return 'cocina';
+    if (rol === 'barman' || rol === 'barraAyudante') return 'cocina';
     if (rol === 'caja') return 'caja';
-    if (rol === 'despensa') return 'despensa';
-    if (rol === 'reparto') return 'reparto';
-    if (rol === 'eventos' || rol === 'artista') return 'eventos';
-    if (rol === 'cliente' || rol === 'master') return 'bienvenida';
+    if (rol === 'gerente' || rol === 'admin' || rol === 'master') return 'mesas';
+    if (rol === 'repartidor') return 'reparto';
+    if (rol === 'artista') return 'eventos';
+    if (rol === 'cliente') return 'bienvenida';
     return 'mesas';
   }
 
-  async function iniciarSesion(nombre, password) {
+  async function iniciarSesion(nombreUsuario, password) {
     try {
-      if (typeof DBAppwrite !== 'undefined' && DBAppwrite.cuenta) {
-        try {
-          try { await DBAppwrite.cuenta.deleteSession('current'); } catch(e) {}
-          _appwriteUserId = null;
+      if (typeof DBAppwrite === 'undefined' || !DBAppwrite.cuenta) {
+        mostrarToast('error', 'Servicio de autenticación no disponible');
+        return false;
+      }
 
-          const email = _emailDesdeNombre(nombre);
-          await DBAppwrite.cuenta.createEmailPasswordSession(email, password);
-          Logger.info(`[Auth] Sesión Appwrite creada para: ${email}`);
+      try { await DBAppwrite.cuenta.deleteSession('current'); } catch(e) {}
+      _appwriteUserId = null;
 
-          let usuario = _usuarios.find(u => u.nombre === nombre);
-          const rolDefecto = (nombre === 'master') ? 'master' : (USUARIOS_POR_DEFECTO.find(u => u.nombre === nombre)?.rol || 'cliente');
-          const nuevoHash = await _sha256(password);
+      const email = _emailDesdeNombre(nombreUsuario);
+      await DBAppwrite.cuenta.createEmailPasswordSession(email, password);
+      Logger.info(`[Auth] Sesión Appwrite creada para: ${email}`);
 
-          if (!usuario) {
-            usuario = { nombre, hash: nuevoHash, rol: rolDefecto, _migradoAAuth: true };
-            _usuarios.push(usuario);
-            _guardarUsuarios();
-            Logger.info(`[Auth] Usuario ${nombre} creado localmente desde Appwrite.`);
-          } else {
-            usuario.hash = nuevoHash;
-            if (nombre === 'master') usuario.rol = 'master';
-            usuario._migradoAAuth = true;
-            _guardarUsuarios();
-          }
+      const appwriteUserId = await obtenerIdUsuarioAppwrite();
+      const espacioId = 'lataberna';
 
-          const localTaberna = { id: 'lataberna', nombre: 'La Taberna', tipo: 'bar', rol: usuario.rol, databaseId: '6a0275cb0022ebf7d30d' };
-          _usuarioActual = { nombre: usuario.nombre, rol: usuario.rol, local: [localTaberna], localActivoId: localTaberna.id, perfil: null };
-          _rolSimulado = null;
+      let roles = ['cliente'];
+      let rolPrincipal = 'cliente';
 
-          const appwriteUserId = await obtenerIdUsuarioAppwrite();
-          if (appwriteUserId) {
-            let perfil = await _cargarPerfilGlobal(appwriteUserId);
-            if (!perfil) {
-              await _crearPerfilGlobal(appwriteUserId, nombre);
-              perfil = await _cargarPerfilGlobal(appwriteUserId);
-            }
-            _usuarioActual.perfil = perfil;
-          }
-
-          sessionStorage.setItem('usuarioActual', JSON.stringify(_usuarioActual));
-          aplicarRestriccionesUI();
-          Logger.debug('[Auth] Login exitoso, cerrando modal...');
-          cerrarModalLogin();
-          mostrarToast('success', 'Bienvenido/a ' + usuario.nombre + ' (' + usuario.rol + ')');
-          const vistaInicial = obtenerVistaPorDefecto();
-          EventBus.emit('app:cambiarVista', vistaInicial);
-          return true;
-        } catch (e) {
-          const esErrorCredenciales = e.code === 401 ||
-                                     (e.type && e.type.includes('user_invalid_credentials')) ||
-                                     (e.message && e.message.toLowerCase().includes('invalid credentials'));
-
-          if (esErrorCredenciales) {
-            Logger.warn('[Auth] Credenciales rechazadas por Appwrite:', e.message);
-            mostrarToast('error', 'Usuario o contraseña incorrectos');
-            return false;
-          }
-          Logger.warn('[Auth] No se pudo iniciar sesión con Appwrite, usando fallback local:', e.message);
+      const db = _obtenerDB();
+      if (db && db.obtenerStaffPorUsuario) {
+        const staff = await db.obtenerStaffPorUsuario(appwriteUserId, espacioId);
+        if (staff) {
+          roles = Array.isArray(staff.roles) ? staff.roles : (() => {
+            try { return JSON.parse(staff.roles || '[]'); } catch { return []; }
+          })();
+          rolPrincipal = staff.rolPrincipal || roles[0] || 'cliente';
         }
       }
 
-      // Fallback local
-      const hashIngresado = await _sha256(password);
-      const usuario = _usuarios.find(u => u.nombre === nombre && u.hash === hashIngresado);
-      if (!usuario) { mostrarToast('error', 'Usuario o contraseña incorrectos'); return false; }
-      const localTaberna = { id: 'lataberna', nombre: 'La Taberna', tipo: 'bar', rol: usuario.rol, databaseId: '6a0275cb0022ebf7d30d' };
-      _usuarioActual = { nombre: usuario.nombre, rol: usuario.rol, local: [localTaberna], localActivoId: localTaberna.id, perfil: null };
+      const localTaberna = {
+        id: espacioId,
+        nombre: 'La Taberna',
+        tipo: 'bar',
+        roles,
+        rolPrincipal,
+        databaseId: '6a0275cb0022ebf7d30d'
+      };
+      _usuarioActual = { nombre: nombreUsuario, local: [localTaberna], localActivoId: espacioId, perfil: null };
       _rolSimulado = null;
+
+      const perfil = await _cargarPerfilGlobal(appwriteUserId);
+      _usuarioActual.perfil = perfil;
+
       sessionStorage.setItem('usuarioActual', JSON.stringify(_usuarioActual));
       aplicarRestriccionesUI();
-      Logger.debug('[Auth] Login local exitoso, cerrando modal...');
       cerrarModalLogin();
-      mostrarToast('success', 'Bienvenido/a ' + usuario.nombre + ' (' + usuario.rol + ')');
+      mostrarToast('success', 'Bienvenido/a ' + nombreUsuario);
       const vistaInicial = obtenerVistaPorDefecto();
       EventBus.emit('app:cambiarVista', vistaInicial);
       return true;
     } catch (e) {
-      Logger.error('[Auth] Error en iniciarSesion:', e);
+      const esErrorCredenciales = e.code === 401 ||
+                                 (e.type && e.type.includes('user_invalid_credentials')) ||
+                                 (e.message && e.message.toLowerCase().includes('invalid credentials'));
+      if (esErrorCredenciales) {
+        Logger.warn('[Auth] Credenciales rechazadas por Appwrite:', e.message);
+        mostrarToast('error', 'Usuario o contraseña incorrectos');
+      } else {
+        Logger.error('[Auth] Error en iniciarSesion:', e);
+        mostrarToast('error', 'Error al iniciar sesión');
+      }
       return false;
+    }
+  }
+
+  async function registrarUsuario(nombreUsuario, password) {
+    if (!nombreUsuario || !password) {
+      return { exito: false, error: 'Usuario y contraseña requeridos' };
+    }
+
+    try {
+      const response = await fetch(URL_FUNCION_REGISTRAR_USUARIO, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombreUsuario, password })
+      });
+      const data = await response.json();
+      if (!data.exito) {
+        return { exito: false, error: data.error || 'Error al registrar usuario' };
+      }
+
+      Logger.info('[Auth] Usuario registrado:', nombreUsuario);
+      EventBus.emit('cliente:cuenta_creada', { nombre: nombreUsuario, timestamp: Date.now() });
+      return { exito: true, nombre: nombreUsuario, usuarioId: data.usuarioId };
+    } catch (e) {
+      Logger.error('[Auth] Error al llamar a registrar-usuario:', e);
+      return { exito: false, error: 'No se pudo conectar con el servicio de registro' };
     }
   }
 
@@ -246,7 +177,9 @@ export const Auth = (() => {
         Logger.info('[Auth] ID de Appwrite obtenido:', _appwriteUserId);
         return _appwriteUserId;
       }
-    } catch (e) { Logger.warn('[Auth] No se pudo obtener el ID de Appwrite:', e); }
+    } catch (e) {
+      Logger.warn('[Auth] No se pudo obtener el ID de Appwrite:', e);
+    }
     return null;
   }
 
@@ -265,7 +198,7 @@ export const Auth = (() => {
           </div>
           <div class="modal-small-body" id="loginPanel">
             <label>Usuario</label>
-            <input type="text" id="loginUsuario" placeholder="Ej: admin, mesero, cocina...">
+            <input type="text" id="loginUsuario" placeholder="Ej: admin, gerente, chef...">
             <label>Contraseña</label>
             <input type="password" id="loginPassword" placeholder="Contraseña">
             <div class="modal-small-footer" style="display:flex; flex-direction:column; gap:8px;">
@@ -281,7 +214,7 @@ export const Auth = (() => {
             <label>Usuario</label>
             <input type="text" id="regUsuario" placeholder="Elegir un nombre de usuario">
             <label>Contraseña</label>
-            <input type="password" id="regPassword" placeholder="Mínimo 4 caracteres">
+            <input type="password" id="regPassword" placeholder="Mínimo 8 caracteres">
             <label>Repetir contraseña</label>
             <input type="password" id="regPasswordConfirm" placeholder="Repetir la contraseña">
             <div class="modal-small-footer" style="display:flex; flex-direction:column; gap:8px;">
@@ -300,24 +233,20 @@ export const Auth = (() => {
       _mostrarLoginPanel();
     }
 
-    // Asignar listeners una sola vez para evitar duplicados
     if (!_listenersAsignados) {
       document.getElementById('btnCerrarModalLogin').addEventListener('click', cerrarModalLogin);
       document.getElementById('btnModalIngresar').addEventListener('click', _iniciarSesionDesdeModal);
       document.getElementById('btnModalRegistrarse').addEventListener('click', _mostrarRegistro);
       document.getElementById('btnVolverLogin').addEventListener('click', _mostrarLoginPanel);
       document.getElementById('btnModalCrearCuenta').addEventListener('click', _registrarDesdeModal);
-      
-      // Listener para cerrar el modal al hacer clic fuera de la tarjeta
+
       loginModal.addEventListener('click', function(e) {
         if (e.target === loginModal) {
-          Logger.debug('[Auth] Clic fuera del modal detectado, cerrando...');
           cerrarModalLogin();
         }
       });
 
       _listenersAsignados = true;
-      Logger.debug('[Auth] Listeners del modal asignados.');
     }
 
     document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
@@ -334,7 +263,6 @@ export const Auth = (() => {
   }
 
   function cerrarModalLogin() {
-    Logger.debug('[Auth] cerrando modal de login');
     if (loginModal) loginModal.style.display = 'none';
   }
 
@@ -349,11 +277,11 @@ export const Auth = (() => {
   }
 
   async function _registrarDesdeModal() {
-    const nombre = document.getElementById('regUsuario')?.value?.trim() || '';
+    const nombreUsuario = document.getElementById('regUsuario')?.value?.trim() || '';
     const password = document.getElementById('regPassword')?.value || '';
     const passwordConfirm = document.getElementById('regPasswordConfirm')?.value || '';
 
-    if (!nombre || !password) {
+    if (!nombreUsuario || !password) {
       mostrarToast('error', 'Completar todos los campos.');
       return;
     }
@@ -362,7 +290,7 @@ export const Auth = (() => {
       return;
     }
 
-    const resultado = await registrarCliente(nombre, password);
+    const resultado = await registrarUsuario(nombreUsuario, password);
     if (resultado.exito) {
       mostrarToast('success', 'Cuenta creada. Ya puedes iniciar sesión.');
       _mostrarLoginPanel();
@@ -374,130 +302,78 @@ export const Auth = (() => {
     }
   }
 
-  async function cambiarPassword(nombreUsuario, nuevaPassword) {
-    if (!esAdmin() && !esMasterReal()) { mostrarToast('error', 'No tienes permiso para cambiar contraseñas'); return false; }
-    const idx = _usuarios.findIndex(u => u.nombre === nombreUsuario);
-    if (idx === -1) { mostrarToast('error', 'Usuario no encontrado'); return false; }
-    const nuevoHash = await _sha256(nuevaPassword);
-    _usuarios[idx].hash = nuevoHash;
-    _guardarUsuarios();
-    mostrarToast('success', 'Contraseña actualizada');
-    return true;
+  function _obtenerLocalActivo() {
+    if (!_usuarioActual || !_usuarioActual.localActivoId) return null;
+    return _usuarioActual.local?.find(l => l.id === _usuarioActual.localActivoId) || null;
   }
 
-  async function cambiarRol(nombreUsuario, nuevoRol) {
-    if (!_usuarioActual) {
-      return { exito: false, error: 'No hay sesión activa.' };
-    }
-    if (!esMasterReal() && !esAdmin()) {
-      return { exito: false, error: 'No tienes permiso para cambiar roles.' };
-    }
-    if (typeof Roles === 'undefined' || !Roles.lista.includes(nuevoRol)) {
-      return { exito: false, error: `El rol "${nuevoRol}" no es válido.` };
-    }
-    if (nombreUsuario === _usuarioActual.nombre) {
-      return { exito: false, error: 'No puedes cambiar tu propio rol.' };
-    }
-    const idx = _usuarios.findIndex(u => u.nombre === nombreUsuario);
-    if (idx === -1) {
-      return { exito: false, error: 'Usuario no encontrado.' };
-    }
-    const usuarioObjetivo = _usuarios[idx];
-    if (usuarioObjetivo.rol === 'master') {
-      return { exito: false, error: 'No se puede cambiar el rol de un master.' };
-    }
-    if (usuarioObjetivo.rol === 'admin' && !esMasterReal()) {
-      return { exito: false, error: 'Solo un master puede cambiar el rol de un admin.' };
-    }
-
-    const rolAnterior = usuarioObjetivo.rol;
-    _usuarios[idx].rol = nuevoRol;
-    _guardarUsuarios();
-    Logger.info(`[Auth] Rol cambiado: ${nombreUsuario} de "${rolAnterior}" a "${nuevoRol}" por ${_usuarioActual.nombre}.`);
-
-    if (usuarioObjetivo._migradoAAuth) {
-      try {
-        let appwriteUserId = usuarioObjetivo._appwriteUserId;
-        if (!appwriteUserId) {
-          appwriteUserId = await _obtenerAppwriteUserIdPorNombre(nombreUsuario);
-        }
-        if (appwriteUserId) {
-          const response = await fetch(URL_FUNCION_ASIGNAR_ROL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: appwriteUserId, rol: nuevoRol })
-          });
-          const data = await response.json();
-          if (!data.success) {
-            Logger.warn(`[Auth] No se pudo sincronizar el label en Appwrite: ${data.error}`);
-          }
-        }
-      } catch (e) {
-        Logger.warn('[Auth] Error al llamar a asignar-rol:', e.message);
-      }
-    }
-
-    return { exito: true };
+  function obtenerRolesEfectivos() {
+    const local = _obtenerLocalActivo();
+    if (local && Array.isArray(local.roles)) return [...local.roles];
+    if (local && local.rol) return [local.rol];
+    if (_usuarioActual?.rol) return [_usuarioActual.rol];
+    return ['cliente'];
   }
 
-  async function registrarCliente(nombre, password) {
-    if (!nombre || !password) { Logger.warn('[Auth] Intento de registro sin nombre o password'); return { exito: false, error: 'Nombre y contraseña requeridos' }; }
-    const existe = _usuarios.find(u => u.nombre === nombre);
-    if (existe) { Logger.warn('[Auth] Registro fallido: el usuario ya existe:', nombre); return { exito: false, error: 'El usuario ya existe' }; }
-
-    let creadoEnAppwrite = false;
-    let appwriteUserId = null;
-    if (typeof DBAppwrite !== 'undefined' && DBAppwrite.cuenta) {
-      try {
-        const email = _emailDesdeNombre(nombre);
-        appwriteUserId = Appwrite.ID.unique();
-        const respuesta = await DBAppwrite.cuenta.create(appwriteUserId, email, password);
-        appwriteUserId = respuesta.$id || appwriteUserId;
-        Logger.info(`[Auth] Usuario creado en Appwrite: ${email} (ID: ${appwriteUserId})`);
-        creadoEnAppwrite = true;
-        await _crearPerfilGlobal(appwriteUserId, nombre);
-      } catch (e) {
-        Logger.warn('[Auth] No se pudo crear usuario en Appwrite, usando solo local:', e.message);
-      }
-    }
-
-    const hash = await _sha256(password);
-    const nuevoUsuario = { nombre, hash, rol: 'cliente', _migradoAAuth: creadoEnAppwrite, _appwriteUserId: appwriteUserId };
-    _usuarios.push(nuevoUsuario);
-    _guardarUsuarios();
-    Logger.info('[Auth] Cliente registrado:', nombre);
-    EventBus.emit('cliente:cuenta_creada', { nombre, timestamp: Date.now() });
-    return { exito: true, nombre };
+  function obtenerRolPrincipal() {
+    const local = _obtenerLocalActivo();
+    if (local && local.rolPrincipal) return local.rolPrincipal;
+    if (local && local.rol) return local.rol;
+    if (_usuarioActual?.rol) return _usuarioActual.rol;
+    return 'cliente';
   }
 
   function obtenerRolEfectivo() {
-    if (_usuarioActual?.rol === 'master' && _rolSimulado) return _rolSimulado;
-    if (_usuarioActual?.localActivoId) {
-      const local = _usuarioActual.local?.find(l => l.id === _usuarioActual.localActivoId);
-      if (local) return local.rol;
-    }
-    return _usuarioActual?.rol || null;
+    return obtenerRolPrincipal();
   }
 
-  function tienePermiso(permiso) { const rol = obtenerRolEfectivo(); if (!rol) return false; return (typeof Roles !== 'undefined' && Roles.getPermisos(rol)[permiso] === true); }
-  function obtenerRol() { return _usuarioActual?.rol || null; }
+  function tienePermiso(permiso) {
+    const roles = obtenerRolesEfectivos();
+    if (!roles.length || typeof Roles === 'undefined') return false;
+    return roles.some(rol => Roles.getPermisos(rol)[permiso] === true);
+  }
+
   function obtenerNombre() { return _usuarioActual?.nombre || ''; }
+  function obtenerRol() { return obtenerRolPrincipal(); }
+
   function obtenerUsuarioActual() {
     if (!_usuarioActual) return null;
     return {
       nombre: _usuarioActual.nombre,
-      rol: _usuarioActual.rol,
-      rolEfectivo: obtenerRolEfectivo(),
+      rolesEfectivos: obtenerRolesEfectivos(),
+      rolPrincipal: obtenerRolPrincipal(),
       simulando: _rolSimulado || null,
       local: _usuarioActual.local || [],
       localActivoId: _usuarioActual.localActivoId,
       perfil: _usuarioActual.perfil || null
     };
   }
+
   function obtenerLocales() { return _usuarioActual?.local || []; }
-  function obtenerLocalActivo() {
-    if (!_usuarioActual || !_usuarioActual.localActivoId) return null;
-    return _usuarioActual.local?.find(l => l.id === _usuarioActual.localActivoId) || null;
+  function obtenerLocalActivo() { return _obtenerLocalActivo(); }
+
+  async function vincularCuentaStaff(token) {
+    const db = _obtenerDB();
+    if (!db || !db.vincularCuentaStaff) return { exito: false, error: 'DB no disponible' };
+    const resultado = await db.vincularCuentaStaff(token);
+    if (resultado.exito) {
+      const appwriteUserId = await obtenerIdUsuarioAppwrite();
+      const espacioId = resultado.staff?.espacioId || 'lataberna';
+      if (appwriteUserId && db.obtenerStaffPorUsuario) {
+        const staff = await db.obtenerStaffPorUsuario(appwriteUserId, espacioId);
+        if (staff) {
+          const local = _obtenerLocalActivo();
+          if (local) {
+            local.roles = staff.roles;
+            local.rolPrincipal = staff.rolPrincipal;
+          }
+          sessionStorage.setItem('usuarioActual', JSON.stringify(_usuarioActual));
+          aplicarRestriccionesUI();
+          EventBus.emit('auth:staff_vinculado', staff);
+        }
+      }
+    }
+    return resultado;
   }
 
   function cambiarLocal(localId) {
@@ -507,57 +383,60 @@ export const Auth = (() => {
     sessionStorage.setItem('usuarioActual', JSON.stringify(_usuarioActual));
     aplicarRestriccionesUI();
     EventBus.emit('app:cambiarVista', obtenerVistaPorDefecto());
-    mostrarToast('info', 'Cambiaste a "' + local.nombre + '" (' + local.rol + ')');
-    Logger.info('[Auth] Local cambiado a "' + local.nombre + '"');
+    mostrarToast('info', 'Cambiaste a "' + local.nombre + '"');
   }
 
   function actualizarNombre(nuevoNombre) {
     if (!_usuarioActual) return;
-    if (!nuevoNombre || typeof nuevoNombre !== 'string') { Logger.warn('[Auth] Intento de actualizar nombre con valor inválido:', nuevoNombre); return; }
+    if (!nuevoNombre || typeof nuevoNombre !== 'string') return;
     _usuarioActual.nombre = nuevoNombre;
     sessionStorage.setItem('usuarioActual', JSON.stringify(_usuarioActual));
     aplicarRestriccionesUI();
-    Logger.info('[Auth] Nombre actualizado a "' + nuevoNombre + '"');
   }
 
-  function esMasterReal() { return _usuarioActual?.rol === 'master'; }
-  function esMaster() { return _usuarioActual?.rol === 'master' && !_rolSimulado; }
-  function esAdmin() { const r = obtenerRolEfectivo(); return r === 'admin' || r === 'master'; }
-  function esCocina() { const r = obtenerRolEfectivo(); return r === 'cocina' || r === 'admin' || r === 'master'; }
-  function esBarra() { const r = obtenerRolEfectivo(); return r === 'barra' || r === 'admin' || r === 'master'; }
-  function esCaja() { const r = obtenerRolEfectivo(); return r === 'caja' || r === 'admin' || r === 'master'; }
-  function esMesero() { const r = obtenerRolEfectivo(); return r === 'mesero' || r === 'admin' || r === 'master'; }
-  function esDespensa() { const r = obtenerRolEfectivo(); return r === 'despensa' || r === 'admin' || r === 'master'; }
-  function esReparto() { const r = obtenerRolEfectivo(); return r === 'reparto' || r === 'admin' || r === 'master'; }
-  function esCliente() { const r = obtenerRolEfectivo(); return r === 'cliente' || r === 'admin' || r === 'master'; }
-  function esEventos() { const r = obtenerRolEfectivo(); return r === 'eventos' || r === 'admin' || r === 'master'; }
-  function esArtista() { const r = obtenerRolEfectivo(); return r === 'artista' || r === 'admin' || r === 'master'; }
+  function esMasterReal() { return obtenerRolesEfectivos().includes('master'); }
+  function esMaster() { return esMasterReal() && !_rolSimulado; }
+  function esAdmin() { return obtenerRolesEfectivos().some(r => r === 'admin' || r === 'master'); }
+  function esGerente() { return obtenerRolesEfectivos().some(r => r === 'gerente' || r === 'admin' || r === 'master'); }
+  function esChef() { return obtenerRolesEfectivos().some(r => r === 'chef' || r === 'admin' || r === 'master'); }
+  function esCocinaAyudante() { return obtenerRolesEfectivos().some(r => r === 'cocinaAyudante' || r === 'chef' || r === 'admin' || r === 'master'); }
+  function esBarman() { return obtenerRolesEfectivos().some(r => r === 'barman' || r === 'admin' || r === 'master'); }
+  function esBarraAyudante() { return obtenerRolesEfectivos().some(r => r === 'barraAyudante' || r === 'barman' || r === 'admin' || r === 'master'); }
+  function esMesero() { return obtenerRolesEfectivos().some(r => r === 'mesero' || r === 'admin' || r === 'master'); }
+  function esCaja() { return obtenerRolesEfectivos().some(r => r === 'caja' || r === 'admin' || r === 'master'); }
+  function esRepartidor() { return obtenerRolesEfectivos().some(r => r === 'repartidor' || r === 'admin' || r === 'master'); }
+  function esArtista() { return obtenerRolesEfectivos().some(r => r === 'artista' || r === 'admin' || r === 'master'); }
+  function esCliente() { return obtenerRolesEfectivos().some(r => r === 'cliente' || r === 'admin' || r === 'master'); }
 
   function puede(permiso) { return tienePermiso(permiso); }
-  function puedeEliminarItemEnviado() { return tienePermiso('eliminarItemEnviado'); }
+  function puedeEliminarItemEnviado() { return tienePermiso('gestionarPedido') || tienePermiso('cambiarEstadoComanda'); }
   function puedeCerrarMesa() { return tienePermiso('cerrarMesa'); }
-  function puedeAccederCaja() { return tienePermiso('accederCaja'); }
-  function puedeAccederCocina() { return tienePermiso('accederCocina'); }
+  function puedeAccederCaja() { return tienePermiso('verCaja'); }
+  function puedeAccederCocina() { return tienePermiso('verCocina'); }
   function puedeCambiarEstadoComanda() { return tienePermiso('cambiarEstadoComanda'); }
   function puedeEditarProductos() { return tienePermiso('editarProductos'); }
   function puedeEditarPrecios() { return tienePermiso('editarPrecios'); }
-  function puedeAccederRecetas() { const rol = obtenerRolEfectivo(); return ['cocina', 'barra', 'admin', 'master'].includes(rol); }
-  function puedeAccederReparto() { const rol = obtenerRolEfectivo(); return ['reparto', 'admin', 'master'].includes(rol); }
-  function puedeAccederMenu() { return obtenerRolEfectivo() !== null; }
-  function puedeAccederEventos() { const rol = obtenerRolEfectivo(); return ['eventos', 'artista', 'admin', 'master'].includes(rol); }
-  function puedeAccederPerfil() { return obtenerRolEfectivo() !== null; }
+  function puedeAccederRecetas() { return tienePermiso('editarRecetas') || tienePermiso('verCostos'); }
+  function puedeAccederReparto() { return tienePermiso('gestionarDelivery') || tienePermiso('verDelivery'); }
+  function puedeAccederMenu() { return tienePermiso('verMenu') || obtenerRolesEfectivos().length > 0; }
+  function puedeAccederEventos() { return tienePermiso('gestionarEventos') || tienePermiso('verEventos'); }
+  function puedeAccederPerfil() { return obtenerRolesEfectivos().length > 0; }
+  function puedeGestionarPersonal() { return tienePermiso('gestionarPersonal'); }
+  function puedeAsignarAdmin() { return tienePermiso('asignarAdmin'); }
+  function puedeAsignarGerente() { return tienePermiso('asignarGerente'); }
+  function puedeAsignarStaff() { return tienePermiso('asignarStaff'); }
 
   function aplicarRestriccionesUI() {
     const userEl = document.getElementById('usuarioActualDisplay');
-    const rolEfectivo = obtenerRolEfectivo();
+    const roles = obtenerRolesEfectivos();
     if (userEl) {
-      let displayText = _usuarioActual ? _usuarioActual.nombre + ' (' + rolEfectivo + ')' : '';
+      let displayText = _usuarioActual ? _usuarioActual.nombre + ' (' + roles.join(', ') + ')' : '';
       if (_rolSimulado) displayText += ' ⇒ ' + _rolSimulado;
       userEl.textContent = displayText;
     }
     document.querySelectorAll('[data-rol]').forEach(el => {
-      const roles = el.dataset.rol.split(',').map(r => r.trim());
-      const mostrar = roles.includes(rolEfectivo) || (rolEfectivo === 'admin' && roles.includes('admin')) || (rolEfectivo === 'master' && roles.includes('master'));
+      const rolesElemento = el.dataset.rol.split(',').map(r => r.trim());
+      const mostrar = roles.some(r => rolesElemento.includes(r));
       el.style.display = mostrar ? '' : 'none';
     });
     _renderSelectorLocal();
@@ -583,7 +462,7 @@ export const Auth = (() => {
     const locales = _usuarioActual.local || [];
     if (locales.length <= 1) { container.innerHTML = ''; return; }
     const activo = _usuarioActual.localActivoId;
-    container.innerHTML = `<i class="fas fa-home"></i><select id="localSelect">${locales.map(l => `<option value="${l.id}" ${l.id === activo ? 'selected' : ''}>${l.nombre} (${l.rol})</option>`).join('')}</select>`;
+    container.innerHTML = `<i class="fas fa-home"></i><select id="localSelect">${locales.map(l => `<option value="${l.id}" ${l.id === activo ? 'selected' : ''}>${l.nombre}</option>`).join('')}</select>`;
     const selectEl = container.querySelector('#localSelect');
     if (selectEl) {
       selectEl.addEventListener('change', function() {
@@ -593,28 +472,29 @@ export const Auth = (() => {
   }
 
   function _cambiarRolSimulado(rol) {
-    if (!_usuarioActual || _usuarioActual.rol !== 'master') return;
+    if (!_usuarioActual || !esMasterReal()) return;
     if (!rol) { _rolSimulado = null; } else { if (typeof Roles !== 'undefined' && !Roles.lista.includes(rol)) return; _rolSimulado = rol; }
     aplicarRestriccionesUI();
-    const vistaInicial = obtenerVistaPorDefecto();
-    EventBus.emit('app:cambiarVista', vistaInicial);
+    EventBus.emit('app:cambiarVista', obtenerVistaPorDefecto());
   }
 
   return {
     iniciar, iniciarSesion, cerrarSesion,
+    registrarUsuario,
     obtenerRol, obtenerNombre, obtenerUsuarioActual, obtenerLocales, obtenerLocalActivo, cambiarLocal,
-    actualizarNombre, tienePermiso, puede, esMaster, esAdmin, esCocina, esBarra, esCaja, esMesero,
-    esDespensa, esReparto, esCliente, esEventos, esArtista, puedeEliminarItemEnviado, puedeCerrarMesa,
-    puedeAccederCaja, puedeAccederCocina, puedeCambiarEstadoComanda, puedeEditarProductos, puedeEditarPrecios,
-    obtenerVistaPorDefecto, mostrarLogin, cerrarModalLogin, _iniciarSesionDesdeModal, _cambiarRolSimulado, obtenerRolEfectivo,
+    obtenerRolesEfectivos, obtenerRolPrincipal, obtenerRolEfectivo,
+    actualizarNombre, tienePermiso, puede, esMaster, esAdmin, esGerente, esChef, esCocinaAyudante, esBarman,
+    esBarraAyudante, esMesero, esCaja, esRepartidor, esArtista, esCliente,
+    puedeEliminarItemEnviado, puedeCerrarMesa,
+    puedeAccederCaja, puedeAccederCocina, puedeCambiarEstadoComanda,
+    puedeEditarProductos, puedeEditarPrecios,
+    obtenerVistaPorDefecto, mostrarLogin, cerrarModalLogin, _iniciarSesionDesdeModal, _cambiarRolSimulado,
     esMasterReal, aplicarRestriccionesUI, puedeAccederRecetas, puedeAccederReparto, puedeAccederMenu,
-    puedeAccederEventos, puedeAccederPerfil, cambiarPassword, cambiarRol, _cargarUsuarios, registrarCliente,
-    obtenerIdUsuarioAppwrite, _mostrarRegistro
+    puedeAccederEventos, puedeAccederPerfil, puedeGestionarPersonal, puedeAsignarAdmin,
+    puedeAsignarGerente, puedeAsignarStaff, obtenerIdUsuarioAppwrite, _mostrarRegistro, vincularCuentaStaff
   };
 })();
 
 export function inicializarAuth() {
-  Auth._cargarUsuarios().catch(function(e) {
-    Logger.error('[Auth] Error al cargar usuarios:', e);
-  });
+  Auth.iniciar();
 }

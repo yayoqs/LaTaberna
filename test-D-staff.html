@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test D – Staff y Roles (Appwrite real)</title>
+  <style>
+    body { font-family: monospace; background: #111827; color: #f9fafb; padding: 30px; line-height: 1.5; }
+    h1 { color: #f59e0b; }
+    .test { margin: 6px 0; padding: 8px 12px; border-radius: 6px; }
+    .pass { background: rgba(16,185,129,.15); border-left: 4px solid #10b981; }
+    .fail { background: rgba(239,68,68,.15); border-left: 4px solid #ef4444; }
+    .info { background: rgba(59,130,246,.15); border-left: 4px solid #3b82f6; }
+    .summary { margin-top: 20px; padding: 12px; background: #1f2937; border: 1px solid #374151; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test D – Staff y Roles Múltiples</h1>
+  <p>Valida alta de personal, asignación de roles, token de vinculación y canje.</p>
+  <div id="results"></div>
+
+  <script src="js/appwrite.min.js"></script>
+  <script type="module">
+    import { Logger } from './js/lib/logger.js';
+    import { DBAppwrite } from './js/db-appwrite.js';
+    import { DB } from './js/db.js';
+    import { Auth } from './js/auth.js';
+    import { inicializarAuth } from './js/auth.js';
+
+    const resultsEl = document.getElementById('results');
+    let passed = 0, failed = 0;
+
+    function assert(cond, msg) {
+      if (cond) { passed++; resultsEl.innerHTML += `<div class="test pass">✔ ${msg}</div>`; }
+      else { failed++; resultsEl.innerHTML += `<div class="test fail">✘ ${msg}</div>`; }
+    }
+
+    function info(msg) { resultsEl.innerHTML += `<div class="test info">ℹ️ ${msg}</div>`; }
+
+    const esperar = ms => new Promise(r => setTimeout(r, ms));
+
+    async function limpiarSesion() { try { await Auth.cerrarSesion(); } catch {} }
+
+    function generarTokenTest() {
+      return 'tk_test_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+    }
+
+    async function run() {
+      Logger.setLevel('ERROR');
+      resultsEl.innerHTML = '';
+
+      info('Inicializando Auth y Appwrite...');
+      await inicializarAuth();
+      if (!(await DBAppwrite.iniciar())) {
+        assert(false, 'No se pudo inicializar Appwrite');
+        return;
+      }
+
+      await DB.init();
+
+      // Autenticar como master
+      await limpiarSesion();
+      if (!(await Auth.iniciarSesion('master', 'master123'))) {
+        assert(false, 'No se pudo autenticar como master');
+        return;
+      }
+      assert(true, 'Master autenticado');
+
+      const espacioId = 'lataberna';
+      const nombreUsuario = 'test_staff_' + Date.now();
+      const passwordTemporal = 'TempPass123';
+
+      // 1. Registrar usuario nuevo para staff
+      const reg = await Auth.registrarUsuario(nombreUsuario, passwordTemporal);
+      assert(reg.exito === true, 'Usuario staff registrado');
+      const usuarioId = reg.usuarioId;
+
+      // 2. Crear staff con roles múltiples y token
+      const rolesIniciales = ['mesero', 'barra'];
+      const token = generarTokenTest();
+      const staffCreado = await DB.crearOActualizarStaff({
+        nombre: 'Test Staff ' + nombreUsuario,
+        usuarioId,
+        espacioId,
+        roles: rolesIniciales,
+        rolPrincipal: 'mesero',
+        estado: 'activo',
+        telefono: '123456789',
+        email: '',
+        notas: '',
+        tokenVinculacion: token
+      });
+      assert(!!staffCreado, 'Staff creado en Appwrite');
+      const staffId = staffCreado.id;
+
+      // 3. Verificar que aparece en DB.obtenerStaffPorEspacio
+      const staffLista = await DB.obtenerStaffPorEspacio(espacioId);
+      const staffEncontrado = staffLista.find(s => s.id === staffId);
+      assert(!!staffEncontrado, 'Staff encontrado en listado del espacio');
+      if (staffEncontrado) {
+        const rolesArray = Array.isArray(staffEncontrado.roles) ? staffEncontrado.roles : JSON.parse(staffEncontrado.roles || '[]');
+        assert(rolesArray.includes('mesero') && rolesArray.includes('barra'), 'Roles múltiples correctos');
+        assert(staffEncontrado.rolPrincipal === 'mesero', 'Rol principal correcto');
+      }
+
+      // 4. Actualizar roles
+      const nuevosRoles = ['mesero', 'cocina', 'barra'];
+      const staffActualizado = await DB.crearOActualizarStaff({
+        ...staffCreado,
+        roles: nuevosRoles,
+        rolPrincipal: 'cocina'
+      });
+      assert(!!staffActualizado, 'Staff actualizado');
+      const rolesActualizados = Array.isArray(staffActualizado.roles) ? staffActualizado.roles : JSON.parse(staffActualizado.roles || '[]');
+      assert(rolesActualizados.includes('cocina') && rolesActualizados.includes('barra'), 'Nuevos roles guardados');
+      assert(staffActualizado.rolPrincipal === 'cocina', 'Nuevo rol principal guardado');
+
+      // 5. Verificar token
+      const staffConToken = await DBAppwrite.obtenerStaffPorUsuarioEspacio(usuarioId, espacioId);
+      assert(staffConToken?.tokenVinculacion === token, 'Token de vinculación guardado');
+
+      // 6. Canje de token (simular con usuario actual)
+      // Primero cerramos sesión master y entramos con la cuenta de staff
+      await limpiarSesion();
+      const loginStaff = await Auth.iniciarSesion(nombreUsuario, passwordTemporal);
+      assert(loginStaff === true, 'Staff inicia sesión con contraseña temporal');
+
+      const resultadoVinculacion = await Auth.vincularCuentaStaff(token);
+      assert(resultadoVinculacion.exito === true, 'Token canjeado correctamente');
+      const usuarioVinculado = Auth.obtenerUsuarioActual();
+      const rolesFinales = usuarioVinculado.rolesEfectivos;
+      assert(rolesFinales.includes('cocina'), 'Staff vinculado tiene roles del staff');
+      assert(usuarioVinculado.rolPrincipal === 'cocina', 'Staff vinculado tiene rol principal correcto');
+
+      // 7. Limpiar
+      info('Limpiando datos de prueba...');
+      await limpiarSesion();
+      await Auth.iniciarSesion('master', 'master123');
+      if (staffId) await DBAppwrite.eliminar('staff', staffId);
+      if (usuarioId) {
+        const perfil = await DBAppwrite.obtenerPerfilPorUsuarioId(usuarioId);
+        if (perfil) await DBAppwrite.eliminar('global_perfiles', perfil.id);
+      }
+      assert(true, 'Datos de prueba eliminados');
+
+      resultsEl.innerHTML += `<div class="summary">${passed} pasaron, ${failed} fallaron</div>`;
+      if (failed === 0) resultsEl.innerHTML += `<div class="test pass">✔ Staff y roles múltiples validados correctamente.</div>`;
+    }
+
+    window.addEventListener('load', () => run().catch(e => {
+      resultsEl.innerHTML += `<div class="test fail">Error: ${e.message}</div>`;
+      console.error(e);
+    }));
+  </script>
+</body>
+</html>

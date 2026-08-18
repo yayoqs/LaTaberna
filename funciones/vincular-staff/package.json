@@ -1,8 +1,8 @@
 {
-  "name": "asignar-rol",
+  "name": "vincular-staff",
   "version": "1.0.0",
   "type": "module",
   "dependencies": {
-    "node-appwrite": "^14.1.0"
+    "node-appwrite": "^22.1.3"
   }
 }

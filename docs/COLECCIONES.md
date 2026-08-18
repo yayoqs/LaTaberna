@@ -1,9 +1,9 @@
 # 📦 COLECCIONES.md — Estructura de la Base de Datos "EkyzD"
 
-**Versión:** 3.0.1 (Final)
-**Fecha:** 9 de agosto de 2026
+**Versión:** 3.3.0
+**Fecha:** 17 de agosto de 2026
 **Base de datos:** `EkyzD` (ID: `6a0275cb0022ebf7d30d`)
-**Propósito:** Especificación canónica de colecciones, columnas, configuración y permisos para Appwrite Cloud.
+**Propósito:** Especificación canónica de colecciones, columnas, configuración, permisos y jerarquía de roles para Appwrite Cloud.
 
 ---
 
@@ -14,193 +14,242 @@
 
 ---
 
-## 🔐 Configuración de permisos (Labels)
+## 🔐 Jerarquía y asignación de roles
 
-Los permisos se asignan mediante **Labels** de Appwrite. Cada rol tiene asociado un label que se sincroniza automáticamente al iniciar sesión o al cambiar el rol de un usuario.
+| Rol | Nivel | Puede asignar |
+|-----|-------|---------------|
+| `master` | Plataforma | `admin` |
+| `admin` | Tenant | `gerente`, `chef`, `cocina_ayudante`, `barman`, `barra_ayudante`, `mesero`, `caja`, `repartidor`, `artista` |
+| `gerente` | Staff | `chef`, `cocina_ayudante`, `barman`, `barra_ayudante`, `mesero`, `caja`, `repartidor`, `artista` |
+| `chef` | Staff | No asigna roles |
+| `cocina_ayudante` | Staff | No asigna roles |
+| `barman` | Staff | No asigna roles |
+| `barra_ayudante` | Staff | No asigna roles |
+| `mesero` | Staff | No asigna roles |
+| `caja` | Staff | No asigna roles |
+| `repartidor` | Staff | No asigna roles |
+| `artista` | Staff | No asigna roles |
+| `cliente` | Usuario | No asigna roles |
 
-### Roles del sistema
+Los usuarios pueden tener múltiples roles staff simultáneamente. El campo `rolPrincipal` define la vista inicial.
 
-| Rol | Descripción |
-|-----|-------------|
-| `master` | Administrador global del ecosistema. Acceso total. |
-| `admin` | Administrador de un local específico. |
-| `cocina` | Encargado de cocina. Prepara recetas y gestiona stock. |
-| `barra` | Encargado de barra. Prepara bebidas y cócteles. |
-| `mesero` | Atención de mesas, toma de pedidos. |
-| `caja` | Cobro y cierre de turno. |
-| `despensa` | Gestión de inventario, insumos y proveedores. |
-| `eventos` | Organización de eventos en vivo. |
-| `reparto` | Gestión de pedidos de delivery. |
-| `artista` | Participación en eventos como artista. |
-| `cliente` | Usuario registrado desde la app pública. |
+---
 
-### Matriz de permisos por colección
+## 🔐 Matriz de permisos por colección
 
-#### 1. `laTaberna_Productos`
+### Leyenda
+
+- **CRUD**: CREATE, READ, UPDATE, DELETE
+- **R/U**: READ, UPDATE
+- **C/R/U**: CREATE, READ, UPDATE
+- **—**: Sin permiso
+
+---
+
+### 1. `laTaberna_Productos`
 
 | Label | Permisos |
 |-------|----------|
-| `master` | CREATE, READ, UPDATE, DELETE |
-| `admin` | CREATE, READ, UPDATE, DELETE |
-| `cocina` | READ |
-| `barra` | READ |
+| `master` | CRUD |
+| `admin` | CRUD |
+| `gerente` | CRUD |
+| `chef` | READ |
+| `cocina_ayudante` | — |
+| `barman` | READ |
+| `barra_ayudante` | — |
 | `mesero` | READ |
-| `despensa` | READ |
-| `eventos` | READ |
+| `caja` | READ |
+| `repartidor` | READ |
+| `artista` | — |
+| `cliente` | READ |
+
+---
+
+### 2. `laTaberna_Pedidos`
+
+| Label | Permisos |
+|-------|----------|
+| `master` | CRUD |
+| `admin` | CRUD |
+| `gerente` | R/U |
+| `chef` | READ |
+| `cocina_ayudante` | — |
+| `barman` | READ |
+| `barra_ayudante` | — |
+| `mesero` | C/R/U |
+| `caja` | READ |
+| `repartidor` | R/U |
+| `artista` | — |
+| `cliente` | READ (propios) |
+
+---
+
+### 3. `laTaberna_Mesas`
+
+| Label | Permisos |
+|-------|----------|
+| `master` | CRUD |
+| `admin` | CRUD |
+| `gerente` | R/U |
+| `chef` | — |
+| `cocina_ayudante` | — |
+| `barman` | — |
+| `barra_ayudante` | — |
+| `mesero` | R/U |
+| `caja` | READ |
+| `repartidor` | — |
+| `artista` | — |
+| `cliente` | READ |
+
+---
+
+### 4. `laTaberna_Comandas`
+
+| Label | Permisos |
+|-------|----------|
+| `master` | CRUD |
+| `admin` | CRUD |
+| `gerente` | R/U |
+| `chef` | R/U |
+| `cocina_ayudante` | R/U |
+| `barman` | R/U |
+| `barra_ayudante` | R/U |
+| `mesero` | C/R |
+| `caja` | — |
+| `repartidor` | READ |
+| `artista` | — |
+| `cliente` | — |
+
+---
+
+### 5. `laTaberna_Insumos`
+
+| Label | Permisos |
+|-------|----------|
+| `master` | CRUD |
+| `admin` | CRUD |
+| `gerente` | CRUD |
+| `chef` | READ |
+| `cocina_ayudante` | — |
+| `barman` | READ |
+| `barra_ayudante` | — |
+| `mesero` | — |
+| `caja` | — |
+| `repartidor` | — |
+| `artista` | — |
+| `cliente` | — |
+
+---
+
+### 6. `laTaberna_Recetas`
+
+| Label | Permisos |
+|-------|----------|
+| `master` | CRUD |
+| `admin` | CRUD |
+| `gerente` | R/U |
+| `chef` | CRUD |
+| `cocina_ayudante` | READ |
+| `barman` | CRUD (barra) |
+| `barra_ayudante` | READ |
+| `mesero` | — |
+| `caja` | — |
+| `repartidor` | — |
+| `artista` | — |
+| `cliente` | — |
+
+---
+
+### 7. `laTaberna_Staff`
+
+| Label | Permisos |
+|-------|----------|
+| `master` | CRUD |
+| `admin` | CRUD |
+| `gerente` | C/R |
+| `chef` | READ |
+| `cocina_ayudante` | READ |
+| `barman` | READ |
+| `barra_ayudante` | READ |
+| `mesero` | READ |
+| `caja` | READ |
+| `repartidor` | READ |
 | `artista` | READ |
-| `reparto` | READ |
 | `cliente` | READ |
 
-#### 2. `laTaberna_Pedidos`
+---
+
+### 8. `laTaberna_Configuracion`
 
 | Label | Permisos |
 |-------|----------|
-| `master` | CREATE, READ, UPDATE, DELETE |
-| `admin` | CREATE, READ, UPDATE, DELETE |
-| `mesero` | CREATE, READ, UPDATE |
-| `cocina` | READ |
-| `barra` | READ |
-| `caja` | READ, UPDATE |
+| `master` | CRUD |
+| `admin` | CRUD |
+| `gerente` | READ |
+| Resto de roles | — |
 
-#### 3. `laTaberna_Mesas`
+---
 
-| Label | Permisos |
-|-------|----------|
-| `master` | CREATE, READ, UPDATE, DELETE |
-| `admin` | CREATE, READ, UPDATE, DELETE |
-| `mesero` | READ, UPDATE |
-| `caja` | READ |
-
-#### 4. `laTaberna_Comandas`
+### 9. `laTaberna_Eventos_en_vivo`
 
 | Label | Permisos |
 |-------|----------|
-| `master` | CREATE, READ, UPDATE, DELETE |
-| `admin` | CREATE, READ, UPDATE, DELETE |
-| `cocina` | READ, UPDATE |
-| `barra` | READ, UPDATE |
-| `mesero` | CREATE, READ |
-
-#### 5. `laTaberna_Insumos`
-
-| Label | Permisos |
-|-------|----------|
-| `master` | CREATE, READ, UPDATE, DELETE |
-| `admin` | CREATE, READ, UPDATE, DELETE |
-| `despensa` | CREATE, READ, UPDATE |
-| `cocina` | READ |
-| `barra` | READ |
-
-#### 6. `laTaberna_Recetas`
-
-| Label | Permisos |
-|-------|----------|
-| `master` | CREATE, READ, UPDATE, DELETE |
-| `admin` | CREATE, READ, UPDATE, DELETE |
-| `cocina` | CREATE, READ, UPDATE |
-| `barra` | CREATE, READ, UPDATE |
-| `despensa` | READ |
-
-#### 7. `laTaberna_Staff`
-
-| Label | Permisos |
-|-------|----------|
-| `master` | CREATE, READ, UPDATE, DELETE |
-| `admin` | CREATE, READ, UPDATE, DELETE |
-
-#### 8. `laTaberna_Configuracion`
-
-| Label | Permisos |
-|-------|----------|
-| `master` | CREATE, READ, UPDATE, DELETE |
-| `admin` | CREATE, READ, UPDATE, DELETE |
-
-#### 9. `laTaberna_Eventos_en_vivo`
-
-| Label | Permisos |
-|-------|----------|
-| `master` | CREATE, READ, UPDATE, DELETE |
-| `admin` | CREATE, READ, UPDATE, DELETE |
-| `eventos` | CREATE, READ, UPDATE |
-| `artista` | READ, UPDATE |
+| `master` | CRUD |
+| `admin` | CRUD |
+| `gerente` | C/R/U |
+| `artista` | R/U |
 | `cliente` | READ |
+| Resto de roles | — |
 
-#### 10. `laTaberna_Menus`
+---
+
+### 10. `laTaberna_Menus`
 
 | Label | Permisos |
 |-------|----------|
-| `master` | CREATE, READ, UPDATE, DELETE |
-| `admin` | CREATE, READ, UPDATE, DELETE |
+| `master` | CRUD |
+| `admin` | CRUD |
+| `gerente` | C/R/U |
 | `mesero` | READ |
 | `cliente` | READ |
+| Resto de roles | — |
 
-#### 11. `laTaberna_Proveedores`
+---
 
-| Label | Permisos |
-|-------|----------|
-| `master` | CREATE, READ, UPDATE, DELETE |
-| `admin` | CREATE, READ, UPDATE, DELETE |
-| `despensa` | CREATE, READ, UPDATE |
-
-#### 12. `laTaberna_Entradas`
+### 11. `laTaberna_Proveedores`
 
 | Label | Permisos |
 |-------|----------|
-| `master` | CREATE, READ, UPDATE, DELETE |
-| `admin` | CREATE, READ, UPDATE, DELETE |
-| `despensa` | CREATE, READ, UPDATE |
-| `cocina` | READ |
-| `barra` | READ |
+| `master` | CRUD |
+| `admin` | CRUD |
+| `gerente` | CRUD |
+| Resto de roles | — |
 
-#### 13. `laTaberna_Comensales`
+---
+
+### 12. `laTaberna_Entradas`
 
 | Label | Permisos |
 |-------|----------|
-| `master` | CREATE, READ, UPDATE, DELETE |
-| `admin` | CREATE, READ, UPDATE, DELETE |
-| `mesero` | CREATE, READ, UPDATE |
+| `master` | CRUD |
+| `admin` | CRUD |
+| `gerente` | CRUD |
+| `chef` | READ |
+| `barman` | READ |
+| Resto de roles | — |
+
+---
+
+### 13. `laTaberna_Comensales`
+
+| Label | Permisos |
+|-------|----------|
+| `master` | CRUD |
+| `admin` | CRUD |
+| `gerente` | C/R/U |
+| `mesero` | C/R/U |
 | `caja` | READ |
-
-#### 14. `global_Perfiles`
-
-| Label | Permisos |
-|-------|----------|
-| `master` | CREATE, READ, UPDATE, DELETE |
-| `admin` | READ, UPDATE |
-| `cocina` | READ |
-| `barra` | READ |
-| `mesero` | READ |
-| `despensa` | READ |
-| `eventos` | READ |
-| `artista` | READ |
-| `reparto` | READ |
-| `caja` | READ |
-| `cliente` | READ, UPDATE |
-
-#### 15. `global_Puntos`
-
-| Label | Permisos |
-|-------|----------|
-| `master` | CREATE, READ, UPDATE, DELETE |
-| `admin` | READ |
-| `cliente` | READ |
-
-#### 16. `global_Eventos`
-
-| Label | Permisos |
-|-------|----------|
-| `master` | CREATE, READ, UPDATE, DELETE |
-| `admin` | CREATE, READ, UPDATE, DELETE |
-| `eventos` | CREATE, READ, UPDATE |
-| `artista` | READ, UPDATE |
-| `cliente` | READ |
-
-#### 17. `global_Espacios`
-
-| Label | Permisos |
-|-------|----------|
-| `master` | CREATE, READ, UPDATE, DELETE |
-| `admin` | READ |
+| Resto de roles | — |
 
 ---
 
@@ -223,9 +272,15 @@ Los permisos se asignan mediante **Labels** de Appwrite. Cada rol tiene asociado
 | `activo` | boolean | Sí | — | `true` |
 | `imagen` | varchar | No | 500 | — |
 | `estado` | enum | Sí | `disponible`, `agotado` | `disponible` |
-| `espacioId` | varchar | No | 100 | `lataberna` |
+| `espacioId` | varchar | No | 100 | — |
 
-**Índices:** `categoria`, `activo`, `destino`
+**Índices:**
+
+| Nombre | Tipo | Columna(s) |
+|--------|------|-----------|
+| `index_categoria` | Key | `categoria` |
+| `index_activo` | Key | `activo` |
+| `index_destino` | Key | `destino` |
 
 ---
 
@@ -254,9 +309,15 @@ Colección unificada para todos los tipos de pedido: local, reparto, retiro y pr
 | `repartidor` | varchar | No | 100 | — |
 | `id_usuario` | varchar | No | 255 | — |
 | `nombre_comensal` | varchar | No | 255 | — |
-| `espacioId` | varchar | No | 100 | `lataberna` |
+| `espacioId` | varchar | No | 100 | — |
 
-**Índices:** `mesa`, `estado`, `tipo`
+**Índices:**
+
+| Nombre | Tipo | Columna(s) |
+|--------|------|-----------|
+| `index_mesa` | Key | `mesa` |
+| `index_estado` | Key | `estado` |
+| `index_tipo` | Key | `tipo` |
 
 ---
 
@@ -276,9 +337,14 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 | `zona` | varchar | No | 100 | `salon` |
 | `esVirtual` | boolean | Sí | — | `false` |
 | `mesasFusionadas` | varchar | No | 500 | — |
-| `espacioId` | varchar | No | 100 | `lataberna` |
+| `espacioId` | varchar | No | 100 | — |
 
-**Índices:** `estado`, `zona`
+**Índices:**
+
+| Nombre | Tipo | Columna(s) |
+|--------|------|-----------|
+| `index_estado` | Key | `estado` |
+| `index_zona` | Key | `zona` |
 
 ---
 
@@ -299,9 +365,15 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 | `ts` | integer | No | — | — |
 | `deliveryId` | varchar | No | 100 | — |
 | `mozo` | varchar | No | 100 | — |
-| `espacioId` | varchar | No | 100 | `lataberna` |
+| `espacioId` | varchar | No | 100 | — |
 
-**Índices:** `estado`, `pedidoId`, `destino`
+**Índices:**
+
+| Nombre | Tipo | Columna(s) |
+|--------|------|-----------|
+| `index_estado` | Key | `estado` |
+| `index_pedidoId` | Key | `pedidoId` |
+| `index_destino` | Key | `destino` |
 
 ---
 
@@ -320,9 +392,14 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 | `stock_minimo` | float | No | — | `0` |
 | `tipo` | enum | Sí | `cocina`, `operativo`, `menaje`, `aseo` | `cocina` |
 | `costo_manual` | float | No | — | `null` |
-| `espacioId` | varchar | No | 100 | `lataberna` |
+| `espacioId` | varchar | No | 100 | — |
 
-**Índices:** `tipo`, `categoria`
+**Índices:**
+
+| Nombre | Tipo | Columna(s) |
+|--------|------|-----------|
+| `index_tipo` | Key | `tipo` |
+| `index_categoria` | Key | `categoria` |
 
 ---
 
@@ -343,9 +420,14 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 | `categoria` | varchar | No | 100 | — |
 | `destino` | varchar | No | 50 | — |
 | `unidadStock` | varchar | No | 50 | — |
-| `espacioId` | varchar | No | 100 | `lataberna` |
+| `espacioId` | varchar | No | 100 | — |
 
-**Índices:** `productoId`, `categoria`
+**Índices:**
+
+| Nombre | Tipo | Columna(s) |
+|--------|------|-----------|
+| `index_productoId` | Key | `productoId` |
+| `index_categoria` | Key | `categoria` |
 
 ---
 
@@ -353,21 +435,29 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 
 **Name:** laTaberna_Staff
 **Table ID:** laTaberna_Staff
-**Propósito:** Personal del restaurante (admin, meseros, cocineros, etc.). Vinculable a perfiles globales.
+**Propósito:** Personal del restaurante con múltiples roles por espacio.
 
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
 |---------|------|:----------:|-------------------|---------|
 | `nombre` | varchar | Sí | 100 | — |
-| `rol` | varchar | Sí | 100 | `cliente` |
 | `usuarioId` | varchar | No | 100 | — |
+| `roles` | varchar | Sí | 16383 | `[]` |
+| `rolPrincipal` | varchar | Sí | 50 | `mesero` |
 | `estado` | enum | Sí | `activo`, `inactivo`, `vacaciones` | `activo` |
 | `fechaIngreso` | datetime | No | — | — |
 | `telefono` | varchar | No | 50 | — |
 | `email` | varchar | No | 255 | — |
 | `notas` | varchar | No | 2000 | — |
-| `espacioId` | varchar | No | 100 | `lataberna` |
+| `tokenVinculacion` | varchar | No | 100 | — |
+| `espacioId` | varchar | No | 100 | — |
 
-**Índices:** `usuarioId`
+**Índices:**
+
+| Nombre | Tipo | Columna(s) |
+|--------|------|-----------|
+| `index_usuarioId_espacioId_unico` | Unique | `usuarioId`, `espacioId` |
+| `index_estado` | Key | `estado` |
+| `index_espacioId` | Key | `espacioId` |
 
 ---
 
@@ -381,7 +471,7 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 |---------|------|:----------:|-------------------|---------|
 | `clave` | varchar | Sí | 100 | — |
 | `valor` | varchar | Sí | 16383 | — |
-| `espacioId` | varchar | No | 100 | `lataberna` |
+| `espacioId` | varchar | No | 100 | — |
 
 ---
 
@@ -396,7 +486,7 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 | `estado` | enum | Sí | `configuracion`, `activo`, `pausado`, `finalizado` | `configuracion` |
 | `datos` | varchar | No | 16383 | — |
 | `creadoPor` | varchar | No | 100 | — |
-| `espacioId` | varchar | No | 100 | `lataberna` |
+| `espacioId` | varchar | No | 100 | — |
 
 ---
 
@@ -414,7 +504,7 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 | `fondo` | varchar | No | 50 | `#1a1a2e` |
 | `tipografia` | varchar | No | 100 | `'Inter', sans-serif` |
 | `grilla` | boolean | No | — | `false` |
-| `espacioId` | varchar | No | 100 | `lataberna` |
+| `espacioId` | varchar | No | 100 | — |
 
 ---
 
@@ -434,7 +524,7 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 | `rubro` | varchar | No | 100 | — |
 | `notas` | varchar | No | 2000 | — |
 | `activo` | boolean | Sí | — | `true` |
-| `espacioId` | varchar | No | 100 | `lataberna` |
+| `espacioId` | varchar | No | 100 | — |
 
 ---
 
@@ -454,9 +544,15 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 | `costo_total` | float | Sí | — | — |
 | `costo_unitario` | float | Sí | — | — |
 | `fecha` | datetime | No | — | — |
-| `espacioId` | varchar | No | 100 | `lataberna` |
+| `espacioId` | varchar | No | 100 | — |
 
-**Índices:** `insumoId`, `proveedorId`, `fecha`
+**Índices:**
+
+| Nombre | Tipo | Columna(s) |
+|--------|------|-----------|
+| `index_insumoId` | Key | `insumoId` |
+| `index_proveedorId` | Key | `proveedorId` |
+| `index_fecha` | Key | `fecha` |
 
 ---
 
@@ -474,20 +570,14 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 | `iniciales` | varchar | No | 4 | — |
 | `activo` | boolean | Sí | — | `true` |
 | `unidoEn` | datetime | No | — | — |
-| `espacioId` | varchar | No | 100 | `lataberna` |
+| `espacioId` | varchar | No | 100 | — |
 
-**Índices:** `mesaId`, `usuarioId`
+**Índices:**
 
----
-
-## 📋 Colecciones obsoletas
-
-Las siguientes colecciones han sido reemplazadas por `laTaberna_Pedidos` unificada y deben eliminarse de Appwrite:
-
-| Colección | Reemplazada por |
-|-----------|-----------------|
-| `laTaberna_Pedidos_delivery` | `laTaberna_Pedidos` con `tipo = reparto` |
-| `laTaberna_Precargas_cliente` | `laTaberna_Pedidos` con `estado = precarga` y `origen = cliente` |
+| Nombre | Tipo | Columna(s) |
+|--------|------|-----------|
+| `index_mesaId` | Key | `mesaId` |
+| `index_usuarioId` | Key | `usuarioId` |
 
 ---
 
@@ -504,6 +594,7 @@ Las siguientes colecciones han sido reemplazadas por `laTaberna_Pedidos` unifica
 | Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
 |---------|------|:----------:|-------------------|---------|
 | `usuarioId` | varchar | Sí | 100 | — |
+| `nombreUsuario` | varchar | Sí | 100 | — |
 | `nombre` | varchar | Sí | 255 | — |
 | `avatar` | varchar | No | 500 | — |
 | `nivel` | integer | Sí | — | `1` |
@@ -514,6 +605,13 @@ Las siguientes colecciones han sido reemplazadas por `laTaberna_Pedidos` unifica
 | `fechaRegistro` | datetime | No | — | — |
 | `bio` | varchar | No | 500 | — |
 | `ultimaActividad` | datetime | No | — | — |
+
+**Índices:**
+
+| Nombre | Tipo | Columna(s) |
+|--------|------|-----------|
+| `index_nombreUsuario_unico` | Unique | `nombreUsuario` |
+| `index_usuarioId_unico` | Unique | `usuarioId` |
 
 ---
 
@@ -533,7 +631,12 @@ Las siguientes colecciones han sido reemplazadas por `laTaberna_Pedidos` unifica
 | `espacioId` | varchar | No | 100 | — |
 | `fecha` | datetime | No | — | — |
 
-**Índices:** `usuarioId`, `app`
+**Índices:**
+
+| Nombre | Tipo | Columna(s) |
+|--------|------|-----------|
+| `index_usuarioId` | Key | `usuarioId` |
+| `index_app` | Key | `app` |
 
 ---
 
@@ -554,7 +657,12 @@ Las siguientes colecciones han sido reemplazadas por `laTaberna_Pedidos` unifica
 | `app` | varchar | No | 50 | — |
 | `espacioId` | varchar | No | 100 | — |
 
-**Índices:** `estado`, `fecha`
+**Índices:**
+
+| Nombre | Tipo | Columna(s) |
+|--------|------|-----------|
+| `index_estado` | Key | `estado` |
+| `index_fecha` | Key | `fecha` |
 
 ---
 
@@ -575,7 +683,21 @@ Las siguientes colecciones han sido reemplazadas por `laTaberna_Pedidos` unifica
 | `pais` | varchar | No | 100 | — |
 | `activo` | boolean | Sí | — | `true` |
 
-**Índices:** `tipo`, `activo`
+**Índices:**
+
+| Nombre | Tipo | Columna(s) |
+|--------|------|-----------|
+| `index_tipo` | Key | `tipo` |
+| `index_activo` | Key | `activo` |
+
+---
+
+## ⚡ Funciones serverless
+
+| Nombre | URL | Descripción |
+|--------|-----|-------------|
+| `registrar-usuario` | `https://6a81573b000d2f0660d5.tor.appwrite.run` | Registro seguro de cuentas del ecosistema. Crea usuario en Appwrite Auth, perfil global y asigna label cliente. |
+| `asignar-rol` | `https://6a6b3c8a003b634646cc.tor.appwrite.run` | Sincroniza labels de roles múltiples en Appwrite Auth según `usuarioId`, `espacioId` y `roles`. También canjea token de vinculación Staff. |
 
 ---
 

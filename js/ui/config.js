@@ -1,11 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/config.js
-   Versión: 3.1.0
+   Versión: 3.2.0
    Propósito: Vista de configuración rediseñada con panel izquierdo,
               gestión de zonas delegada a B1, personal por roles,
               impresoras y contraseñas. Swipe y overlay en móvil.
-              v3.1.0: Zonas extraídas a js/ui/mesas/admin-zonas.js
+              v3.2.0: sección Personal usa renderTabAdmin async.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -74,14 +74,13 @@ const Config = (() => {
   }
 
   function _renderSeccionZonas() {
-    // Delegado al módulo de B1
     renderZonas('sec-zonas');
   }
 
-  function _renderSeccionPersonal() {
+  async function _renderSeccionPersonal() {
     const usuarioActual = Auth.obtenerUsuarioActual();
     const esMaster = Auth.esMasterReal();
-    renderTabAdmin(usuarioActual, esMaster, 'sec-personal');
+    await renderTabAdmin(usuarioActual, esMaster, 'sec-personal');
   }
 
   function _renderSeccionImpresoras() {

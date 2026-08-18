@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — REPOSITORIO JS (ES6)
    Archivo: js/repositorios/pedido-repository.js
-   Versión: 1.1.9
+   Versión: 1.1.12
    Propósito: Implementación local del repositorio de pedidos con
               sincronización directa a Appwrite.
-              v1.1.9: _syncMesa usa _rowId si existe (mesas virtuales).
+              v1.1.12: liberarMesa elimina mesa virtual en Appwrite (M2).
    ================================================================ */
 
 import { DB } from '../db.js';
@@ -14,6 +14,7 @@ import { Store } from '../lib/store.js';
 import { EventBus } from '../lib/eventBus.js';
 import { calcularTotal } from '../utils.js';
 import { mesaVacia } from '../db-core.js';
+import { Auth } from '../auth.js';
 
 const PedidoRepository = {
   async crearPedidoMesa(datos) { throw new Error('No implementado'); },
@@ -31,6 +32,15 @@ const PedidoRepository = {
 };
 
 const PedidoRepositoryLocal = (() => {
+  function _obtenerEspacioId() {
+    try {
+      const local = Auth.obtenerLocalActivo();
+      return local?.id || 'lataberna';
+    } catch {
+      return 'lataberna';
+    }
+  }
+
   function _normalizarFecha(valor) {
     if (!valor) return null;
     if (typeof valor === 'number') return new Date(valor).toISOString();
@@ -49,7 +59,7 @@ const PedidoRepositoryLocal = (() => {
       zona: String(m.zona || 'salon').substring(0, 50),
       mesasFusionadas: Array.isArray(m.mesasFusionadas) ? JSON.stringify(m.mesasFusionadas).substring(0, 500) : String(m.mesasFusionadas || '').substring(0, 500),
       esVirtual: Boolean(m.esVirtual),
-      espacioId: String(m.espacioId || '').substring(0, 100)
+      espacioId: String(m.espacioId || _obtenerEspacioId()).substring(0, 100)
     };
   }
 
@@ -61,6 +71,7 @@ const PedidoRepositoryLocal = (() => {
     if (Array.isArray(data.transacciones)) data.transacciones = JSON.stringify(data.transacciones).substring(0, 5000);
     else data.transacciones = String(data.transacciones || '[]').substring(0, 5000);
     data.comensales = Number(data.comensales) || 1;
+    data.espacioId = String(data.espacioId || _obtenerEspacioId()).substring(0, 100);
     return data;
   }
 
@@ -70,6 +81,7 @@ const PedidoRepositoryLocal = (() => {
     if (Array.isArray(data.items)) data.items = JSON.stringify(data.items).substring(0, 5000);
     else data.items = String(data.items || '[]').substring(0, 5000);
     data.subcomandas = typeof data.subcomandas === 'string' ? data.subcomandas : JSON.stringify(data.subcomandas || {});
+    data.espacioId = String(data.espacioId || _obtenerEspacioId()).substring(0, 100);
     return data;
   }
 
@@ -94,30 +106,38 @@ const PedidoRepositoryLocal = (() => {
   }
 
   async function _syncMesa(mesa) {
-    if (!mesa || mesa.esVirtual) return;
-    const rowIdRaw = mesa._rowId || mesa.numero;
-    let rowId = String(rowIdRaw || '');
+    if (!mesa || mesa.esVirtual) return true;
+
+    let rowId = String(mesa._rowId || mesa.numero || '');
     if (!rowId || rowId.length > 36 || /[^a-zA-Z0-9._-]/.test(rowId)) {
       Logger.warn('[Repo] _syncMesa: rowId inválido detectado, normalizando. Original: "' + rowId + '" (longitud: ' + rowId.length + ')');
       rowId = rowId.substring(0, 36).replace(/[^a-zA-Z0-9._-]/g, '_');
       if (!rowId) {
-        Logger.error('[Repo] _syncMesa: no se pudo generar un rowId válido a partir de mesa.numero. Omitiendo sincronización.');
-        return;
+        Logger.error('[Repo] _syncMesa: no se pudo generar un rowId válido. Omitiendo sincronización.');
+        return false;
       }
     }
+
     const datos = _sanitizarMesa(mesa);
-    if (!DBAppwrite || !DBAppwrite.habilitado) return;
+    if (!DBAppwrite || !DBAppwrite.habilitado) return true;
+
     Logger.debug('[Repo] _syncMesa: sincronizando mesa ' + rowId + ' (estado: ' + mesa.estado + ')');
+
     try {
-      await DBAppwrite.crear('mesas', rowId, datos);
+      await DBAppwrite.actualizar('mesas', rowId, datos);
+      return true;
     } catch (e) {
-      if (e.code === 409) {
-        try { await DBAppwrite.actualizar('mesas', rowId, datos); } catch (e2) {
-          Logger.error('[Repo] Error al actualizar mesa existente:', e2);
+      if (e.code === 404) {
+        try {
+          await DBAppwrite.crear('mesas', rowId, datos);
+          return true;
+        } catch (e2) {
+          Logger.error('[Repo] Error al crear mesa tras 404:', e2);
+          return false;
         }
-      } else {
-        Logger.error('[Repo] Error al crear mesa en Appwrite:', e);
       }
+      Logger.error('[Repo] Error al actualizar mesa en Appwrite:', e);
+      return false;
     }
   }
 
@@ -161,6 +181,7 @@ const PedidoRepositoryLocal = (() => {
     pedidoLocal.transacciones = [];
     pedidoLocal.tipo = 'local';
     pedidoLocal.origen = 'staff';
+    pedidoLocal.espacioId = _obtenerEspacioId();
     mesa.pedidoId = pedidoLocal.id;
     DB.saveMesas();
 
@@ -190,7 +211,8 @@ const PedidoRepositoryLocal = (() => {
         id: 'kds_' + Date.now() + '_' + Math.random().toString(36).substr(2,6),
         mesa: mesa.numero, mozo: mozoActivo, destino: destinoKds,
         items: items.map(it => ({ ...it })), observaciones: observaciones || '', estado: 'nueva', ts: Date.now(),
-        pedidoId: mesa.pedidoId || null, subcomandas: {}
+        pedidoId: mesa.pedidoId || null, subcomandas: {},
+        espacioId: _obtenerEspacioId()
       };
       DB.comandas.push(comanda);
       return comanda;
@@ -215,7 +237,8 @@ const PedidoRepositoryLocal = (() => {
         total: calcularTotal(itemsActuales),
         mozo: mozoActivo,
         comensales: comensalesActivos,
-        observaciones: observaciones || ''
+        observaciones: observaciones || '',
+        espacioId: _obtenerEspacioId()
       });
     }
 
@@ -235,6 +258,7 @@ const PedidoRepositoryLocal = (() => {
     pedidoLocal.transacciones = [];
     pedidoLocal.tipo = datos.tipo || 'local';
     pedidoLocal.origen = datos.origen || 'staff';
+    pedidoLocal.espacioId = _obtenerEspacioId();
     await _syncPedido(pedidoLocal, true);
     return pedidoLocal;
   }
@@ -389,7 +413,8 @@ const PedidoRepositoryLocal = (() => {
     if (existente) throw new Error(`Ya existe una mesa con el número ${datosMesa.numero}`);
     DB.mesas.push(datosMesa);
     DB.saveMesas();
-    await _syncMesa(datosMesa);
+    const ok = await _syncMesa(datosMesa);
+    if (!ok) throw new Error('No se pudo crear la mesa en Appwrite');
     return datosMesa;
   }
 
@@ -400,6 +425,17 @@ const PedidoRepositoryLocal = (() => {
 
     if (mesa.estado !== 'ocupada' && mesa.estado !== 'pagada' && !mesa.esVirtual) {
       throw new Error(`La mesa ${numeroMesa} no se puede liberar en su estado actual (${mesa.estado})`);
+    }
+
+    // Eliminar mesa virtual en Appwrite si aplica
+    if (mesa.esVirtual && DBAppwrite && DBAppwrite.habilitado) {
+      const rowIdVirtual = mesa._rowId || mesa.numero;
+      try {
+        await DBAppwrite.eliminar('mesas', String(rowIdVirtual));
+        Logger.info('[Repo] Mesa virtual ' + rowIdVirtual + ' eliminada en Appwrite.');
+      } catch (e) {
+        Logger.warn('[Repo] No se pudo eliminar mesa virtual en Appwrite:', e);
+      }
     }
 
     if (mesa.esVirtual) {
@@ -419,11 +455,16 @@ const PedidoRepositoryLocal = (() => {
 
     if (!mesa.esVirtual) {
       const mesaActualizada = DB.mesas.find(m => m.numero == numeroMesa);
-      if (mesaActualizada) await _syncMesa(mesaActualizada);
+      if (!mesaActualizada) throw new Error('No se encontró la mesa actualizada para sincronizar');
+      const sincronizado = await _syncMesa(mesaActualizada);
+      if (!sincronizado) throw new Error('No se pudo sincronizar la mesa liberada con Appwrite');
     } else {
       for (const num of mesa.mesasFusionadas || []) {
         const m = DB.mesas.find(x => x.numero === num);
-        if (m) await _syncMesa(m);
+        if (m) {
+          const sincronizado = await _syncMesa(m);
+          if (!sincronizado) throw new Error('No se pudo sincronizar mesa fusionada con Appwrite');
+        }
       }
     }
 

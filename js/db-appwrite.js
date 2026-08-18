@@ -1,11 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-appwrite.js
-   Versión: 1.5.0
+   Versión: 1.7.2
    Propósito: Cliente de Appwrite (API TablesDB), Realtime y operadores.
               Soporte multi-espacio con espacioId dinámico.
-              Colecciones globales exentas de filtro.
-              v1.5.0: renombrada colección usuarios → staff.
+              v1.7.2: consulta staff por usuario+espacio sin and (M1).
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -67,9 +66,7 @@ export const DBAppwrite = (function() {
     const actualizado = datos.$updatedAt || null;
 
     Object.keys(datos).forEach(function(clave) {
-      if (clave.startsWith('$')) {
-        delete datos[clave];
-      }
+      if (clave.startsWith('$')) delete datos[clave];
     });
 
     datos.id = fila.$id;
@@ -123,6 +120,7 @@ export const DBAppwrite = (function() {
           queries.push(Appwrite.Query.equal('espacioId', espacio.id));
         }
       }
+      queries.push(Appwrite.Query.limit(100));
 
       const respuesta = await modulo.baseDeDatos.listRows({
         databaseId: modulo.idBaseDeDatos,
@@ -161,19 +159,13 @@ export const DBAppwrite = (function() {
         data: datosLimpios
       };
 
-      if (permisos && Array.isArray(permisos) && permisos.length > 0) {
-        params.permissions = permisos;
-      }
-      if (idTransaccion) {
-        params.transactionId = idTransaccion;
-      }
+      if (permisos && Array.isArray(permisos) && permisos.length > 0) params.permissions = permisos;
+      if (idTransaccion) params.transactionId = idTransaccion;
 
       const respuesta = await modulo.baseDeDatos.createRow(params);
       return _limpiarFila(respuesta);
     } catch (e) {
-      if (e.code !== 409) {
-        Logger.error('[Appwrite] Error al crear en ' + coleccion + ':', e);
-      }
+      if (e.code !== 409) Logger.error('[Appwrite] Error al crear en ' + coleccion + ':', e);
       return null;
     }
   };
@@ -195,16 +187,12 @@ export const DBAppwrite = (function() {
         data: cambiosLimpios
       };
 
-      if (idTransaccion) {
-        params.transactionId = idTransaccion;
-      }
+      if (idTransaccion) params.transactionId = idTransaccion;
 
       const respuesta = await modulo.baseDeDatos.updateRow(params);
       return _limpiarFila(respuesta);
     } catch (e) {
-      if (e.code !== 404) {
-        Logger.error('[Appwrite] Error al actualizar ' + coleccion + ':', e);
-      }
+      if (e.code !== 404) Logger.error('[Appwrite] Error al actualizar ' + coleccion + ':', e);
       return null;
     }
   };
@@ -217,11 +205,7 @@ export const DBAppwrite = (function() {
         tableId: modulo.COLECCIONES[coleccion],
         rowId: id
       };
-
-      if (idTransaccion) {
-        params.transactionId = idTransaccion;
-      }
-
+      if (idTransaccion) params.transactionId = idTransaccion;
       await modulo.baseDeDatos.deleteRow(params);
       return true;
     } catch (e) {
@@ -242,7 +226,6 @@ export const DBAppwrite = (function() {
       };
       if (maximo !== undefined) params.max = maximo;
       if (idTransaccion) params.transactionId = idTransaccion;
-
       return await modulo.baseDeDatos.incrementRowColumn(params);
     } catch (e) {
       Logger.error('[Appwrite] Error al incrementar ' + columna + ':', e);
@@ -262,7 +245,6 @@ export const DBAppwrite = (function() {
       };
       if (minimo !== undefined) params.min = minimo;
       if (idTransaccion) params.transactionId = idTransaccion;
-
       return await modulo.baseDeDatos.decrementRowColumn(params);
     } catch (e) {
       Logger.error('[Appwrite] Error al decrementar ' + columna + ':', e);
@@ -280,7 +262,6 @@ export const DBAppwrite = (function() {
         data: datosConOperadores
       };
       if (idTransaccion) params.transactionId = idTransaccion;
-
       const respuesta = await modulo.baseDeDatos.updateRow(params);
       return _limpiarFila(respuesta);
     } catch (e) {
@@ -291,40 +272,124 @@ export const DBAppwrite = (function() {
 
   modulo.crearTransaccion = async function() {
     if (!modulo.habilitado || !modulo.baseDeDatos) return null;
-    try {
-      const tx = await modulo.baseDeDatos.createTransaction();
-      return tx;
-    } catch (e) {
-      Logger.error('[Appwrite] Error al crear transacción:', e);
-      return null;
-    }
+    try { return await modulo.baseDeDatos.createTransaction(); }
+    catch (e) { Logger.error('[Appwrite] Error al crear transacción:', e); return null; }
   };
 
   modulo.confirmarTransaccion = async function(idTransaccion) {
     if (!modulo.habilitado || !modulo.baseDeDatos) return false;
     try {
-      await modulo.baseDeDatos.updateTransaction({
-        transactionId: idTransaccion,
-        commit: true
-      });
+      await modulo.baseDeDatos.updateTransaction({ transactionId: idTransaccion, commit: true });
       return true;
-    } catch (e) {
-      Logger.error('[Appwrite] Error al confirmar transacción:', e);
-      return false;
-    }
+    } catch (e) { Logger.error('[Appwrite] Error al confirmar transacción:', e); return false; }
   };
 
   modulo.cancelarTransaccion = async function(idTransaccion) {
     if (!modulo.habilitado || !modulo.baseDeDatos) return false;
     try {
-      await modulo.baseDeDatos.updateTransaction({
-        transactionId: idTransaccion,
-        rollback: true
-      });
+      await modulo.baseDeDatos.updateTransaction({ transactionId: idTransaccion, rollback: true });
       return true;
+    } catch (e) { Logger.error('[Appwrite] Error al cancelar transacción:', e); return false; }
+  };
+
+  /* ── CONSULTAS ESPECÍFICAS ──────────────────────────────── */
+
+  function _parsearRoles(staff) {
+    if (!staff) return null;
+    try {
+      if (typeof staff.roles === 'string') staff.roles = JSON.parse(staff.roles || '[]');
+    } catch { staff.roles = []; }
+    return staff;
+  }
+
+  modulo.obtenerPerfilPorNombreUsuario = async function(nombreUsuario) {
+    if (!modulo.habilitado || !modulo.baseDeDatos) return null;
+    try {
+      const respuesta = await modulo.baseDeDatos.listRows({
+        databaseId: modulo.idBaseDeDatos,
+        tableId: modulo.COLECCIONES.global_perfiles,
+        queries: [
+          Appwrite.Query.equal('nombreUsuario', nombreUsuario),
+          Appwrite.Query.limit(100)
+        ]
+      });
+      return respuesta.rows.map(_limpiarFila)[0] || null;
     } catch (e) {
-      Logger.error('[Appwrite] Error al cancelar transacción:', e);
-      return false;
+      Logger.error('[Appwrite] Error al buscar perfil por nombreUsuario:', e);
+      return null;
+    }
+  };
+
+  modulo.obtenerPerfilPorUsuarioId = async function(usuarioId) {
+    if (!modulo.habilitado || !modulo.baseDeDatos) return null;
+    try {
+      const respuesta = await modulo.baseDeDatos.listRows({
+        databaseId: modulo.idBaseDeDatos,
+        tableId: modulo.COLECCIONES.global_perfiles,
+        queries: [
+          Appwrite.Query.equal('usuarioId', usuarioId),
+          Appwrite.Query.limit(100)
+        ]
+      });
+      return respuesta.rows.map(_limpiarFila)[0] || null;
+    } catch (e) {
+      Logger.error('[Appwrite] Error al buscar perfil por usuarioId:', e);
+      return null;
+    }
+  };
+
+  modulo.obtenerStaffPorUsuarioEspacio = async function(usuarioId, espacioId) {
+    if (!modulo.habilitado || !modulo.baseDeDatos) return null;
+    try {
+      const respuesta = await modulo.baseDeDatos.listRows({
+        databaseId: modulo.idBaseDeDatos,
+        tableId: modulo.COLECCIONES.staff,
+        queries: [
+          Appwrite.Query.equal('usuarioId', usuarioId),
+          Appwrite.Query.equal('espacioId', espacioId),
+          Appwrite.Query.limit(100)
+        ]
+      });
+      return _parsearRoles(respuesta.rows.map(_limpiarFila)[0] || null);
+    } catch (e) {
+      Logger.error('[Appwrite] Error al obtener staff por usuario+espacio:', e);
+      return null;
+    }
+  };
+
+  modulo.obtenerStaffPorEspacio = async function(espacioId) {
+    if (!modulo.habilitado || !modulo.baseDeDatos) return [];
+    try {
+      const respuesta = await modulo.baseDeDatos.listRows({
+        databaseId: modulo.idBaseDeDatos,
+        tableId: modulo.COLECCIONES.staff,
+        queries: [
+          Appwrite.Query.equal('espacioId', espacioId),
+          Appwrite.Query.limit(100)
+        ]
+      });
+      return respuesta.rows.map(_limpiarFila).map(_parsearRoles);
+    } catch (e) {
+      Logger.error('[Appwrite] Error al obtener staff por espacio:', e);
+      return [];
+    }
+  };
+
+  modulo.buscarStaffPorToken = async function(token) {
+    if (!modulo.habilitado || !modulo.baseDeDatos) return null;
+    try {
+      const respuesta = await modulo.baseDeDatos.listRows({
+        databaseId: modulo.idBaseDeDatos,
+        tableId: modulo.COLECCIONES.staff,
+        queries: [
+          Appwrite.Query.equal('tokenVinculacion', token),
+          Appwrite.Query.limit(100)
+        ]
+      });
+      return _parsearRoles(respuesta.rows.map(_limpiarFila)[0] || null);
+    } catch (e) {
+      Logger.error('[Appwrite] Error al buscar staff por token:', e);
+      return null;
     }
   };
 
@@ -355,7 +420,6 @@ export const DBAppwrite = (function() {
           let tipo = 'update';
           if (payload.events.includes('create')) tipo = 'create';
           else if (payload.events.includes('delete')) tipo = 'delete';
-
           _callbacksRealtime.forEach(function(cb) { cb(coleccion, tipo, payload.payload); });
         });
       });
@@ -369,29 +433,17 @@ export const DBAppwrite = (function() {
     if (!modulo.habilitado) return;
     modulo.suscribirRealtime(function(coleccion, tipo, payload) {
       if (!payload || !payload.$id) return;
-
       modulo.baseDeDatos.getRow({
         databaseId: modulo.idBaseDeDatos,
         tableId: modulo.COLECCIONES[coleccion],
         rowId: payload.$id
       }).then(function(doc) {
         const datos = _limpiarFila(doc);
-
-        EventBus.emit('realtime:documento_actualizado', {
-          coleccion: coleccion,
-          tipo: tipo,
-          datos: datos
-        });
-
-        if (coleccion === 'pedidos') {
-          EventBus.emit('sincronizacion:completada');
-        } else if (coleccion === 'comandas') {
-          EventBus.emit('comanda:enviada', datos);
-        } else if (coleccion === 'mesas') {
-          EventBus.emit('mesa:actualizada', { mesa: datos.numero, estado: datos.estado });
-        } else {
-          EventBus.emit(coleccion + ':actualizada', datos);
-        }
+        EventBus.emit('realtime:documento_actualizado', { coleccion, tipo, datos });
+        if (coleccion === 'pedidos') EventBus.emit('sincronizacion:completada');
+        else if (coleccion === 'comandas') EventBus.emit('comanda:enviada', datos);
+        else if (coleccion === 'mesas') EventBus.emit('mesa:actualizada', { mesa: datos.numero, estado: datos.estado });
+        else EventBus.emit(coleccion + ':actualizada', datos);
       }).catch(function(e) {
         Logger.warn('[Realtime] Error al obtener fila de ' + coleccion + ':', e);
       });

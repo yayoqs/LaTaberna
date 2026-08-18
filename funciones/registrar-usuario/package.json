@@ -1,0 +1,8 @@
+{
+  "name": "registrar-usuario",
+  "version": "1.1.0",
+  "type": "module",
+  "dependencies": {
+    "node-appwrite": "^22.1.3"
+  }
+}

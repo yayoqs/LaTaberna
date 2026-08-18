@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — Módulo (ES6)
    Archivo: js/modulos/cliente/pantalla-inicio.js
-   Versión: 2.1.6
+   Versión: 2.1.7
    Propósito: Pantalla de inicio con triángulo neón, cabecera,
              vitrinas con imagen, títulos de sección y modal expansivo.
-             Botón del modal ahora llama a _mostrarLogin().
+             Adaptado a Auth v2.0.1: registro solo vía modal de Auth.
    ================================================================ */
 
 import { Auth } from '../../auth.js';
@@ -201,6 +201,8 @@ const PantallaInicio = (() => {
     _cbLoginCorner = () => _mostrarLogin();
 
     document.getElementById('btnLoginCorner').addEventListener('click', _cbLoginCorner);
+    // El enlace Registrarse del triángulo no tiene acción.
+    // El registro se realiza desde el modal de Auth v2.0.1.
 
     _iniciarEsloganDinamico();
     _conectarModalPortal();
@@ -270,7 +272,7 @@ const PantallaInicio = (() => {
 
     _cbModalAction = () => {
       modal.classList.remove('active');
-      _mostrarLogin();  // ← Ahora abre el modal de login
+      _mostrarLogin();
     };
     mActionBtn.addEventListener('click', _cbModalAction);
   }

@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/kds.css
-   Versión: 3.0.0
+   Versión: 3.1.0
    Propósito: Estilos para la vista del Jefe de Cocina/Barra.
               Encapsulado bajo #view-cocina. Sin :root.
+              v3.1.0: añadidos chips de destino (Cocina/Barra/Todas).
    ================================================================ */
 
 /* ── Filtros ────────────────────────────────── */
@@ -31,6 +32,41 @@
   background: var(--color-accent);
   color: #000;
   border-color: var(--color-accent);
+}
+
+/* ── Filtro de destino (Cocina/Barra/Todas) ── */
+#view-cocina .kds-filtro-destino {
+  display: flex;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+  overflow-x: auto;
+}
+#view-cocina .kds-chip-destino {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-sec);
+  padding: 5px 13px;
+  border-radius: 99px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: var(--t);
+}
+#view-cocina .kds-chip-destino.activo {
+  color: #000;
+  border-color: transparent;
+}
+#view-cocina .kds-chip-destino[data-destino="todas"].activo {
+  background: var(--color-accent);
+}
+#view-cocina .kds-chip-destino[data-destino="cocina"].activo {
+  background: var(--color-cocina);
+}
+#view-cocina .kds-chip-destino[data-destino="barra"].activo {
+  background: var(--color-barra);
 }
 
 /* ── Pestañas de estado ─────────────────────── */
@@ -326,3 +362,14 @@
   transition: var(--t);
 }
 #view-cocina .kds-boton-reabrir:active { background: var(--color-info); color: #04122b; }
+
+/* ── Accesibilidad ──────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  #view-cocina .kds-ticket,
+  #view-cocina .kds-ticket-tiempo.t-peligro,
+  #view-cocina .kds-chip,
+  #view-cocina .kds-chip-destino {
+    animation: none !important;
+    transition: none !important;
+  }
+}

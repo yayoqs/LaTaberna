@@ -1,12 +1,13 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/kds.js
-   Versión: 5.0.5
+   Versión: 5.1.0
    Propósito: Vista del Jefe de Cocina/Barra. Gestión de comandas con
               pestañas de estado, filtros, progreso, checkeo de ítems,
               swipe entre pestañas, acceso rápido a receta (toque largo)
               y preparación para modo Ayudante (solo lectura).
-              v5.0.5: validación defensiva en touchstart del swipe.
+              v5.1.0: soporte de roles múltiples (obtenerRolesEfectivos)
+                      y control visual Cocina/Barra/Todas.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -24,6 +25,7 @@ let _activada = false;
 let _canceladores = [];
 let _filtroActivo = 'todos';
 let _estadoActivo = 'nueva';
+let _vistaDestino = 'todas';
 let _ctxAudio = null;
 let _comandas = [];
 
@@ -97,6 +99,11 @@ function _construirVista(main) {
       <span class="kds-chip" data-filtro="mesa">Mesa</span>
       <span class="kds-chip" data-filtro="reparto">Reparto</span>
     </div>
+    <div class="kds-filtro-destino" id="kds-filtro-destino" style="display:none;">
+      <span class="kds-chip-destino activo" data-destino="todas">Todas</span>
+      <span class="kds-chip-destino" data-destino="cocina">Cocina</span>
+      <span class="kds-chip-destino" data-destino="barra">Barra</span>
+    </div>
     <div class="kds-pestanas" id="kds-pestanas">
       <div class="kds-pestana activo" data-estado="nueva"><b id="kds-num-nuevas">0</b><span>Nuevas</span></div>
       <div class="kds-pestana" data-estado="en-proceso"><b id="kds-num-proceso">0</b><span>En preparación</span></div>
@@ -113,6 +120,15 @@ function _construirVista(main) {
     chip.classList.add('activo');
     _filtroActivo = chip.dataset.filtro;
     _pintar();
+  });
+
+  document.getElementById('kds-filtro-destino').addEventListener('click', e => {
+    const chip = e.target.closest('.kds-chip-destino');
+    if (!chip) return;
+    document.querySelectorAll('#kds-filtro-destino .kds-chip-destino').forEach(c => c.classList.remove('activo'));
+    chip.classList.add('activo');
+    _vistaDestino = chip.dataset.destino;
+    recargar();
   });
 
   document.getElementById('kds-pestanas').addEventListener('click', e => {
@@ -338,7 +354,11 @@ function recargar() {
 
   const state = Store.obtenerEstado();
   const ahora = Date.now();
-  const rol = Auth.obtenerRol();
+  const roles = Auth.obtenerRolesEfectivos();
+
+  const veCocina = roles.some(rol => ['chef', 'cocinaAyudante', 'admin', 'master', 'gerente'].includes(rol));
+  const veBarra = roles.some(rol => ['barman', 'barraAyudante', 'admin', 'master', 'gerente'].includes(rol));
+
   let comandas = state.comandas || [];
 
   const procesadas = [];
@@ -352,15 +372,46 @@ function recargar() {
       procesadas.push(c);
     }
   });
+
   comandas = procesadas.filter(c => {
     if (c.estado === 'lista') return (ahora - (c.ts || 0)) < MINUTOS_OCULTAR_LISTA * 60 * 1000;
     return true;
   });
-  if (rol === 'cocina') comandas = comandas.filter(c => c.destino === 'cocina');
-  else if (rol === 'barra') comandas = comandas.filter(c => c.destino === 'barra');
+
+  if (veCocina && veBarra) {
+    if (_vistaDestino === 'cocina') {
+      comandas = comandas.filter(c => c.destino === 'cocina');
+    } else if (_vistaDestino === 'barra') {
+      comandas = comandas.filter(c => c.destino === 'barra');
+    }
+    // 'todas' no filtra por destino
+  } else if (veCocina) {
+    comandas = comandas.filter(c => c.destino === 'cocina');
+    _vistaDestino = 'cocina';
+  } else if (veBarra) {
+    comandas = comandas.filter(c => c.destino === 'barra');
+    _vistaDestino = 'barra';
+  } else {
+    comandas = [];
+    _vistaDestino = 'todas';
+  }
 
   _comandas = comandas;
+  _actualizarControlDestino(veCocina, veBarra);
   _pintar();
+}
+
+function _actualizarControlDestino(veCocina, veBarra) {
+  const cont = document.getElementById('kds-filtro-destino');
+  if (!cont) return;
+  if (veCocina && veBarra) {
+    cont.style.display = 'flex';
+    cont.querySelectorAll('.kds-chip-destino').forEach(chip => {
+      chip.classList.toggle('activo', chip.dataset.destino === _vistaDestino);
+    });
+  } else {
+    cont.style.display = 'none';
+  }
 }
 
 /* ─── Ciclo de vida ─────────────────────────── */

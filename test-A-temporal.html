@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test Temporal — Depurar liberación de mesa</title>
+  <style>
+    body { font-family: monospace; background: #111827; color: #f9fafb; padding: 30px; line-height: 1.5; }
+    h1 { color: #f59e0b; }
+    button { background: #f59e0b; color: #000; border: none; padding: 12px 24px; font-weight: bold; border-radius: 6px; cursor: pointer; font-family: monospace; margin: 10px 0; }
+    .info { background: rgba(59,130,246,.15); border-left: 4px solid #3b82f6; padding: 8px 12px; border-radius: 6px; margin: 6px 0; }
+    .pass { background: rgba(16,185,129,.15); border-left: 4px solid #10b981; padding: 8px 12px; border-radius: 6px; margin: 6px 0; }
+    .fail { background: rgba(239,68,68,.15); border-left: 4px solid #ef4444; padding: 8px 12px; border-radius: 6px; margin: 6px 0; }
+    pre { background: #000; padding: 12px; white-space: pre-wrap; word-wrap: break-word; border-radius: 6px; font-size: 12px; margin: 8px 0; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test Temporal — Depurar liberación de mesa</h1>
+  <p>Investiga por qué la mesa no queda libre en Appwrite tras liberarMesa.</p>
+
+  <button id="btnProbar">⚡ Probar diagnóstico</button>
+
+  <div id="resultado"></div>
+
+  <script src="/js/appwrite.min.js"></script>
+
+  <script type="module">
+    import { Logger } from './js/lib/logger.js';
+    import { CommandBus } from './js/lib/command-bus.js';
+    import { Deps } from './js/lib/deps.js';
+    import { DBAppwrite } from './js/db-appwrite.js';
+    import { DB } from './js/db.js';
+    import { Auth } from './js/auth.js';
+    import { inicializarAuth } from './js/auth.js';
+    import { PedidoManager } from './js/managers/pedido-manager.js';
+    import { PedidoRepositoryLocal } from './js/repositorios/pedido-repository.js';
+    import './js/comandos/agregar-mesa.js';
+    import './js/comandos/crear-pedido-mesa.js';
+    import './js/comandos/enviar-comanda.js';
+    import './js/comandos/liberar-mesa.js';
+    import './js/comandos/completar-subcomanda.js';
+
+    const res = document.getElementById('resultado');
+
+    function log(tipo, msg) {
+      const div = document.createElement('div');
+      div.className = tipo;
+      div.textContent = msg;
+      res.appendChild(div);
+    }
+
+    function pre(obj) {
+      const el = document.createElement('pre');
+      el.textContent = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
+      res.appendChild(el);
+    }
+
+    const esperar = ms => new Promise(r => setTimeout(r, ms));
+
+    async function diagnosticar() {
+      res.innerHTML = '';
+      Logger.setLevel('ERROR');
+      await inicializarAuth();
+      await DBAppwrite.iniciar();
+
+      try { await Auth.cerrarSesion(); } catch {}
+      await Auth.iniciarSesion('master', 'master123');
+      log('info', 'Master autenticado');
+
+      await DB.init();
+      PedidoManager.init({ pedidoRepo: PedidoRepositoryLocal });
+      Deps.registrar('pedidoRepo', PedidoRepositoryLocal);
+      Deps.registrar('inventarioService', { validarStockParaArticulos: () => ({ ok: true, faltantes: [] }) });
+
+      const espacioId = Auth.obtenerLocalActivo()?.id || 'lataberna';
+      log('info', 'Espacio activo: ' + espacioId);
+
+      const numMesa = 'test_liberar_' + Date.now();
+      log('info', 'Creando mesa ' + numMesa);
+
+      await CommandBus.ejecutar({ type: 'agregarMesa', datos: { numero: numMesa, zona: 'salon' } });
+      await esperar(500);
+
+      log('info', 'Creando pedido');
+      const rPedido = await CommandBus.ejecutar({ type: 'crearPedidoMesa', datos: { numeroMesa: numMesa, mozo: 'Test', comensales: 2 } });
+      const pedidoId = rPedido.data?.id;
+      await esperar(500);
+
+      log('info', 'Enviando comanda');
+      const item = { prodId: 'prod_test', nombre: 'Hamburguesa', precio: 1500, qty: 1, destino: 'cocina', obs: '', enviado: false };
+      await DB.actualizarPedido(pedidoId, { items: [item] });
+      const mesaParaComanda = (await DBAppwrite.listar('mesas')).find(m => m.numero === numMesa);
+      const rComanda = await CommandBus.ejecutar({ type: 'enviarComanda', datos: { mesa: mesaParaComanda, mozo: 'Test', comensales: 2, observaciones: '', itemsPendientes: [item] } });
+      const comanda = rComanda.data?.comandas?.[0];
+      await esperar(500);
+
+      log('info', 'Completando subcomanda');
+      await CommandBus.ejecutar({ type: 'completarSubcomanda', datos: { idOriginal: comanda.id, destino: 'cocina' } });
+      await esperar(500);
+
+      log('info', 'Liberando mesa');
+      const rLiberar = await CommandBus.ejecutar({ type: 'liberarMesa', datos: { numeroMesa: numMesa } });
+      log('info', 'Resultado liberar: ' + JSON.stringify(rLiberar));
+      await esperar(1000);
+
+      // Estado local
+      const mesaLocal = DB.mesas.find(m => m.numero === numMesa);
+      log('info', 'Mesa local: ' + JSON.stringify(mesaLocal));
+
+      // Estado en Appwrite filtrado
+      const mesasFiltradas = await DBAppwrite.listar('mesas');
+      const mesaFiltrada = mesasFiltradas.find(m => m.numero === numMesa);
+      log('info', 'Mesa filtrada: ' + JSON.stringify(mesaFiltrada));
+
+      // Estado global sin filtro
+      try {
+        const todas = await DBAppwrite.baseDeDatos.listRows({
+          databaseId: DBAppwrite.idBaseDeDatos,
+          tableId: DBAppwrite.COLECCIONES.mesas,
+          queries: [Appwrite.Query.limit(100)]
+        });
+        const filaGlobal = todas.rows.find(r => r.$id === numMesa || r.data?.numero === numMesa);
+        log('info', 'Fila global: ' + JSON.stringify(filaGlobal));
+        if (filaGlobal) pre(filaGlobal);
+      } catch (e) {
+        log('fail', 'Error consulta global: ' + e.message);
+      }
+
+      // Espera adicional y reverificar
+      await esperar(3000);
+      const mesasFiltradas2 = await DBAppwrite.listar('mesas');
+      const mesaFiltrada2 = mesasFiltradas2.find(m => m.numero === numMesa);
+      log('info', 'Mesa después de 3s: ' + JSON.stringify(mesaFiltrada2));
+    }
+
+    document.getElementById('btnProbar').addEventListener('click', diagnosticar);
+  </script>
+</body>
+</html>

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test A — Exploración de Base de Datos</title>
+  <style>
+    body { font-family: monospace; background: #111827; color: #f9fafb; padding: 30px; line-height: 1.5; }
+    h1 { color: #f59e0b; }
+    h2 { color: #60a5fa; margin-top: 20px; }
+    .info { background: rgba(59,130,246,.15); border-left: 4px solid #3b82f6; padding: 8px 12px; border-radius: 6px; margin: 6px 0; }
+    .warn { background: rgba(239,68,68,.15); border-left: 4px solid #ef4444; padding: 8px 12px; border-radius: 6px; margin: 6px 0; }
+    pre { background: #000; padding: 12px; white-space: pre-wrap; word-wrap: break-word; border-radius: 6px; font-size: 12px; margin: 8px 0; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test A — Exploración de Base de Datos</h1>
+  <p>Muestra el estado real de colecciones, columnas y permisos sin emitir fallos.</p>
+  <div id="results"></div>
+
+  <script src="/js/appwrite.min.js"></script>
+
+  <script type="module">
+    import { Logger } from './js/lib/logger.js';
+    import { DBAppwrite } from './js/db-appwrite.js';
+    import { DB } from './js/db.js';
+    import { Auth } from './js/auth.js';
+    import { inicializarAuth } from './js/auth.js';
+
+    const resultsEl = document.getElementById('results');
+
+    function info(msg) {
+      const div = document.createElement('div');
+      div.className = 'info';
+      div.textContent = msg;
+      resultsEl.appendChild(div);
+    }
+
+    function warn(msg) {
+      const div = document.createElement('div');
+      div.className = 'warn';
+      div.textContent = msg;
+      resultsEl.appendChild(div);
+    }
+
+    function pre(obj) {
+      const el = document.createElement('pre');
+      el.textContent = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
+      resultsEl.appendChild(el);
+    }
+
+    async function run() {
+      Logger.setLevel('ERROR');
+      resultsEl.innerHTML = '';
+
+      info('Inicializando Auth y Appwrite...');
+      await inicializarAuth();
+      await DBAppwrite.iniciar();
+      try { await Auth.cerrarSesion(); } catch {}
+      if (!(await Auth.iniciarSesion('master', 'master123'))) {
+        warn('No se pudo autenticar como master. Revisa credenciales y etiquetas.');
+        return;
+      }
+      info('Master autenticado. Inicializando DB...');
+      await DB.init();
+
+      info('Colecciones en DBAppwrite.COLECCIONES:');
+      const claves = Object.keys(DBAppwrite.COLECCIONES);
+      claves.forEach(k => info(`  · ${k} → ${DBAppwrite.COLECCIONES[k]}`));
+
+      const obsoletas = ['pedidos_delivery', 'precargas_cliente'];
+      const obsoletasPresentes = obsoletas.filter(k => claves.includes(k));
+      if (obsoletasPresentes.length > 0) {
+        warn('⚠️ Colecciones obsoletas aún en el mapa: ' + obsoletasPresentes.join(', '));
+      } else {
+        info('✓ No hay colecciones obsoletas en el mapa.');
+      }
+
+      info('Consultando cada colección...');
+      for (const clave of claves) {
+        try {
+          const filas = await DBAppwrite.listar(clave);
+          info(`📦 ${clave}: ${filas.length} filas`);
+          if (filas.length > 0) {
+            pre(filas.slice(0, 2));
+          } else {
+            info('   (vacía)');
+          }
+        } catch (e) {
+          warn(`❌ Error al listar ${clave}: ${e.message}`);
+        }
+      }
+
+      info('Prueba de escritura/borrado mínima por colección...');
+      const documentoPrueba = {
+        productos: { nombre: 'Test Exploración', precio: 1, categoria: 'general', destino: 'cocina', activo: true, imagen: '', estado: 'disponible' },
+        pedidos: { mesa: '999', tipo: 'local', origen: 'staff', estado: 'abierta', mozo: 'Test', comensales: 1, items: '[]', total: 0, transacciones: '[]' },
+        mesas: { numero: '999', estado: 'libre', pedidoId: '', comensales: 1, zona: 'salon', esVirtual: false },
+        comandas: { mesa: '999', pedidoId: '', destino: 'cocina', items: '[]', observaciones: '', estado: 'nueva', subcomandas: '{}', ts: Date.now() },
+        insumos: { nombre: 'Insumo Test', unidad: 'u', categoria: 'general', ubicacion: '', stock: 1, stock_minimo: 0, tipo: 'cocina', costo_manual: 0 },
+        recetas: { productoId: 'prod_test', ingredientes: '[]', instrucciones: '', es_intermedio: false, nivel: 'producto_final', categoria: 'general', destino: 'cocina', unidadStock: 'u' },
+        staff: { nombre: 'Staff Test', usuarioId: 'usr_test', roles: '[]', rolPrincipal: 'mesero', estado: 'activo', fechaIngreso: new Date().toISOString(), telefono: '', email: '', notas: '', tokenVinculacion: '', espacioId: 'lataberna' },
+        configuracion: { clave: 'test_' + Date.now(), valor: '{}' },
+        eventos_en_vivo: { tipo: 'votacion', estado: 'configuracion', datos: '{}', creadoPor: 'Test' },
+        menus: { nombre: 'Menu Test', estado: 'borrador', productos: '[]', creadoPor: 'Test', fondo: '#1a1a2e', tipografia: "'Inter', sans-serif", grilla: false },
+        proveedores: { nombre: 'Prov Test', tipo: 'otro', contacto: '', telefono: '', email: '', direccion: '', rubro: '', notas: '', activo: true },
+        entradas: { insumoId: 'ins_test', proveedorId: 'prov_test', formato: 'Test', cantidad: 1, unidad_por_formato: 1, costo_total: 1, costo_unitario: 1, fecha: new Date().toISOString() },
+        comensales: { mesaId: '999', usuarioId: null, nombre: 'Comensal Test', iniciales: 'CT', activo: true, unidoEn: new Date().toISOString() },
+        global_perfiles: { usuarioId: 'usr_test_' + Date.now(), nombreUsuario: 'test_exp_' + Date.now(), nombre: 'Test', avatar: '', nivel: 1, xp: 0, insignias: '[]', racha: 0, titulos: '[]', fechaRegistro: new Date().toISOString(), bio: '', ultimaActividad: new Date().toISOString() },
+        global_puntos: { usuarioId: 'usr_test', cantidad: 1, motivo: 'test', origen: 'test', app: 'lataberna', espacioId: 'lataberna', fecha: new Date().toISOString() },
+        global_eventos: { titulo: 'Evento Test', descripcion: 'Test', fecha: new Date().toISOString(), tipo: 'aviso', estado: 'pendiente', creadoPor: 'Test', app: 'lataberna', espacioId: 'lataberna' },
+        global_espacios: { nombre: 'Espacio Test', tipo: 'bar', databaseId: '', adminAsignado: '', direccion: '', ciudad: '', pais: '', activo: true }
+      };
+
+      for (const clave of claves) {
+        const datos = documentoPrueba[clave];
+        if (!datos) {
+          info(`⏭️ Sin documento de prueba para ${clave}`);
+          continue;
+        }
+        try {
+          const creado = await DBAppwrite.crear(clave, 'unique()', datos);
+          if (creado) {
+            await DBAppwrite.eliminar(clave, creado.id);
+            info(`✓ ${clave}: escritura y borrado OK`);
+          } else {
+            warn(`❌ ${clave}: no se pudo crear documento`);
+          }
+        } catch (e) {
+          warn(`❌ ${clave}: ${e.message}`);
+        }
+      }
+
+      info('Funciones serverless registradas:');
+      info('  · registrar-usuario: https://6a81573b000d2f0660d5.tor.appwrite.run');
+      info('  · asignar-rol: https://6a6b3c8a003b634646cc.tor.appwrite.run');
+    }
+
+    window.addEventListener('load', () => run().catch(e => {
+      resultsEl.innerHTML += `<div class="warn">Error: ${e.message}</div>`;
+      console.error(e);
+    }));
+  </script>
+</body>
+</html>

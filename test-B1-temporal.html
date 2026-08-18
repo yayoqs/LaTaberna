@@ -1,181 +1,379 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Test B1 – Cazador de Mesas Cero</title>
-  <style>
-    body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
-    h1 { color: #f59e0b; }
-    .suite { margin-bottom: 20px; border-bottom: 1px solid #2e2e42; padding-bottom: 12px; }
-    .test { margin: 4px 0; padding: 4px 8px; border-radius: 4px; }
-    .pass { background: rgba(34,197,94,.2); }
-    .fail { background: rgba(239,68,68,.2); }
-    .log { background: rgba(99,102,241,.2); }
-    .summary { margin-top: 20px; font-weight: bold; }
-    .info { color: #94a3b8; font-size: 12px; margin: 2px 0; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Támara Quilodrán · Bioquímica &amp; Microbiología</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Sans:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>
+:root{
+  --bg:#0d1a1a;
+  --bg-2:#122423;
+  --surface:#16302d;
+  --surface-2:#1c3a35;
+  --line:#294942;
+  --paper:#eee7d8;
+  --paper-dim:#c9c2ad;
+  --gold:#c9a227;
+  --gold-soft:#e2c05f;
+  --coral:#e8617a;
+  --sage:#8fb3a6;
+  --sage-dim:#5d7d73;
+  --radius:2px;
+  --serif:'Spectral', serif;
+  --sans:'IBM Plex Sans', sans-serif;
+  --mono:'IBM Plex Mono', monospace;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+html{scroll-behavior:smooth;}
+body{
+  background:var(--bg);
+  color:var(--paper);
+  font-family:var(--sans);
+  line-height:1.6;
+  overflow-x:hidden;
+}
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important; scroll-behavior:auto !important;}
+}
+a{color:inherit;}
+img{max-width:100%; display:block;}
+:focus-visible{outline:2px solid var(--gold-soft); outline-offset:3px;}
+
+.wrap{max-width:1120px; margin:0 auto; padding:0 32px;}
+.eyebrow{
+  font-family:var(--mono); font-size:12px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--sage); display:flex; align-items:center; gap:10px; margin-bottom:18px;
+}
+.eyebrow::before{content:""; width:22px; height:1px; background:var(--sage-dim);}
+h1,h2,h3{font-family:var(--serif); font-weight:600; color:var(--paper);}
+.section-title{font-size:clamp(28px,4vw,42px); margin-bottom:14px; line-height:1.15;}
+.section-lede{color:var(--paper-dim); max-width:640px; font-size:16px; margin-bottom:48px;}
+section{padding:100px 0; position:relative;}
+.section-edit-note{
+  font-family:var(--mono); font-size:11.5px; color:var(--coral); background:rgba(232,97,122,.08);
+  border:1px dashed rgba(232,97,122,.4); padding:8px 12px; border-radius:var(--radius); display:inline-block; margin-top:10px;
+}
+
+/* ---------- NAV ---------- */
+nav{
+  position:fixed; top:0; left:0; right:0; z-index:100;
+  background:rgba(13,26,26,.86); backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--line);
+}
+nav .wrap{display:flex; align-items:center; justify-content:space-between; padding:16px 32px;}
+.nav-brand{font-family:var(--serif); font-size:19px; font-weight:600; letter-spacing:.01em;}
+.nav-brand span{color:var(--gold-soft);}
+.nav-links{display:flex; gap:28px; list-style:none; font-size:13.5px; font-family:var(--mono); letter-spacing:.03em;}
+.nav-links a{text-decoration:none; color:var(--paper-dim); transition:color .2s;}
+.nav-links a:hover{color:var(--gold-soft);}
+.nav-toggle{display:none; background:none; border:none; color:var(--paper); font-size:20px; cursor:pointer;}
+@media (max-width:820px){
+  .nav-links{position:fixed; top:60px; right:0; left:0; background:var(--bg-2); flex-direction:column; padding:20px 32px; gap:16px; border-bottom:1px solid var(--line); transform:translateY(-130%); transition:transform .3s; }
+  .nav-links.open{transform:translateY(0);}
+  .nav-toggle{display:block;}
+}
+
+/* ---------- HERO ---------- */
+.hero{
+  min-height:100vh; display:flex; align-items:center; padding-top:100px;
+  background:
+    radial-gradient(circle at 78% 30%, rgba(201,162,39,.10), transparent 45%),
+    radial-gradient(circle at 15% 80%, rgba(232,97,122,.08), transparent 40%),
+    var(--bg);
+}
+.hero-grid{display:grid; grid-template-columns:1.15fr .85fr; gap:64px; align-items:center;}
+@media (max-width:900px){.hero-grid{grid-template-columns:1fr;}}
+.hero-name{font-size:clamp(40px,6vw,64px); line-height:1.05; margin-bottom:6px;}
+.hero-name em{font-style:italic; color:var(--gold-soft); font-weight:500;}
+.hero-role{font-family:var(--mono); color:var(--sage); font-size:15px; letter-spacing:.05em; margin-bottom:28px;}
+.hero-desc{color:var(--paper-dim); font-size:17px; max-width:520px; margin-bottom:34px;}
+.hero-cta{display:flex; gap:16px; flex-wrap:wrap; margin-bottom:44px;}
+.btn{
+  font-family:var(--mono); font-size:13px; letter-spacing:.04em; padding:13px 22px; border-radius:var(--radius);
+  text-decoration:none; display:inline-flex; align-items:center; gap:9px; transition:all .2s; cursor:pointer; border:1px solid transparent;
+}
+.btn-primary{background:var(--gold); color:#12201d; font-weight:600;}
+.btn-primary:hover{background:var(--gold-soft); transform:translateY(-1px);}
+.btn-ghost{border-color:var(--line); color:var(--paper);}
+.btn-ghost:hover{border-color:var(--sage); color:var(--sage);}
+.hero-stats{display:flex; gap:34px; flex-wrap:wrap;}
+.hero-stat b{display:block; font-family:var(--serif); font-size:26px; color:var(--gold-soft);}
+.hero-stat span{font-family:var(--mono); font-size:11.5px; color:var(--paper-dim); text-transform:uppercase; letter-spacing:.06em;}
+
+/* signature: petri dish / streak plate visual */
+.petri-wrap{display:flex; align-items:center; justify-content:center; position:relative;}
+.petri{
+  width:min(380px, 80vw); aspect-ratio:1; border-radius:50%;
+  background:radial-gradient(circle at 40% 35%, #1d3b36, #0f2320 72%);
+  border:2px solid var(--line); position:relative; box-shadow:0 0 0 10px rgba(201,162,39,.03), 0 30px 60px rgba(0,0,0,.4);
+}
+.petri::before{
+  content:""; position:absolute; inset:14px; border-radius:50%; border:1px dashed rgba(143,179,166,.25);
+}
+.streak{position:absolute; border-radius:50%; opacity:.85;}
+.colony{position:absolute; border-radius:50%; background:var(--gold-soft); filter:blur(.3px); animation:grow 3.6s ease-in-out infinite;}
+@keyframes grow{0%,100%{transform:scale(1); opacity:.75;} 50%{transform:scale(1.25); opacity:1;}}
+.petri-label{
+  position:absolute; bottom:-38px; left:50%; transform:translateX(-50%); white-space:nowrap;
+  font-family:var(--mono); font-size:11px; color:var(--sage-dim); letter-spacing:.06em;
+}
+
+/* ---------- ABOUT ---------- */
+.about{background:var(--bg-2); border-top:1px solid var(--line); border-bottom:1px solid var(--line);}
+.about-grid{display:grid; grid-template-columns:.9fr 1.1fr; gap:64px;}
+@media (max-width:860px){.about-grid{grid-template-columns:1fr;}}
+.about-portrait{
+  aspect-ratio:4/5; background:linear-gradient(155deg,var(--surface-2),var(--surface)); border:1px solid var(--line);
+  border-radius:var(--radius); display:flex; align-items:center; justify-content:center; flex-direction:column; gap:10px; text-align:center; padding:24px;
+}
+.about-portrait i{font-size:34px; color:var(--sage-dim);}
+.about-portrait span{font-family:var(--mono); font-size:12px; color:var(--paper-dim); max-width:220px;}
+.about-body p{color:var(--paper-dim); margin-bottom:16px; font-size:15.5px;}
+.about-body strong{color:var(--paper); font-weight:600;}
+.chip-row{display:flex; gap:10px; flex-wrap:wrap; margin-top:22px;}
+.chip{
+  font-family:var(--mono); font-size:12px; padding:7px 13px; border:1px solid var(--line); border-radius:20px; color:var(--sage);
+}
+
+/* ---------- RESEARCH AREAS ---------- */
+.research-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:1px; background:var(--line); border:1px solid var(--line);}
+@media (max-width:760px){.research-grid{grid-template-columns:1fr;}}
+.rcard{background:var(--bg); padding:36px 34px;}
+.rcard i{color:var(--gold-soft); font-size:20px; margin-bottom:16px; display:block;}
+.rcard h3{font-size:19px; margin-bottom:10px;}
+.rcard p{color:var(--paper-dim); font-size:14.5px;}
+.rcard .rtag{font-family:var(--mono); font-size:10.5px; color:var(--sage-dim); text-transform:uppercase; letter-spacing:.08em; margin-top:14px; display:block;}
+
+/* ---------- TIMELINE (education/experience) ---------- */
+.tl{border-left:1px solid var(--line); margin-left:8px; padding-left:36px; display:flex; flex-direction:column; gap:44px;}
+.tl-item{position:relative;}
+.tl-item::before{
+  content:""; position:absolute; left:-44px; top:4px; width:11px; height:11px; border-radius:50%;
+  background:var(--bg); border:2px solid var(--gold-soft);
+}
+.tl-date{font-family:var(--mono); font-size:12px; color:var(--gold-soft); letter-spacing:.05em; margin-bottom:6px; display:block;}
+.tl-item h3{font-size:19px; margin-bottom:4px;}
+.tl-item .tl-org{color:var(--sage); font-size:13.5px; font-family:var(--mono); margin-bottom:10px; display:block;}
+.tl-item p{color:var(--paper-dim); font-size:14.5px; max-width:640px;}
+
+/* ---------- PUBLICATIONS ---------- */
+.pub{
+  border:1px solid var(--line); border-radius:var(--radius); padding:22px 26px; margin-bottom:14px;
+  display:flex; justify-content:space-between; gap:20px; align-items:flex-start; background:var(--bg-2);
+  transition:border-color .2s;
+}
+.pub:hover{border-color:var(--sage-dim);}
+.pub h4{font-family:var(--serif); font-size:16.5px; font-weight:500; margin-bottom:6px; color:var(--paper);}
+.pub .pub-meta{font-family:var(--mono); font-size:11.5px; color:var(--sage-dim); text-transform:uppercase; letter-spacing:.05em;}
+.pub-status{
+  font-family:var(--mono); font-size:10.5px; padding:5px 10px; border-radius:14px; white-space:nowrap; height:fit-content;
+  border:1px solid var(--coral); color:var(--coral);
+}
+
+/* ---------- SKILLS ---------- */
+.skills-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:28px;}
+.skill-group h4{font-family:var(--mono); font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--gold-soft); margin-bottom:14px;}
+.bar-row{margin-bottom:12px;}
+.bar-row .label{display:flex; justify-content:space-between; font-size:13px; color:var(--paper-dim); margin-bottom:5px;}
+.bar-track{height:5px; background:var(--surface-2); border-radius:4px; overflow:hidden;}
+.bar-fill{height:100%; background:linear-gradient(90deg,var(--sage-dim),var(--gold-soft)); border-radius:4px;}
+
+/* ---------- PLANNER ---------- */
+.planner{background:var(--bg-2); border-top:1px solid var(--line); border-bottom:1px solid var(--line);}
+.planner-grid{display:grid; grid-template-columns:1.3fr 1fr; gap:40px;}
+@media (max-width:860px){.planner-grid{grid-template-columns:1fr;}}
+.notebook{
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:28px;
+}
+.notebook-head{display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;}
+.notebook-head h3{font-size:18px;}
+.task-form{display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap;}
+.task-form input, .task-form select{
+  background:var(--bg); border:1px solid var(--line); color:var(--paper); padding:10px 12px; border-radius:var(--radius);
+  font-family:var(--sans); font-size:13.5px;
+}
+.task-form input[type=text]{flex:1; min-width:160px;}
+.task-list{list-style:none; display:flex; flex-direction:column; gap:8px; max-height:340px; overflow-y:auto; padding-right:4px;}
+.task-list::-webkit-scrollbar{width:6px;}
+.task-list::-webkit-scrollbar-thumb{background:var(--line); border-radius:4px;}
+.task-item{
+  display:flex; align-items:center; gap:12px; background:var(--bg); border:1px solid var(--line); border-radius:var(--radius);
+  padding:11px 14px; font-size:13.5px;
+}
+.task-item.done{opacity:.45; text-decoration:line-through;}
+.task-item .tcat{
+  font-family:var(--mono); font-size:9.5px; text-transform:uppercase; padding:3px 8px; border-radius:10px; letter-spacing:.05em; white-space:nowrap;
+}
+.tcat.investigacion{background:rgba(201,162,39,.15); color:var(--gold-soft);}
+.tcat.laboratorio{background:rgba(143,179,166,.15); color:var(--sage);}
+.tcat.docencia{background:rgba(232,97,122,.15); color:var(--coral);}
+.task-item .ttext{flex:1;}
+.task-item .tdate{font-family:var(--mono); font-size:11px; color:var(--paper-dim);}
+.task-item button{background:none; border:none; color:var(--paper-dim); cursor:pointer; font-size:14px;}
+.task-item button:hover{color:var(--coral);}
+.task-empty{color:var(--paper-dim); font-size:13px; font-family:var(--mono); text-align:center; padding:20px 0;}
+
+.deadline-card{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius); padding:26px; margin-bottom:20px;}
+.deadline-card h3{font-size:17px; margin-bottom:16px;}
+.countdown{display:flex; gap:14px; margin-bottom:16px;}
+.countdown div{text-align:center; flex:1; background:var(--bg); border:1px solid var(--line); padding:12px 4px; border-radius:var(--radius);}
+.countdown b{font-family:var(--serif); font-size:24px; color:var(--gold-soft); display:block;}
+.countdown span{font-family:var(--mono); font-size:9.5px; text-transform:uppercase; color:var(--paper-dim);}
+.deadline-input{display:flex; gap:8px;}
+.deadline-input input{flex:1; background:var(--bg); border:1px solid var(--line); color:var(--paper); padding:9px 10px; border-radius:var(--radius); font-size:13px;}
+
+/* ---------- CONTACT ---------- */
+.contact{text-align:center;}
+.contact .section-lede{margin-left:auto; margin-right:auto;}
+.contact-links{display:flex; gap:18px; justify-content:center; flex-wrap:wrap; margin-top:34px;}
+.contact-link{
+  border:1px solid var(--line); border-radius:var(--radius); padding:16px 24px; text-decoration:none; color:var(--paper);
+  display:flex; flex-direction:column; align-items:center; gap:8px; min-width:150px; transition:border-color .2s, transform .2s;
+}
+.contact-link:hover{border-color:var(--gold-soft); transform:translateY(-2px);}
+.contact-link i{font-size:18px; color:var(--gold-soft);}
+.contact-link span{font-family:var(--mono); font-size:12px;}
+
+footer{padding:36px 0; text-align:center; font-family:var(--mono); font-size:11.5px; color:var(--sage-dim); border-top:1px solid var(--line);}
+
+.reveal{opacity:0; transform:translateY(18px); transition:opacity .7s ease, transform .7s ease;}
+.reveal.in{opacity:1; transform:none;}
+</style>
 </head>
 <body>
-  <h1>🧪 Test B1 – Cazador de Mesas Cero</h1>
-  <p class="info">Ejecuta acciones variadas y vigila si aparece mesa número 0.</p>
-  <div id="results"></div>
 
-  <script src="/js/appwrite.min.js"></script>
+<nav>
+  <div class="wrap">
+    <div class="nav-brand">Támara Quilodrán <span>· UdeC</span></div>
+    <button class="nav-toggle" id="navToggle" aria-label="Abrir menú"><i class="fa-solid fa-bars"></i></button>
+    <ul class="nav-links" id="navLinks">
+      <li><a href="#sobre-mi">Sobre mí</a></li>
+      <li><a href="#investigacion">Investigación</a></li>
+      <li><a href="#trayectoria">Trayectoria</a></li>
+      <li><a href="#publicaciones">Publicaciones</a></li>
+      <li><a href="#planificador">Planificador</a></li>
+      <li><a href="#contacto">Contacto</a></li>
+    </ul>
+  </div>
+</nav>
 
-  <script type="module">
-    const { Logger }         = await import('/js/lib/logger.js');
-    const { EventBus }       = await import('/js/lib/eventBus.js');
-    const { Store }          = await import('/js/lib/store.js');
-    const { CommandBus }     = await import('/js/lib/command-bus.js');
-    const { DBAppwrite }     = await import('/js/db-appwrite.js');
-    const { DB }             = await import('/js/db.js');
-    const { Auth, inicializarAuth } = await import('/js/auth.js');
-    const { Mesas }          = await import('/js/ui/mesas.js');
-    const { agregarMesa }    = await import('/js/ui/mesas/acciones-mesa.js');
-    const { PedidoManager }  = await import('/js/managers/pedido-manager.js');
-    const { PedidoRepositoryLocal } = await import('/js/repositorios/pedido-repository.js');
-    const { Deps }           = await import('/js/lib/deps.js');
+<!-- HERO -->
+<header class="hero" id="inicio">
+  <div class="wrap hero-grid">
+    <div>
+      <div class="eyebrow">Bioquímica · Microbiología clínica y ambiental</div>
+      <h1 class="hero-name">Támara <em>Quilodrán</em></h1>
+      <div class="hero-role">Magíster en Bioquímica — Universidad de Concepción, Chile</div>
+      <p class="hero-desc">
+        Investigo los mecanismos de resistencia a antimicrobianos y el comportamiento de comunidades microbianas,
+        con foco en vigilancia epidemiológica y desarrollo de estrategias diagnósticas aplicadas a salud pública.
+      </p>
+      <div class="hero-cta">
+        <a href="#investigacion" class="btn btn-primary"><i class="fa-solid fa-flask"></i> Ver líneas de investigación</a>
+        <a href="#contacto" class="btn btn-ghost"><i class="fa-regular fa-envelope"></i> Contactar</a>
+      </div>
+      <div class="hero-stats">
+        <div class="hero-stat"><b>[X]</b><span>Publicaciones</span></div>
+        <div class="hero-stat"><b>[X]</b><span>Proyectos de investigación</span></div>
+        <div class="hero-stat"><b>[X]</b><span>Cepas / aislados caracterizados</span></div>
+        <div class="hero-stat"><b>2026</b><span>Magíster, UdeC</span></div>
+      </div>
+    </div>
+    <div class="petri-wrap">
+      <div class="petri" id="petri">
+        <!-- streaks and colonies injected by JS -->
+      </div>
+      <div class="petri-label">placa de cultivo — modelo de crecimiento en zigzag</div>
+    </div>
+  </div>
+</header>
 
-    await import('/js/comandos/agregar-mesa.js');
-    await import('/js/comandos/crear-pedido-mesa.js');
-    await import('/js/comandos/liberar-mesa.js');
-    await import('/js/comandos/enviar-comanda.js');
-    await import('/js/comandos/completar-subcomanda.js');
+<!-- ABOUT -->
+<section class="about" id="sobre-mi">
+  <div class="wrap about-grid">
+    <div class="about-portrait reveal">
+      <i class="fa-solid fa-microscope"></i>
+      <span>[EDITAR: reemplazar por fotografía profesional de Támara — retrato en laboratorio o formal]</span>
+    </div>
+    <div class="about-body reveal">
+      <div class="eyebrow">Sobre mí</div>
+      <h2 class="section-title">Ciencia aplicada, con los pies en el laboratorio</h2>
+      <p>
+        Soy Bioquímica y Magíster en Bioquímica por la <strong>Universidad de Concepción</strong>, con especialización
+        en microbiología. Mi trabajo se centra en comprender cómo los microorganismos desarrollan y transmiten
+        resistencia a los antimicrobianos, y en traducir esos hallazgos en herramientas de diagnóstico y vigilancia
+        útiles para el sistema de salud.
+      </p>
+      <p>
+        [EDITAR: Támara — este es tu espacio para contar tu historia real: qué te llevó a la microbiología,
+        qué laboratorio o grupo de investigación te formó, y qué problema científico te mueve a seguir investigando.
+        Dos o tres párrafos bastan; que suene a tu voz, no a un CV.]
+      </p>
+      <div class="chip-row">
+        <span class="chip">Resistencia antimicrobiana</span>
+        <span class="chip">Microbiología clínica</span>
+        <span class="chip">Vigilancia epidemiológica</span>
+        <span class="chip">Enfoque «Una Salud»</span>
+        <span class="chip">Biología molecular</span>
+      </div>
+    </div>
+  </div>
+</section>
 
-    Logger.setLevel('ERROR');
-    const resultsEl = document.getElementById('results');
-    let passed = 0, failed = 0;
-    const log = msg => { resultsEl.innerHTML += `<div class="test log">🔍 ${msg}</div>`; };
-    const pass = msg => { passed++; resultsEl.innerHTML += `<div class="test pass">✔ ${msg}</div>`; };
-    const fail = msg => { failed++; resultsEl.innerHTML += `<div class="test fail">✘ ${msg}</div>`; };
-    const esperar = ms => new Promise(r => setTimeout(r, ms));
+<!-- RESEARCH -->
+<section id="investigacion">
+  <div class="wrap">
+    <div class="eyebrow">Líneas de investigación</div>
+    <h2 class="section-title">Dónde se concentra mi trabajo</h2>
+    <p class="section-lede">
+      Áreas activas dentro de la microbiología y la resistencia antimicrobiana (RAM), alineadas con las prioridades
+      del Plan de Acción Mundial sobre RAM 2026–2036 de la OMS y el enfoque «Una Salud» (One Health).
+    </p>
+  </div>
+  <div class="wrap">
+    <div class="research-grid reveal">
+      <div class="rcard">
+        <i class="fa-solid fa-bacterium"></i>
+        <h3>Mecanismos de resistencia bacteriana</h3>
+        <p>
+          Caracterización fenotípica y molecular de aislados clínicos y ambientales resistentes a betalactámicos,
+          carbapenémicos y otras familias de antimicrobianos; identificación de determinantes genéticos de resistencia.
+        </p>
+        <span class="rtag">[EDITAR: cepas / familias de antibióticos de tu tesis]</span>
+      </div>
+      <div class="rcard">
+        <i class="fa-solid fa-magnifying-glass-chart"></i>
+        <h3>Vigilancia epidemiológica</h3>
+        <p>
+          Análisis de tendencias de resistencia en el tiempo, con miras a apoyar sistemas de alerta temprana
+          compatibles con plataformas como GLASS (OMS) a nivel local y regional.
+        </p>
+        <span class="rtag">[EDITAR: institución / base de datos con la que trabajaste]</span>
+      </div>
+      <div class="rcard">
+        <i class="fa-solid fa-leaf"></i>
+        <h3>Antimicrobianos de origen natural</h3>
+        <p>
+          Bioprospección de compuestos con actividad antimicrobiana en fuentes naturales (plantas, hongos endófitos,
+          microorganismos del suelo) como alternativa frente al agotamiento de nuevas moléculas sintéticas.
+        </p>
+        <span class="rtag">[EDITAR: si aplica a tu línea de tesis]</span>
+      </div>
+      <div class="rcard">
+        <i class="fa-solid fa-globe"></i>
+        <h3>Enfoque «Una Salud» (One Health)</h3>
+        <p>
+          Interacción entre resistencia antimicrobiana en salud humana, animal y ambiental, considerando el uso de
+          antimicrobianos en sistemas agroalimentarios y su impacto en la contaminación ambiental por microbios resistentes.
+        </p>
+        <span class="rtag">Marco OMS 2026–2036</span>
+      </div>
+    </div>
+  </div>
+</section>
 
-    const obtenerNumerosDOM = () => [...document.querySelectorAll('.mesa-card .mesa-numero')].map(el => el.textContent.trim());
-
-    const imprimirEstado = async (etapa) => {
-      const dbMesas = (DB.mesas || []).map(m => `${m.numero}:${m.zona}:${m.estado}${m.esVirtual ? ':virtual' : ''}`).sort((a,b)=>a.localeCompare(b, undefined, {numeric:true}));
-      const storeMesas = (Store.obtenerEstado().mesas || []).map(m => `${m.numero}:${m.zona}:${m.estado}${m.esVirtual ? ':virtual' : ''}`).sort((a,b)=>a.localeCompare(b, undefined, {numeric:true}));
-      const appwriteMesas = (await DBAppwrite.listar('mesas')).map(m => `${m.numero}:${m.zona}:${m.estado}${m.esVirtual ? ':virtual' : ''}`).sort((a,b)=>a.localeCompare(b, undefined, {numeric:true}));
-      const domMesas = obtenerNumerosDOM().sort((a,b)=>a.localeCompare(b, undefined, {numeric:true}));
-
-      log(`--- ${etapa} ---`);
-      log(`DB.mesas: [${dbMesas.join(', ')}]`);
-      log(`Store.mesas: [${storeMesas.join(', ')}]`);
-      log(`Appwrite: [${appwriteMesas.join(', ')}]`);
-      log(`DOM: [${domMesas.join(', ')}]`);
-
-      const hayCeroDB = dbMesas.some(s => s.startsWith('0:'));
-      const hayCeroStore = storeMesas.some(s => s.startsWith('0:'));
-      const hayCeroAppwrite = appwriteMesas.some(s => s.startsWith('0:'));
-      const hayCeroDOM = domMesas.includes('0');
-
-      if (hayCeroDB || hayCeroStore || hayCeroAppwrite || hayCeroDOM) {
-        fail(`Detectada mesa 0 en ${etapa}`);
-      } else {
-        pass(`Sin mesa 0 en ${etapa}`);
-      }
-    };
-
-    try {
-      log('Inicializando Appwrite...');
-      if (!(await DBAppwrite.iniciar()) || !DBAppwrite.habilitado) throw new Error('Appwrite no disponible');
-
-      log('Autenticando master...');
-      await inicializarAuth();
-      if (!(await Auth.iniciarSesion('master', 'master123'))) throw new Error('Auth falló');
-
-      await DB.init();
-      PedidoManager.init({ pedidoRepo: PedidoRepositoryLocal });
-      Deps.registrar('pedidoRepo', PedidoRepositoryLocal);
-
-      // Limpieza previa total
-      log('Limpiando todas las mesas...');
-      const todasPrevias = await DBAppwrite.listar('mesas');
-      for (const m of todasPrevias) {
-        if (/^\d+$/.test(m.numero) || m.numero === '0' || m.numero === 'cumpleaños') await DBAppwrite.eliminar('mesas', m.id).catch(()=>{});
-      }
-      localStorage.removeItem('pubpos_mesas');
-      localStorage.removeItem('pubpos_config');
-      DB.mesas = [];
-
-      // Crear zona con 12 mesas
-      const zonas = [{ nombre: 'zona1', cantidad: 12 }];
-      DB.config = { ...DB.config, zonas };
-      DB.saveConfig();
-      await DB.sincronizarMesasConConfig();
-      Store.despachar({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
-
-      const main = document.createElement('main');
-      main.id = 'view-mesas';
-      main.className = 'view active';
-      document.body.appendChild(main);
-      EventBus.emit('vista:cambiada', 'mesas');
-      Mesas.render();
-      await esperar(300);
-
-      await imprimirEstado('1. Después de crear 12 mesas');
-
-      // Agregar mesa nueva
-      await agregarMesa();
-      await esperar(1000);
-      Mesas.render();
-      await esperar(300);
-      await imprimirEstado('2. Después de agregar mesa 13');
-
-      // Fusionar 3+5+6 como cumpleaños
-      await DB.fusionarMesas(['3','5','6'], 'Mozo Test', 'cumpleaños');
-      await esperar(1000);
-      Store.despachar({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
-      Mesas.render();
-      await esperar(300);
-      await imprimirEstado('3. Después de fusionar 3+5+6 como cumpleaños');
-
-      // Agregar otra mesa
-      await agregarMesa();
-      await esperar(1000);
-      Mesas.render();
-      await esperar(300);
-      await imprimirEstado('4. Después de agregar mesa 14');
-
-      // Liberar mesa virtual (probar si genera 0)
-      const mesaVirtual = DB.mesas.find(m => m.numero === 'cumpleaños');
-      if (mesaVirtual && mesaVirtual.esVirtual) {
-        log('Liberando mesa virtual cumpleaños...');
-        DB.liberarMesasFusionadas(mesaVirtual);
-        await esperar(800);
-        Store.despachar({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
-        Mesas.render();
-        await esperar(300);
-        await imprimirEstado('5. Después de liberar mesa virtual');
-      } else {
-        log('No se encontró mesa virtual para liberar.');
-      }
-
-      // Resetear mesas si DB.resetearMesas está disponible
-      if (typeof DB.resetearMesas === 'function') {
-        log('Reseteando mesas...');
-        await DB.resetearMesas();
-        await esperar(1000);
-        Store.despachar({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
-        Mesas.render();
-        await esperar(300);
-        await imprimirEstado('6. Después de resetear mesas');
-      }
-
-      resultsEl.innerHTML += `<div class="summary">${passed} pasaron, ${failed} fallaron</div>`;
-    } catch (e) {
-      fail('ERROR: ' + e.message);
-      console.error(e);
-    } finally {
-      try {
-        const todasFinal = await DBAppwrite.listar('mesas');
-        for (const m of todasFinal) {
-          if (/^\d+$/.test(m.numero) || m.numero === '0' || m.numero === 'cumpleaños') await DBAppwrite.eliminar('mesas', m.id).catch(()=>{});
-        }
-      } catch {}
-      document.getElementById('view-mesas')?.remove();
-      log('🏁 Test finalizado');
-    }
-  </script>
-</body>
-</html>
+<!-- TIMELINE -->
+<section class="about" id="

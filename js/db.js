@@ -1,10 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db.js
-   Versión: 1.1.4
+   Versión: 1.4.1
    Propósito: Orquestador de base de datos (Appwrite + localStorage).
-              v1.1.4: sincronizarMesasConConfig delega en resetearMesas
-                      y despacha MESAS_INICIALIZAR una sola vez.
+              v1.4.1: corregida validación jerárquica de roles (A2).
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -15,6 +14,10 @@ import { DBInventario } from './db-inventario.js';
 import { DBFusion } from './db-fusion.js';
 import { DBAppwrite } from './db-appwrite.js';
 import { DBShim } from './db-shim.js';
+import { Deps } from './lib/deps.js';
+import { Roles } from './roles.js';
+import { Auth } from './auth.js';
+import { URL_FUNCION_ASIGNAR_ROL } from './config-appwrite.js';
 import { inicializarAuth } from './auth.js';
 
 export const DB = (function() {
@@ -32,6 +35,184 @@ export const DB = (function() {
     mesaVacia
   };
 
+  /* ── STAFF ─────────────────────────────────────────────── */
+
+  function _rolesActuales() {
+    try {
+      return Auth.obtenerRolesEfectivos();
+    } catch {
+      return [];
+    }
+  }
+
+  function _validarAsignacionRoles(rolesObjetivo, rolPrincipal) {
+    const rolesActuales = _rolesActuales();
+    if (rolesActuales.includes('master')) return;
+
+    // Para cada rol objetivo, debe existir al menos un rol actual
+    // que pueda asignarlo.
+    const puedeAsignar = rolesObjetivo.every(rolObjetivo =>
+      rolesActuales.some(rolActual =>
+        Roles.puedeAsignar(rolActual, rolObjetivo)
+      )
+    );
+
+    if (!puedeAsignar) {
+      throw new Error('No tienes permisos para asignar esos roles.');
+    }
+
+    if (!rolesObjetivo.includes(rolPrincipal)) {
+      throw new Error('El rol principal debe estar incluido en los roles asignados.');
+    }
+  }
+
+  combined.obtenerStaffPorUsuario = async function(usuarioId, espacioId) {
+    if (appwrite && appwrite.habilitado) {
+      return await appwrite.obtenerStaffPorUsuarioEspacio(usuarioId, espacioId);
+    }
+    return (this.staff || []).find(s => s.usuarioId === usuarioId && s.espacioId === espacioId) || null;
+  };
+
+  combined.obtenerStaffPorEspacio = async function(espacioId) {
+    if (appwrite && appwrite.habilitado) {
+      return await appwrite.obtenerStaffPorEspacio(espacioId);
+    }
+    return (this.staff || []).filter(s => s.espacioId === espacioId);
+  };
+
+  combined.crearOActualizarStaff = async function(datos) {
+    const {
+      nombre,
+      usuarioId,
+      espacioId,
+      roles,
+      rolPrincipal,
+      estado,
+      fechaIngreso,
+      telefono,
+      email,
+      notas,
+      tokenVinculacion
+    } = datos;
+
+    if (!usuarioId || !espacioId) throw new Error('usuarioId y espacioId son obligatorios');
+    if (!nombre) throw new Error('nombre es obligatorio');
+
+    const rolesArray = Array.isArray(roles) ? roles : (() => {
+      try { return JSON.parse(roles || '[]'); } catch { return []; }
+    })();
+
+    const rolPrincipalFinal = rolPrincipal || rolesArray[0] || 'mesero';
+
+    _validarAsignacionRoles(rolesArray, rolPrincipalFinal);
+
+    const registro = {
+      nombre,
+      usuarioId,
+      espacioId,
+      roles: JSON.stringify(rolesArray),
+      rolPrincipal: rolPrincipalFinal,
+      estado: estado || 'activo',
+      fechaIngreso: fechaIngreso || null,
+      telefono: telefono || '',
+      email: email || '',
+      notas: notas || '',
+      tokenVinculacion: tokenVinculacion || ''
+    };
+
+    let resultado;
+
+    if (appwrite && appwrite.habilitado) {
+      const existente = await this.obtenerStaffPorUsuario(usuarioId, espacioId);
+      if (existente) {
+        await appwrite.actualizar('staff', existente.id, registro);
+        resultado = { ...existente, ...registro, id: existente.id };
+      } else {
+        resultado = await appwrite.crear('staff', 'unique()', registro);
+      }
+    } else {
+      this.staff = this.staff || [];
+      const idx = this.staff.findIndex(s => s.usuarioId === usuarioId && s.espacioId === espacioId);
+      if (idx >= 0) {
+        this.staff[idx] = { ...this.staff[idx], ...registro };
+        resultado = this.staff[idx];
+      } else {
+        this.staff.push({ id: 'staff_' + Date.now(), ...registro });
+        resultado = this.staff[this.staff.length - 1];
+      }
+    }
+
+    if (resultado) {
+      try {
+        await this.sincronizarLabelsStaff(usuarioId, espacioId, rolesArray);
+      } catch (e) {
+        Logger.warn('[DB] No se pudo sincronizar labels de staff:', e.message);
+      }
+    }
+
+    return resultado;
+  };
+
+  combined.vincularCuentaStaff = async function(token) {
+    if (!token) throw new Error('Token de vinculación requerido');
+
+    const usuarioId = await this.obtenerIdUsuarioActual?.();
+    if (!usuarioId) return { exito: false, error: 'No hay cuenta activa para vincular' };
+
+    try {
+      const response = await fetch(URL_FUNCION_ASIGNAR_ROL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, userId: usuarioId })
+      });
+      const data = await response.json();
+      if (!data.exito) {
+        Logger.warn('[DB] No se pudo canjear token:', data.error);
+        return { exito: false, error: data.error || 'Error al canjear token' };
+      }
+      return { exito: true, staff: data.staff };
+    } catch (e) {
+      Logger.error('[DB] Error al llamar a asignar-rol para vinculación:', e);
+      return { exito: false, error: 'No se pudo conectar con el servicio de vinculación' };
+    }
+  };
+
+  combined.sincronizarLabelsStaff = async function(usuarioId, espacioId, roles) {
+    Logger.info(`[DB] Sincronizando labels de staff para usuario ${usuarioId} en espacio ${espacioId}`);
+
+    if (appwrite && appwrite.habilitado) {
+      try {
+        const response = await fetch(URL_FUNCION_ASIGNAR_ROL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: usuarioId, espacioId, roles })
+        });
+        const data = await response.json();
+        if (!data.success) {
+          Logger.warn('[DB] No se pudo sincronizar labels:', data.error);
+          return { exito: false, error: data.error || 'Error al sincronizar labels' };
+        }
+        return { exito: true };
+      } catch (e) {
+        Logger.error('[DB] Error al llamar a la función de sincronización:', e);
+        return { exito: false, error: e.message };
+      }
+    }
+
+    return { exito: true, local: true };
+  };
+
+  combined.obtenerIdUsuarioActual = async function() {
+    try {
+      return await Auth.obtenerIdUsuarioAppwrite();
+    } catch (e) {
+      Logger.warn('[DB] No se pudo obtener el ID del usuario actual:', e);
+      return null;
+    }
+  };
+
+  /* ── RESTO DEL ORQUESTADOR (sin cambios) ───────────────── */
+
   combined.init = async function() {
     try {
       Logger.info("[DB] Iniciando carga de datos...");
@@ -45,6 +226,8 @@ export const DB = (function() {
           appwriteOk = false;
         }
       }
+
+      Deps.registrar('db', combined);
 
       await inicializarAuth();
       await this._cargarConfiguracion();
@@ -262,7 +445,6 @@ export const DB = (function() {
     this.mesas.sort(function(a, b) { return parseInt(a.numero) - parseInt(b.numero); });
 
     this.saveMesas();
-    // Reemplazar completamente la lista de mesas en Store (sin duplicados)
     Store.despachar({ type: 'MESAS_INICIALIZAR', payload: this.mesas });
     EventBus.emit('mesas:guardadas', this.mesas);
     Logger.info('[DB] Reseteo de mesas completado. Total: ' + this.mesas.length);
