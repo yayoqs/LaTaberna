@@ -1,11 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/modals.css
-   Versión: 1.2.4
+   Versión: 1.2.5
    Propósito: Modales pequeños, modal dual, cierre de mesa, ticket,
               modal de confirmación y modal de entrada.
-              v1.2.4: Eliminados !important en .modal-overlay para
-              permitir que JS controle la visibilidad del modal.
+              v1.2.5: agrega estilos para modal de alta de staff
+                      y caja de contraseña temporal visible.
    ================================================================ */
 
 /* ── MODAL OVERLAY ──────────────────────────────────────────── */
@@ -349,4 +349,61 @@
 
 .modal-input:focus {
   border-color: var(--color-accent);
+}
+
+/* ── MODAL ALTA STAFF ──────────────────────────────────────── */
+.modal-alta-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.modal-alta-rol-check {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 5px 11px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: var(--t);
+}
+
+.modal-alta-rol-check:hover {
+  border-color: var(--color-accent);
+}
+
+.modal-alta-rol-check input {
+  accent-color: var(--color-accent);
+  width: 13px;
+  height: 13px;
+}
+
+.modal-password-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-top: 8px;
+}
+
+.modal-password-box input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--color-text);
+  font-family: monospace;
+  font-size: 14px;
+  outline: none;
+  padding: 0;
+}
+
+.modal-password-box .btn-secondary {
+  flex-shrink: 0;
 }

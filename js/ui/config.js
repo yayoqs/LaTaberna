@@ -1,11 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/config.js
-   Versión: 3.2.0
+   Versión: 3.2.1
    Propósito: Vista de configuración rediseñada con panel izquierdo,
               gestión de zonas delegada a B1, personal por roles,
-              impresoras y contraseñas. Swipe y overlay en móvil.
-              v3.2.0: sección Personal usa renderTabAdmin async.
+              impresoras y contraseñas ocultas temporalmente.
+              v3.2.1: sección Contraseñas oculta. No usa Auth.cambiarPassword.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -39,14 +39,12 @@ const Config = (() => {
           <button class="nav-btn" data-seccion="zonas">📍 Zonas</button>
           <button class="nav-btn" data-seccion="personal">👥 Personal</button>
           <button class="nav-btn" data-seccion="impresoras">🖨️ Impresoras</button>
-          <button class="nav-btn" data-seccion="contrasenas" id="navContrasenas" style="display:none;">🔑 Contraseñas</button>
         </div>
         <div class="panel-central" id="panelCentralConfig">
           <div class="seccion activo" id="sec-local"></div>
           <div class="seccion" id="sec-zonas"></div>
           <div class="seccion" id="sec-personal"></div>
           <div class="seccion" id="sec-impresoras"></div>
-          <div class="seccion" id="sec-contrasenas"></div>
         </div>
       </div>
       <div class="overlay" id="configOverlay"></div>
@@ -96,36 +94,6 @@ const Config = (() => {
     `;
   }
 
-  function _renderSeccionContrasenas() {
-    const sec = document.getElementById('sec-contrasenas');
-    if (!sec) return;
-
-    let usuarios = [];
-    try {
-      const raw = localStorage.getItem('pubpos_usuarios');
-      if (raw) usuarios = JSON.parse(raw);
-    } catch (e) { usuarios = []; }
-
-    sec.innerHTML = `
-      <h3><i class="fas fa-key"></i> Contraseñas de Usuarios</h3>
-      <p style="font-size:12px; color:var(--color-text-muted); margin-bottom:12px;">Solo el master puede cambiar contraseñas.</p>
-      ${usuarios.map(u => `
-        <div class="usuario-row">
-          <div class="usuario-row-top">
-            <div class="av">${u.nombre.charAt(0).toUpperCase()}</div>
-            <strong>${u.nombre}</strong>
-            <span class="rol-actual">${u.rol}</span>
-          </div>
-          <button class="btn-secondary btn-cambiar-pass" data-nombre="${u.nombre}">🔑 Cambiar contraseña</button>
-        </div>
-      `).join('')}
-    `;
-
-    sec.querySelectorAll('.btn-cambiar-pass').forEach(btn => {
-      btn.addEventListener('click', () => _mostrarCambiarPassword(btn.dataset.nombre));
-    });
-  }
-
   async function _guardarConfig() {
     let config = Store.obtenerEstado().config || {};
 
@@ -165,26 +133,6 @@ const Config = (() => {
     }
   }
 
-  async function _mostrarCambiarPassword(nombreUsuario) {
-    if (!Auth.esMasterReal()) {
-      mostrarToast('error', 'Solo el master puede cambiar contraseñas');
-      return;
-    }
-    const nueva = await mostrarEntrada('Nueva contraseña', 'Nueva contraseña para ' + nombreUsuario + ':', { type: 'password' });
-    if (!nueva || nueva.trim().length === 0) return;
-    const confirmacion = await mostrarEntrada('Confirmar contraseña', 'Confirma la nueva contraseña:', { type: 'password' });
-    if (confirmacion !== nueva) {
-      mostrarToast('error', 'Las contraseñas no coinciden');
-      return;
-    }
-    if (typeof Auth.cambiarPassword === 'function') {
-      const ok = await Auth.cambiarPassword(nombreUsuario, nueva.trim());
-      if (ok) _renderSeccionContrasenas();
-    } else {
-      mostrarToast('error', 'Función no disponible');
-    }
-  }
-
   function activar() {
     limpiar();
     _abortController = new AbortController();
@@ -213,16 +161,10 @@ const Config = (() => {
     _configurarSwipe(signal);
     _configurarAjusteHeader(signal);
 
-    const navContrasenas = document.getElementById('navContrasenas');
-    if (navContrasenas) {
-      navContrasenas.style.display = Auth.esMasterReal() ? 'flex' : 'none';
-    }
-
     _renderSeccionLocal();
     _renderSeccionZonas();
     _renderSeccionPersonal();
     _renderSeccionImpresoras();
-    _renderSeccionContrasenas();
 
     _desuscripciones.push(EventBus.on('vista:cambiada', (vista) => {
       if (vista === 'config') {

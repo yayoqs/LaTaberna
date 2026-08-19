@@ -1,17 +1,18 @@
 /* ================================================================
    LaTaberna - PubPOS — PERFIL SUBMÓDULO (ES6)
    Archivo: js/ui/perfil/admin-roles.js
-   Versión: 2.0.0
+   Versión: 2.1.0
    Propósito: Gestión canónica de personal (Staff) con roles múltiples,
               alta segura, token de vinculación y canje.
-              v2.0.0: adaptado a laTaberna_Staff (roles, rolPrincipal,
-                      tokenVinculacion) y a Auth.registrarUsuario.
+              v2.1.0: jerarquía de asignación visual, multiselección
+                      real en alta y contraseña temporal visible.
    ================================================================ */
 
 import { Auth } from '../../auth.js';
 import { Roles } from '../../roles.js';
 import { DB } from '../../db.js';
 import { DBAppwrite } from '../../db-appwrite.js';
+import { Logger } from '../../lib/logger.js';
 import { mostrarToast, mostrarEntrada, mostrarConfirmacion } from '../../utils.js';
 
 function _obtenerEspacioId() {
@@ -39,6 +40,227 @@ function _parsearRoles(staff) {
   try { return JSON.parse(staff.roles || '[]'); } catch { return []; }
 }
 
+/**
+ * Calcula los roles que el usuario actual PUEDE ASIGNAR según su jerarquía.
+ * Temporalmente excluye 'artista' hasta que B4 defina su flujo.
+ * @returns {string[]}
+ */
+function _obtenerRolesAsignables() {
+  try {
+    const rolesActuales = Auth.obtenerRolesEfectivos();
+    const permitidos = [];
+
+    rolesActuales.forEach(rol => {
+      if (rol === 'master') {
+        permitidos.push('admin');
+      } else {
+        const jerarquiaRol = Roles.jerarquia[rol] || [];
+        jerarquiaRol.forEach(r => {
+          if (!permitidos.includes(r)) permitidos.push(r);
+        });
+      }
+    });
+
+    return permitidos.filter(r => r !== 'cliente' && r !== 'master' && r !== 'artista');
+  } catch (e) {
+    Logger.warn('[admin-roles] No se pudieron calcular roles asignables:', e);
+    return [];
+  }
+}
+
+/**
+ * Abre un modal para alta de staff.
+ * Devuelve una promesa que resuelve con los datos o null si cancela.
+ */
+function _abrirModalAlta(rolesAsignables) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.display = 'flex';
+    overlay.innerHTML = `
+      <div class="modal-small" style="max-width:480px;">
+        <div class="modal-header">
+          <h3><i class="fas fa-user-plus"></i> Nuevo personal</h3>
+          <button class="modal-close" id="btnCerrarAltaStaff"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-small-body" id="altaStaffBody">
+          <label>Nombre de usuario</label>
+          <input type="text" id="altaUsuario" placeholder="Ej: pedro.soto">
+
+          <label>Nombre visible</label>
+          <input type="text" id="altaNombreVisible" placeholder="Pedro Soto">
+
+          <label>Roles</label>
+          <div class="modal-alta-roles" id="altaRolesChecks">
+            ${rolesAsignables.length === 0
+              ? '<p style="font-size:12px;color:var(--color-text-muted);">No tienes roles para asignar.</p>'
+              : rolesAsignables.map(rol => `
+                  <label class="modal-alta-rol-check">
+                    <input type="checkbox" value="${rol}">
+                    ${rol.charAt(0).toUpperCase() + rol.slice(1)}
+                  </label>
+                `).join('')}
+          </div>
+
+          <label>Rol principal</label>
+          <select id="altaRolPrincipal" disabled>
+            <option value="">— Selecciona roles —</option>
+          </select>
+
+          <label>Estado</label>
+          <select id="altaEstado">
+            <option value="activo" selected>Activo</option>
+            <option value="inactivo">Inactivo</option>
+            <option value="vacaciones">Vacaciones</option>
+          </select>
+        </div>
+        <div class="modal-small-footer">
+          <button class="btn-secondary" id="btnCancelarAltaStaff">Cancelar</button>
+          <button class="btn-primary" id="btnConfirmarAltaStaff">Crear personal</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const cerrar = (valor) => {
+      overlay.remove();
+      resolve(valor);
+    };
+
+    overlay.querySelector('#btnCerrarAltaStaff').addEventListener('click', () => cerrar(null));
+    overlay.querySelector('#btnCancelarAltaStaff').addEventListener('click', () => cerrar(null));
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) cerrar(null);
+    });
+
+    // Sincronizar rol principal con checkboxes
+    const checksContainer = overlay.querySelector('#altaRolesChecks');
+    const selectPrincipal = overlay.querySelector('#altaRolPrincipal');
+
+    function actualizarSelectPrincipal() {
+      const marcados = [...checksContainer.querySelectorAll('input[type="checkbox"]:checked')].map(c => c.value);
+      selectPrincipal.innerHTML = marcados.length === 0
+        ? '<option value="">— Selecciona roles —</option>'
+        : marcados.map(r => `<option value="${r}">${r.charAt(0).toUpperCase() + r.slice(1)}</option>`).join('');
+      selectPrincipal.disabled = marcados.length === 0;
+      if (marcados.length > 0) {
+        // Mantener selección previa si sigue disponible
+        const seleccionAnterior = selectPrincipal.dataset.anterior;
+        if (seleccionAnterior && marcados.includes(seleccionAnterior)) {
+          selectPrincipal.value = seleccionAnterior;
+        } else {
+          selectPrincipal.value = marcados[0];
+        }
+      }
+    }
+
+    checksContainer.addEventListener('change', (e) => {
+      if (e.target.matches('input[type="checkbox"]')) {
+        selectPrincipal.dataset.anterior = selectPrincipal.value || '';
+        actualizarSelectPrincipal();
+      }
+    });
+
+    overlay.querySelector('#btnConfirmarAltaStaff').addEventListener('click', () => {
+      const nombreUsuario = overlay.querySelector('#altaUsuario').value.trim();
+      const nombreVisible = overlay.querySelector('#altaNombreVisible').value.trim() || nombreUsuario;
+      const rolesSeleccionados = [...overlay.querySelectorAll('#altaRolesChecks input:checked')].map(c => c.value);
+      const rolPrincipal = overlay.querySelector('#altaRolPrincipal').value;
+      const estado = overlay.querySelector('#altaEstado').value;
+
+      if (!nombreUsuario) {
+        mostrarToast('error', 'Debes ingresar un nombre de usuario.');
+        return;
+      }
+      if (rolesSeleccionados.length === 0) {
+        mostrarToast('error', 'Selecciona al menos un rol.');
+        return;
+      }
+      if (!rolPrincipal || !rolesSeleccionados.includes(rolPrincipal)) {
+        mostrarToast('error', 'El rol principal debe estar entre los roles seleccionados.');
+        return;
+      }
+
+      cerrar({ nombreUsuario, nombreVisible, roles: rolesSeleccionados, rolPrincipal, estado });
+    });
+
+    // Escape cierra
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        cerrar(null);
+        document.removeEventListener('keydown', onKeyDown);
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+  });
+}
+
+/**
+ * Muestra la contraseña temporal en un modal visible después de crear cuenta.
+ */
+async function _mostrarModalPasswordTemporal(usuario, password) {
+  return new Promise((resolve) => {
+    const overlay = document.createElement('div');
+    overlay.className = 'modal-overlay';
+    overlay.style.display = 'flex';
+    overlay.innerHTML = `
+      <div class="modal-small" style="max-width:400px;">
+        <div class="modal-header">
+          <h3><i class="fas fa-key"></i> Contraseña temporal</h3>
+          <button class="modal-close" id="btnCerrarPasswordTemporal"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-small-body">
+          <p style="font-size:13px;color:var(--color-text-sec);">
+            La cuenta <strong>${usuario}</strong> fue creada correctamente.<br>
+            Esta contraseña <strong>no se volverá a mostrar</strong>.
+          </p>
+          <div class="modal-password-box">
+            <input type="text" id="inputPasswordTemporal" value="${password}" readonly>
+            <button class="btn-secondary" id="btnCopiarPasswordTemporal"><i class="fas fa-copy"></i> Copiar</button>
+          </div>
+        </div>
+        <div class="modal-small-footer">
+          <button class="btn-primary" id="btnContinuarPasswordTemporal">Entendido</button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    const cerrar = () => {
+      overlay.remove();
+      resolve();
+    };
+
+    overlay.querySelector('#btnCerrarPasswordTemporal').addEventListener('click', cerrar);
+    overlay.querySelector('#btnContinuarPasswordTemporal').addEventListener('click', cerrar);
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) cerrar();
+    });
+
+    overlay.querySelector('#btnCopiarPasswordTemporal').addEventListener('click', async () => {
+      const input = overlay.querySelector('#inputPasswordTemporal');
+      try {
+        await navigator.clipboard.writeText(input.value);
+        mostrarToast('success', 'Contraseña copiada');
+      } catch {
+        input.select();
+        document.execCommand('copy');
+        mostrarToast('success', 'Contraseña copiada');
+      }
+    });
+
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        cerrar();
+        document.removeEventListener('keydown', onKeyDown);
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+  });
+}
+
 export async function renderTabAdmin(usuarioActual, esMaster, contenedorId = 'tab-admin') {
   const contenedor = document.getElementById(contenedorId);
   if (!contenedor) return;
@@ -55,7 +277,7 @@ export async function renderTabAdmin(usuarioActual, esMaster, contenedorId = 'ta
   // Normalizar roles en cada staff
   staff = staff.map(s => ({ ...s, roles: _parsearRoles(s) }));
 
-  const rolesOperativos = Roles.lista.filter(r => r !== 'cliente' && r !== 'artista' && r !== 'master');
+  const rolesAsignables = _obtenerRolesAsignables();
 
   contenedor.innerHTML = `
     <div class="nota-privacidad">
@@ -97,6 +319,11 @@ export async function renderTabAdmin(usuarioActual, esMaster, contenedorId = 'ta
       fila.className = 'usuario-row';
       fila.dataset.estado = s.estado || 'activo';
       fila.dataset.nombre = (s.nombre || '').toLowerCase();
+
+      // Roles a mostrar: asignables + roles ya poseídos (aunque no asignables)
+      const rolesMostrados = [...new Set([...rolesAsignables, ...s.roles])]
+        .filter(r => r !== 'cliente' && r !== 'master' && r !== 'artista');
+
       fila.innerHTML = `
         <div class="usuario-row-top">
           <div class="av">${(s.nombre || '?').charAt(0).toUpperCase()}</div>
@@ -104,9 +331,10 @@ export async function renderTabAdmin(usuarioActual, esMaster, contenedorId = 'ta
           <span class="rol-actual">${s.rolPrincipal || 'sin rol'} · ${s.estado || 'activo'}</span>
         </div>
         <div class="roles-checks">
-          ${rolesOperativos.map(rol => {
+          ${rolesMostrados.map(rol => {
             const tieneRol = s.roles.includes(rol);
-            const restringido = !esMaster && rol === 'admin';
+            const asignable = rolesAsignables.includes(rol);
+            const restringido = !asignable;
             return `
               <label class="rol-check ${restringido ? 'bloqueado' : ''}">
                 <input type="checkbox" ${tieneRol ? 'checked' : ''} ${restringido ? 'disabled' : ''}
@@ -126,6 +354,7 @@ export async function renderTabAdmin(usuarioActual, esMaster, contenedorId = 'ta
 
     // Cambiar roles
     listaContainer.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+      if (checkbox.disabled) return; // Los bloqueados no tienen listener
       checkbox.addEventListener('change', async function () {
         const staffId = this.dataset.staffId;
         const rol = this.dataset.rol;
@@ -203,8 +432,52 @@ export async function renderTabAdmin(usuarioActual, esMaster, contenedorId = 'ta
   });
 
   // Nuevo personal
-  contenedor.querySelector('#btnNuevoStaff')?.addEventListener('click', () => {
-    _mostrarModalAlta(usuarioActual, esMaster, contenedorId);
+  contenedor.querySelector('#btnNuevoStaff')?.addEventListener('click', async () => {
+    const datos = await _abrirModalAlta(rolesAsignables);
+    if (!datos) return;
+
+    let usuarioId = null;
+    try {
+      const perfilExistente = await DBAppwrite.obtenerPerfilPorNombreUsuario(datos.nombreUsuario);
+      usuarioId = perfilExistente?.usuarioId || null;
+    } catch (e) {
+      Logger.warn('[admin-roles] Error al buscar perfil existente:', e);
+    }
+
+    if (!usuarioId) {
+      const passwordTemporal = _generarPasswordTemporal();
+      const reg = await Auth.registrarUsuario(datos.nombreUsuario, passwordTemporal);
+      if (!reg.exito) {
+        mostrarToast('error', reg.error || 'No se pudo crear la cuenta.');
+        return;
+      }
+      usuarioId = reg.usuarioId;
+
+      // Mostrar contraseña temporal de forma visible antes de continuar
+      await _mostrarModalPasswordTemporal(datos.nombreUsuario, passwordTemporal);
+    }
+
+    const token = _generarToken();
+    const registro = {
+      nombre: datos.nombreVisible,
+      usuarioId,
+      espacioId: _obtenerEspacioId(),
+      roles: datos.roles,
+      rolPrincipal: datos.rolPrincipal,
+      estado: datos.estado,
+      telefono: '',
+      email: '',
+      notas: '',
+      tokenVinculacion: token
+    };
+
+    try {
+      await DB.crearOActualizarStaff(registro);
+      mostrarToast('success', 'Personal agregado correctamente');
+      await renderTabAdmin(usuarioActual, esMaster, contenedorId);
+    } catch (e) {
+      mostrarToast('error', 'Error al crear staff: ' + e.message);
+    }
   });
 
   // Canjear token
@@ -218,80 +491,4 @@ export async function renderTabAdmin(usuarioActual, esMaster, contenedorId = 'ta
       mostrarToast('error', resultado.error || 'No se pudo vincular');
     }
   });
-}
-
-async function _mostrarModalAlta(usuarioActual, esMaster, contenedorId) {
-  const nombreUsuario = await mostrarEntrada('Nuevo personal', 'Nombre de usuario (si ya existe, se vinculará):', { placeholder: 'Ej: pedro.soto' });
-  if (!nombreUsuario) return;
-
-  const nombreVisible = await mostrarEntrada('Nuevo personal', 'Nombre visible (opcional, por defecto el usuario):', { placeholder: 'Pedro Soto' });
-  if (!nombreVisible) return;
-
-  const rolesDisponibles = Roles.lista.filter(r => r !== 'cliente' && r !== 'master');
-  const seleccionados = {};
-
-  // Todo los roles disponibles se muestran como checkboxes en un modal simple
-  const rolPrincipal = await mostrarEntrada('Rol principal', 'Ingresa el rol principal (ej: mesero):', { valorPredefinido: 'mesero' });
-  if (!rolPrincipal || !rolesDisponibles.includes(rolPrincipal.trim())) {
-    mostrarToast('error', 'Rol principal inválido.');
-    return;
-  }
-
-  // Usar roles múltiples: por ahora rolPrincipal + mesero por defecto
-  const roles = [rolPrincipal.trim()];
-  if (!roles.includes('mesero')) roles.push('mesero');
-
-  const estado = await mostrarEntrada('Estado', 'Ingresa estado (activo, inactivo, vacaciones):', { valorPredefinido: 'activo' });
-  const estadoValido = ['activo', 'inactivo', 'vacaciones'].includes(estado?.trim());
-  if (!estadoValido) {
-    mostrarToast('error', 'Estado inválido.');
-    return;
-  }
-
-  // Buscar si la cuenta ya existe en global_perfiles
-  const perfilExistente = await DBAppwrite.obtenerPerfilPorNombreUsuario(nombreUsuario.trim());
-  let usuarioId = perfilExistente?.usuarioId || null;
-
-  if (!usuarioId) {
-    // Crear cuenta nueva
-    const passwordTemporal = _generarPasswordTemporal();
-    const reg = await Auth.registrarUsuario(nombreUsuario.trim(), passwordTemporal);
-    if (!reg.exito) {
-      mostrarToast('error', reg.error || 'No se pudo crear la cuenta.');
-      return;
-    }
-    usuarioId = reg.usuarioId;
-
-    // Mostrar contraseña temporal una vez
-    try {
-      await navigator.clipboard.writeText(passwordTemporal);
-    } catch {}
-
-    await mostrarConfirmacion(
-      'Contraseña temporal',
-      `Contraseña temporal para ${nombreUsuario}: ${passwordTemporal}\n\nSe copió al portapapeles. Guárdala bien.`
-    );
-  }
-
-  const token = _generarToken();
-  const registro = {
-    nombre: nombreVisible.trim(),
-    usuarioId,
-    espacioId: _obtenerEspacioId(),
-    roles,
-    rolPrincipal: rolPrincipal.trim(),
-    estado: estado.trim(),
-    telefono: '',
-    email: '',
-    notas: '',
-    tokenVinculacion: token
-  };
-
-  try {
-    await DB.crearOActualizarStaff(registro);
-    mostrarToast('success', 'Personal agregado correctamente');
-    await renderTabAdmin(usuarioActual, esMaster, contenedorId);
-  } catch (e) {
-    mostrarToast('error', 'Error al crear staff: ' + e.message);
-  }
 }
