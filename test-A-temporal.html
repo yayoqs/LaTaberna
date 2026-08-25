@@ -1,149 +1,198 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es-CL">
 <head>
   <meta charset="UTF-8">
-  <title>Test Temporal — Depurar liberación de mesa</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
+  <title>Test D — Temporal</title>
+  <link rel="stylesheet" href="css/vars.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/modals.css">
+  <link rel="stylesheet" href="css/config.css">
+  <script src="js/appwrite.min.js"></script>
   <style>
-    body { font-family: monospace; background: #111827; color: #f9fafb; padding: 30px; line-height: 1.5; }
-    h1 { color: #f59e0b; }
-    button { background: #f59e0b; color: #000; border: none; padding: 12px 24px; font-weight: bold; border-radius: 6px; cursor: pointer; font-family: monospace; margin: 10px 0; }
-    .info { background: rgba(59,130,246,.15); border-left: 4px solid #3b82f6; padding: 8px 12px; border-radius: 6px; margin: 6px 0; }
-    .pass { background: rgba(16,185,129,.15); border-left: 4px solid #10b981; padding: 8px 12px; border-radius: 6px; margin: 6px 0; }
-    .fail { background: rgba(239,68,68,.15); border-left: 4px solid #ef4444; padding: 8px 12px; border-radius: 6px; margin: 6px 0; }
-    pre { background: #000; padding: 12px; white-space: pre-wrap; word-wrap: break-word; border-radius: 6px; font-size: 12px; margin: 8px 0; }
+    /* Ajustes específicos para tests temporales:
+       permitir scroll en móvil y evitar bloqueo de altura fija */
+    html, body {
+      height: auto;
+      min-height: 100vh;
+      overflow-y: auto;
+      overflow-x: hidden;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      display: block;
+      background: #0f0f14;
+      color: #f1f5f9;
+      font-family: 'Nunito', system-ui, sans-serif;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+
+    .panel-test {
+      background: #1a1a24;
+      border: 1px solid #2e2e42;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-sizing: border-box;
+    }
+
+    .panel-test h2 {
+      font-size: 18px;
+      margin: 0 0 12px;
+    }
+
+    .log-positivo { color: #22c55e; font-weight: 700; }
+    .log-error { color: #ef4444; font-weight: 700; }
+    .log-info { color: #60a5fa; font-weight: 700; }
+
+    code {
+      background: #252535;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    /* Asegurar que los contenedores internos no limiten scroll */
+    #view-config {
+      display: block;
+      height: auto;
+      min-height: 0;
+      overflow: visible;
+    }
+
+    @media (max-width: 768px) {
+      body {
+        padding: 12px;
+      }
+
+      .panel-test {
+        padding: 14px;
+      }
+    }
   </style>
 </head>
 <body>
-  <h1>🧪 Test Temporal — Depurar liberación de mesa</h1>
-  <p>Investiga por qué la mesa no queda libre en Appwrite tras liberarMesa.</p>
 
-  <button id="btnProbar">⚡ Probar diagnóstico</button>
+  <div class="panel-test">
+    <h2>Test D — Temporal</h2>
+    <p style="font-size:13px; color:#94a3b8; margin:0 0 8px;">
+      Test temporal para verificar cambios. Al pasar en verde, su lógica se incorpora al test unificado.
+    </p>
+    <div id="logTest"></div>
+  </div>
 
-  <div id="resultado"></div>
-
-  <script src="/js/appwrite.min.js"></script>
+  <!-- Contenedor donde Config.activar() montará la vista -->
+  <div id="view-config"></div>
 
   <script type="module">
-    import { Logger } from './js/lib/logger.js';
-    import { CommandBus } from './js/lib/command-bus.js';
-    import { Deps } from './js/lib/deps.js';
-    import { DBAppwrite } from './js/db-appwrite.js';
-    import { DB } from './js/db.js';
     import { Auth } from './js/auth.js';
-    import { inicializarAuth } from './js/auth.js';
-    import { PedidoManager } from './js/managers/pedido-manager.js';
-    import { PedidoRepositoryLocal } from './js/repositorios/pedido-repository.js';
-    import './js/comandos/agregar-mesa.js';
-    import './js/comandos/crear-pedido-mesa.js';
-    import './js/comandos/enviar-comanda.js';
-    import './js/comandos/liberar-mesa.js';
-    import './js/comandos/completar-subcomanda.js';
+    import { DB } from './js/db.js';
+    import { DBAppwrite } from './js/db-appwrite.js';
+    import { Logger } from './js/lib/logger.js';
+    import { Config } from './js/ui/config.js';
 
-    const res = document.getElementById('resultado');
+    Logger.setLevel('ERROR');
 
-    function log(tipo, msg) {
-      const div = document.createElement('div');
-      div.className = tipo;
-      div.textContent = msg;
-      res.appendChild(div);
+    const log = document.getElementById('logTest');
+    const resultados = [];
+
+    function agregarResultado(nombre, ok, detalle = '') {
+      const fila = document.createElement('div');
+      fila.className = ok ? 'log-positivo' : 'log-error';
+      fila.innerHTML = `${ok ? '✅' : '❌'} ${nombre}${detalle ? ` — <code>${detalle}</code>` : ''}`;
+      log.appendChild(fila);
+      resultados.push({ nombre, ok });
     }
 
-    function pre(obj) {
-      const el = document.createElement('pre');
-      el.textContent = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
-      res.appendChild(el);
+    function agregarInfo(mensaje) {
+      const fila = document.createElement('div');
+      fila.className = 'log-info';
+      fila.innerHTML = `ℹ️ ${mensaje}`;
+      log.appendChild(fila);
     }
 
     const esperar = ms => new Promise(r => setTimeout(r, ms));
 
-    async function diagnosticar() {
-      res.innerHTML = '';
+    async function run() {
       Logger.setLevel('ERROR');
-      await inicializarAuth();
-      await DBAppwrite.iniciar();
+      log.innerHTML = '';
 
-      try { await Auth.cerrarSesion(); } catch {}
-      await Auth.iniciarSesion('master', 'master123');
-      log('info', 'Master autenticado');
-
+      // Inicializar
       await DB.init();
-      PedidoManager.init({ pedidoRepo: PedidoRepositoryLocal });
-      Deps.registrar('pedidoRepo', PedidoRepositoryLocal);
-      Deps.registrar('inventarioService', { validarStockParaArticulos: () => ({ ok: true, faltantes: [] }) });
+      await Auth.cerrarSesion();
 
-      const numMesa = 'test_liberar_' + Date.now();
-      log('info', 'Creando mesa ' + numMesa);
-
-      await CommandBus.ejecutar({ type: 'agregarMesa', datos: { numero: numMesa, zona: 'salon' } });
-      await esperar(500);
-
-      log('info', 'Creando pedido');
-      const rPedido = await CommandBus.ejecutar({ type: 'crearPedidoMesa', datos: { numeroMesa: numMesa, mozo: 'Test', comensales: 2 } });
-      const pedidoId = rPedido.data?.id;
-      await esperar(500);
-
-      log('info', 'Enviando comanda');
-      const item = { prodId: 'prod_test', nombre: 'Hamburguesa', precio: 1500, qty: 1, destino: 'cocina', obs: '', enviado: false };
-      await DB.actualizarPedido(pedidoId, { items: [item] });
-      const mesaParaComanda = (await DBAppwrite.listar('mesas')).find(m => m.numero === numMesa);
-      const rComanda = await CommandBus.ejecutar({ type: 'enviarComanda', datos: { mesa: mesaParaComanda, mozo: 'Test', comensales: 2, observaciones: '', itemsPendientes: [item] } });
-      const comanda = rComanda.data?.comandas?.[0];
-      await esperar(500);
-
-      log('info', 'Completando subcomanda');
-      await CommandBus.ejecutar({ type: 'completarSubcomanda', datos: { idOriginal: comanda.id, destino: 'cocina' } });
-      await esperar(500);
-
-      log('info', 'Liberando mesa');
-      const rLiberar = await CommandBus.ejecutar({ type: 'liberarMesa', datos: { numeroMesa: numMesa } });
-      log('info', 'Resultado liberar: ' + JSON.stringify(rLiberar));
-      await esperar(1000);
-
-      // Estado local
-      const mesaLocal = DB.mesas.find(m => m.numero === numMesa);
-      log('info', 'Mesa local: ' + JSON.stringify(mesaLocal));
-
-      // Estado en Appwrite filtrado
-      const mesasFiltradas = await DBAppwrite.listar('mesas');
-      const mesaFiltrada = mesasFiltradas.find(m => m.numero === numMesa);
-      log('info', 'Mesa filtrada: ' + JSON.stringify(mesaFiltrada));
-
-      // Estado global sin filtro
-      try {
-        const todas = await DBAppwrite.baseDeDatos.listRows({
-          databaseId: DBAppwrite.idBaseDeDatos,
-          tableId: DBAppwrite.COLECCIONES.mesas,
-          queries: [Appwrite.Query.limit(100)]
-        });
-        const filaGlobal = todas.rows.find(r => r.$id === numMesa || r.data?.numero === numMesa);
-        log('info', 'Fila global: ' + JSON.stringify(filaGlobal));
-        if (filaGlobal) pre(filaGlobal);
-      } catch (e) {
-        log('fail', 'Error consulta global: ' + e.message);
+      const login = await Auth.iniciarSesion('master', 'master123');
+      if (!login) {
+        agregarResultado('Login master', false);
+        return;
       }
+      agregarResultado('Login master', true);
 
-      // Reintentos de verificación
-      for (let i = 0; i < 5; i++) {
-        await esperar(1000);
-        const mesas = await DBAppwrite.listar('mesas');
-        const mesa = mesas.find(m => m.numero === numMesa);
-        log(mesa?.estado === 'libre' ? 'pass' : 'fail', `Intento ${i + 1}: ${mesa ? mesa.estado : 'no encontrada'}`);
-        if (mesa?.estado === 'libre') {
-          // Limpiar
-          try {
-            await DBAppwrite.eliminar('mesas', mesa.id);
-            log('info', 'Mesa de prueba eliminada.');
-          } catch (e) {
-            log('fail', 'Error al limpiar mesa: ' + e.message);
-          }
-          return;
-        }
+      // Crear documento global con espacioId falso para probar filtro
+      const espacioFalso = 'espacio_falso_' + Date.now();
+      await DBAppwrite.crear('configuracion', 'unique()', {
+        clave: 'global',
+        valor: JSON.stringify({ nombreLocal: 'Falso' }),
+        espacioId: espacioFalso
+      });
+
+      // Activar Configuración real (monta en #view-config)
+      Config.activar();
+
+      const inputNombre = document.getElementById('cfgNombreLocal');
+      if (!inputNombre) {
+        agregarResultado('Campos de configuración disponibles', false);
+        return;
       }
+      inputNombre.value = 'La Taberna Test';
+      document.getElementById('cfgDireccion').value = 'Dirección Test';
+      document.getElementById('cfgCuit').value = '12345678';
+      document.getElementById('cfgPie').value = 'Pie Test';
 
-      log('fail', 'La mesa no quedó libre en Appwrite después de 5 reintentos.');
+      document.getElementById('btnGuardarConfig').click();
+      await esperar(2000); // esperar sincronización Appwrite
+
+      // Verificar que el documento correcto fue actualizado
+      const configs = await DBAppwrite.listar('configuracion');
+      const docCorrecto = configs.find(d => d.clave === 'global' && d.espacioId === 'lataberna');
+      const docFalso = configs.find(d => d.clave === 'global' && d.espacioId === espacioFalso);
+
+      agregarResultado(
+        'Documento con espacio correcto actualizado',
+        !!docCorrecto && docCorrecto.valor.includes('La Taberna Test')
+      );
+      agregarResultado(
+        'Documento con espacio falso no fue tocado',
+        !!docFalso && docFalso.valor.includes('Falso')
+      );
+
+      // Limpiar documento falso
+      if (docFalso) await DBAppwrite.eliminar('configuracion', docFalso.id);
+      const configsDespues = await DBAppwrite.listar('configuracion');
+      const falsoEliminado = !configsDespues.some(d => d.id === docFalso?.id);
+      agregarResultado('Documento falso eliminado', falsoEliminado);
+
+      // Resumen final
+      const total = resultados.length;
+      const pasaron = resultados.filter(r => r.ok).length;
+      const fallaron = total - pasaron;
+
+      const resumen = document.createElement('div');
+      resumen.style.marginTop = '12px';
+      resumen.className = fallaron === 0 ? 'log-positivo' : 'log-error';
+      resumen.innerHTML = `<strong>Resumen:</strong> ${pasaron} correctos, ${fallaron} fallidos.`;
+      log.appendChild(resumen);
+
+      Logger.info(`[test-D-temporal] Finalizado. ${pasaron}/${total} correctos.`);
     }
 
-    document.getElementById('btnProbar').addEventListener('click', diagnosticar);
+    window.addEventListener('load', () => run().catch(e => {
+      log.innerHTML += `<div class="log-error">Error: ${e.message}</div>`;
+      console.error(e);
+    }));
   </script>
 </body>
 </html>

@@ -1,10 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — DESPENSA SUBMÓDULO (ES6)
    Archivo: js/ui/despensa/ciclo-vida.js
-   Versión: 3.4.1
+   Versión: 3.4.2
    Propósito: Ciclo de vida de la despensa con panel izquierdo acordeón,
               proveedores reales y conexión Insumo ↔ Proveedor.
-              v3.4.1: migrado a la nueva nomenclatura de colecciones.
+              v3.4.2: corrige quitarDeListaCompras para pasar objeto
+                      { nombre } en lugar de string.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -208,7 +209,7 @@ export function activar() {
     if (btn) {
       const itemNombre = btn.dataset.item || btn.closest('.compra-item')?.querySelector('.nombre')?.textContent.trim();
       if (itemNombre) {
-        quitarDeListaCompras(itemNombre);
+        quitarDeListaCompras({ nombre: itemNombre });
         renderListaCompras(getListaCompras());
       }
     }

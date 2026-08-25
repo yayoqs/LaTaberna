@@ -1,11 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — PERFIL SUBMÓDULO (ES6)
    Archivo: js/ui/perfil/admin-roles.js
-   Versión: 2.1.3
+   Versión: 2.1.4
    Propósito: Gestión canónica de personal (Staff) con roles múltiples,
               alta segura, token de vinculación y canje.
-              v2.1.3: elimina uso de clase .seccion en HTML generado
-                      para evitar que se oculte dentro de #view-config.
+              v2.1.4: robustez adicional en renderTabAdmin para evitar
+                      retorno temprano y asegurar estado vacío.
    ================================================================ */
 
 import { Auth } from '../../auth.js';
@@ -49,8 +49,9 @@ function _parsearRoles(staff) {
 function _obtenerRolesAsignables(rolesEfectivos) {
   try {
     const permitidos = [];
+    const roles = Array.isArray(rolesEfectivos) ? rolesEfectivos : Auth.obtenerRolesEfectivos() || [];
 
-    rolesEfectivos.forEach(rol => {
+    roles.forEach(rol => {
       if (rol === 'master') {
         if (!permitidos.includes('admin')) permitidos.push('admin');
       } else {
@@ -260,10 +261,21 @@ async function _mostrarModalPasswordTemporal(usuario, password) {
 
 export async function renderTabAdmin(usuarioActual, esMaster, contenedorId = 'tab-admin') {
   const contenedor = document.getElementById(contenedorId);
-  if (!contenedor) return;
+  if (!contenedor) {
+    Logger.error(`[admin-roles] Contenedor "${contenedorId}" no encontrado.`);
+    return;
+  }
 
-  // Obtener roles reales desde el usuarioActual o desde Auth
-  const rolesEfectivos = usuarioActual?.rolesEfectivos || Auth.obtenerRolesEfectivos();
+  let rolesEfectivos;
+  try {
+    rolesEfectivos = usuarioActual?.rolesEfectivos || Auth.obtenerRolesEfectivos() || [];
+  } catch (e) {
+    Logger.error('[admin-roles] Error obteniendo roles efectivos:', e);
+    rolesEfectivos = [];
+  }
+
+  if (!Array.isArray(rolesEfectivos)) rolesEfectivos = [rolesEfectivos];
+
   const espacioId = _obtenerEspacioId();
   let staff = [];
 
@@ -277,8 +289,6 @@ export async function renderTabAdmin(usuarioActual, esMaster, contenedorId = 'ta
   staff = staff.map(s => ({ ...s, roles: _parsearRoles(s) }));
 
   const rolesAsignables = _obtenerRolesAsignables(rolesEfectivos);
-
-  // Mostrar el rol real del usuario en la nota de jerarquía
   const rolPrincipalReal = usuarioActual?.rolPrincipal || rolesEfectivos[0] || 'staff';
 
   contenedor.innerHTML = `
@@ -286,25 +296,32 @@ export async function renderTabAdmin(usuarioActual, esMaster, contenedorId = 'ta
       🔑 Como <strong>${rolPrincipalReal}</strong>, puedes gestionar al personal del local.
       ${rolPrincipalReal !== 'master' ? ' El rol <strong>Admin</strong> solo puede asignarlo un <strong>Master</strong>.' : ''}
     </div>
+
     <div class="panel-admin">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
         <h3 style="margin:0;"><i class="fas fa-users"></i> Personal</h3>
         <button class="btn-primary" id="btnNuevoStaff"><i class="fas fa-user-plus"></i> Nuevo personal</button>
       </div>
+
       <div class="search-box" style="margin-bottom:12px;">
         <span>🔍</span>
         <input type="text" id="buscarPersonalInput" placeholder="Buscar por nombre o usuario...">
       </div>
+
       <div class="filtros-roles">
         <button class="filtro-rol activo" data-filtro="todos">Todos</button>
         <button class="filtro-rol" data-filtro="activo">Activos</button>
         <button class="filtro-rol" data-filtro="inactivo">Inactivos</button>
         <button class="filtro-rol" data-filtro="vacaciones">Vacaciones</button>
       </div>
+
       <div id="listaPersonalContainer">
-        ${staff.length === 0 ? '<p style="color:var(--color-text-muted); font-size:12px;">No hay personal registrado.</p>' : ''}
+        ${staff.length === 0
+          ? '<p style="color:var(--color-text-muted); font-size:12px;">No hay personal registrado. Usa el botón "Nuevo personal" para agregar.</p>'
+          : ''}
       </div>
     </div>
+
     <div class="panel-admin" style="margin-top:16px;">
       <h3><i class="fas fa-link"></i> Vincular cuenta con token</h3>
       <p style="font-size:12px; color:var(--color-text-muted); margin-bottom:8px;">
@@ -322,7 +339,6 @@ export async function renderTabAdmin(usuarioActual, esMaster, contenedorId = 'ta
       fila.dataset.estado = s.estado || 'activo';
       fila.dataset.nombre = (s.nombre || '').toLowerCase();
 
-      // Solo mostramos roles asignables por el usuario actual
       const rolesMostrados = rolesAsignables;
 
       fila.innerHTML = `

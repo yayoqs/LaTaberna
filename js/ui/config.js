@@ -1,12 +1,12 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/config.js
-   Versión: 3.2.3
+   Versión: 3.2.4
    Propósito: Vista de configuración rediseñada con panel izquierdo,
               gestión de zonas delegada a B1, personal por roles,
               impresoras y contraseñas ocultas temporalmente.
-              v3.2.3: _guardarConfig filtra por espacio activo y
-                      normaliza documento legacy sin espacioId.
+              v3.2.4: robustez en _renderSeccionPersonal: calcula
+                      esMaster por roles efectivos y maneja errores.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -78,8 +78,36 @@ const Config = (() => {
 
   async function _renderSeccionPersonal() {
     const usuarioActual = Auth.obtenerUsuarioActual();
-    const esMaster = Auth.esMasterReal();
-    await renderTabAdmin(usuarioActual, esMaster, 'sec-personal');
+    if (!usuarioActual) {
+      mostrarToast('error', 'No hay sesión activa.');
+      return;
+    }
+
+    // Calcular esMaster usando roles efectivos, no Auth.esMasterReal
+    const roles = usuarioActual.rolesEfectivos || Auth.obtenerRolesEfectivos() || [];
+    const esMaster = roles.includes('master');
+
+    Logger.debug(`[Config] Renderizando sección Personal. esMaster=${esMaster}, roles=${roles.join(', ')}`);
+
+    const contenedor = document.getElementById('sec-personal');
+    if (!contenedor) {
+      Logger.error('[Config] No se encontró el contenedor sec-personal.');
+      return;
+    }
+
+    try {
+      await renderTabAdmin(usuarioActual, esMaster, 'sec-personal');
+    } catch (e) {
+      Logger.error('[Config] Error al renderizar sección Personal:', e);
+      mostrarToast('error', 'No se pudo cargar la sección Personal.');
+      contenedor.innerHTML = `
+        <div class="panel-admin">
+          <h3><i class="fas fa-exclamation-triangle"></i> Error</h3>
+          <p style="font-size:12px; color:var(--color-text-muted);">No se pudo cargar la sección Personal. Revisa la consola.</p>
+          <button class="btn-primary" onclick="location.reload()">Reintentar</button>
+        </div>
+      `;
+    }
   }
 
   function _renderSeccionImpresoras() {
@@ -128,18 +156,10 @@ const Config = (() => {
         };
 
         const existente = await DBAppwrite.listar('configuracion');
+        let docGlobal = existente.find(d => d.clave === 'global' && d.espacioId === espacioId);
 
-        // Filtrar por espacio activo, no solo por clave
-        let docGlobal = existente.find(function (d) {
-          return d.clave === 'global' && d.espacioId === espacioId;
-        });
-
-        // Si hay un documento legacy con clave global pero sin espacioId,
-        // lo adoptamos y normalizamos.
         if (!docGlobal) {
-          const docLegacy = existente.find(function (d) {
-            return d.clave === 'global' && !d.espacioId;
-          });
+          const docLegacy = existente.find(d => d.clave === 'global' && !d.espacioId);
           if (docLegacy) {
             await DBAppwrite.actualizar('configuracion', docLegacy.id, datosConfig);
             Logger.info('[Config] Documento global legacy normalizado con espacioId.');
@@ -188,7 +208,7 @@ const Config = (() => {
 
     _renderSeccionLocal();
     _renderSeccionZonas();
-    _renderSeccionPersonal();
+    _renderSeccionPersonal();   // async, se ejecuta sin await
     _renderSeccionImpresoras();
 
     _desuscripciones.push(EventBus.on('vista:cambiada', (vista) => {

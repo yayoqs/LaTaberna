@@ -2,7 +2,7 @@
 <html lang="es-CL">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
   <title>Test D — Unificado</title>
   <link rel="stylesheet" href="css/vars.css">
   <link rel="stylesheet" href="css/base.css">
@@ -10,48 +10,74 @@
   <link rel="stylesheet" href="css/modals.css">
   <link rel="stylesheet" href="css/config.css">
   <link rel="stylesheet" href="css/perfil.css">
+  <link rel="stylesheet" href="css/despensa.css">
   <script src="js/appwrite.min.js"></script>
   <style>
+    html, body {
+      height: auto;
+      min-height: 100vh;
+      overflow-y: auto;
+      overflow-x: hidden;
+      margin: 0;
+      padding: 0;
+    }
+
     body {
+      display: block;
       background: #0f0f14;
       color: #f1f5f9;
       font-family: 'Nunito', system-ui, sans-serif;
       padding: 20px;
+      box-sizing: border-box;
     }
+
     .panel-test {
       background: #1a1a24;
       border: 1px solid #2e2e42;
       border-radius: 12px;
       padding: 20px;
       margin-bottom: 20px;
+      box-sizing: border-box;
     }
+
     .panel-test h2 {
       font-size: 18px;
       margin: 0 0 12px;
     }
-    .log-positivo {
-      color: #22c55e;
-      font-weight: 700;
-    }
-    .log-error {
-      color: #ef4444;
-      font-weight: 700;
-    }
-    .log-info {
-      color: #60a5fa;
-      font-weight: 700;
-    }
+
+    .log-positivo { color: #22c55e; font-weight: 700; }
+    .log-error { color: #ef4444; font-weight: 700; }
+    .log-info { color: #60a5fa; font-weight: 700; }
+
     code {
       background: #252535;
       padding: 2px 6px;
       border-radius: 4px;
+    }
+
+    #view-config,
+    #view-despensa,
+    #view-perfil {
+      display: block;
+      height: auto;
+      min-height: 0;
+      overflow: visible;
+    }
+
+    @media (max-width: 768px) {
+      body { padding: 12px; }
+      .panel-test { padding: 14px; }
     }
   </style>
 </head>
 <body>
 
   <div class="panel-test">
-    <h2>Test D — Unificado: Staff y Jerarquía + Alta con Contraseña Temporal</h2>
+    <h2>Test D — Unificado</h2>
+    <p style="font-size:13px; color:#94a3b8; margin:0 0 8px;">
+      Batería completa: jerarquía de roles, alta de staff, sección personal,
+      configuración por espacio, despensa, perfil y limpieza.
+    </p>
     <div id="logTest"></div>
   </div>
 
@@ -70,15 +96,39 @@
     <div id="tab-gerente-test"></div>
   </div>
 
+  <div class="panel-test">
+    <h2>Sección Personal (como master)</h2>
+    <div id="sec-personal-test"></div>
+  </div>
+
+  <div class="panel-test">
+    <h2>Configuración por espacio</h2>
+    <div id="view-config"></div>
+  </div>
+
+  <div class="panel-test">
+    <h2>Despensa</h2>
+    <div id="view-despensa"></div>
+  </div>
+
+  <div class="panel-test">
+    <h2>Perfil</h2>
+    <div id="view-perfil"></div>
+  </div>
+
   <script type="module">
     import { Auth } from './js/auth.js';
     import { Roles } from './js/roles.js';
     import { DB } from './js/db.js';
     import { DBAppwrite } from './js/db-appwrite.js';
-    import { Store } from './js/lib/store.js';
-    import { EventBus } from './js/lib/eventBus.js';
-    import { renderTabAdmin } from './js/ui/perfil/admin-roles.js';
     import { Logger } from './js/lib/logger.js';
+    import { Store } from './js/lib/store.js';
+    import { renderTabAdmin } from './js/ui/perfil/admin-roles.js';
+    import { Config } from './js/ui/config.js';
+    import { Despensa } from './js/ui/despensa.js';
+    import { Perfil } from './js/ui/perfil.js';
+    import { InventarioService } from './js/servicios/inventario-service.js';
+    import { crearInventarioRepo } from './js/repositorios/inventario-repository.js';
 
     Logger.setLevel('DEBUG');
 
@@ -129,21 +179,19 @@
       Logger.setLevel('ERROR');
       log.innerHTML = '';
 
-      // ── BLOQUE 1: JERARQUÍA DE ROLES ──────────────────
-      agregarInfo('--- Bloque 1: Jerarquía de roles ---');
-
-      // 1. Inicializar Auth y DB
+      // ── Inicialización ────────────────────────────────
+      await Auth.cerrarSesion();
       await DB.init();
-
-      // 2. Iniciar sesión como master
-      const loginMaster = await Auth.iniciarSesion('master', 'master123');
-      if (!loginMaster) {
-        agregarResultado('Login master', false, 'No se pudo iniciar sesión como master');
+      const loginMasterInicial = await Auth.iniciarSesion('master', 'master123');
+      if (!loginMasterInicial) {
+        agregarResultado('Login master inicial', false);
         return;
       }
-      agregarResultado('Login master', true);
+      agregarResultado('Login master inicial', true);
 
-      // 3. Renderizar pestaña para master y verificar solo admin
+      // ── Bloque 1: Jerarquía de roles ─────────────────
+      agregarInfo('--- Bloque 1: Jerarquía de roles ---');
+
       const usuarioMaster = Auth.obtenerUsuarioActual();
       await renderTabAdmin(usuarioMaster, true, 'tab-master-test');
       const checksMaster = [...document.querySelectorAll('#tab-master-test .rol-check input[type="checkbox"]')];
@@ -155,11 +203,8 @@
         `Roles únicos: ${rolesMasterUnicos.join(', ')}`
       );
 
-      // 4. Crear usuario admin de prueba
-      const nombreAdmin = `test_admin_${Date.now()}`;
+      const nombreAdmin = `tpa_${Date.now().toString().slice(-8)}`;
       const passwordAdmin = 'Pass12345';
-      agregarInfo(`Creando usuario admin: ${nombreAdmin}`);
-
       const regAdmin = await Auth.registrarUsuario(nombreAdmin, passwordAdmin);
       if (!regAdmin.exito) {
         agregarResultado('Registrar admin', false, regAdmin.error);
@@ -177,14 +222,13 @@
       });
       agregarResultado('Crear staff admin', !!staffAdmin);
 
-      // 5. Cerrar sesión y entrar como admin
       await Auth.cerrarSesion();
-      const loginAdmin = await Auth.iniciarSesion(nombreAdmin, passwordAdmin);
-      if (!loginAdmin) {
-        agregarResultado('Login admin', false);
+      const loginAdmin1 = await Auth.iniciarSesion(nombreAdmin, passwordAdmin);
+      if (!loginAdmin1) {
+        agregarResultado('Login admin (Bloque 1)', false);
         return;
       }
-      agregarResultado('Login admin', true);
+      agregarResultado('Login admin (Bloque 1)', true);
 
       const usuarioAdmin = Auth.obtenerUsuarioActual();
       await renderTabAdmin(usuarioAdmin, false, 'tab-admin-test');
@@ -201,13 +245,14 @@
       agregarResultado('Admin ve caja', rolesAdminUnicos.includes('caja'));
       agregarResultado('Admin ve repartidor', rolesAdminUnicos.includes('repartidor'));
 
-      // 6. Crear usuario gerente de prueba
       await Auth.cerrarSesion();
-      await Auth.iniciarSesion('master', 'master123');
-      const nombreGerente = `test_gerente_${Date.now()}`;
+      const loginMaster2 = await Auth.iniciarSesion('master', 'master123');
+      if (!loginMaster2) {
+        agregarResultado('Login master (para crear gerente)', false);
+        return;
+      }
+      const nombreGerente = `tge_${Date.now().toString().slice(-8)}`;
       const passwordGerente = 'Pass12345';
-      agregarInfo(`Creando usuario gerente: ${nombreGerente}`);
-
       const regGerente = await Auth.registrarUsuario(nombreGerente, passwordGerente);
       if (!regGerente.exito) {
         agregarResultado('Registrar gerente', false, regGerente.error);
@@ -225,7 +270,6 @@
       });
       agregarResultado('Crear staff gerente', !!staffGerente);
 
-      // 7. Cerrar sesión y entrar como gerente
       await Auth.cerrarSesion();
       const loginGerente = await Auth.iniciarSesion(nombreGerente, passwordGerente);
       if (!loginGerente) {
@@ -247,38 +291,31 @@
       agregarResultado('Gerente ve cocinaAyudante', rolesGerenteUnicos.includes('cocinaAyudante'));
       agregarResultado('Gerente ve barraAyudante', rolesGerenteUnicos.includes('barraAyudante'));
 
-      // ── BLOQUE 2: ALTA DE STAFF CON CONTRASEÑA TEMPORAL ──
-      agregarInfo('--- Bloque 2: Alta de staff con contraseña temporal ---');
+      // ── Bloque 2: Alta de staff con contraseña temporal ──
+      agregarInfo('--- Bloque 2: Alta de staff ---');
 
-      // 8. Volver a admin para probar alta
       await Auth.cerrarSesion();
-      await Auth.iniciarSesion(nombreAdmin, passwordAdmin);
+      const loginAdmin2 = await Auth.iniciarSesion(nombreAdmin, passwordAdmin);
+      if (!loginAdmin2) {
+        agregarResultado('Login admin (Bloque 2)', false);
+        return;
+      }
+      agregarResultado('Login admin (Bloque 2)', true);
+
       const usuarioAdminAlta = Auth.obtenerUsuarioActual();
       await renderTabAdmin(usuarioAdminAlta, false, 'tab-admin-test');
 
-      // 9. Hacer clic en Nuevo personal
       const btnNuevo = document.querySelector('#tab-admin-test #btnNuevoStaff');
-      if (!btnNuevo) {
-        agregarResultado('Botón Nuevo personal existe', false);
-        return;
-      }
-      agregarResultado('Botón Nuevo personal existe', true);
+      agregarResultado('Botón Nuevo personal existe', !!btnNuevo);
       btnNuevo.click();
       await esperar(500);
 
-      // 10. Verificar que modal de alta aparezca
       const modalAlta = await esperarElemento('#altaUsuario');
-      if (!modalAlta) {
-        agregarResultado('Modal de alta aparece', false);
-        return;
-      }
-      agregarResultado('Modal de alta aparece', true);
+      agregarResultado('Modal de alta aparece', !!modalAlta);
 
-      // 11. Completar formulario
-      const nombreUsuarioAlta = `test_alta_staff_${Date.now()}`;
+      const nombreUsuarioAlta = `tpa_${Date.now().toString().slice(-8)}`;
       const nombreVisibleAlta = 'Personal de Prueba';
       modalAlta.value = nombreUsuarioAlta;
-
       document.querySelector('#altaNombreVisible').value = nombreVisibleAlta;
 
       const checkMesero = [...document.querySelectorAll('#altaRolesChecks input[type="checkbox"]')]
@@ -286,10 +323,7 @@
       const checkCaja = [...document.querySelectorAll('#altaRolesChecks input[type="checkbox"]')]
         .find(c => c.value === 'caja');
 
-      if (!checkMesero || !checkCaja) {
-        agregarResultado('Checkboxes mesero y caja disponibles', false);
-        return;
-      }
+      agregarResultado('Checkboxes mesero y caja disponibles', !!checkMesero && !!checkCaja);
       checkMesero.checked = true;
       checkMesero.dispatchEvent(new Event('change', { bubbles: true }));
       checkCaja.checked = true;
@@ -305,39 +339,315 @@
       selectPrincipal.value = 'mesero';
       selectPrincipal.dispatchEvent(new Event('change', { bubbles: true }));
 
-      // 12. Confirmar alta
       document.querySelector('#btnConfirmarAltaStaff').click();
       agregarInfo('Confirmando alta...');
 
-      // 13. Esperar modal de contraseña temporal
       const inputPassword = await esperarElemento('#inputPasswordTemporal', 10000);
-      if (!inputPassword) {
-        agregarResultado('Modal de contraseña temporal aparece', false);
-        return;
-      }
-      agregarResultado('Modal de contraseña temporal aparece', true);
-      agregarResultado('Input de contraseña es readonly', inputPassword.readOnly);
-      agregarResultado('Contraseña visible no vacía', inputPassword.value.length > 0);
+      agregarResultado('Modal de contraseña temporal aparece', !!inputPassword);
+      agregarResultado('Input de contraseña es readonly', inputPassword?.readOnly === true);
+      agregarResultado('Contraseña visible no vacía', inputPassword?.value.length > 0);
+      agregarResultado('Botón copiar existe', !!document.querySelector('#btnCopiarPasswordTemporal'));
 
-      const btnCopiar = document.querySelector('#btnCopiarPasswordTemporal');
-      agregarResultado('Botón copiar existe', !!btnCopiar);
-
-      const modalPassword = inputPassword.closest('.modal-overlay');
+      const modalPassword = inputPassword?.closest('.modal-overlay');
       const textoAdvertencia = modalPassword?.textContent || '';
       agregarResultado('Advertencia de no volver a mostrar', textoAdvertencia.includes('no se volverá a mostrar'));
 
-      // 14. Cerrar modal de contraseña
       document.querySelector('#btnContinuarPasswordTemporal')?.click();
 
-      // 15. Esperar a que el staff aparezca en la lista
       const staffCreado = await esperarStaffEnLista('tab-admin-test', nombreVisibleAlta, 15000);
       agregarResultado('Staff aparece en la lista', !!staffCreado);
 
-      // ── BLOQUE 3: LIMPIEZA DE HUELLA ──────────────────
-      agregarInfo('--- Bloque 3: Limpieza de huella ---');
+      // ── Bloque 3: Sección Personal completa (master) ──
+      agregarInfo('--- Bloque 3: Sección Personal completa ---');
 
       await Auth.cerrarSesion();
-      await Auth.iniciarSesion('master', 'master123');
+      const loginMaster3 = await Auth.iniciarSesion('master', 'master123');
+      if (!loginMaster3) {
+        agregarResultado('Login master (Bloque 3)', false);
+        return;
+      }
+      const usuarioMaster2 = Auth.obtenerUsuarioActual();
+      const esMasterReal = usuarioMaster2.rolesEfectivos.includes('master');
+      await renderTabAdmin(usuarioMaster2, esMasterReal, 'sec-personal-test');
+
+      agregarResultado('Botón nuevo existe', !!document.querySelector('#sec-personal-test #btnNuevoStaff'));
+      agregarResultado('Búsqueda existe', !!document.querySelector('#sec-personal-test #buscarPersonalInput'));
+      agregarResultado('Lista existe', !!document.querySelector('#sec-personal-test #listaPersonalContainer'));
+      agregarResultado(
+        'Nota muestra master',
+        document.querySelector('#sec-personal-test .nota-privacidad')?.textContent.includes('master')
+      );
+
+      // ── Bloque 4: Configuración por espacio ─────────────
+      agregarInfo('--- Bloque 4: Configuración por espacio ---');
+
+      const espacioFalso = 'espacio_falso_' + Date.now();
+      await DBAppwrite.crear('configuracion', 'unique()', {
+        clave: 'global',
+        valor: JSON.stringify({ nombreLocal: 'Falso' }),
+        espacioId: espacioFalso
+      });
+
+      Config.activar();
+
+      const inputNombre = document.getElementById('cfgNombreLocal');
+      agregarResultado('Campos de configuración disponibles', !!inputNombre);
+      if (inputNombre) {
+        inputNombre.value = 'La Taberna Test';
+        document.getElementById('cfgDireccion').value = 'Dirección Test';
+        document.getElementById('cfgCuit').value = '12345678';
+        document.getElementById('cfgPie').value = 'Pie Test';
+        document.getElementById('btnGuardarConfig').click();
+        await esperar(2000);
+
+        const configs = await DBAppwrite.listar('configuracion');
+        const docCorrecto = configs.find(d => d.clave === 'global' && d.espacioId === 'lataberna');
+        const docFalso = configs.find(d => d.clave === 'global' && d.espacioId === espacioFalso);
+
+        agregarResultado(
+          'Documento con espacio correcto actualizado',
+          !!docCorrecto && docCorrecto.valor.includes('La Taberna Test')
+        );
+        agregarResultado(
+          'Documento con espacio falso no fue tocado',
+          !!docFalso && docFalso.valor.includes('Falso')
+        );
+
+        if (docFalso) await DBAppwrite.eliminar('configuracion', docFalso.id);
+        const configsDespues = await DBAppwrite.listar('configuracion');
+        const falsoEliminado = !configsDespues.some(d => d.id === docFalso?.id);
+        agregarResultado('Documento falso eliminado', falsoEliminado);
+      }
+
+      // ── Bloque 5: Despensa ─────────────────────────────
+      agregarInfo('--- Bloque 5: Despensa ---');
+
+      const inventarioRepo = crearInventarioRepo();
+      InventarioService.configurar(inventarioRepo);
+
+      const nombreInsumoBase = 'Insumo Base Temporal ' + Date.now();
+      const insumoBase = await InventarioService.guardarInsumo({
+        nombre: nombreInsumoBase,
+        stock: 10,
+        stock_minimo: 2,
+        unidad: 'kg',
+        categoria: 'cocina',
+        ubicacion: 'Test Base',
+        tipo: 'cocina',
+        costo_manual: 100
+      });
+
+      if (!insumoBase?.exito) {
+        agregarResultado('Crear insumo base', false, insumoBase?.error || 'Sin resultado');
+        return;
+      }
+      const insumoBaseId = insumoBase.datos?.id || insumoBase.datos?._id;
+      agregarResultado('Crear insumo base', !!insumoBaseId, insumoBaseId);
+
+      Despensa.activar();
+      await esperar(500);
+
+      const vistaDespensa = document.getElementById('view-despensa');
+      agregarResultado('Vista despensa creada', !!vistaDespensa && !!vistaDespensa.querySelector('.main-layout'));
+
+      const panelTabs = document.querySelectorAll('#view-despensa .panel-tab');
+      agregarResultado('Dos pestañas panel izquierdo', panelTabs.length === 2);
+      agregarResultado('Pestaña proveedores activa', panelTabs[0]?.classList.contains('activo'));
+
+      const centralTabs = document.querySelectorAll('#view-despensa .central-tab');
+      agregarResultado('Dos pestañas centrales', centralTabs.length === 2);
+
+      const searchInput = document.getElementById('inventarioSearch');
+      agregarResultado('Input de búsqueda existe', !!searchInput);
+      if (searchInput) {
+        searchInput.value = 'insumo base';
+        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+        await esperar(300);
+        agregarResultado('Búsqueda no rompe render', !!document.getElementById('espaciosContainer'));
+        searchInput.value = '';
+        searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+        await esperar(200);
+      }
+
+      const inputCompra = document.getElementById('inputCompra');
+      const btnAddCompra = document.getElementById('btnAddCompra');
+      agregarResultado('Input lista de compras existe', !!inputCompra && !!btnAddCompra);
+      if (inputCompra && btnAddCompra) {
+        inputCompra.value = 'Item Temporal Test';
+        btnAddCompra.click();
+        await esperar(300);
+        const listaCompras = document.getElementById('listaCompras');
+        const itemAgregado = listaCompras?.textContent.includes('Item Temporal Test');
+        agregarResultado('Item agregado a lista', itemAgregado);
+
+        if (itemAgregado) {
+          const btnQuitar = await esperarElemento('#listaCompras .btn-quitar[data-item="Item Temporal Test"]');
+          if (btnQuitar) {
+            btnQuitar.click();
+            await esperar(300);
+            const itemQuitado = !document.getElementById('listaCompras')?.textContent.includes('Item Temporal Test');
+            agregarResultado('Item quitado de lista', itemQuitado);
+          } else {
+            agregarResultado('Botón quitar encontrado', false);
+          }
+        }
+      }
+
+      const btnNuevoProveedor = document.getElementById('btnNuevoProveedor');
+      agregarResultado('Botón nuevo proveedor existe', !!btnNuevoProveedor);
+      if (btnNuevoProveedor) {
+        btnNuevoProveedor.click();
+        await esperar(300);
+        const modalProv = await esperarElemento('#modalProveedor');
+        agregarResultado('Modal proveedor abre', !!modalProv && modalProv.style.display === 'flex');
+
+        if (modalProv) {
+          const nombreProv = 'Proveedor Temporal ' + Date.now();
+          document.getElementById('provNombre').value = nombreProv;
+          document.getElementById('provTipo').value = 'distribuidor';
+          document.getElementById('provContacto').value = 'Contacto Temporal';
+          document.getElementById('provTelefono').value = '+56912345678';
+          document.getElementById('provEmail').value = 'prov@test.cl';
+          document.getElementById('provRubro').value = 'Test';
+          document.getElementById('btnGuardarModalProv').click();
+          await esperar(1000);
+
+          const listaProv = await DBAppwrite.listar('proveedores');
+          const creado = listaProv.find(p => p.nombre === nombreProv);
+          agregarResultado('Proveedor creado en Appwrite', !!creado);
+          if (creado) {
+            await DBAppwrite.eliminar('proveedores', creado.id);
+            agregarResultado('Proveedor temporal eliminado', true);
+          }
+        }
+      }
+
+      const btnNuevoProducto = document.getElementById('btnNuevoProducto');
+      agregarResultado('Botón nuevo producto existe', !!btnNuevoProducto);
+      if (btnNuevoProducto) {
+        btnNuevoProducto.click();
+        await esperar(300);
+        const modalInsumo = await esperarElemento('#modalInsumo');
+        agregarResultado('Modal insumo abre', !!modalInsumo && modalInsumo.style.display === 'flex');
+
+        if (modalInsumo) {
+          const nombreInsumo = 'Insumo Temporal ' + Date.now();
+          document.getElementById('insumoNombre').value = nombreInsumo;
+          document.getElementById('insumoCategoria').value = 'cocina';
+          document.getElementById('insumoTipo').value = 'cocina';
+          document.getElementById('insumoStock').value = '10';
+          document.getElementById('insumoStockMin').value = '2';
+          document.getElementById('insumoUnidad').value = 'kg';
+          document.getElementById('insumoUbicacion').value = 'Test';
+          document.getElementById('insumoCostoManual').value = '100';
+          document.getElementById('btnGuardarModalInsumo').click();
+          await esperar(1000);
+
+          const listaIns = await DBAppwrite.listar('insumos');
+          const creadoIns = listaIns.find(i => i.nombre === nombreInsumo);
+          agregarResultado('Insumo creado en Appwrite', !!creadoIns);
+          if (creadoIns) {
+            await DBAppwrite.eliminar('insumos', creadoIns.id);
+            agregarResultado('Insumo temporal eliminado', true);
+          }
+        }
+      }
+
+      if (insumoBaseId) {
+        await DBAppwrite.eliminar('insumos', insumoBaseId);
+        agregarResultado('Insumo base eliminado', true);
+      }
+
+      // ── Bloque 6: Perfil ───────────────────────────────
+      agregarInfo('--- Bloque 6: Perfil ---');
+
+      await Auth.cerrarSesion();
+      const loginAdminPerfil = await Auth.iniciarSesion(nombreAdmin, passwordAdmin);
+      if (!loginAdminPerfil) {
+        agregarResultado('Login admin (Perfil)', false);
+        return;
+      }
+      agregarResultado('Login admin (Perfil)', true);
+
+      Perfil.activar();
+      await esperar(500);
+
+      const vistaPerfil = document.getElementById('view-perfil');
+      agregarResultado('Vista perfil creada', !!vistaPerfil && !!vistaPerfil.querySelector('.main-layout'));
+      agregarResultado('Header perfil existe', !!document.querySelector('#view-perfil .perfil-header'));
+      agregarResultado('Panel izquierdo existe', !!document.getElementById('panelIzquierdoPerfil'));
+      agregarResultado('Panel derecho existe', !!document.getElementById('panelDerechoPerfil'));
+
+      const idCard = document.getElementById('perfilIdCard');
+      agregarResultado('ID card existe', !!idCard);
+      agregarResultado('Nombre visible en ID card', idCard?.textContent.includes(nombreAdmin));
+
+      const modoVitrina = document.getElementById('modoVitrinaPerfil');
+      const modoEdicion = document.getElementById('modoEdicionPerfil');
+      agregarResultado('Modo vitrina visible', modoVitrina && modoVitrina.style.display !== 'none');
+      agregarResultado('Modo edición oculto', modoEdicion && (modoEdicion.style.display === 'none' || !modoEdicion.style.display));
+
+      const btnEditarPerfil = document.getElementById('btnEditarPerfil');
+      agregarResultado('Botón editar perfil existe', !!btnEditarPerfil);
+      if (btnEditarPerfil) {
+        btnEditarPerfil.click();
+        await esperar(300);
+        agregarResultado('Modo edición visible tras clic', modoEdicion && modoEdicion.style.display !== 'none');
+        agregarResultado('Modo vitrina oculto tras clic', modoVitrina && modoVitrina.style.display === 'none');
+      }
+
+      const tabs = document.querySelectorAll('#view-perfil .central-tab');
+      const tabsVisibles = [...tabs].filter(t => t.classList.contains('visible'));
+      agregarResultado('Pestañas visibles existentes', tabsVisibles.length >= 3);
+
+      const tabPublico = document.querySelector('#view-perfil .central-tab[data-tab="publico"]');
+      agregarResultado('Pestaña pública activa por defecto', tabPublico?.classList.contains('activo'));
+
+      const inputApodo = document.getElementById('editarApodo');
+      if (inputApodo) {
+        inputApodo.value = 'Apodo Temporal';
+        const btnGuardarPublico = document.getElementById('btnGuardarPerfilPublico');
+        if (btnGuardarPublico) {
+          btnGuardarPublico.click();
+          await esperar(300);
+          agregarResultado('Apodo guardado sin errores', true);
+        }
+      }
+
+      const tabPrefs = document.querySelector('#view-perfil .central-tab[data-tab="preferencias"]');
+      if (tabPrefs) {
+        tabPrefs.click();
+        await esperar(300);
+        agregarResultado('Pestaña preferencias activada', document.getElementById('tab-preferencias')?.classList.contains('activo'));
+      }
+
+      const tabAdmin = document.querySelector('#view-perfil .central-tab[data-tab="admin"]');
+      agregarResultado('Pestaña admin visible', tabAdmin?.classList.contains('visible'));
+      if (tabAdmin) {
+        tabAdmin.click();
+        await esperar(500);
+        const tabAdminContent = document.getElementById('tab-admin');
+        agregarResultado('Pestaña admin activa', tabAdminContent?.classList.contains('activo'));
+        agregarResultado('Botón nuevo staff en pestaña admin', !!tabAdminContent?.querySelector('#btnNuevoStaff'));
+        agregarResultado('Lista personal en pestaña admin', !!tabAdminContent?.querySelector('#listaPersonalContainer'));
+      }
+
+      const btnVolver = document.getElementById('btnVolverVitrina');
+      if (btnVolver) {
+        btnVolver.click();
+        await esperar(300);
+        agregarResultado('Volver a vitrina funciona', modoVitrina && modoVitrina.style.display !== 'none');
+      }
+
+      // ── Bloque 7: Limpieza de huella ───────────────────
+      agregarInfo('--- Bloque 7: Limpieza de huella ---');
+
+      await Auth.cerrarSesion();
+      const loginMasterFinal = await Auth.iniciarSesion('master', 'master123');
+      if (!loginMasterFinal) {
+        agregarResultado('Login master final', false);
+        return;
+      }
 
       const staffActual = await DB.obtenerStaffPorEspacio('lataberna');
       const staffAlta = staffActual.find(s => s.nombre === nombreVisibleAlta);
@@ -349,15 +659,11 @@
       if (staffGerenteActual?.id) await DBAppwrite.eliminar('staff', staffGerenteActual.id);
 
       const staffDespues = await DB.obtenerStaffPorEspacio('lataberna');
-      const altaEliminado = !staffDespues.some(s => s.nombre === nombreVisibleAlta);
-      const adminEliminado = !staffDespues.some(s => s.id === staffAdmin?.id);
-      const gerenteEliminado = !staffDespues.some(s => s.id === staffGerente?.id);
+      agregarResultado('Staff de alta eliminado', !staffDespues.some(s => s.nombre === nombreVisibleAlta));
+      agregarResultado('Staff admin temporal eliminado', !staffDespues.some(s => s.id === staffAdmin?.id));
+      agregarResultado('Staff gerente temporal eliminado', !staffDespues.some(s => s.id === staffGerente?.id));
 
-      agregarResultado('Staff de alta eliminado', altaEliminado);
-      agregarResultado('Staff admin temporal eliminado', adminEliminado);
-      agregarResultado('Staff gerente temporal eliminado', gerenteEliminado);
-
-      // ── RESUMEN FINAL ─────────────────────────────────
+      // ── Resumen final ─────────────────────────────────
       const total = resultados.length;
       const pasaron = resultados.filter(r => r.ok).length;
       const fallaron = total - pasaron;

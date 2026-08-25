@@ -1,3 +1,114 @@
+# Tablero de Integración — La Taberna
+
+**Fecha:** 2026-08-25
+
+---
+
+## Estado de células
+
+| Célula | Estado | Archivos clave | Pruebas |
+|--------|:------:|----------------|:-------:|
+| A — Core | ✅ | auth, db, colecciones, repositorios, comandos | 119/119 |
+| B1 — Mesero | ✅ | mesas, bandeja, avisos, comanda, pedido | 44/44 |
+| B2 — Cocina y Barra | ✅ | KDS, recetas | Operativo |
+| B3 — Caja | ✅ | caja, cobro, tickets, managers | Operativo |
+| B4 — Animador | ✅ | eventos-en-vivo | Operativo |
+| C — Cliente | ✅ | registro, login, menú, precargas, avisos | Operativo |
+| D — Administración | ✅ | personal, despensa, reparto, menú, perfil | 85/85 |
+| E — Infraestructura | ✅ | app, bootstrap, Store, EventBus, CSS | Operativo |
+
+---
+
+## Contratos vigentes
+
+- `docs/API-GUIA.md` v5.0.0
+- `docs/EVENTOS.md` v5.1.0
+- `docs/COLECCIONES.md` v3.4.1
+- `docs/PROPIEDAD.md` v1.3.1
+
+---
+
+## Documentos de referencia
+
+| Documento | Propósito |
+|-----------|-----------|
+| `COLECCIONES.md` | Estructura de la base de datos |
+| `API-GUIA.md` | Reglas de integración y API |
+| `EVENTOS.md` | Catálogo de eventos |
+| `PROPIEDAD.md` | Mapa de propiedad de archivos |
+| `ESTADO.md` | Estado general del sistema |
+
+---
+
+## Puntos de conexión
+
+- `Store`: estado central de solo lectura.
+- `EventBus`: comunicación por eventos.
+- `CommandBus`: operaciones de escritura con lógica de negocio.
+- `DBAppwrite`: acceso a Appwrite.
+- `DB`: orquestador de datos locales y remotos.
+- `Auth`: autenticación y roles.
+
+---
+
+## Acceso a vistas
+
+| Vista | Roles con acceso |
+|-------|------------------|
+| mesas | master, admin, gerente, mesero |
+| cocina | master, admin, gerente, chef, cocinaAyudante, barman, barraAyudante |
+| caja | master, admin, gerente, caja |
+| despensa | master, admin, gerente, chef |
+| recetas | master, admin, gerente, chef, cocinaAyudante, barman, barraAyudante |
+| reparto | master, admin, gerente, repartidor |
+| menu | master, admin, gerente, mesero, cliente |
+| eventos | master, admin, gerente, artista |
+| eventos-en-vivo | master, admin, gerente, artista |
+| perfil | todos |
+| config | master, admin |
+| carta-editor | master, admin |
+
+---
+
+## Checklist de validación integral
+
+- [ ] Iniciar sesión con todos los roles.
+- [ ] Alta de staff con cuenta existente y nueva.
+- [ ] Asignación jerárquica de roles.
+- [ ] Crear mesa y verificar persistencia en Appwrite.
+- [ ] Abrir mesa y crear pedido.
+- [ ] Enviar comanda a cocina.
+- [ ] Enviar comanda a barra.
+- [ ] Usuario con roles combinados alternar Cocina/Barra.
+- [ ] Cliente genera aviso de vinculación.
+- [ ] Cliente llama al garzón.
+- [ ] Mesero visualiza avisos en otro dispositivo.
+- [ ] Cliente envía precarga.
+- [ ] Mesero revisa precarga.
+- [ ] Pedir cuenta y cerrar mesa.
+- [ ] Fusionar y deshacer fusión.
+- [ ] Registrar insumo y entrada.
+- [ ] Crear receta intermedia y ejecutar preparación.
+- [ ] Configurar local por espacio.
+- [ ] Validar menú digital.
+- [ ] Validar vista de reparto.
+
+---
+
+## Pendientes de coordinación
+
+1. Prueba integral general con todas las células.
+2. Definición formal del rol artista con B4.
+3. Revisión de deuda técnica de Store y DBAppwrite.
+4. Inicio de reforma del flujo de dinero con B3.
+5. Evaluación de servidor local para operación offline.
+
+
+
+
+......
+
+
 ┌──────────────────────────────────────────────┐
 │ REMITENTE: Coordinador de Integración        │
 │ FECHA:     2026-07-02 00:00 UTC              │

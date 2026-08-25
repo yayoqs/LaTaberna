@@ -1,159 +1,220 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es-CL">
 <head>
   <meta charset="UTF-8">
-  <title>Test D – Zonas y Mesas (Diagnóstico detallado)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
+  <title>Test D — Temporal: Perfil v2</title>
+  <link rel="stylesheet" href="css/vars.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/modals.css">
+  <link rel="stylesheet" href="css/perfil.css">
+  <script src="js/appwrite.min.js"></script>
   <style>
-    body { font-family: system-ui, sans-serif; background: #0f0f14; color: #f1f5f9; padding: 20px; }
-    h1 { color: #f59e0b; }
-    .resultado { background: #1a1a24; border-radius: 8px; padding: 12px 16px; margin: 8px 0; display: flex; align-items: center; gap: 12px; }
-    .ok { border-left: 4px solid #22c55e; }
-    .fallo { border-left: 4px solid #ef4444; }
-    .info { border-left: 4px solid #3b82f6; }
-    .seccion { color: #f59e0b; font-size: 13px; min-width: 100px; }
-    pre { background: #111; color: #94a3b8; padding: 8px; border-radius: 4px; font-size: 11px; margin: 4px 0; white-space: pre-wrap; word-wrap: break-word; }
+    html, body {
+      height: auto;
+      min-height: 100vh;
+      overflow-y: auto;
+      overflow-x: hidden;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      display: block;
+      background: #0f0f14;
+      color: #f1f5f9;
+      font-family: 'Nunito', system-ui, sans-serif;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    .panel-test {
+      background: #1a1a24;
+      border: 1px solid #2e2e42;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+      box-sizing: border-box;
+    }
+    .panel-test h2 { font-size: 18px; margin: 0 0 12px; }
+    .log-positivo { color: #22c55e; font-weight: 700; }
+    .log-error { color: #ef4444; font-weight: 700; }
+    .log-info { color: #60a5fa; font-weight: 700; }
+    code { background: #252535; padding: 2px 6px; border-radius: 4px; }
+    #view-perfil { display: block; height: auto; min-height: 0; overflow: visible; }
+    @media (max-width: 768px) {
+      body { padding: 12px; }
+      .panel-test { padding: 14px; }
+    }
   </style>
 </head>
 <body>
-  <h1>Test D – Zonas y Mesas (Diagnóstico detallado)</h1>
-  <p style="color:#a0a0a0;">Verifica campo por campo qué se envía a Appwrite.</p>
-  <div id="resultados"></div>
-  <div id="toastContainer"></div>
-
-  <script src="js/appwrite.min.js"></script>
-  <script type="module" src="js/lib/logger.js"></script>
-  <script type="module" src="js/lib/eventBus.js"></script>
-  <script type="module" src="js/lib/store.js"></script>
-  <script type="module" src="js/auth.js"></script>
-  <script type="module" src="js/utils.js"></script>
-  <script type="module" src="js/db.js?v=1.1.0"></script>
-  <script type="module" src="js/db-appwrite.js"></script>
+  <div class="panel-test">
+    <h2>Test D — Temporal: Perfil v2</h2>
+    <p style="font-size:13px; color:#94a3b8; margin:0 0 8px;">
+      Verifica la interfaz real de perfil: render, paneles, pestañas, edición y administración de roles.
+    </p>
+    <div id="logTest"></div>
+  </div>
+  <main id="view-perfil"></main>
 
   <script type="module">
-    import { DBAppwrite } from './js/db-appwrite.js';
+    import { Auth } from './js/auth.js';
     import { DB } from './js/db.js';
+    import { DBAppwrite } from './js/db-appwrite.js';
+    import { Logger } from './js/lib/logger.js';
+    import { Perfil } from './js/ui/perfil.js';
 
-    function resultado(ok, seccion, mensaje) {
-      const div = document.createElement('div');
-      const clase = ok === 'info' ? 'info' : (ok ? 'ok' : 'fallo');
-      div.className = 'resultado ' + clase;
-      const icono = ok === 'info' ? 'ℹ' : (ok ? '✔' : '✘');
-      div.innerHTML = `<span>${icono}</span><span class="seccion">[${seccion}]</span><span>${mensaje}</span>`;
-      document.getElementById('resultados').appendChild(div);
+    Logger.setLevel('ERROR');
+    const log = document.getElementById('logTest');
+    const resultados = [];
+
+    function agregarResultado(nombre, ok, detalle = '') {
+      const fila = document.createElement('div');
+      fila.className = ok ? 'log-positivo' : 'log-error';
+      fila.innerHTML = `${ok ? '✅' : '❌'} ${nombre}${detalle ? ` — <code>${detalle}</code>` : ''}`;
+      log.appendChild(fila);
+      resultados.push({ nombre, ok });
     }
-
-    async function esperar(ms) {
-      return new Promise(resolve => setTimeout(resolve, ms));
+    function agregarInfo(mensaje) {
+      const fila = document.createElement('div');
+      fila.className = 'log-info';
+      fila.innerHTML = `ℹ️ ${mensaje}`;
+      log.appendChild(fila);
     }
+    const esperar = ms => new Promise(r => setTimeout(r, ms));
 
-    async function iniciarTest() {
-      if (!DBAppwrite.habilitado) await DBAppwrite.iniciar();
-      if (!DBAppwrite.habilitado) {
-        resultado(false, 'Inicio', 'No se pudo inicializar Appwrite');
+    async function run() {
+      Logger.setLevel('ERROR');
+      log.innerHTML = '';
+
+      await DB.init();
+      await Auth.cerrarSesion();
+      const loginMaster = await Auth.iniciarSesion('master', 'master123');
+      if (!loginMaster) { agregarResultado('Login master', false); return; }
+      agregarResultado('Login master', true);
+
+      // Generar nombre corto (máximo 30 caracteres)
+      const sufijo = Date.now().toString().slice(-8);
+      const nombreAdmin = `tpa_${sufijo}`; // 4 + 8 = 12 caracteres
+      const passwordAdmin = 'Pass12345';
+      agregarInfo(`Creando admin temporal: ${nombreAdmin}`);
+
+      const regAdmin = await Auth.registrarUsuario(nombreAdmin, passwordAdmin);
+      if (!regAdmin.exito) {
+        agregarResultado('Registrar admin temporal', false, regAdmin.error);
         return;
       }
-      resultado(true, 'Inicio', 'Appwrite inicializado');
+      agregarResultado('Registrar admin temporal', true);
 
-      // 1. Limpiar todas las mesas existentes
-      try {
-        const mesasActuales = await DBAppwrite.listar('mesas');
-        for (const mesa of mesasActuales) {
-          await DBAppwrite.eliminar('mesas', mesa.id);
-        }
-        resultado(true, 'Limpieza', `Eliminadas ${mesasActuales.length} mesas`);
-        await esperar(1000);
-      } catch (e) {
-        resultado(false, 'Limpieza', `Error: ${e.message}`);
-        return;
+      const staffAdmin = await DB.crearOActualizarStaff({
+        nombre: 'Admin Perfil Test',
+        usuarioId: regAdmin.usuarioId,
+        espacioId: 'lataberna',
+        roles: ['admin'],
+        rolPrincipal: 'admin',
+        estado: 'activo',
+        tokenVinculacion: ''
+      });
+      if (!staffAdmin) { agregarResultado('Crear staff admin temporal', false); return; }
+      agregarResultado('Crear staff admin temporal', true);
+
+      await Auth.cerrarSesion();
+      const loginAdmin = await Auth.iniciarSesion(nombreAdmin, passwordAdmin);
+      if (!loginAdmin) { agregarResultado('Login admin temporal', false); return; }
+      agregarResultado('Login admin temporal', true);
+
+      Perfil.activar();
+      await esperar(500);
+
+      const vistaPerfil = document.getElementById('view-perfil');
+      agregarResultado('Vista perfil creada', !!vistaPerfil && !!vistaPerfil.querySelector('.main-layout'));
+      agregarResultado('Header perfil existe', !!document.querySelector('#view-perfil .perfil-header'));
+      agregarResultado('Panel izquierdo existe', !!document.getElementById('panelIzquierdoPerfil'));
+      agregarResultado('Panel derecho existe', !!document.getElementById('panelDerechoPerfil'));
+
+      const idCard = document.getElementById('perfilIdCard');
+      agregarResultado('ID card existe', !!idCard);
+      agregarResultado('Nombre visible en ID card', idCard?.textContent.includes(nombreAdmin));
+
+      const modoVitrina = document.getElementById('modoVitrinaPerfil');
+      const modoEdicion = document.getElementById('modoEdicionPerfil');
+      agregarResultado('Modo vitrina visible', modoVitrina && modoVitrina.style.display !== 'none');
+      agregarResultado('Modo edición oculto', modoEdicion && (modoEdicion.style.display === 'none' || !modoEdicion.style.display));
+
+      const btnEditarPerfil = document.getElementById('btnEditarPerfil');
+      agregarResultado('Botón editar perfil existe', !!btnEditarPerfil);
+      if (btnEditarPerfil) {
+        btnEditarPerfil.click();
+        await esperar(300);
+        agregarResultado('Modo edición visible tras clic', modoEdicion && modoEdicion.style.display !== 'none');
+        agregarResultado('Modo vitrina oculto tras clic', modoVitrina && modoVitrina.style.display === 'none');
       }
 
-      // 2. Verificar qué campos tiene realmente la colección listando una mesa (si queda alguna)
-      const mesasPostLimpieza = await DBAppwrite.listar('mesas');
-      resultado(mesasPostLimpieza.length === 0, 'Limpieza', 'Confirmado: 0 mesas en Appwrite');
+      const tabs = document.querySelectorAll('#view-perfil .central-tab');
+      const tabsVisibles = [...tabs].filter(t => t.classList.contains('visible'));
+      agregarResultado('Pestañas visibles existentes', tabsVisibles.length >= 3);
 
-      // 3. Crear UNA mesa manualmente con DBAppwrite.crear para ver la estructura
-      try {
-        const mesaManual = await DBAppwrite.crear('mesas', 'test_1', {
-          numero: 'test_1',
-          estado: 'libre',
-          pedidoId: '',
-          comensales: 1,
-          zona: 'test-zona',
-          esVirtual: false
-        });
-        resultado(!!mesaManual, 'Crear manual', `Mesa creada manualmente: ${mesaManual?.id}`);
-        
-        // Leerla de vuelta para ver qué campos devuelve
-        const mesasDespues = await DBAppwrite.listar('mesas');
-        const mesaLeida = mesasDespues.find(m => m.id === 'test_1');
-        if (mesaLeida) {
-          resultado('info', 'Campos', `Campos devueltos por Appwrite:`);
-          resultado('info', 'Campos', `<pre>${JSON.stringify(mesaLeida, null, 2)}</pre>`);
-          resultado(mesaLeida.zona === 'test-zona', 'Zona manual', 'El campo zona se guardó y recuperó correctamente');
+      const tabPublico = document.querySelector('#view-perfil .central-tab[data-tab="publico"]');
+      agregarResultado('Pestaña pública activa por defecto', tabPublico?.classList.contains('activo'));
+
+      const inputApodo = document.getElementById('editarApodo');
+      if (inputApodo) {
+        inputApodo.value = 'Apodo Temporal';
+        const btnGuardarPublico = document.getElementById('btnGuardarPerfilPublico');
+        if (btnGuardarPublico) {
+          btnGuardarPublico.click();
+          await esperar(300);
+          agregarResultado('Apodo guardado sin errores', true);
         }
-        
-        // Limpiar
-        await DBAppwrite.eliminar('mesas', 'test_1');
+      }
+
+      const tabPrefs = document.querySelector('#view-perfil .central-tab[data-tab="preferencias"]');
+      if (tabPrefs) {
+        tabPrefs.click();
+        await esperar(300);
+        agregarResultado('Pestaña preferencias activada', document.getElementById('tab-preferencias')?.classList.contains('activo'));
+      }
+
+      const tabAdmin = document.querySelector('#view-perfil .central-tab[data-tab="admin"]');
+      agregarResultado('Pestaña admin visible', tabAdmin?.classList.contains('visible'));
+      if (tabAdmin) {
+        tabAdmin.click();
         await esperar(500);
-      } catch (e) {
-        resultado(false, 'Crear manual', `Error: ${e.message}`);
+        const tabAdminContent = document.getElementById('tab-admin');
+        agregarResultado('Pestaña admin activa', tabAdminContent?.classList.contains('activo'));
+        agregarResultado('Botón nuevo staff en pestaña admin', !!tabAdminContent?.querySelector('#btnNuevoStaff'));
+        agregarResultado('Lista personal en pestaña admin', !!tabAdminContent?.querySelector('#listaPersonalContainer'));
       }
 
-      // 4. Ahora probar con DB.sincronizarMesasConConfig
-      try {
-        DB.config = {
-          nombreLocal: 'Test',
-          direccion: '',
-          cuit: '',
-          pieTicket: '',
-          zonas: [
-            { nombre: 'comedor', cantidad: 2 },
-            { nombre: 'barra', cantidad: 1 }
-          ],
-          bloquearStockInsuficiente: true
-        };
-        
-        resultado('info', 'Sincro', 'Ejecutando DB.sincronizarMesasConConfig()...');
-        await DB.sincronizarMesasConConfig();
-        await esperar(1500);
-        
-        const mesasSincro = await DBAppwrite.listar('mesas');
-        resultado('info', 'Sincro', `Mesas después de sincronizar: ${mesasSincro.length}`);
-        
-        if (mesasSincro.length > 0) {
-          resultado('info', 'Sincro', `Primera mesa recibida:`);
-          resultado('info', 'Sincro', `<pre>${JSON.stringify(mesasSincro[0], null, 2)}</pre>`);
-          
-          // Contar por zona
-          const comedor = mesasSincro.filter(m => m.zona === 'comedor');
-          const barra = mesasSincro.filter(m => m.zona === 'barra');
-          resultado(comedor.length === 2, 'Sincro', `Zona "comedor": ${comedor.length} mesas (esperado 2)`);
-          resultado(barra.length === 1, 'Sincro', `Zona "barra": ${barra.length} mesas (esperado 1)`);
-          
-          if (comedor.length === 2) {
-            const nums = comedor.map(m => parseInt(m.numero)).sort((a,b) => a-b);
-            resultado(nums[0] > 0 && nums[1] === nums[0] + 1, 'Sincro nums', `Números comedor: ${nums.join(', ')}`);
-          }
-        }
-        
-        // Limpiar
-        for (const mesa of mesasSincro) {
-          await DBAppwrite.eliminar('mesas', mesa.id);
-        }
-        await esperar(500);
-      } catch (e) {
-        resultado(false, 'Sincro', `Error: ${e.message}`);
+      const btnVolver = document.getElementById('btnVolverVitrina');
+      if (btnVolver) {
+        btnVolver.click();
+        await esperar(300);
+        agregarResultado('Volver a vitrina funciona', modoVitrina && modoVitrina.style.display !== 'none');
       }
 
-      // 5. Restaurar
-      DB.config.zonas = [{ nombre: 'salon', cantidad: 3 }];
-      await DB.sincronizarMesasConConfig();
-      resultado(true, 'Restaurar', 'Restaurado a salón (3 mesas)');
+      await Auth.cerrarSesion();
+      await Auth.iniciarSesion('master', 'master123');
+      if (staffAdmin?.id) await DBAppwrite.eliminar('staff', staffAdmin.id);
+      const staffActual = await DB.obtenerStaffPorEspacio('lataberna');
+      agregarResultado('Staff admin temporal eliminado', !staffActual.some(s => s.id === staffAdmin?.id));
+      await Auth.cerrarSesion();
 
-      console.log('Test detallado completado.');
+      const total = resultados.length;
+      const pasaron = resultados.filter(r => r.ok).length;
+      const fallaron = total - pasaron;
+      const resumen = document.createElement('div');
+      resumen.style.marginTop = '12px';
+      resumen.className = fallaron === 0 ? 'log-positivo' : 'log-error';
+      resumen.innerHTML = `<strong>Resumen:</strong> ${pasaron} correctos, ${fallaron} fallidos.`;
+      log.appendChild(resumen);
+      Logger.info(`[test-D-temporal-perfil-v2] Finalizado. ${pasaron}/${total} correctos.`);
     }
 
-    window.addEventListener('load', () => setTimeout(iniciarTest, 100));
+    window.addEventListener('load', () => run().catch(e => {
+      log.innerHTML += `<div class="log-error">Error: ${e.message}</div>`;
+      console.error(e);
+    }));
   </script>
 </body>
 </html>
