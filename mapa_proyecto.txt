@@ -3,362 +3,95 @@
     📄 MapearVersiones.js
         🔹 function extraerVersion(rutaArchivo) {
         🔹 function recorrerDirectorio(dir) {
-    📄 Prueba-B2-Comandas.html
-        🔹 function idUnico() { return 'c' + (contador++) + '_' + Math.random().toString(36).slice(2,6); }
-        🔹 function inicializarRecetas() {
-        🔹 function crearPedido() {
-        🔹 function sonarAlerta() {
-        🔹 function toast(msg) {
-        🔹 const wrap = document.getElementById('toastWrap');
-        🔹 function crearTicketEl(p) {
-        🔹 const listos = p.items.filter(i => i.listo).length;
-        🔹 row.addEventListener('click', (e) => {
-        🔹 btnPrincipal.addEventListener('click', (e) => {
-        🔹 function renderComandas() {
-        🔹 const porEstado = filtradas.filter(p => p.estado === estadoActivo).sort((a,b) => a.ts - b.ts);
-        🔹 const lista = document.getElementById('listaComandas');
-        🔹 document.getElementById('cNueva').textContent = filtradas.filter(p => p.estado === 'nueva').length;
-        🔹 document.getElementById('cLista').textContent = filtradas.filter(p => p.estado === 'lista').length;
-        🔹 document.getElementById('resumen').innerHTML = `
-        🔹 function actualizarCronometros() {
-        🔹 const p = pedidos.find(x => x.id === el.dataset.id);
-        🔹 function obtenerColorDesdeNombre(nombre) {
-        🔹 function renderRecetas() {
-        🔹 const grid = document.getElementById('recetasGrid');
-        🔹 const receta = recetas.find(r => r.productoId === prod.id);
-        🔹 const ingData = ingredientes.find(i => i.id === ing.ingredienteId);
-        🔹 const receta = recetas.find(r => r.productoId === prod.id);
-        🔹 card.addEventListener('click', () => mostrarDetalleReceta(card.dataset.prodId));
-        🔹 function mostrarDetalleReceta(prodId) {
-        🔹 const prod = productos.find(p => p.id === prodId);
-        🔹 const receta = recetas.find(r => r.productoId === prodId);
-        🔹 const ingData = ingredientes.find(i => i.id === ing.ingredienteId);
-        🔹 overlay.querySelector('.btn-editar-receta').addEventListener('click', () => {
-        🔹 overlay.addEventListener('click', (e) => {
-        🔹 function abrirModalReceta(productoId = null) {
-        🔹 const receta = editando ? recetas.find(r => r.productoId === productoId) : null;
-        🔹 function renderForm() {
-        🔹 const productoActual = productoId ? productos.find(p => p.id === productoId) : null;
-        🔹 const ingData = ingredientes.find(i => i.id === ing.ingredienteId);
-        🔹 overlay.querySelector('#btnAgregarIng').addEventListener('click', () => {
-        🔹 overlay.querySelector('#listaAsignados').addEventListener('click', (e) => {
-        🔹 overlay.querySelector('#btnCancelar').addEventListener('click', () => overlay.remove());
-        🔹 overlay.querySelector('#btnGuardar').addEventListener('click', () => {
-        🔹 const receta = recetas.find(r => r.productoId === productoId);
-        🔹 overlay.addEventListener('click', (e) => {
-        🔹 function setPanel(panel) {
-        🔹 document.getElementById('panelComandas').style.display = panel === 'comandas' ? '' : 'none';
-        🔹 document.getElementById('panelRecetas').style.display = panel === 'recetas' ? '' : 'none';
-        🔹 function aplicarModo(nuevoModo) {
-        🔹 document.getElementById('iconoVista').className = 'fas ' + cat.icono;
-        🔹 document.getElementById('labelPreparacion').textContent = cat.labelPreparacion;
-        🔹 btn.addEventListener('click', () => setPanel(btn.dataset.panel));
-        🔹 document.getElementById('tabsEstado').addEventListener('click', (e) => {
-        🔹 document.getElementById('filtros').addEventListener('click', (e) => {
-        🔹 document.getElementById('btnModo').addEventListener('click', () => {
-        🔹 document.getElementById('recetasSearch').addEventListener('input', (e) => {
-        🔹 document.getElementById('recetasIngredienteSearch').addEventListener('input', (e) => {
-        🔹 document.getElementById('btnNuevaReceta').addEventListener('click', () => abrirModalReceta(null));
-        🔹 function llegaPedidoNuevo() {
-        🔹 function programarLlegadaAleatoria() {
-        🔹 function actualizarReloj() {
-    📄 Prueba-B2-Jefe.html
-        🔹 function _idUnico() { return 'c' + (_contador++) + '_' + Math.random().toString(36).slice(2,6); }
-        🔹 function _crearPedido() {
-        🔹 function _reproducirAlerta() {
-        🔹 function _mostrarToast(msg) {
-        🔹 const cont = document.getElementById('kds-toast-contenedor');
-        🔹 function _crearTicket(p) {
-        🔹 const listos = p.items.filter(i => i.listo).length;
-        🔹 row.addEventListener('click', (ev) => {
-        🔹 btn.addEventListener('click', (ev) => {
-        🔹 btnReabrir.addEventListener('click', (ev) => {
-        🔹 function _pintar() {
-        🔹 const visibles = filtradas.filter(p => p.estado === _estadoActivo).sort((a, b) => a.ts - b.ts);
-        🔹 const lista = document.getElementById('kds-lista');
-        🔹 document.getElementById('kds-resumen').innerHTML = `
-        🔹 function _actualizarCronometros() {
-        🔹 const p = _pedidos.find(x => x.id === el.dataset.id);
-        🔹 function _agregarComanda() {
-        🔹 function _avanzar() {
-        🔹 const candidatos = _pedidos.filter(p => p.estado === estado).sort((a, b) => a.ts - b.ts);
-        🔹 function _retirar() {
-        🔹 const listas = _pedidos.filter(p => p.estado === 'lista').sort((a, b) => a.ts - b.ts);
-        🔹 function _programarLlegada() {
-        🔹 document.getElementById('kds-filtros').addEventListener('click', (e) => {
-        🔹 document.getElementById('kds-pestanas').addEventListener('click', (e) => {
-        🔹 document.getElementById('btnNuevaComanda').addEventListener('click', _agregarComanda);
-        🔹 document.getElementById('btnAvanzar').addEventListener('click', _avanzar);
-        🔹 document.getElementById('btnRetirar').addEventListener('click', _retirar);
-        🔹 document.getElementById('btnModo').addEventListener('click', () => {
-        🔹 document.getElementById('btnRecetario').addEventListener('click', () => {
-        🔹 function _actualizarReloj() {
-    📄 Prueba-B2-PantallaTablet.html
-        🔹 function idUnico() { return 'c' + (contador++) + '_' + Math.random().toString(36).slice(2,6); }
-        🔹 function crearPedido() {
-        🔹 function clasificarTiempo(ms) {
-        🔹 function fmtTiempo(ms) {
-        🔹 function crearTicketHTML(p) {
-        🔹 function filtrarPedidos(lista) {
-        🔹 function render() {
-        🔹 const nuevas = filtrarPedidos(pedidos.filter(p => p.estado === 'nueva'));
-        🔹 const preparacion = filtrarPedidos(pedidos.filter(p => p.estado === 'preparacion'));
-        🔹 const listas = filtrarPedidos(pedidos.filter(p => p.estado === 'lista'));
-        🔹 const pintar = (contId, lista, vacioTxt) => {
-        🔹 const cont = document.getElementById(contId);
-        🔹 document.getElementById('cNueva').textContent = nuevas.length;
-        🔹 document.getElementById('cPreparacion').textContent = preparacion.length;
-        🔹 document.getElementById('cLista').textContent = listas.length;
-        🔹 document.getElementById('resumen').innerHTML = `
-        🔹 btn.addEventListener('click', (e) => {
-        🔹 const pedido = pedidos.find(p => p.id === id);
-        🔹 ticketEl.addEventListener('click', (e) => {
-        🔹 const p = pedidos.find(p => p.id === id);
-        🔹 function abrirDetalle(p) {
-        🔹 overlay.addEventListener('click', (e) => {
-        🔹 document.getElementById('btnNuevaComanda').addEventListener('click', () => {
-        🔹 document.getElementById('btnAvanzar').addEventListener('click', () => {
-        🔹 const candidatos = pedidos.filter(p => p.estado === estado).sort((a, b) => a.ts - b.ts);
-        🔹 document.getElementById('btnRetirar').addEventListener('click', () => {
-        🔹 const listas = pedidos.filter(p => p.estado === 'lista').sort((a, b) => a.ts - b.ts);
-        🔹 document.getElementById('filtros').addEventListener('click', (e) => {
-        🔹 function actualizarReloj() {
-    📄 Prueba-B2-pantallaEncargado.html
-        🔹 function renderizarComensales() {
-        🔹 const grid = document.getElementById('comensalesGrid');
-        🔹 const iniciales = nombre.split(' ').map(n => n.charAt(0).toUpperCase()).slice(0, 2).join('');
-        🔹 document.getElementById('centroComensales').textContent = _comensales.length;
-        🔹 function anadirComensal() {
-        🔹 function renderizarPrecargas() {
-        🔹 const container = document.getElementById('precargasContainer');
-        🔹 function simularPrecarga() {
-        🔹 const iniciales = nombre.split(' ').map(n => n.charAt(0).toUpperCase()).slice(0, 2).join('');
-        🔹 function revisarPrecarga(precargaId) {
-        🔹 const precarga = _precargas.find(p => p.id === precargaId);
-        🔹 document.getElementById('btnCancelarRevision').onclick = () => overlay.remove();
-        🔹 document.getElementById('btnConfirmarRevision').onclick = () => {
-        🔹 function renderizarComanda() {
-        🔹 const container = document.getElementById('comandaItems');
-        🔹 document.getElementById('comandaTotal').textContent = `$${total}`;
-        🔹 const resumen = document.getElementById('comandaResumen');
-        🔹 function agregarComanda() {
-        🔹 function toggleColumna() {
-        🔹 const columna = document.getElementById('columnaIzquierda');
-        🔹 const icono = document.getElementById('toggleColumna').querySelector('i');
-        🔹 function abrirCentro() {
-        🔹 function cerrarCentro() { document.getElementById('modalCentro').classList.remove('visible'); }
-    📄 Prueba-B2-recetas.html
-        🔹 const modal = document.getElementById('modalReceta');
-        🔹 const modalTitulo = document.getElementById('modalTitulo');
-        🔹 function abrirModal(idReceta = null) {
-        🔹 document.getElementById('inputNombre').value = r.nombre;
-        🔹 document.getElementById('inputCapitulo').value = r.capitulo;
-        🔹 document.getElementById('inputNivel').value = r.nivel;
-        🔹 document.getElementById('inputIntermedio').checked = r.es_intermedio;
-        🔹 document.getElementById('inputNombre').value = '';
-        🔹 document.getElementById('inputCapitulo').value = 'salsas';
-        🔹 document.getElementById('inputNivel').value = '';
-        🔹 document.getElementById('inputIntermedio').checked = false;
-        🔹 function cerrarModal() { modal.classList.remove('activo'); }
-        🔹 document.getElementById('btnNuevaReceta').addEventListener('click', () => abrirModal());
-        🔹 document.getElementById('btnCerrarModal').addEventListener('click', cerrarModal);
-        🔹 document.getElementById('btnCancelar').addEventListener('click', cerrarModal);
-        🔹 btn.addEventListener('click', (e) => {
-        🔹 btn.addEventListener('click', () => {
-        🔹 function actualizarSelectorIngredientes() {
-        🔹 const tipo = document.getElementById('tipoIngrediente').value;
-        🔹 const select = document.getElementById('selectorIngrediente');
-        🔹 function pintarIngredientes() {
-        🔹 const lista = document.getElementById('ingredientesLista');
-        🔹 btn.addEventListener('click', () => {
-        🔹 document.getElementById('btnAgregarIng').addEventListener('click', () => {
-        🔹 const tipo = document.getElementById('tipoIngrediente').value;
-        🔹 const select = document.getElementById('selectorIngrediente');
-        🔹 const cantidad = parseFloat(document.getElementById('cantidadIngrediente').value);
-        🔹 document.getElementById('cantidadIngrediente').value = '';
-        🔹 function pintarPasos() {
-        🔹 const editor = document.getElementById('pasosEditor');
-        🔹 input.addEventListener('input', (e) => {
-        🔹 btn.addEventListener('click', () => {
-        🔹 document.getElementById('btnAgregarPaso').addEventListener('click', () => {
-        🔹 document.getElementById('btnGuardar').addEventListener('click', () => {
-        🔹 const nombre = document.getElementById('inputNombre').value.trim();
-        🔹 const capitulo = document.getElementById('inputCapitulo').value;
-        🔹 const nivel = document.getElementById('inputNivel').value.trim().toLowerCase();
-        🔹 const esIntermedio = document.getElementById('inputIntermedio').checked;
-        🔹 const pasosValidos = pasosActuales.filter(p => p.trim());
-        🔹 function actualizarListaRecetas() {
-        🔹 const main = document.getElementById('mainContent');
-        🔹 btn.addEventListener('click', (e) => {
-    📄 Prueba-C-2-PantallaInicio.html
-        🔹 const cyber = document.getElementById('themeCyberpunk');
-        🔹 const clasico = document.getElementById('themeClasica');
-        🔹 const btnCyber = document.getElementById('btnCyber');
-        🔹 const btnClasico = document.getElementById('btnClasico');
-        🔹 const el = document.getElementById('eslogan-cyber');
-        🔹 const el = document.getElementById('eslogan-clasico');
-        🔹 btnCyber.addEventListener('click', () => {
-        🔹 btnClasico.addEventListener('click', () => {
-    📄 Prueba-C-mesaDetalles.html
-        🔹 function cambiarComensales(delta) {
-        🔹 document.getElementById('cantidadComensales').textContent = _comensales;
-        🔹 function cancelarApertura() {
-        🔹 document.getElementById('aperturaForm').style.display = 'none';
-        🔹 function activarModoApertura() {
-        🔹 document.getElementById('aperturaForm').style.display = 'flex';
-        🔹 function renderizarAcciones(estado) {
-        🔹 const container = document.getElementById('accionesContainer');
-        🔹 function abrirCentro(estado, atencion) {
-        🔹 document.getElementById('aperturaForm').style.display = 'none';
-        🔹 const overlay = document.getElementById('modalCentro');
-        🔹 const badge = document.getElementById('centroBadge');
-        🔹 document.getElementById('pagadaMensaje').style.display = estado === 'pagada' ? 'block' : 'none';
-        🔹 document.getElementById('comandaResumen').style.display = estado === 'ocupada' ? 'block' : 'none';
-        🔹 function cerrarCentro() {
-        🔹 document.getElementById('modalCentro').classList.remove('visible');
-        🔹 document.getElementById('modalCentro').addEventListener('click', function(e) {
-    📄 Prueba-D-CreadorCarta.html
-        🔹 const canvas = document.getElementById('canvas');
-        🔹 const sidebar = document.getElementById('sidebar');
-        🔹 const sidebarOverlay = document.getElementById('sidebarOverlay');
-        🔹 const sidebarList = document.getElementById('sidebarList');
-        🔹 const fabBtn = document.getElementById('fabBtn');
-        🔹 const fabOverlayEl = document.getElementById('fabOverlay');
-        🔹 const radialMenu = document.getElementById('radialMenu');
-        🔹 const bottomSheet = document.getElementById('bottomSheet');
-        🔹 const sheetOverlay = document.getElementById('sheetOverlay');
-        🔹 const sheetListEl = document.getElementById('sheetList');
-        🔹 const ctxMenu = document.getElementById('contextMenu');
-        🔹 const propsPanel = document.getElementById('propsPanel');
-        🔹 const propsOverlay = document.getElementById('propsOverlay');
-        🔹 function renderSidebar() {
-        🔹 function abrirSidebar() {
-        🔹 function cerrarSidebar() {
-        🔹 document.getElementById('hamburgerBtn').addEventListener('click', abrirSidebar);
-        🔹 document.getElementById('closeSidebarBtn').addEventListener('click', cerrarSidebar);
-        🔹 sidebarOverlay.addEventListener('click', cerrarSidebar);
-        🔹 document.addEventListener('touchstart', e => {
-        🔹 document.addEventListener('touchend', e => {
-        🔹 sidebarList.addEventListener('click', e => {
-        🔹 document.getElementById('menuName').value = menuActivo.nombre;
-        🔹 fabBtn.addEventListener('click', () => {
-        🔹 fabOverlayEl.addEventListener('click', () => {
-        🔹 btn.addEventListener('click', () => {
-        🔹 function toggleSheet() {
-        🔹 sheetOverlay.addEventListener('click', toggleSheet);
-        🔹 function renderBiblioteca() {
-        🔹 card.addEventListener('dragstart', e => { draggedId = card.dataset.id; });
-        🔹 card.addEventListener('touchstart', e => {
-        🔹 card.addEventListener('touchend', e => {
-        🔹 const prod = productos.find(p => p.id === draggedId);
-        🔹 canvas.addEventListener('dragover', e => e.preventDefault());
-        🔹 canvas.addEventListener('drop', e => {
-        🔹 const prod = productos.find(p => p.id === draggedId);
-        🔹 function crearFicha(tipo, data, x, y) {
-        🔹 ficha.addEventListener('mousedown', startDragFicha);
-        🔹 ficha.addEventListener('touchstart', startDragFichaTouch);
-        🔹 ficha.addEventListener('click', e => { e.stopPropagation(); abrirProps(ficha); });
-        🔹 function abrirProps(ficha) {
-        🔹 document.getElementById('propShape').style.display = (tipo === 'producto') ? '' : 'none';
-        🔹 document.getElementById('propDisplay').style.display = (tipo === 'producto') ? '' : 'none';
-        🔹 document.getElementById('propPrice').style.display = (tipo === 'producto') ? '' : 'none';
-        🔹 document.getElementById('deleteFicha').addEventListener('click', () => {
-        🔹 document.getElementById('propPrice').addEventListener('input', actualizarMargen);
-        🔹 function aplicarProps() {
-        🔹 document.getElementById('propShape').addEventListener('change', aplicarProps);
-        🔹 document.getElementById('propDisplay').addEventListener('change', aplicarProps);
-        🔹 document.getElementById('propPrice').addEventListener('change', aplicarProps);
-        🔹 document.getElementById('propContent').addEventListener('input', aplicarProps);
-        🔹 document.getElementById('previewBtn').addEventListener('click', () => {
-        🔹 const previewContent = document.getElementById('previewContent');
-        🔹 document.getElementById('previewModal').classList.add('active');
-        🔹 document.getElementById('saveBtn').addEventListener('click', () => toast('💾 Borrador guardado'));
-    📄 Prueba-D-despensa.html
-        🔹 const panelIzq = document.getElementById('panelIzquierdo');
-        🔹 const panelDer = document.getElementById('panelDerecho');
-        🔹 const overlay = document.getElementById('overlay');
-        🔹 const mainLayout = document.getElementById('mainLayout');
-        🔹 function abrirPanel(panel) {
-        🔹 function cerrarPaneles() {
-        🔹 overlay.addEventListener('click', cerrarPaneles);
-        🔹 document.getElementById('btnCerrarDer').addEventListener('click', cerrarPaneles);
-        🔹 mainLayout.addEventListener('touchstart', (e) => {
-        🔹 mainLayout.addEventListener('touchend', (e) => {
-        🔹 document.getElementById('btnToggleIzq')?.addEventListener('click', () => {
-        🔹 document.getElementById('btnToggleDer')?.addEventListener('click', () => {
-        🔹 tab.addEventListener('click', () => {
-        🔹 document.getElementById('tab-' + tab.dataset.tab).classList.add('activo');
-        🔹 tab.addEventListener('click', () => {
-        🔹 document.getElementById('central-' + tab.dataset.tab).classList.add('activo');
-        🔹 btn.addEventListener('click', () => {
-        🔹 document.getElementById('btnAddCompra').addEventListener('click', () => {
-        🔹 const input = document.getElementById('inputCompra');
-        🔹 document.getElementById('btnSugerirCompras').addEventListener('click', () => {
-        🔹 function agregarItemCompra(nombre, stockInfo) {
-        🔹 const lista = document.getElementById('listaCompras');
-        🔹 item.querySelector('.btn-quitar').addEventListener('click', () => item.remove());
-        🔹 header.addEventListener('click', () => {
-        🔹 btn.addEventListener('click', (e) => {
-    📄 Prueba-D-perfil.html
-        🔹 const panelIzq = document.getElementById('panelIzquierdo');
-        🔹 const panelDer = document.getElementById('panelDerecho');
-        🔹 const overlay = document.getElementById('overlay');
-        🔹 document.getElementById('btnToggleIzq').addEventListener('click', () => {
-        🔹 document.getElementById('btnToggleDer').addEventListener('click', () => {
-        🔹 overlay.addEventListener('click', () => {
-        🔹 const modoVitrina = document.getElementById('modoVitrina');
-        🔹 const modoEdicion = document.getElementById('modoEdicion');
-        🔹 document.getElementById('btnEditarPerfil').addEventListener('click', () => {
-        🔹 document.getElementById('btnVolver').addEventListener('click', () => {
-        🔹 tab.addEventListener('click', () => {
-        🔹 document.getElementById('tab-' + tab.dataset.tab).classList.add('activo');
-        🔹 btn.addEventListener('click', () => {
-        🔹 document.getElementById('badgeModo').textContent = btn.dataset.modo === 'staff' ? '🛠️' : '🎟️';
-        🔹 slot.addEventListener('click', () => {
-        🔹 previewBtns.forEach(btn => btn.addEventListener('click', () => aplicarRol(btn.dataset.role)));
-        🔹 function aplicarRol(rol) {
-        🔹 const rolAdminTexto = document.getElementById('rolAdminTexto');
-        🔹 document.getElementById('tab-publico').classList.add('activo');
-📁 Vendor/
-    📁 fontawesome/
-        📁 css/
-        📁 webfonts/
+    📄 PantallaInicio-FiestadeLonganiza.html
+    📄 Sandbox-pantalla-inicio.html
+        🔹 const $ = (sel, root=document) => root.querySelector(sel);
+        🔹 const $$ = (sel, root=document) => [...root.querySelectorAll(sel)];
+        🔹 const uid = () => Math.random().toString(36).slice(2,9);
+        🔹 function esc(str){
+        🔹 function escJs(str){
+        🔹 function getByPath(obj, path){
+        🔹 function setByPath(obj, path, value){
+        🔹 function buildInnerHTML(){
+        🔹 const vitrinasHTML = state.vitrinas.map(v => `
+        🔹 function buildModalHTML(){
+        🔹 function buildCSS(){
+        🔹 function buildRuntimeJS(){
+        🔹 function luminancia(hex){
+        🔹 function buildFullHTML(){
+        🔹 function buildModuleJS(){
+        🔹 const inner = buildInnerHTML().split("\n").map(l=>"      "+l).join("\n");
+        🔹 const PantallaInicio = (() => {
+        🔹 function _asegurarVista() {
+        🔹 function _crearModalPortal() {
+        🔹 function _luminancia(hex){
+        🔹 function activar() {
+        🔹 function limpiar() {
+        🔹 function _conectarModalPortal() {
+        🔹 function _desconectarModalPortal() {
+        🔹 function _iniciarEsloganDinamico() {
+        🔹 function _mostrarLogin() {
+        🔹 function mostrar() {
+        🔹 function ocultar() {
+        🔹 function renderControls(){
+        🔹 function accItem(id, titulo, color, bodyHTML){
+        🔹 function syncAccentSwatches(){
+        🔹 function updatePreviewAndCode(){
+        🔹 function renderCodeOutput(){
+        🔹 function showToast(msg){
+    📄 Test-B1-Flujo-completo-Mesero.html
+        🔹 const log = msg => { resultsEl.innerHTML += `<div class="test log">🔍 ${msg}</div>`; };
+        🔹 const pass = msg => { passed++; resultsEl.innerHTML += `<div class="test pass">✔ ${msg}</div>`; };
+        🔹 const fail = msg => { failed++; resultsEl.innerHTML += `<div class="test fail">✘ ${msg}</div>`; };
+        🔹 const esperar = ms => new Promise(r => setTimeout(r, ms));
+        🔹 const maxExistente = mesasExistentes.reduce((max, m) => {
+        🔹 const cuentaPruebas = mesasPrueba.filter(n => mesasActuales.some(m => m.numero === n)).length;
+        🔹 const eliminadaDeAppwrite = await esperarHasta(async () => {
+        🔹 const virtualLocal = DB.mesas.find(m => m.numero === 'cumpleaños');
+        🔹 const originalesLocal = nums.map(n => DB.mesas.find(x => String(x.numero) === String(n))?.estado);
+        🔹 const originalesAppwrite = await esperarHasta(async () => {
+        🔹 const numericos = dom.filter(n => /^\d+$/.test(n)).map(Number);
+        🔹 const ascendente = numericos.every((n,i,a)=>i===0||a[i-1]<n);
+        🔹 const maxDespues = Math.max(...DB.mesas.map(m => parseInt(m.numero) || 0));
+        🔹 const mesaNuevaDB = DB.mesas.find(m => String(m.numero) === mesaNueva);
+        🔹 const mesaNuevaStore = Store.obtenerEstado().mesas.find(m => String(m.numero) === mesaNueva);
+        🔹 const mesaNuevaAppwrite = (await DBAppwrite.listar('mesas')).find(m => m.numero === mesaNueva);
+        🔹 const mesa = mesas.find(m => m.numero === String(baseInicio));
+        🔹 const pedidoLocal = DB.pedidos.find(p => p.id === pedidoId);
+        🔹 const totalQty = items.reduce((s,i)=>s+(i.qty||1),0);
+        🔹 const pendientes = items.map(i => ({ ...i, enviado: false }));
+        🔹 const totalFinal = itemsFinal.reduce((s,i)=>s+(i.qty||1),0);
     📄 analizar_fallas.js
         🔹 function analizarArchivo(rutaCompleta, archivo) {
         🔹 function recorrerYAnalizar(dir) {
-📁 asignar-rol/
-        📄 index.js
 📁 css/
 📁 docs/
+📁 funciones/
+    📁 asignar-rol/
+            📄 index.js
+                🔹 function parsearRoles(staff) {
+    📁 registrar-usuario/
+            📄 index.js
+                🔹 function obtenerIp(req) {
+                🔹 function validarNombreUsuario(nombre) {
+                🔹 function validarPassword(password) {
+                🔹 function generarIdValido(prefijo = 'usr_') {
+                🔹 const lista = (registros.get(ip) || []).filter(ts => ahora - ts < VENTANA_MS);
+    📁 vincular-staff/
+            📄 index.js
 📁 functions/
     📁 sync-pedidos-a-sheets/
             📄 index.js
     📄 index.html
 📁 js/
         📄 app.js
+            🔹 export const App = {
             🔹 const actualizar = () => {
-            🔹 const fechaEl = document.getElementById('currentDate');
-            🔹 const horaEl = document.getElementById('currentTime');
             🔹 function aplicarVH() {
-            🔹 window.addEventListener('resize', aplicarVH);
-            🔹 window.addEventListener('orientationchange', aplicarVH);
-            🔹 document.addEventListener('focusin', (e) => {
             🔹 const onTouchStart = (e) => { touchStartY = e.touches[0].clientY; };
             🔹 const onTouchEnd = (e) => {
-            🔹 document.addEventListener('touchstart', onTouchStart, { passive: true });
-            🔹 document.addEventListener('touchend', onTouchEnd, { passive: true });
             🔹 const limpiarSwipe = () => {
-            🔹 document.addEventListener('vista:cambiada', limpiarSwipe, { once: true });
-            🔹 window.addEventListener('online', () => {
-            🔹 window.addEventListener('offline', () => {
-            🔹 const badge = document.getElementById('syncPendingBadge');
-            🔹 const countSpan = document.getElementById('syncPendingCount');
-            🔹 const indicator = document.getElementById('syncStatusIndicator');
             🔹 function _vincularHeader() {
-            🔹 btn.addEventListener('click', function() {
-            🔹 var logoutBtn = document.getElementById('btnLogout');
-            🔹 logoutBtn.addEventListener('click', function() {
-            🔹 document.addEventListener('DOMContentLoaded', function() {
         📄 appwrite.min.js
             🔹 function __awaiter(thisArg, _arguments, P, generator) {
             🔹 function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
@@ -397,9 +130,6 @@
             🔹 function reviver(_key, value) {
             🔹 class AppwriteException extends Error {
             🔹 class Client {
-            🔹 this.realtime.socket.addEventListener('message', this.realtime.onMessage);
-            🔹 this.realtime.socket.addEventListener('open', _event => {
-            🔹 this.realtime.socket.addEventListener('close', event => {
             🔹 const isSubscribed = data.channels.some(channel => this.realtime.channels.has(channel));
             🔹 const channelStrings = channelArray.map(ch => {
             🔹 class Service {
@@ -414,11 +144,6 @@
             🔹 class TablesDB {
             🔹 class Teams {
             🔹 class Realtime {
-            🔹 socket.addEventListener('open', () => {
-            🔹 socket.addEventListener('message', (event) => {
-            🔹 socket.addEventListener('close', (event) => __awaiter(this, void 0, void 0, function* () {
-            🔹 socket.addEventListener('error', (event) => {
-            🔹 this.socket.addEventListener('close', () => {
             🔹 const ids = subscriptionIds.filter(id => typeof id === 'string' && id.length > 0);
             🔹 const channelStrings = channelArray.map(ch => this.channelToString(ch));
             🔹 const unsubscribe = () => __awaiter(this, void 0, void 0, function* () {
@@ -431,79 +156,53 @@
             🔹 class Channel {
             🔹 class Operator {
         📄 auth.js
-            🔹 function _emailDesdeNombre(nombre) {
-            🔹 const perfil = perfiles.find(p => p.usuarioId === usuarioId);
-            🔹 const usuario = _usuarios.find(u => u.nombre === nombre);
-            🔹 const perfil = perfiles.find(p => p.nombre === nombre);
-            🔹 const idx = _usuarios.findIndex(u => u.nombre === defUser.nombre);
-            🔹 function _guardarUsuarios() { localStorage.setItem('pubpos_usuarios', JSON.stringify(_usuarios)); }
-            🔹 function init() {
+            🔹 export const Auth = (() => {
+            🔹 function _emailDesdeNombre(nombreUsuario) {
+            🔹 function _obtenerDB() {
+            🔹 function iniciar() {
             🔹 function obtenerVistaPorDefecto() {
-            🔹 let usuario = _usuarios.find(u => u.nombre === nombre);
-            🔹 const usuario = _usuarios.find(u => u.nombre === nombre && u.hash === hashIngresado);
             🔹 function mostrarLogin() {
-            🔹 document.getElementById('btnCerrarModalLogin').addEventListener('click', cerrarModalLogin);
-            🔹 document.getElementById('btnModalIngresar').addEventListener('click', _iniciarSesionDesdeModal);
-            🔹 document.getElementById('btnModalRegistrarse').addEventListener('click', _mostrarRegistro);
-            🔹 document.getElementById('btnVolverLogin').addEventListener('click', _mostrarLoginPanel);
-            🔹 document.getElementById('btnModalCrearCuenta').addEventListener('click', _registrarDesdeModal);
             🔹 function _mostrarLoginPanel() {
-            🔹 document.getElementById('loginPanel').style.display = '';
-            🔹 document.getElementById('registroPanel').style.display = 'none';
             🔹 function _mostrarRegistro() {
-            🔹 document.getElementById('loginPanel').style.display = 'none';
-            🔹 document.getElementById('registroPanel').style.display = '';
-            🔹 function cerrarModalLogin() { if (loginModal) loginModal.style.display = 'none'; }
-            🔹 const usuario = document.getElementById('loginUsuario')?.value.trim() || '';
-            🔹 const password = document.getElementById('loginPassword')?.value.trim() || '';
-            🔹 const userInput = document.getElementById('loginUsuario');
-            🔹 const passInput = document.getElementById('loginPassword');
-            🔹 const nombre = document.getElementById('regUsuario')?.value?.trim() || '';
-            🔹 const password = document.getElementById('regPassword')?.value || '';
-            🔹 const passwordConfirm = document.getElementById('regPasswordConfirm')?.value || '';
-            🔹 document.getElementById('regUsuario').value = '';
-            🔹 document.getElementById('regPassword').value = '';
-            🔹 document.getElementById('regPasswordConfirm').value = '';
-            🔹 const idx = _usuarios.findIndex(u => u.nombre === nombreUsuario);
-            🔹 const idx = _usuarios.findIndex(u => u.nombre === nombreUsuario);
-            🔹 const existe = _usuarios.find(u => u.nombre === nombre);
+            🔹 function cerrarModalLogin() {
+            🔹 function _obtenerLocalActivo() {
+            🔹 function obtenerRolesEfectivos() {
+            🔹 function obtenerRolPrincipal() {
             🔹 function obtenerRolEfectivo() {
-            🔹 const local = _usuarioActual.local?.find(l => l.id === _usuarioActual.localActivoId);
-            🔹 function obtenerRol() { return _usuarioActual?.rol || null; }
+            🔹 function tienePermiso(permiso) {
             🔹 function obtenerNombre() { return _usuarioActual?.nombre || ''; }
+            🔹 function obtenerRol() { return obtenerRolPrincipal(); }
             🔹 function obtenerUsuarioActual() {
             🔹 function obtenerLocales() { return _usuarioActual?.local || []; }
-            🔹 function obtenerLocalActivo() {
+            🔹 function obtenerLocalActivo() { return _obtenerLocalActivo(); }
             🔹 function cambiarLocal(localId) {
             🔹 const local = _usuarioActual?.local?.find(l => l.id === localId);
             🔹 function actualizarNombre(nuevoNombre) {
-            🔹 function esMasterReal() { return _usuarioActual?.rol === 'master'; }
-            🔹 function esMaster() { return _usuarioActual?.rol === 'master' && !_rolSimulado; }
-            🔹 function esAdmin() { const r = obtenerRolEfectivo(); return r === 'admin' || r === 'master'; }
+            🔹 function esMasterReal() { return obtenerRolesEfectivos().includes('master'); }
+            🔹 function esMaster() { return esMasterReal() && !_rolSimulado; }
+            🔹 function esAdmin() { return obtenerRolesEfectivos().some(r => r === 'admin' || r === 'master'); }
             🔹 function puede(permiso) { return tienePermiso(permiso); }
-            🔹 function puedeEliminarItemEnviado() { return tienePermiso('eliminarItemEnviado'); }
             🔹 function puedeCerrarMesa() { return tienePermiso('cerrarMesa'); }
-            🔹 function puedeAccederCaja() { return tienePermiso('accederCaja'); }
-            🔹 function puedeAccederCocina() { return tienePermiso('accederCocina'); }
+            🔹 function puedeAccederCaja() { return tienePermiso('verCaja'); }
+            🔹 function puedeAccederCocina() { return tienePermiso('verCocina'); }
             🔹 function puedeCambiarEstadoComanda() { return tienePermiso('cambiarEstadoComanda'); }
             🔹 function puedeEditarProductos() { return tienePermiso('editarProductos'); }
             🔹 function puedeEditarPrecios() { return tienePermiso('editarPrecios'); }
-            🔹 function puedeAccederMenu() { return obtenerRolEfectivo() !== null; }
-            🔹 function puedeAccederPerfil() { return obtenerRolEfectivo() !== null; }
+            🔹 function puedeAccederPerfil() { return obtenerRolesEfectivos().length > 0; }
+            🔹 function puedeGestionarPersonal() { return tienePermiso('gestionarPersonal'); }
+            🔹 function puedeAsignarAdmin() { return tienePermiso('asignarAdmin'); }
+            🔹 function puedeAsignarGerente() { return tienePermiso('asignarGerente'); }
+            🔹 function puedeAsignarStaff() { return tienePermiso('asignarStaff'); }
             🔹 function aplicarRestriccionesUI() {
-            🔹 const userEl = document.getElementById('usuarioActualDisplay');
-            🔹 const roles = el.dataset.rol.split(',').map(r => r.trim());
-            🔹 selectEl.addEventListener('change', function() {
+            🔹 const rolesElemento = el.dataset.rol.split(',').map(r => r.trim());
+            🔹 const mostrar = roles.some(r => rolesElemento.includes(r));
             🔹 function _renderSelectorLocal() {
-            🔹 const container = document.getElementById('localSelectorContainer');
-            🔹 selectEl.addEventListener('change', function() {
             🔹 function _cambiarRolSimulado(rol) {
             🔹 export function inicializarAuth() {
         📄 bootstrap.js
             🔹 const Bootstrap = (() => {
             🔹 const idx = (DB.pedidosDelivery || []).findIndex(p => p.id === datos.id);
             🔹 function _bootstrapArrancar() {
-            🔹 document.addEventListener('DOMContentLoaded', _bootstrapArrancar);
     📁 comandos/
             📄 agregar-mesa.js
                 🔹 export function crearComandoAgregarMesa(datos) {
@@ -511,6 +210,7 @@
             📄 completar-subcomanda.js
                 🔹 export function crearComandoCompletarSubcomanda(idOriginal, destino) {
                 🔹 const comanda = comandas.find(c => c.id === idOriginal);
+                🔹 const ambasListas = destinosComanda.every(d => subcomandas[d] === 'completada');
             📄 crear-pedido-mesa.js
                 🔹 export function crearComandoPedidoMesa(datos) {
                 🔹 const existe = mesas.some(m => m.numero == numeroMesa);
@@ -522,11 +222,18 @@
                 🔹 export function crearComandoLiberarMesa(datos) {
             📄 marcar-agotado.js
         📄 config-appwrite.js
+            🔹 export const APPWRITE_ENDPOINT =
+            🔹 export const APPWRITE_PROJECT_ID =
+            🔹 export const URL_FUNCION_REGISTRAR_USUARIO =
+            🔹 export const URL_FUNCION_ASIGNAR_ROL =
         📄 db-appwrite.js
+            🔹 export const DBAppwrite = (function() {
             🔹 function _obtenerEspacioActivo() {
             🔹 function _esColeccionSinFiltro(coleccion) {
             🔹 function _limpiarFila(fila) {
+            🔹 function _parsearRoles(staff) {
         📄 db-core.js
+            🔹 export const DBCore = (function() {
             🔹 function _validarId(val, prefijo) {
             🔹 function _validarString(val, defecto) {
             🔹 function _validarNumero(val, defecto) {
@@ -534,62 +241,85 @@
             🔹 function _validarDestino(val) {
             🔹 function _validarEstadoMesa(val) {
             🔹 const mesasReales = this.mesas.filter(m => !m.esVirtual);
-            🔹 let maxNumero = Math.max(0, ...mesasReales.map(m => m.numero));
             🔹 const idx = this.pedidos.findIndex(p => p.id === id);
             🔹 const idx = this.pedidosDelivery.findIndex(p => p.id === id);
             🔹 export function mesaVacia(num, zona = 'salon') {
         📄 db-fusion.js
+            🔹 export const DBFusion = (function() {
+            🔹 function _normalizarIdAppwrite(texto) {
             🔹 const mesasSeleccionadas = numeros.map(num => this.getMesa(num)).filter(m => m);
-            🔹 const original = this.mesas.find(m => m.numero === num && !m.esVirtual);
+            🔹 const original = this.mesas.find(m => String(m.numero) === String(num) && !m.esVirtual);
+            🔹 const pedido = this.pedidos.find(p => p.id === m.pedidoId);
             🔹 const idx = this.mesas.findIndex(mesa => mesa.numero === m.numero);
-            🔹 const existe = this.mesas.some(m => String(m.numero) === nombre);
             🔹 const idx = this.mesas.findIndex(m => m.numero === num);
             🔹 const idxVirtual = this.mesas.findIndex(m => m.numero === mesaVirtual.numero);
         📄 db-inventario.js
+            🔹 export const DBInventario = (function() {
             🔹 function _validarId(val, prefijo) {
             🔹 function _validarString(val, defecto) {
             🔹 function _validarNumero(val, defecto) {
             🔹 function _validarBooleano(val, defecto) {
-            🔹 function _resolverIngredientes(recetaId, cantidad, recetas, ingredientes) {
+            🔹 function _resolverInsumos(recetaId, cantidad, recetas, insumos) {
             🔹 const receta = recetas.find(r => r.id === recetaId);
-            🔹 const insumo = ingredientes.find(i => i.id === ing.id);
+            🔹 const insumo = insumos.find(i => i.id === ing.id);
+            🔹 const insumo = this.insumos.find(i => i.id === insumoId);
+            🔹 const receta = this.recetas.find(r => r.id === recetaId);
+            🔹 const producto = (state.productos || []).find(p => p.id === receta.productoId);
             🔹 const receta = this.recetas.find(r => r.productoId === productoId);
             🔹 const receta = this.recetas.find(r => r.productoId === productoId);
-            🔹 const ingrediente = this.ingredientes.find(i => i.id === necesario.ingredienteId);
-            🔹 const ingrediente = this.ingredientes.find(i => i.id === ingredienteId);
+            🔹 const insumo = this.insumos.find(i => i.id === necesario.insumoId);
+            🔹 const insumo = this.insumos.find(i => i.id === insumoId);
         📄 db-shim.js
+            🔹 export const DBShim = (function() {
         📄 db.js
+            🔹 export const DB = (function() {
+            🔹 function _rolesActuales() {
+            🔹 function _validarAsignacionRoles(rolesObjetivo, rolPrincipal) {
+            🔹 const puedeAsignar = rolesObjetivo.every(rolObjetivo =>
+            🔹 const rolesArray = Array.isArray(roles) ? roles : (() => {
+            🔹 const idx = this.staff.findIndex(s => s.usuarioId === usuarioId && s.espacioId === espacioId);
             🔹 const pedido = this.pedidos.find(p => p.id === id);
     📁 dominio/
             📄 cantidad.js
+                🔹 export class Cantidad {
                 🔹 export function crearCantidad(valor) {
             📄 delivery.js
+                🔹 export class Delivery {
                 🔹 const existente = this._items.find(it => it.nombre === nombre);
                 🔹 export function reconstruirDelivery(datos) {
             📄 dinero.js
+                🔹 export class Dinero {
                 🔹 export function crearDinero(monto) {
             📄 direccion.js
+                🔹 export class Direccion {
                 🔹 export function crearDireccion(calle, numero, depto, referencia, telefono) {
             📄 ingrediente.js
+                🔹 export class Ingrediente {
                 🔹 export function reconstruirIngrediente(datos) {
             📄 pedido.js
+                🔹 export class PedidoAgregado {
                 🔹 const existente = this._items.find(it => it.nombre === nombre);
                 🔹 export function reconstruirPedidoAgregado(datos) {
             📄 resultado.js
+                🔹 export class Resultado {
     📁 lib/
             📄 command-bus.js
+                🔹 export const CommandBus = (() => {
                 🔹 function registrar(commandType, handler) {
             📄 deps.js
+                🔹 export const Deps = (() => {
                 🔹 function registrar(nombre, instancia) {
                 🔹 function obtener(nombre) {
                 🔹 function existe(nombre) { return !!_registro[nombre]; }
             📄 eventBus.js
+                🔹 export const EventBus = (() => {
                 🔹 function on(eventType, callback) {
                 🔹 function emit(event, datos) {
                 🔹 function off(eventType, callback) {
                 🔹 function listar() {
                 🔹 function _nombreEvento(eventType) {
             📄 logger.js
+                🔹 export const Logger = (() => {
                 🔹 function setLevel(level) {
                 🔹 function setCollect(active = true) {
                 🔹 function getLogs() { return [..._logBuffer]; }
@@ -601,8 +331,6 @@
                 🔹 function _log(level, levelName, message, args) {
                 🔹 const ErrorHandler = (() => {
                 🔹 function init() {
-                🔹 window.addEventListener('error', (event) => {
-                🔹 window.addEventListener('unhandledrejection', (event) => {
             📄 store.js
                 🔹 const Store = (() => {
                 🔹 function obtenerEstado() {
@@ -623,20 +351,20 @@
                 🔹 function espaciosReducer(espacios, action) {
                 🔹 function espacioActivoReducer(espacioActivo, action) {
                 🔹 function menusReducer(menus, action) {
-                🔹 function precargasClienteReducer(precargas, action) {   // ← nuevo reducer
+                🔹 function precargasClienteReducer(precargas, action) {
+                🔹 function usuarioReducer(usuario, action) {
                 🔹 function clienteReducer(cliente, action) {
     📁 managers/
             📄 pedido-manager.js
+                🔹 export const PedidoManager = (() => {
                 🔹 function init(options = {}) {
                 🔹 function _iniciarNuevoTurno() {
                 🔹 function _cargarAuditLog() {
                 🔹 function _guardarAuditLog() {
                 🔹 function _registrarAuditoria(tipo, datos) {
-                🔹 function crearPedidoDelivery(datos) {
-                🔹 function enviarPedidoDeliveryACocina(deliveryId) {
-                🔹 const pedido = DB.pedidosDelivery.find(p => p.id === deliveryId);
                 🔹 function finalizarTurno() {
             📄 turno-manager.js
+                🔹 export const TurnoManager = (() => {
                 🔹 function _getTurnoActual() {
                 🔹 function _getAuditLog(turnoId) {
                 🔹 function _resetearLocalStorage(turno) {
@@ -647,80 +375,36 @@
                 📄 eventos-en-vivo.js
                     🔹 const EventosEnVivo = (() => {
                     🔹 function _asegurarVista() {
-                    🔹 const main = document.getElementById('view-eventos-en-vivo');
-                    🔹 const referencia = document.getElementById('toastContainer') || document.body.lastChild;
                     🔹 function _construirContenido(contenedor) {
-                    🔹 document.getElementById('btnCrearEvento').addEventListener('click', crearEvento);
-                    🔹 document.getElementById('btnIniciar').addEventListener('click', () => cambiarEstado('activo'));
-                    🔹 document.getElementById('btnPausar').addEventListener('click', () => cambiarEstado('pausado'));
-                    🔹 document.getElementById('btnReiniciar').addEventListener('click', reiniciarEvento);
-                    🔹 document.getElementById('zonaInteraccion').addEventListener('click', (e) => {
                     🔹 function _usuarioAutorizado() {
                     🔹 function render() {
-                    🔹 document.getElementById('panelEventoVivo').innerHTML =
                     🔹 function _actualizarUI() {
-                    🔹 const badge = document.getElementById('estadoEvento');
-                    🔹 const zona = document.getElementById('zonaInteraccion');
-                    🔹 const btnIniciar = document.getElementById('btnIniciar');
-                    🔹 const btnPausar = document.getElementById('btnPausar');
-                    🔹 const btnFinalizar = document.getElementById('btnFinalizar');
-                    🔹 const btnReiniciar = document.getElementById('btnReiniciar');
-                    🔹 const btnCrear = document.getElementById('btnCrearEvento');
                     🔹 function _renderInterfazBingo(datos, estado) {
-                    🔹 const zona = document.getElementById('zonaInteraccion');
                     🔹 function _renderInterfazKaraoke(datos, estado) {
-                    🔹 const zona = document.getElementById('zonaInteraccion');
                     🔹 function _renderInterfazVotacion(datos, estado) {
-                    🔹 const zona = document.getElementById('zonaInteraccion');
-                    🔹 const tipo = document.getElementById('selTipoEvento').value;
-                    🔹 const letra = document.getElementById('letraKaraoke')?.value || '';
-                    🔹 const ta = document.getElementById('letraKaraoke'); if (ta) ta.value = '';
-                    🔹 const input = document.getElementById('nuevaOpcion'); const opcion = input?.value.trim();
                     🔹 function _suscribirTiempoReal() {
                     🔹 function _init() {
         📁 cliente/
             📁 Cambio de pantallas/
                     📄 Prueba-C-1-PantallaInicio.html
-                        🔹 const esloganEl = document.getElementById('eslogan-dinamico');
-                        🔹 const modal = document.getElementById('modalPortal');
-                        🔹 const mImg = document.getElementById('modalImg');
-                        🔹 const mBadge = document.getElementById('modalBadge');
-                        🔹 const mTitulo = document.getElementById('modalTitulo');
-                        🔹 const mIngredientes = document.getElementById('modalIngredientes');
-                        🔹 const mLore = document.getElementById('modalLore');
-                        🔹 const mActionBtn = document.getElementById('modalActionBtn');
-                        🔹 card.addEventListener('click', () => {
-                        🔹 modal.addEventListener('click', (e) => {
-                        🔹 mActionBtn.addEventListener('click', () => {
-                        🔹 const loginCorner = document.getElementById('btnLoginCorner');
+                    📄 Prueba-C-2-PantallaInicio.html
                 📄 menu-digital.js
                     🔹 const MenuDigital = (() => {
                     🔹 function _asegurarVista() {
-                    🔹 let main = document.getElementById('view-menu-digital');
-                    🔹 document.getElementById('menuDigitalSearch').addEventListener('input', () => {
-                    🔹 _terminoBusqueda = document.getElementById('menuDigitalSearch')?.value?.trim() || '';
-                    🔹 document.getElementById('btnToggleOrden').addEventListener('click', _togglePanelOrden);
                     🔹 function activar() {
                     🔹 function limpiar() {
                     🔹 function _crearPanelOrden() {
-                    🔹 const vista = document.getElementById('view-menu-digital');
-                    🔹 document.getElementById('btnConfirmarOrden').addEventListener('click', _confirmarOrden);
                     🔹 function _togglePanelOrden() { _panelOrden.classList.toggle('oculto'); _renderizarItemsOrden(); }
                     🔹 function _renderizarItemsOrden() {
-                    🔹 const container = document.getElementById('ordenItems');
-                    🔹 const totalEl = document.getElementById('ordenTotal');
-                    🔹 btn.addEventListener('click', () => {
                     🔹 const id = btn.dataset.id; const item = items.find(i => i.prodId === id); if (!item) return;
                     🔹 function _actualizarContador() {
                     🔹 const items = Orden.obtenerItems(); const totalCantidad = items.reduce((sum, i) => sum + i.qty, 0);
                     🔹 function mostrar() {
+                    🔹 function ocultar() {
                     🔹 function _actualizarEstado() {
                     🔹 function _verificarPermiso() {
                     🔹 function _renderCategorias() {
-                    🔹 const container = document.getElementById('menuDigitalCategorias'); if (!container) return;
                     🔹 function _renderProductos() {
-                    🔹 const grid = document.getElementById('menuDigitalGrid'); if (!grid) return;
-                    🔹 let productos = (Store.obtenerEstado().productos || []).filter(p => p.activo !== false);
                     🔹 function _initRealtime() {
                 📄 orden.js
                     🔹 const Orden = (() => {
@@ -737,62 +421,30 @@
                 📄 pantalla-bienvenida.js
                     🔹 const PantallaBienvenida = (() => {
                     🔹 function _asegurarVista() {
-                    🔹 let main = document.getElementById('view-bienvenida');
                     🔹 function activar() {
-                    🔹 document.getElementById('btnGuardarMesa').addEventListener('click', _cbBtnGuardar);
-                    🔹 document.getElementById('btnBarra').addEventListener('click', _cbBtnBarra);
-                    🔹 document.getElementById('btnLogout').addEventListener('click', _cbLogout);
-                    🔹 document.getElementById('cardEntretenimientoInicial').addEventListener('click', _cbEventosInicial);
-                    🔹 document.getElementById('cardGastronomicaInicial').addEventListener('click', _cbGastroInicial);
                     🔹 function limpiar() {
                     🔹 function _actualizarPerfil() {
                     🔹 const iniciales = nombre.split(' ').map(n => n.charAt(0).toUpperCase()).slice(0, 2).join('');
-                    🔹 const nombreEl = document.getElementById('bienvenidaNombre');
-                    🔹 const avatarEl = document.getElementById('bienvenidaAvatar');
                     🔹 function _guardarMesa() {
-                    🔹 const input = document.getElementById('inputMesa');
-                    🔹 const estadoEl = document.getElementById('estadoMesa');
-                    🔹 const mesaExiste = mesas.some(m => m.numero === valor);
                     🔹 function _vincularBarra() { _vincular('barra', document.getElementById('estadoMesa')); }
                     🔹 function _vincular(mesaId, estadoEl) {
-                    🔹 const cardIngreso = document.getElementById('cardIngresoMesa');
-                    🔹 const cardEspera = document.getElementById('cardEspera');
-                    🔹 const mensaje = document.getElementById('mensajeGastroInicial');
                     🔹 function _verificarPermisoMesa() {
-                    🔹 const cardEspera = document.getElementById('cardEspera');
-                    🔹 const mensaje = document.getElementById('mensajeGastroInicial');
+                    🔹 const pedidoActivo = pedidos.find(p => String(p.mesa) === String(_mesa) && p.estado === 'abierta');
                     🔹 function _construirPanelControl() {
-                    🔹 const container = document.getElementById('welcomeContainer');
-                    🔹 const avatarPrincipal = document.getElementById('avatarPrincipal');
-                    🔹 document.getElementById('btnHacerPedido').addEventListener('click', _irAlMenu);
-                    🔹 document.getElementById('btnLlamarGarzon').addEventListener('click', _llamarGarzon);
-                    🔹 document.getElementById('cardGastronomica').addEventListener('click', _irAlMenu);
-                    🔹 document.getElementById('cardEntretenimiento').addEventListener('click', _irAEventos);
-                    🔹 document.getElementById('btnAgregarComensal').addEventListener('click', _agregarComensal);
                     🔹 function _llamarGarzon() {
-                    🔹 const btn = document.getElementById('btnLlamarGarzon');
-                    🔹 function _agregarComensal() {
                     🔹 const iniciales = nombre.split(' ').map(n => n.charAt(0).toUpperCase()).slice(0, 2).join('');
-                    🔹 const lista = document.getElementById('listaComensales');
                     🔹 function _actualizarVistazoPedido() {
-                    🔹 const misPrecargas = precargas.filter(p => p.id_usuario === (Auth.getAppwriteUserId?.() || ''));
-                    🔹 const texto = document.getElementById('textoEstadoPedido');
-                    🔹 const badge = document.getElementById('badgeCantidadPedidos');
                     🔹 const totalItems = items.reduce((sum, i) => sum + i.qty, 0);
                     🔹 function obtenerMesa() { return _mesa; }
                     🔹 function permitePrepedidos() { return _permitePrepedidos; }
                     🔹 function _irAEventos() { EventBus.emit('app:cambiarVista', 'eventos'); }
                     🔹 function mostrar() {
-                    🔹 const viewMenu = document.getElementById('view-menu');
-                    🔹 const cardIngreso = document.getElementById('cardIngresoMesa');
-                    🔹 const cardEspera = document.getElementById('cardEspera');
                     🔹 function ocultar() {
                     🔹 function _initRealtime() {
                     🔹 const activo = eventos.find(e => e.estado === 'activo');
                 📄 pantalla-eventos.js
                     🔹 const PantallaEventos = (() => {
                     🔹 function _asegurarVista() {
-                    🔹 let main = document.getElementById('view-eventos-cliente');
                     🔹 function activar() {
                     🔹 function limpiar() {
                     🔹 function mostrar() {
@@ -801,67 +453,56 @@
                     🔹 function _mostrarSinEvento(container, badge, sub) {
                     🔹 function _mostrarEventoActivo(container, badge, sub, evento) {
                     🔹 function _configurarVotacion(evento) {
-                    🔹 btn.addEventListener('click', async () => {
                     🔹 function _initRealtime() {
                 📄 pantalla-inicio.js
                     🔹 const PantallaInicio = (() => {
                     🔹 function _asegurarVista() {
-                    🔹 let main = document.getElementById('view-inicio');
                     🔹 function _crearModalPortal() {
                     🔹 function activar() {
-                    🔹 document.getElementById('btnLoginCorner').addEventListener('click', _cbLoginCorner);
                     🔹 function limpiar() {
-                    🔹 document.getElementById('btnLoginCorner').removeEventListener('click', _cbLoginCorner);
-                    🔹 const btnCerrar = document.getElementById('btnCerrarModalLogin');
                     🔹 function _conectarModalPortal() {
-                    🔹 const modal = document.getElementById('modalPortal');
-                    🔹 const mImg = document.getElementById('modalImg');
-                    🔹 const mBadge = document.getElementById('modalBadge');
-                    🔹 const mTitulo = document.getElementById('modalTitulo');
-                    🔹 const mIngredientes = document.getElementById('modalIngredientes');
-                    🔹 const mLore = document.getElementById('modalLore');
-                    🔹 const mActionBtn = document.getElementById('modalActionBtn');
-                    🔹 card.addEventListener('click', () => {
-                    🔹 modal.addEventListener('click', _cbModalClose);
-                    🔹 const loginCorner = document.getElementById('btnLoginCorner');
-                    🔹 mActionBtn.addEventListener('click', _cbModalAction);
                     🔹 function _desconectarModalPortal() {
-                    🔹 const modal = document.getElementById('modalPortal');
-                    🔹 const mActionBtn = document.getElementById('modalActionBtn');
                     🔹 function _iniciarEsloganDinamico() {
-                    🔹 const esloganEl = document.getElementById('eslogan-dinamico');
                     🔹 function _mostrarLogin() {
-                    🔹 const btnCerrarPrev = document.getElementById('btnCerrarModalLogin');
-                    🔹 const btnCerrar = document.getElementById('btnCerrarModalLogin');
-                    🔹 btnCerrar.addEventListener('click', _cbCerrarModalLogin);
                     🔹 function mostrar() {
                     🔹 function ocultar() {
                 📄 principal.js
+                    🔹 export const ClienteModulo = {
         📁 interno/
+                📄 avisos-mesero.js
+                    🔹 const AvisosMesero = (() => {
+                    🔹 function _crearTriangulo() {
+                    🔹 function _actualizarUI() {
+                    🔹 function _agregarNotificacion(tipo, mesa) {
+                    🔹 function _removerNotificacion(tipo, mesa) {
+                    🔹 function activar() {
+                    🔹 function limpiar() {
                 📄 guia-mesero.js
                     🔹 const GuiaMesero = (() => {
                     🔹 function _iniciar() {
                     🔹 function _crearContenedor() {
                     🔹 function _mostrarPaso() {
-                    🔹 document.getElementById('guia-mesero-btn').addEventListener('click', _siguientePaso);
-                    🔹 document.getElementById('guia-mesero-saltar').addEventListener('click', _finalizar);
                     🔹 function _siguientePaso() {
                     🔹 function _finalizar() {
                     🔹 function activar() {
                 📄 precarga-control.js
-                    🔹 const PrecargaControl = (() => {
+                    🔹 export const PrecargaControl = (() => {
                     🔹 function _onPrecargaEnviada(data) {
                     🔹 function activar() {
     📁 repositorios/
             📄 inventario-repository.js
                 🔹 export function crearInventarioRepo() {
-                🔹 const idx = DB.ingredientes.findIndex(i => i.id == ingrediente.id);
+                🔹 const idx = DB.insumos.findIndex(i => i.id == insumo.id);
             📄 pedido-repository.js
                 🔹 const PedidoRepositoryLocal = (() => {
+                🔹 function _obtenerEspacioId() {
                 🔹 function _normalizarFecha(valor) {
                 🔹 function _sanitizarMesa(m) {
                 🔹 function _sanitizarPedido(p) {
                 🔹 function _sanitizarComanda(c) {
+                🔹 const mesaRemota = mesasRemotas.find(m => m.numero == numeroMesa);
+                🔹 const pedidoActivo = mesa.pedidoId ? DB.pedidos.find(p => p.id === mesa.pedidoId) : null;
+                🔹 const itemsActuales = pedidoActivo ? (() => {
                 🔹 const _crearComanda = (items, destinoKds) => {
                 🔹 const pedidoActualizado = DB.pedidos.find(p => p.id === mesa.pedidoId);
                 🔹 const pedido = DB.pedidos.find(p => p.id === id);
@@ -884,9 +525,11 @@
                 🔹 export function crearRecetaRepo() {
                 🔹 const idx = (DB.recetas || []).findIndex(r => r.id === receta.id);
                 🔹 const idx = (DB.productos || []).findIndex(p => p.id === producto.id);
+                🔹 const idx = (DB.insumos || []).findIndex(i => i.id === insumo.id);
                 🔹 const receta = (DB.recetas || []).find(r => r.id === id);
-                🔹 const ingrediente = (DB.ingredientes || []).find(i => i.id === id);
+                🔹 const insumo = (DB.insumos || []).find(i => i.id === id);
         📄 roles.js
+            🔹 export const Roles = {
     📁 servicios/
             📄 delivery-service.js
                 🔹 const DeliveryService = (() => {
@@ -894,21 +537,17 @@
             📄 inventario-service.js
                 🔹 const InventarioService = (() => {
                 🔹 function configurar(repo) {
-                🔹 function validarStockParaArticulos(items) {
-                🔹 const receta = DB.recetas.find(r => r.productoId == item.prodId);
-                🔹 const ingData = ingredientesState.find(i => i.id === datos.ingredienteId);
+                🔹 const receta = recetasState.find(r => r.productoId == item.prodId);
+                🔹 const ingData = insumosState.find(i => i.id === datos.insumoId);
             📄 pedido-service.js
                 🔹 const PedidoService = (() => {
                 🔹 function configurar(repo) { _pedidoRepo = repo; }
                 🔹 function _reconstruirPedido(datos) {
     📁 ui/
             📄 caja.js
-                🔹 function _asegurarVista() {
-                🔹 const main = document.getElementById('view-caja');
-                🔹 function _construirContenido(contenedor) {
-                🔹 document.getElementById('btnCerrarTurno').addEventListener('click', () => {
-                🔹 document.getElementById('btnVentaBarra').addEventListener('click', () => {
-                🔹 let mesaBarra = mesas.find(m => m.numero === 'barra');
+                🔹 export const Caja = (() => {
+                🔹 function _asegurarVista(signal) {
+                🔹 function _construirContenido(contenedor, signal) {
                 🔹 function activar() {
                 🔹 const unsubscribeStore = Store.suscribir((state, action) => {
                 🔹 const onDbInicializada = () => { if (_estaActiva) render(); };
@@ -921,7 +560,6 @@
                 🔹 const pedidosPendientes = pedidos.filter(p => {
                 🔹 const cubierto = transacciones.reduce((s, t) => s + (t.monto || 0), 0);
                 🔹 const cubierto = (p.transacciones || []).reduce((s, t) => s + (t.monto || 0), 0);
-                🔹 btn.addEventListener('click', () => {
                 🔹 const mesa = (Store.obtenerEstado().mesas || []).find(m => m.numero == numeroMesa);
                 🔹 function _htmlStats(totalVentas, cerradas, promedio, abiertas) {
                 🔹 function _htmlFila(p) {
@@ -932,12 +570,9 @@
                 🔹 function limpiar() {
                 🔹 function render() {
                 🔹 function _renderCategorias() {
-                🔹 btn.addEventListener('click', () => establecerCategoria(btn.dataset.categoria));
                 🔹 function establecerCategoria(cat) {
                 🔹 function filtrar() {
                 🔹 function _renderProductos() {
-                🔹 let productosFiltrados = (Store.obtenerEstado().productos || []).filter(p => p.activo !== false);
-                🔹 card.addEventListener('click', () => seleccionarProducto(card.dataset.prodId));
                 🔹 function _htmlProducto(p) {
                 🔹 function seleccionarProducto(prodId) {
                 🔹 const producto = (Store.obtenerEstado().productos || []).find(p => p.id === prodId);
@@ -945,171 +580,77 @@
                 🔹 const Cobro = (() => {
                 🔹 function _getPedidoService() {
                 🔹 function _asegurarModalCierre() {
-                🔹 document.getElementById('btnCerrarModalCierre').addEventListener('click', cerrarModalCierre);
-                🔹 document.getElementById('btnCancelarCierre').addEventListener('click', cerrarModalCierre);
-                🔹 document.getElementById('btnConfirmarCierre').addEventListener('click', confirmarCierre);
-                🔹 document.getElementById('cierreDescuento').addEventListener('input', actualizarTotalCierre);
-                🔹 document.getElementById('formasPagoContainer').addEventListener('click', (e) => {
                 🔹 function abrirModalCierre(mesaOpcional) {
-                🔹 const obsInput = document.getElementById('comandaObs');
-                🔹 const modal = document.getElementById('modalCierre');
-                🔹 const ppContainer = document.getElementById('pagosParcialesContainer');
-                🔹 const singleContainer = document.getElementById('cierreSingleContainer');
                 🔹 function _renderResumen() {
-                🔹 const resumenEl = document.getElementById('cierreResumen');
-                🔹 const ppContainer = document.getElementById('pagosParcialesContainer');
-                🔹 const singleContainer = document.getElementById('cierreSingleContainer');
                 🔹 function _renderPagosParciales(porPersona) {
-                🔹 const container = document.getElementById('pagosParcialesContainer');
-                🔹 const singleContainer = document.getElementById('cierreSingleContainer');
                 🔹 const pagoExistente = _pagosParciales.find(p => p.persona === persona);
-                🔹 select.addEventListener('change', function() {
-                🔹 input.addEventListener('change', function() {
-                🔹 btn.addEventListener('click', function() {
-                🔹 document.getElementById('btnCobrarTodoJuntoSplit')?.addEventListener('click', () => {
-                🔹 document.getElementById('pagosParcialesContainer').style.display = 'none';
-                🔹 document.getElementById('cierreSingleContainer').style.display = 'block';
                 🔹 function _inicializarPagosParciales() {
                 🔹 function _actualizarSaldoPendiente() {
-                🔹 const infoEl = document.getElementById('saldoPendienteInfo');
                 🔹 function actualizarFormaPagoPersona(persona, forma) {
                 🔹 const pago = _pagosParciales.find(p => p.persona === persona);
                 🔹 function actualizarMontoPersona(persona, montoStr) {
                 🔹 const pago = _pagosParciales.find(p => p.persona === persona);
                 🔹 const pago = _pagosParciales.find(p => p.persona === persona);
-                🔹 const fila = document.getElementById(`fila-${persona.replace(/\s/g, '_')}`);
                 🔹 function cobrarTodoJunto() {
-                🔹 const container = document.getElementById('pagosParcialesContainer');
-                🔹 document.getElementById('cierreSingleContainer').style.display = 'block';
-                🔹 document.getElementById('cierreDescuento').value = 0;
                 🔹 function selectPago(btn) {
                 🔹 function actualizarTotalCierre() {
                 🔹 function _actualizarTotalFinal() {
-                🔹 const descuentoInput = document.getElementById('cierreDescuento');
-                🔹 const totalEl = document.getElementById('cierreTotalFinal');
-                🔹 const ppContainer = document.getElementById('pagosParcialesContainer');
                 🔹 const pendientes = _pagosParciales.filter(p => !p.pagado);
-                🔹 const descuentoInput = document.getElementById('cierreDescuento');
-                🔹 const descuentoAplicado = parseFloat(document.getElementById('cierreDescuento')?.value) || 0;
-                🔹 const pedidoCerrado = Store.obtenerEstado().pedidos.find(p => p.id === _mesaACerrar.pedidoId);
                 🔹 function cerrarModalCierre() {
-                🔹 const modal = document.getElementById('modalCierre');
             📄 comanda.js
                 🔹 const Comanda = (() => {
-                🔹 function _mesasIguales(a, b) {
-                🔹 function _syncMesaStoreADB(mesaActualizada) {
-                🔹 const idx = DB.mesas.findIndex(m => m.numero == mesaActualizada.numero);
+                🔹 function _normalizarItems(items) {
+                🔹 function _obtenerPedidoActivo(mesa) {
+                🔹 function _syncPedidoADB(pedido) {
+                🔹 const idx = DB.pedidos.findIndex(p => p.id === pedido.id);
                 🔹 function _inicializarSincroniaStore() {
-                🔹 const mesaStore = state.mesas.find(m => m.numero == _mesaActiva.numero);
+                🔹 const pedidoStore = (state.pedidos || []).find(p => p.id === _pedidoActivo.id);
+                🔹 function activar() {
                 🔹 function establecerMesaActiva(mesa) {
                 🔹 function _sincronizarCamposHeader() {
-                🔹 const selMozo = document.getElementById('comandaMozo');
-                🔹 const inpComensales = document.getElementById('comandaComensales');
-                🔹 const inpObs = document.getElementById('comandaObs');
                 🔹 function _renderSelectorPersona() {
-                🔹 const container = document.getElementById('personaActivaContainer');
-                🔹 document.getElementById('personaActivaSelect').addEventListener('change', function() {
-                🔹 document.getElementById('btnAgregarPersona').addEventListener('click', agregarPersona);
                 🔹 function establecerPersonaActiva(nombre) {
                 🔹 function agregarItem(producto) {
+                🔹 const pedidoLocal = DB.pedidos.find(p => p.id === _pedidoActivo.id);
+                🔹 const existente = itemsNormalizados.find(it => it.prodId === item.prodId && !it.enviado);
                 🔹 function cambiarCantidad(idx, delta) {
                 🔹 function establecerObservacion(idx, valor) {
                 🔹 function quitarItem(idx) {
                 🔹 function establecerMozo(mozo) {
                 🔹 function establecerComensales(cant) {
                 🔹 function establecerObservacionGeneral(obs) {
-                🔹 function render() {
+                🔹 function render() { _render(); }
                 🔹 function _render() {
-                🔹 const contenedor = document.getElementById('comandaItems');
-                🔹 const subtotalEl = document.getElementById('subtotalDisplay');
-                🔹 const mesaDelStore = state.mesas.find(m => m.numero == _mesaActiva.numero);
-                🔹 btn.addEventListener('click', function() {
-                🔹 input.addEventListener('input', function() {
-                🔹 btn.addEventListener('click', function() {
+                🔹 const pedidoStore = (state.pedidos || []).find(p => p.id === _pedidoActivo.id);
                 🔹 function _htmlItem(item, idx) {
                 🔹 function _inicializarEscuchadores() {
             📄 config.js
                 🔹 const Config = (() => {
                 🔹 function _asegurarVista() {
-                🔹 let main = document.getElementById('view-config');
-                🔹 const referencia = document.getElementById('toastContainer') || document.body.lastChild;
-                🔹 function _vincularEventos() {
-                🔹 document.getElementById('btnAgregarZona')?.addEventListener('click', agregarZona, { signal });
-                🔹 document.getElementById('btnResetearMesas')?.addEventListener('click', resetearMesas, { signal });
-                🔹 document.getElementById('btnGuardarConfig')?.addEventListener('click', guardar, { signal });
-                🔹 document.getElementById('btnAgregarMozo')?.addEventListener('click', agregarMozo, { signal });
-                🔹 document.getElementById('zonasContainer')?.addEventListener('click', (e) => {
-                🔹 document.getElementById('zonasContainer')?.addEventListener('change', (e) => {
-                🔹 document.getElementById('mozosLista')?.addEventListener('click', (e) => {
-                🔹 document.getElementById('usuariosLista')?.addEventListener('click', (e) => {
+                🔹 function _renderSeccionLocal() {
+                🔹 function _renderSeccionZonas() {
+                🔹 function _renderSeccionImpresoras() {
                 🔹 function activar() {
-                🔹 const unsubscribeStore = Store.suscribir((state, action) => {
                 🔹 function limpiar() {
-                🔹 function cargar() {
-                🔹 document.getElementById('cfgNombreLocal').value = config.nombreLocal || '';
-                🔹 document.getElementById('cfgDireccion').value = config.direccion || '';
-                🔹 document.getElementById('cfgCuit').value = config.cuit || '';
-                🔹 document.getElementById('cfgPie').value = config.pieTicket || '';
-                🔹 const chk = document.getElementById('cfgBloquearStock');
-                🔹 function _renderUsuarios() {
-                🔹 const card = document.getElementById('usuariosCard');
-                🔹 const lista = document.getElementById('usuariosLista');
-                🔹 function _renderZonas() {
-                🔹 const container = document.getElementById('zonasContainer');
-                🔹 function _actualizarZona(idx, campo, valor) {
-                🔹 const zonasContainer = document.getElementById('zonasContainer');
-                🔹 const zonasNuevas = Array.from(filas).map(fila => {
-                🔹 nombreLocal: document.getElementById('cfgNombreLocal').value.trim(),
-                🔹 direccion: document.getElementById('cfgDireccion').value.trim(),
-                🔹 cuit: document.getElementById('cfgCuit').value.trim(),
-                🔹 pieTicket: document.getElementById('cfgPie').value.trim(),
-                🔹 bloquearStockInsuficiente: document.getElementById('cfgBloquearStock')?.checked ?? true
-                🔹 function renderMozos() {
-                🔹 const container = document.getElementById('mozosLista');
-                🔹 function agregarMozo() {
-                🔹 const nombre = document.getElementById('nuevoMozoNombre').value.trim();
-                🔹 document.getElementById('nuevoMozoNombre').value = '';
+                🔹 function _abrirPanel() {
+                🔹 function _cerrarPanel() {
+                🔹 function _calcularTopPanel() {
+                🔹 function _ajustarPosicionPanel(panel) {
+                🔹 function _configurarAjusteHeader(signal) {
+                🔹 function _configurarSwipe(signal) {
             📄 cuenta.js
                 🔹 const Cuenta = (() => {
                 🔹 function pedirCuenta() {
-                🔹 const obsInput = document.getElementById('comandaObs');
-                🔹 const badge = document.getElementById('modalEstadoBadge');
         📁 despensa/
                 📄 acciones.js
                     🔹 const ing = ingredientes.find(i => i.nombre.toLowerCase() === nombre.toLowerCase());
                     🔹 const ing = ingredientes.find(i => i.id === ingredienteId);
                 📄 ciclo-vida.js
-                    🔹 const ingredientes = (state.ingredientes || []).filter(i => {
+                    🔹 const insumos = (state.insumos || state.ingredientes || []).filter(i => {
                     🔹 export function activar() {
-                    🔹 tab.addEventListener('click', () => {
-                    🔹 document.getElementById('tab-' + tab.dataset.tab).classList.add('activo');
-                    🔹 tab.addEventListener('click', () => {
-                    🔹 document.getElementById('central-' + tab.dataset.tab).classList.add('activo');
-                    🔹 btn.addEventListener('click', () => {
-                    🔹 document.getElementById('inventarioSearch')?.addEventListener('input', function() {
-                    🔹 const panelIzq = document.getElementById('panelIzquierdo');
-                    🔹 panelIzq.addEventListener('click', (e) => {
-                    🔹 document.getElementById('espaciosContainer')?.addEventListener('click', (e) => {
-                    🔹 document.getElementById('btnExportarCSV')?.addEventListener('click', exportarCSV, { signal });
-                    🔹 document.getElementById('btnExportarPDF')?.addEventListener('click', exportarPDF, { signal });
-                    🔹 document.getElementById('despensaOverlay')?.addEventListener('click', cerrarPaneles, { signal });
-                    🔹 document.getElementById('btnCerrarDer')?.addEventListener('click', cerrarPaneles, { signal });
-                    🔹 document.getElementById('btnToggleIzq')?.addEventListener('click', () => {
-                    🔹 const panel = document.getElementById('panelIzquierdo');
-                    🔹 document.getElementById('btnToggleDer')?.addEventListener('click', () => {
-                    🔹 const panel = document.getElementById('panelDerecho');
-                    🔹 const mainLayout = document.getElementById('despensaMainLayout');
-                    🔹 mainLayout.addEventListener('touchstart', (e) => {
-                    🔹 mainLayout.addEventListener('touchend', (e) => {
-                    🔹 document.getElementById('btnAddCompra')?.addEventListener('click', () => {
-                    🔹 const input = document.getElementById('inputCompra');
-                    🔹 document.getElementById('btnSugerirCompras')?.addEventListener('click', () => {
                     🔹 const actuales = getListaCompras().map(i => i.nombre);
-                    🔹 document.getElementById('listaCompras')?.addEventListener('click', (e) => {
                     🔹 const observer = new MutationObserver(() => {
-                    🔹 const el = document.getElementById(id);
                     🔹 export function limpiar() {
-                    🔹 const main = document.getElementById('view-despensa');
                 📄 estado.js
                     🔹 function _guardar() {
                     🔹 export function getListaCompras() {
@@ -1123,106 +664,46 @@
                 📄 exportacion.js
                     🔹 export function exportarCSV() {
                     🔹 export function exportarPDF() {
-                📄 modal-ingrediente.js
-                    🔹 function _getRepoProv() {
-                    🔹 let modal = document.getElementById('modalIngrediente');
-                    🔹 document.getElementById('btnCerrarModalIng').addEventListener('click', () => cerrar(onGuardado));
-                    🔹 document.getElementById('btnCancelarModalIng').addEventListener('click', () => cerrar(onGuardado));
-                    🔹 document.getElementById('btnGuardarModalIng').addEventListener('click', () => guardar(onGuardado));
-                    🔹 const selectProv = document.getElementById('ingProveedorSelect');
-                    🔹 document.getElementById('ingId').value = ingrediente?.id || '';
-                    🔹 document.getElementById('ingNombre').value = ingrediente?.nombre || '';
-                    🔹 document.getElementById('ingCategoria').value = ingrediente?.categoria || 'general';
-                    🔹 document.getElementById('ingStock').value = ingrediente?.stock || 0;
-                    🔹 document.getElementById('ingUnidad').value = ingrediente?.unidad || 'kg';
-                    🔹 document.getElementById('ingStockMin').value = ingrediente?.stock_minimo || 5;
-                    🔹 document.getElementById('ingUbicacion').value = ingrediente?.ubicacion || '';
-                    🔹 document.getElementById('ingValorUnitario').value = ingrediente?.valor_unitario || 0;
-                    🔹 document.getElementById('ingTitulo').textContent = titulo;
-                    🔹 document.getElementById('btnEliminarModalIng').style.display = esEdicion ? 'inline-flex' : 'none';
+                📄 modal-insumo.js
                     🔹 export function cerrar(onCerrar) {
-                    🔹 const modal = document.getElementById('modalIngrediente');
-                    🔹 const id = document.getElementById('ingId').value;
-                    🔹 const ingredientesActualizados = (state.ingredientes || []).filter(i => i.id != id);
-                    🔹 const id = document.getElementById('ingId').value;
-                    🔹 const nombre = document.getElementById('ingNombre').value.trim();
-                    🔹 const proveedorSeleccionado = document.getElementById('ingProveedorSelect').value;
-                    🔹 const precioProveedor = parseFloat(document.getElementById('ingPrecioProveedor').value) || 0;
-                    🔹 stock: parseFloat(document.getElementById('ingStock').value) || 0,
-                    🔹 unidad: document.getElementById('ingUnidad').value.trim() || 'u',
-                    🔹 stock_minimo: parseFloat(document.getElementById('ingStockMin').value) || 0,
-                    🔹 categoria: document.getElementById('ingCategoria').value,
-                    🔹 ubicacion: document.getElementById('ingUbicacion').value.trim() || '',
-                    🔹 valor_unitario: parseFloat(document.getElementById('ingValorUnitario').value) || 0,
-                    🔹 export function editarIngrediente(id, onGuardado) {
-                    🔹 const ing = ingredientes.find(i => i.id == id);
+                    🔹 const insumosActualizados = (state.insumos || []).filter(i => i.id != id);
+                    🔹 export function editarInsumo(id, onGuardado) {
+                    🔹 const insumo = insumos.find(i => i.id == id);
                 📄 modal-proveedor.js
                     🔹 function _getRepo() {
                     🔹 export function mostrar(proveedor = null, onGuardado = null) {
-                    🔹 let modal = document.getElementById('modalProveedor');
-                    🔹 document.getElementById('btnCerrarModalProv').addEventListener('click', () => cerrar(onGuardado));
-                    🔹 document.getElementById('provId').value = proveedor?.id || '';
-                    🔹 document.getElementById('provNombre').value = proveedor?.nombre || '';
-                    🔹 document.getElementById('provNotas').value = proveedor?.notas || '';
-                    🔹 document.getElementById('provTitulo').textContent = titulo;
                     🔹 export function cerrar(onCerrar) {
-                    🔹 const modal = document.getElementById('modalProveedor');
-                    🔹 const id = document.getElementById('provId').value;
-                    🔹 const nombre = document.getElementById('provNombre').value.trim();
-                    🔹 notas: document.getElementById('provNotas').value.trim()
                 📄 renderer.js
                     🔹 export function asegurarVista() {
-                    🔹 let main = document.getElementById('view-despensa');
-                    🔹 const referencia = document.getElementById('toastContainer') || document.body.lastChild;
                     🔹 function _normalizarIngredientes(ingredientes) {
                     🔹 export function renderResumen(ingredientes) {
-                    🔹 const bar = document.getElementById('resumenBar');
                     🔹 const bajoMin = validos.filter(i => i.stock <= i.stock_minimo).length;
                     🔹 const valorTotal = validos.reduce((s, i) => s + i.stock * (i.valor_unitario || 0), 0);
                     🔹 export function renderEspacios(ingredientes) {
-                    🔹 const container = document.getElementById('espaciosContainer');
                     🔹 const algunBajo = items.some(i => i.stock <= i.stock_minimo);
                     🔹 export function renderMovimientos(filtro = 'todos') {
-                    🔹 const cont = document.getElementById('movimientosContainer');
                     🔹 const filtrados = filtro === 'todos' ? movs : movs.filter(m => m.tipo === filtro);
                     🔹 export function renderListaCompras(items) {
-                    🔹 const lista = document.getElementById('listaCompras');
                     🔹 export function renderProveedores(proveedores) {
-                    🔹 const tab = document.getElementById('tab-proveedores');
                     🔹 export function renderProductosDisponibles(productos) {
-                    🔹 const tab = document.getElementById('tab-productos');
                     🔹 function _calcularTopPanel() {
                     🔹 function _ajustarPosicionPanel(panel) {
                     🔹 export function abrirPanelIzquierdo() {
-                    🔹 const panel = document.getElementById('panelIzquierdo');
                     🔹 export function abrirPanelDerecho() {
-                    🔹 const panel = document.getElementById('panelDerecho');
                     🔹 export function cerrarPaneles() {
-                    🔹 document.getElementById('panelIzquierdo')?.classList.remove('abierto');
-                    🔹 document.getElementById('panelDerecho')?.classList.remove('abierto');
-                    🔹 document.getElementById('despensaOverlay')?.classList.remove('activo');
             📄 despensa.js
             📄 eventos.js
                 🔹 const Eventos = (() => {
                 🔹 function _asegurarVista() {
-                🔹 let main = document.getElementById('view-eventos');
-                🔹 const referencia = document.getElementById('toastContainer') || document.body.lastChild;
                 🔹 function render() {
                 🔹 function activar() {
                 🔹 function limpiar() {
             📄 kds.js
                 🔹 function _cambiarEstado(id, estado) {
-                🔹 let c = comandas.find(x => x.id === id);
                 🔹 function _actualizarLocal(id, cambios) {
                 🔹 const i = _comandas.findIndex(c => c.id === id);
                 🔹 function _asegurarVista() {
-                🔹 let main = document.getElementById('view-cocina');
                 🔹 function _construirVista(main) {
-                🔹 document.getElementById('kds-filtros').addEventListener('click', e => {
-                🔹 document.getElementById('kds-pestanas').addEventListener('click', e => {
-                🔹 const lista = document.getElementById('kds-lista');
-                🔹 lista.addEventListener('touchstart', e => {
-                🔹 lista.addEventListener('touchend', e => {
                 🔹 function _activarPestana(estado) {
                 🔹 function _clasificarTiempo(ms) {
                 🔹 function _formatearTiempo(ms) {
@@ -1232,56 +713,29 @@
                 🔹 const startLongPress = (e) => {
                 🔹 const cancelLongPress = () => clearTimeout(longPressTimer);
                 🔹 const handleClick = (ev) => {
-                🔹 row.addEventListener('touchstart', startLongPress, { passive: true });
-                🔹 row.addEventListener('touchend', cancelLongPress);
-                🔹 row.addEventListener('touchmove', cancelLongPress);
-                🔹 row.addEventListener('mousedown', startLongPress);
-                🔹 row.addEventListener('mouseup', cancelLongPress);
-                🔹 row.addEventListener('mouseleave', cancelLongPress);
-                🔹 row.addEventListener('click', handleClick);
-                🔹 btn.addEventListener('click', ev => {
-                🔹 btnReabrir.addEventListener('click', ev => {
                 🔹 function _pintar() {
-                🔹 const lista = document.getElementById('kds-lista');
-                🔹 document.getElementById('kds-resumen').innerHTML = `
                 🔹 function recargar() {
                 🔹 const itemsCocina = c.items.filter(it => it.destino === 'cocina' || it.destino === 'ambos');
                 🔹 const itemsBarra = c.items.filter(it => it.destino === 'barra' || it.destino === 'ambos');
+                🔹 function _actualizarControlDestino(veCocina, veBarra) {
                 🔹 function activar() {
                 🔹 function limpiar() {
-                🔹 const main = document.getElementById('view-cocina');
+                🔹 export const KDS = { refresh: recargar, activar, limpiar };
         📁 menu/
                 📄 acciones.js
                     🔹 const idx = menus.findIndex(m => m.id === menu.id);
                 📄 barra-lateral.js
-                    🔹 const lista = document.getElementById('menuSidebarList');
-                    🔹 lista.addEventListener('click', (e) => {
-                    🔹 document.getElementById('menuNuevoBtn')?.addEventListener('click', crearNuevoMenu);
                     🔹 export function refrescarLista() {
                     🔹 export function seleccionarMenu(id) {
                     🔹 const menu = menus.find(m => m.id === id);
                     🔹 export function toggle() {
-                    🔹 const sidebar = document.getElementById('menuSidebar');
                     🔹 const menu = menus.find(m => m.id === id);
                     🔹 const menusActualizados = menus.filter(m => m.id !== id);
-                    🔹 document.getElementById('menuNameInput').value = '';
-                    🔹 const canvas = document.getElementById('menuCanvas');
                 📄 biblioteca.js
                     🔹 export function inicializar(onProductoAgregado) {
-                    🔹 const sheetList = document.getElementById('menuSheetList');
-                    🔹 sheetList.addEventListener('dragstart', (e) => {
-                    🔹 sheetList.addEventListener('touchstart', (e) => {
-                    🔹 sheetList.addEventListener('touchmove', (e) => {
-                    🔹 sheetList.addEventListener('touchend', (e) => {
-                    🔹 const canvas = document.getElementById('menuCanvas');
-                    🔹 const canvas = document.getElementById('menuCanvas');
-                    🔹 canvas.addEventListener('dragover', (e) => e.preventDefault());
-                    🔹 canvas.addEventListener('drop', (e) => {
                     🔹 export function refrescar() {
-                    🔹 let productos = (state.productos || []).filter(p => p.activo !== false);
                     🔹 const receta = (state.recetas || []).find(r => r.productoId === p.id);
                     🔹 export function toggle() {
-                    🔹 const sheet = document.getElementById('menuBottomSheet');
                     🔹 function obtenerProductoPorId(id) {
                     🔹 const producto = (state.productos || []).find(p => p.id === id);
                     🔹 const receta = (state.recetas || []).find(r => r.productoId === id);
@@ -1290,52 +744,12 @@
                 📄 ciclo-vida.js
                     🔹 export function activar() {
                     🔹 const unsubscribeStore = Store.suscribir((state, action) => {
-                    🔹 document.getElementById('menuNameInput').value = menu.nombre;
                     🔹 export function limpiar() {
-                    🔹 function _aplicarEstilos(menu) {
-                    🔹 const canvas = document.getElementById('menuCanvas');
-                    🔹 document.getElementById('menuBgSelect').value = menu.fondo || '#1a1a2e';
-                    🔹 document.getElementById('menuFontSelect').value = menu.tipografia || "'Inter', sans-serif";
-                    🔹 document.getElementById('menuGridToggle').checked = menu.grilla || false;
-                    🔹 function _guardarEstilosEnMenu() {
-                    🔹 menu.fondo = document.getElementById('menuBgSelect').value;
-                    🔹 menu.tipografia = document.getElementById('menuFontSelect').value;
-                    🔹 menu.grilla = document.getElementById('menuGridToggle').checked;
                     🔹 function onMenuSeleccionado(menu) {
-                    🔹 document.getElementById('menuNameInput').value = menu.nombre;
                     🔹 function onProductoAgregado(producto, x, y) {
                     🔹 function _vincularEventosDOM(signal) {
-                    🔹 document.getElementById('menuHamburgerBtn')?.addEventListener('click', abrirSidebar, { signal });
-                    🔹 document.getElementById('menuFabBtn')?.addEventListener('click', toggleFabMenu, { signal });
-                    🔹 document.getElementById('menuFabOverlay')?.addEventListener('click', toggleFabMenu, { signal });
-                    🔹 btn.addEventListener('click', () => {
-                    🔹 const canvas = document.getElementById('menuCanvas');
-                    🔹 document.getElementById('menuCanvas')?.addEventListener('click', (e) => {
-                    🔹 document.getElementById('menuClosePropsBtn')?.addEventListener('click', () => {
-                    🔹 document.getElementById('menuPropsOverlay')?.addEventListener('click', () => {
-                    🔹 document.getElementById('menuDeleteFichaBtn')?.addEventListener('click', () => {
-                    🔹 document.getElementById('menuCtxBtn')?.addEventListener('click', () => {
-                    🔹 document.getElementById('menuContextMenu')?.classList.toggle('active');
-                    🔹 document.getElementById('menuBgSelect')?.addEventListener('change', function() {
-                    🔹 const canvas = document.getElementById('menuCanvas');
-                    🔹 document.getElementById('menuFontSelect')?.addEventListener('change', function() {
-                    🔹 const canvas = document.getElementById('menuCanvas');
-                    🔹 document.getElementById('menuGridToggle')?.addEventListener('change', function() {
-                    🔹 document.getElementById('menuCanvas')?.classList.toggle('grid', this.checked);
-                    🔹 document.getElementById('menuSaveBtn')?.addEventListener('click', async () => {
-                    🔹 menu.nombre = document.getElementById('menuNameInput')?.value || 'Sin nombre';
-                    🔹 document.getElementById('menuPublishBtn')?.addEventListener('click', async () => {
-                    🔹 menu.nombre = document.getElementById('menuNameInput')?.value || menu.nombre;
-                    🔹 document.getElementById('menuContextMenu')?.classList.remove('active');
-                    🔹 document.getElementById('menuPreviewBtn')?.addEventListener('click', () => {
-                    🔹 const canvas = document.getElementById('menuCanvas');
-                    🔹 const previewContent = document.getElementById('menuPreviewContent');
-                    🔹 document.getElementById('menuPreviewModal')?.classList.add('active');
-                    🔹 document.getElementById('menuClosePreviewBtn')?.addEventListener('click', () => {
-                    🔹 document.getElementById('menuPreviewModal')?.classList.remove('active');
                     🔹 function agregarFichaNoProducto(tipo, data) {
                     🔹 function _serializarLienzo() {
-                    🔹 const canvas = document.getElementById('menuCanvas');
                 📄 estado.js
                     🔹 export function getMenuActivo() {
                     🔹 export function setMenuActivo(menu) {
@@ -1348,109 +762,47 @@
                     🔹 export function quitarProductoDelMenu(productoId) {
                 📄 modal-propiedades.js
                     🔹 export function abrir(ficha, onCambio) {
-                    🔹 const panel = document.getElementById('menuPropsPanel');
-                    🔹 const overlay = document.getElementById('menuPropsOverlay');
-                    🔹 document.getElementById('menuPropShape').value = ficha.dataset.shape || 'rect';
-                    🔹 document.getElementById('menuPropDisplay').value = ficha.dataset.display || 'both';
-                    🔹 document.getElementById('menuPropPrice').value = ficha.dataset.price || 0;
-                    🔹 document.getElementById('menuPropCost').textContent = formatearDinero(ficha.dataset.cost || 0);
-                    🔹 document.getElementById('menuPropContent').value = ficha.dataset.content || '';
                     🔹 export function cerrar() {
-                    🔹 document.getElementById('menuPropsPanel')?.classList.remove('active');
-                    🔹 document.getElementById('menuPropsOverlay')?.classList.remove('active');
                     🔹 export function guardarCambios() {
-                    🔹 _fichaActual.dataset.shape = document.getElementById('menuPropShape').value;
-                    🔹 _fichaActual.dataset.display = document.getElementById('menuPropDisplay').value;
-                    🔹 _fichaActual.dataset.price = document.getElementById('menuPropPrice').value;
-                    🔹 _fichaActual.dataset.content = document.getElementById('menuPropContent').value;
                     🔹 export function eliminarFicha() {
                     🔹 function actualizarMargenLocal() {
-                    🔹 const costoText = document.getElementById('menuPropCost').textContent || '';
-                    🔹 const precio = parseFloat(document.getElementById('menuPropPrice').value) || 0;
-                    🔹 const spanMargen = document.getElementById('menuPropMargin');
                 📄 renderer.js
                     🔹 export function asegurarVista() {
-                    🔹 let main = document.getElementById('view-carta-editor');
-                    🔹 const referencia = document.getElementById('toastContainer') || document.body.lastChild;
                     🔹 export function renderSidebar(menus, menuActivo) {
-                    🔹 const lista = document.getElementById('menuSidebarList');
                     🔹 export function renderBiblioteca(productos) {
-                    🔹 const lista = document.getElementById('menuSheetList');
                     🔹 export function renderLienzo(productos) {
-                    🔹 const canvas = document.getElementById('menuCanvas');
                     🔹 export function abrirSidebar() {
-                    🔹 document.getElementById('menuSidebar')?.classList.add('active');
-                    🔹 document.getElementById('menuSidebarOverlay')?.classList.add('active');
                     🔹 export function cerrarSidebar() {
-                    🔹 document.getElementById('menuSidebar')?.classList.remove('active');
-                    🔹 document.getElementById('menuSidebarOverlay')?.classList.remove('active');
                     🔹 export function toggleFabMenu() {
-                    🔹 const menu = document.getElementById('menuRadialMenu');
-                    🔹 const overlay = document.getElementById('menuFabOverlay');
-                    🔹 const fab = document.getElementById('menuFabBtn');
                     🔹 export function abrirBiblioteca() {
-                    🔹 document.getElementById('menuBottomSheet')?.classList.add('active');
-                    🔹 document.getElementById('menuSheetOverlay')?.classList.add('active');
                     🔹 export function cerrarBiblioteca() {
-                    🔹 document.getElementById('menuBottomSheet')?.classList.remove('active');
-                    🔹 document.getElementById('menuSheetOverlay')?.classList.remove('active');
             📄 menu.js
             📄 mesa-detalles.js
                 🔹 const MesaDetalles = (() => {
-                🔹 function _onTouchStart(e) {
+                🔹 function _obtenerPedidoDeMesa(mesa) {
                 🔹 function _onTouchEnd(e) {
-                🔹 const columna = document.getElementById('columnaIzquierda');
                 🔹 function _asegurarModal() {
-                🔹 if (document.getElementById('modalMesaDetalles')) return;
-                🔹 document.getElementById('btnCerrarMesaDetalles').addEventListener('click', cerrar);
-                🔹 overlay.addEventListener('click', function(e) {
-                🔹 const columna = document.getElementById('columnaIzquierda');
-                🔹 columna.addEventListener('touchstart', _onTouchStart, { passive: true });
-                🔹 columna.addEventListener('touchend', _onTouchEnd, { passive: true });
-                🔹 document.getElementById('columnaDerecha').addEventListener('click', function(e) {
+                🔹 function _mostrarSeccionEspera(infoAtencion, mesa) {
                 🔹 function _renderizarEstado(mesa) {
-                🔹 const badge = document.getElementById('mdEstado');
-                🔹 const centroBody = document.getElementById('centroBody');
-                🔹 const columnaIzquierda = document.getElementById('columnaIzquierda');
-                🔹 const datosContainer = document.getElementById('centroDatos');
-                🔹 const comandaResumen = document.getElementById('comandaResumen');
-                🔹 const pagadaMensaje = document.getElementById('pagadaMensaje');
-                🔹 const seccionEspera = document.getElementById('seccionEspera');
-                🔹 const aperturaForm = document.getElementById('aperturaForm');
-                🔹 document.getElementById('mdMozo').textContent = mesa.mozo || '—';
-                🔹 document.getElementById('mdComensales').textContent = mesa.comensales || 0;
                 🔹 function _htmlDatosBasicos(mesa) {
                 🔹 function _renderizarComensales(personas) {
-                🔹 const grid = document.getElementById('comensalesGrid');
                 🔹 const iniciales = nombre.split(' ').map(n => n.charAt(0).toUpperCase()).slice(0, 2).join('');
-                🔹 function _renderizarComanda(mesa) {
-                🔹 const container = document.getElementById('comandaResumen');
+                🔹 function _renderizarComanda() {
                 🔹 const total = items.reduce((sum, i) => sum + (i.precio || 0) * (i.qty || 1), 0);
                 🔹 function _renderizarAcciones(estado) {
-                🔹 const container = document.getElementById('accionesContainer');
                 🔹 function activarModoApertura() {
-                🔹 const form = document.getElementById('aperturaForm');
-                🔹 function cambiarComensales(delta) {
-                🔹 document.getElementById('cantidadComensales').textContent = _comensalesApertura;
-                🔹 function cancelarApertura() {
-                🔹 document.getElementById('aperturaForm').style.display = 'none';
-                🔹 const mozo = document.getElementById('mozoActivo')?.value || 'Mozo';
-                🔹 const mesaActualizada = mesas.find(m => m.numero == num);
-                🔹 function _tiempoDesde(ts) {
+                🔹 const mesaActualizada = Store.obtenerEstado().mesas.find(m => m.numero == num);
                 🔹 function abrir(numMesa) {
                 🔹 const mesa = mesas.find(m => m.numero == numMesa);
-                🔹 document.getElementById('modalMesaDetalles').style.display = 'flex';
                 🔹 function cerrar() {
-                🔹 const overlay = document.getElementById('modalMesaDetalles');
-                🔹 function pedirCuenta() { cerrar(); if (Cuenta && Cuenta.pedirCuenta) Cuenta.pedirCuenta(); }
-                🔹 function cerrarMesa() { cerrar(); if (Cobro && Cobro.abrirModalCierre) Cobro.abrirModalCierre(); }
-                🔹 function aceptarVinculacion(numMesa) {
-                🔹 const mesa = mesas.find(m => m.numero == numMesa);
-                🔹 const mesaDB = DB.mesas.find(m => m.numero == numMesa);
+                🔹 function pedirCuenta() { cerrar(); Cuenta?.pedirCuenta(); }
+                🔹 function cerrarMesa() { cerrar(); Cobro?.abrirModalCierre(); }
+                🔹 const mesa = Store.obtenerEstado().mesas.find(m => m.numero == numMesa);
                 🔹 function cargarPrecarga(precargaId) {
         📁 mesas/
                 📄 acciones-mesa.js
-                    🔹 function agregarMesa() {
+                    🔹 const existe = mesasAppwrite.some(m => String(m.numero) === String(nuevoNum));
+                    🔹 const existenteLocal = DB.mesas.find(m => String(m.numero) === String(nuevoNum));
                     🔹 function labelEstado(estado) { return LABELS[estado] || estado; }
                     🔹 function setBadge(numMesa, cantidad, precargaId) {
                     🔹 function clearBadge(numMesa) {
@@ -1462,24 +814,41 @@
                     🔹 const precarga = notificaciones.find(n => n.tipo === 'precarga');
                     🔹 function clearBadgeAtencion(numMesa) {
                     🔹 function setZona(zona) {
+                📄 admin-zonas.js
+                    🔹 function _obtenerZonas() {
+                    🔹 function _renderFilas(zonas, contenedor) {
+                    🔹 const zonasNuevas = Array.from(filas).map(fila => {
+                    🔹 const docGlobal = existente.find(d => d.clave === 'global');
+                    🔹 export function renderZonas(contenedorId) {
+                📄 bandeja-atencion.js
+                    🔹 function _asegurarOverlay() {
+                    🔹 function _renderSolicitudes() {
+                    🔹 function _eliminarSolicitud(id) {
+                    🔹 function _agregarSolicitud(tipo, mesa, datos = {}) {
+                    🔹 const existente = _solicitudes.find(s => s.tipo === tipo && String(s.mesa) === String(mesa));
+                    🔹 function _onTouchStart(e) {
+                    🔹 function _onTouchEnd(e) {
+                    🔹 export function abrirBandeja() {
+                    🔹 export function cerrarBandeja() {
+                    🔹 export function activar() {
+                    🔹 export function limpiar() {
+                    🔹 export const BandejaAtencion = {
                 📄 ciclo-vida.js
                     🔹 export function activar() {
-                    🔹 document.getElementById('btnAgregarMesa')?.addEventListener('click', agregarMesa, { signal });
-                    🔹 document.getElementById('btnFusionar')?.addEventListener('click', toggleModoFusion, { signal });
                     🔹 const unsubscribeStore = Store.suscribir((state, action) => {
                     🔹 export function limpiar() {
                 📄 constantes.js
+                    🔹 export const ICONOS = {
+                    🔹 export const LABELS = {
                 📄 estado-comandas.js
                     🔹 export function getEstadoComandas(mesaNumero) {
                     🔹 export function colorEstado(estado) {
                 📄 fusion.js
                     🔹 export function toggleModoFusion() {
-                    🔹 const btnFusionar = document.getElementById('btnFusionar');
-                    🔹 const btnConfirmar = document.getElementById('btnConfirmarFusion');
                     🔹 export function toggleSeleccionMesa(num, isChecked) {
                     🔹 const numeros = Array.from(seleccionadas).sort((a, b) => {
-                    🔹 const mozo = document.getElementById('mozoActivo')?.value || 'Mozo';
                 📄 notificaciones.js
+                    🔹 function _clave(numMesa) {
                     🔹 function getNotificaciones(numMesa) {
                     🔹 function addNotificacion(numMesa, tipo, datos = {}) {
                     🔹 const idx = lista.findIndex(n => n.tipo === tipo);
@@ -1494,42 +863,22 @@
                     🔹 export function limpiarSeleccion() { _mesasSeleccionadas.clear(); }
                     🔹 export function setZonaActiva(zona) { _zonaActiva = zona; }
                     🔹 export function getZonaActiva() { return _zonaActiva; }
+                    🔹 export function setVistaActiva(valor) {
+                    🔹 export function isVistaActiva() { return _vistaActiva; }
                     🔹 function _getZonaColor(zonaNombre) {
                     🔹 const idx = zonas.findIndex(z => z.nombre === zonaNombre);
                     🔹 export function renderZoneButtons() {
-                    🔹 const container = document.getElementById('zonaButtonsContainer');
-                    🔹 btnTodas.addEventListener('click', () => {
-                    🔹 btn.addEventListener('click', () => {
                     🔹 export function renderGrid() {
-                    🔹 const grid = document.getElementById('mesasGrid');
-                    🔹 card.addEventListener('mousedown', (e) => {
-                    🔹 card.addEventListener('mouseup', (e) => {
-                    🔹 card.addEventListener('mouseleave', () => {
-                    🔹 card.addEventListener('touchstart', (e) => {
-                    🔹 card.addEventListener('touchend', (e) => {
-                    🔹 card.addEventListener('touchmove', () => {
-                    🔹 card.addEventListener('click', (e) => {
                     🔹 const precarga = notificaciones.find(n => n.tipo === 'precarga');
                     🔹 function _htmlMesa(mesa, puedeSeleccionar, colorZona) {
                     🔹 const precargaNotif = notificaciones.find(n => n.tipo === 'precarga');
                     🔹 const esperaNotif = notificaciones.find(n => n.tipo === 'esperando');
-                    🔹 export function mostrarPopover(mesa, card) {
-                    🔹 const cont = document.getElementById('popoverContainer');
+                    🔹 export function mostrarPopover(mesa, card, event) {
                     🔹 const mesaComandas = comandas.filter(c => c.mesa == mesa.numero);
-                    🔹 document.getElementById('popoverCerrarBtn')?.addEventListener('click', () => {
                     🔹 const clickFuera = (e) => {
-                    🔹 const popover = document.getElementById('popoverContent');
-                    🔹 document.addEventListener('click', clickFuera);
-                    🔹 const grid = document.getElementById('mesasGrid');
                     🔹 const scrollCierre = () => {
-                    🔹 grid.addEventListener('scroll', scrollCierre, { once: true });
-                    🔹 export function asegurarVista(callbacks = {}) {
-                    🔹 const main = document.getElementById('view-mesas');
-                    🔹 const referencia = document.getElementById('toastContainer') || document.body.lastChild;
-                    🔹 function _construirContenido(contenedor, callbacks) {
-                    🔹 document.getElementById('btnAgregarMesa')?.addEventListener('click', () => {
-                    🔹 document.getElementById('btnFusionar')?.addEventListener('click', () => {
-                    🔹 document.getElementById('btnConfirmarFusion')?.addEventListener('click', () => {
+                    🔹 export function asegurarVista() {
+                    🔹 function _construirContenido(contenedor) {
             📄 mesas.js
                 🔹 const Mesas = (() => {
                 🔹 function render() {
@@ -1537,45 +886,25 @@
                 🔹 const precarga = notificaciones.find(n => n.tipo === 'precarga');
             📄 pedido-ui.js
                 🔹 const Pedido = (() => {
+                🔹 function _normalizarItems(items) {
                 🔹 function _asegurarModalPedido() {
-                🔹 modal.addEventListener('click', (e) => {
-                🔹 $id('searchProducto').addEventListener('input', () => Carta.filtrar());
-                🔹 $id('comandaMozo').addEventListener('change', function () {
-                🔹 $id('comandaComensales').addEventListener('change', function () {
-                🔹 $id('comandaObs').addEventListener('input', function () {
                 🔹 function _abrirModalPedido(mesa) {
-                🔹 const tituloEl = document.getElementById('modalMesaTitulo');
-                🔹 const badgeEl = document.getElementById('modalEstadoBadge');
-                🔹 const modal = document.getElementById('modalPedido');
                 🔹 function abrirMesa(num) {
-                🔹 const mesa = mesas.find(m => m.numero == num);
-                🔹 function cerrar() {
-                🔹 const modal = document.getElementById('modalPedido');
+                🔹 const mesa = (Store.obtenerEstado().mesas || []).find(m => m.numero == num);
                 🔹 const idx = DB.mesas.findIndex(m => m.numero === mesa.numero);
-                🔹 const pendientes = mesa.items.filter(it => !it.enviado);
-                🔹 const comandasMesa = comandas.filter(c => {
-                🔹 const mozoSelect = document.getElementById('comandaMozo');
-                🔹 const comensalesInput = document.getElementById('comandaComensales');
-                🔹 const obsInput = document.getElementById('comandaObs');
+                🔹 const pedidoIdx = DB.pedidos.findIndex(p => p.id === pedido.id);
+                🔹 const pendientes = (pedido?.items || []).filter(it => !it.enviado);
+                🔹 const comandasMesa = (Store.obtenerEstado().comandas || []).filter(c => c.mesa == mesa.numero);
                 🔹 function _mostrarRevisarPendientes(mesa, pendientes) {
                 🔹 function crearOpciones(comandaTemp) {
-                🔹 function crearComandaTemp(items, destino) {
-                🔹 const cocinaItems = pendientes.filter(it => it.destino === 'cocina' || it.destino === 'ambos');
-                🔹 const barraItems  = pendientes.filter(it => it.destino === 'barra'  || it.destino === 'ambos');
+                🔹 const cocina = pendientes.filter(it => it.destino === 'cocina' || it.destino === 'ambos');
+                🔹 const barra = pendientes.filter(it => it.destino === 'barra' || it.destino === 'ambos');
                 🔹 function _mostrarDialogoStockInsuficiente(mesa, pendientes, faltantes, mensaje) {
                 🔹 const itemsList = faltantes.map(f => {
-                🔹 document.getElementById(modalId + '-close').onclick = closeModal;
-                🔹 document.getElementById(modalId + '-cancel').onclick = closeModal;
-                🔹 document.getElementById(modalId + '-force').onclick = async function() {
                 🔹 function _mostrarReimprimir(comandas) {
-                🔹 function transferirMesa(mesaOrigenNum, mesaDestinoNum) {
-                🔹 const mesaOrigen = mesas.find(m => m.numero == mesaOrigenNum);
-                🔹 const mesaDestino = mesas.find(m => m.numero == mesaDestinoNum);
-                🔹 const mesaDestinoDB = DB.mesas.find(m => m.numero == mesaDestinoNum);
-                🔹 const mesaOrigenDB = DB.mesas.find(m => m.numero == mesaOrigenNum);
-                🔹 const pedido = DB.pedidos.find(p => p.id === mesaDestinoDB.pedidoId);
-                🔹 const idxOrigen = DB.mesas.findIndex(m => m.numero === mesaOrigenNum);
-                🔹 const opciones = mesasLibres.map(m => m.numero).join(', ');
+                🔹 function transferirMesa(origen, destino) {
+                🔹 const pedido = DB.pedidos.find(p => p.id === dbOrigen.pedidoId);
+                🔹 const idx = DB.mesas.findIndex(m => m.numero === origen);
                 🔹 function pedirCuenta() { Cuenta.pedirCuenta(); }
                 🔹 function cerrarMesa() { Cobro.abrirModalCierre(); }
                 🔹 function _establecerCat(cat) { Carta.establecerCategoria(cat); }
@@ -1583,65 +912,32 @@
                 🔹 function actualizarObsGeneral(valor) { Comanda.establecerObservacionGeneral(valor); }
         📁 perfil/
                 📄 admin-roles.js
-                    🔹 export function renderTabAdmin(usuarioActual, esMaster) {
-                    🔹 const tabAdmin = document.getElementById('tab-admin');
-                    🔹 const rolesOperativos = Roles.lista.filter(r => r !== 'cliente' && r !== 'artista');
-                    🔹 const usuariosFiltrados = todosUsuarios.filter(u => {
-                    🔹 const rolesAsignables = Roles.lista.filter(r => r !== 'master');
-                    🔹 const container = document.getElementById('listaPersonalContainer');
-                    🔹 checkbox.addEventListener('change', async function () {
-                    🔹 document.getElementById('buscarPersonalInput')?.addEventListener('input', function () {
-                    🔹 document.getElementById('btnInvitarPersonal')?.addEventListener('click', async () => {
+                    🔹 function _obtenerEspacioId() {
+                    🔹 function _generarToken() {
+                    🔹 function _generarPasswordTemporal() {
+                    🔹 function _parsearRoles(staff) {
+                    🔹 function _obtenerRolesAsignables(rolesEfectivos) {
+                    🔹 function _abrirModalAlta(rolesAsignables) {
+                    🔹 const cerrar = (valor) => {
+                    🔹 function actualizarSelectPrincipal() {
+                    🔹 const onKeyDown = (e) => {
+                    🔹 const cerrar = () => {
+                    🔹 const onKeyDown = (e) => {
+                    🔹 const staffActual = staff.find(s => s.id === staffId);
                 📄 ciclo-vida.js
-                    🔹 const modoSwitch = document.getElementById('perfilModoSwitch');
                     🔹 export function activar() {
-                    🔹 document.getElementById('btnToggleIzqPerfil')?.addEventListener('click', _toggleIzq, { signal });
-                    🔹 document.getElementById('btnToggleDerPerfil')?.addEventListener('click', _toggleDer, { signal });
-                    🔹 document.getElementById('perfilOverlay')?.addEventListener('click', _cerrarPaneles, { signal });
-                    🔹 document.getElementById('btnEditarPerfil')?.addEventListener('click', _mostrarEdicion, { signal });
-                    🔹 tab.addEventListener('click', () => {
-                    🔹 document.getElementById('tab-' + tab.dataset.tab)?.classList.add('activo');
-                    🔹 btn.addEventListener('click', () => {
                     🔹 export function limpiar() {
-                    🔹 const main = document.getElementById('view-perfil');
                     🔹 function _toggleIzq() {
-                    🔹 const panel = document.getElementById('panelIzquierdoPerfil');
                     🔹 function _toggleDer() {
-                    🔹 const panel = document.getElementById('panelDerechoPerfil');
                     🔹 function _cerrarPaneles() {
-                    🔹 document.getElementById('panelIzquierdoPerfil')?.classList.remove('abierto');
-                    🔹 document.getElementById('panelDerechoPerfil')?.classList.remove('abierto');
-                    🔹 document.getElementById('perfilOverlay')?.classList.remove('activo');
                     🔹 function _mostrarEdicion() {
-                    🔹 const vitrina = document.getElementById('modoVitrinaPerfil');
-                    🔹 const edicion = document.getElementById('modoEdicionPerfil');
                     🔹 function _mostrarVitrina() {
-                    🔹 const vitrina = document.getElementById('modoVitrinaPerfil');
-                    🔹 const edicion = document.getElementById('modoEdicionPerfil');
                     🔹 function _calcularTopPanel() {
                     🔹 function _ajustarPosicionPanel(panel) {
                     🔹 function _configurarAjusteHeader(signal) {
-                    🔹 const panelIzq = document.getElementById('panelIzquierdoPerfil');
-                    🔹 const panelDer = document.getElementById('panelDerechoPerfil');
                     🔹 function _configurarSwipe(signal) {
-                    🔹 const mainLayout = document.getElementById('perfilMainLayout');
-                    🔹 mainLayout.addEventListener('touchstart', (e) => {
-                    🔹 mainLayout.addEventListener('touchend', (e) => {
                 📄 edicion.js
                     🔹 export function renderModoEdicion(usuario, extras, esAdmin, esMaster) {
-                    🔹 const tabPublico = document.getElementById('tab-publico');
-                    🔹 document.getElementById('btnGuardarPerfilPublico')?.addEventListener('click', () => {
-                    🔹 const tabPrefs = document.getElementById('tab-preferencias');
-                    🔹 document.getElementById('btnGuardarPreferencias')?.addEventListener('click', () => {
-                    🔹 vegano: document.getElementById('prefVegano').checked,
-                    🔹 vegetariano: document.getElementById('prefVegetariano').checked,
-                    🔹 sinGluten: document.getElementById('prefSinGluten').checked,
-                    🔹 lactosa: document.getElementById('prefLactosa').checked,
-                    🔹 alcohol: document.getElementById('prefAlcohol').checked
-                    🔹 alergias: document.getElementById('editarAlergias').value,
-                    🔹 notasSalud: document.getElementById('editarNotasSalud').value
-                    🔹 const tabParticipaciones = document.getElementById('tab-participaciones');
-                    🔹 const tabStaff = document.getElementById('tab-staff');
                 📄 estado.js
                     🔹 function _storageKey(usuario) {
                     🔹 export function cargarExtras(usuario) {
@@ -1649,117 +945,53 @@
                     🔹 export function guardarExtras(usuario, datos) {
                 📄 renderer.js
                     🔹 export function asegurarVista() {
-                    🔹 let main = document.getElementById('view-perfil');
                     🔹 export function renderPanelIzquierdo(usuario, extras) {
-                    🔹 const idCard = document.getElementById('perfilIdCard');
-                    🔹 const cargosLista = document.getElementById('perfilCargosLista');
-                    🔹 const miniStats = document.getElementById('perfilMiniStats');
-                    🔹 const insigniasContainer = document.getElementById('perfilInsignias');
                     🔹 export function renderPanelDerecho(usuario, extras) {
-                    🔹 const panelDer = document.getElementById('panelDerechoPerfil');
                     🔹 export function aplicarVisibilidadRoles(esStaff, esAdmin) {
-                    🔹 document.getElementById('tab-publico')?.classList.add('activo');
                 📄 vitrina.js
                     🔹 export function renderModoVitrina(usuario, extras) {
-                    🔹 const vitrina = document.getElementById('modoVitrinaPerfil');
-                    🔹 slot.addEventListener('click', () => {
             📄 perfil.js
         📁 recetas/
                 📄 ciclo-vida.js
                     🔹 export function activar() {
                     🔹 export function limpiar() {
-                    🔹 const main = document.getElementById('view-recetas');
                 📄 crear.js
                     🔹 function _getRepo() {
                     🔹 export function mostrarModalReceta(idReceta = null) {
                     🔹 const receta = idReceta ? recetas.find(r => r.id === idReceta) : null;
                     🔹 const categorias = [...new Set(recetas.map(r => r.categoria || 'sin_categoria'))].sort();
-                    🔹 const datalistCap = document.getElementById('recModalListaCapitulos');
-                    🔹 const prod = productos.find(p => p.id == receta.productoId);
-                    🔹 document.getElementById('recModalNombre').value = prod ? prod.nombre : '';
-                    🔹 document.getElementById('recModalCapitulo').value = receta.categoria || 'sin_categoria';
-                    🔹 document.getElementById('recModalNivel').value = receta.nivel || '';
-                    🔹 document.getElementById('recModalIntermedio').checked = !!receta.es_intermedio;
-                    🔹 const ingData = (state.ingredientes || []).find(i => i.id == ing.id);
+                    🔹 const insumoData = insumosState.find(i => i.id == ing.id);
                     🔹 const sub = recetas.find(r => r.id == ing.id);
-                    🔹 const p = sub ? productos.find(p => p.id == sub.productoId) : null;
-                    🔹 document.getElementById('recModalTitulo').textContent = 'Editar Receta';
-                    🔹 document.getElementById('recModalNombre').value = '';
-                    🔹 document.getElementById('recModalCapitulo').value = '';
-                    🔹 document.getElementById('recModalNivel').value = '';
-                    🔹 document.getElementById('recModalIntermedio').checked = false;
-                    🔹 document.getElementById('recModalTitulo').textContent = 'Nueva Receta';
-                    🔹 document.getElementById('modalRecetaSheet').classList.add('activo');
                     🔹 function _asegurarModal() {
-                    🔹 if (document.getElementById('modalRecetaSheet')) return;
-                    🔹 const vista = document.getElementById('view-recetas');
-                    🔹 overlay.addEventListener('click', (e) => { if (e.target === overlay) cerrarModalReceta(); });
-                    🔹 document.getElementById('btnCerrarModalSheet').addEventListener('click', cerrarModalReceta);
-                    🔹 document.getElementById('btnCancelarModalSheet').addEventListener('click', cerrarModalReceta);
-                    🔹 document.getElementById('btnGuardarModalSheet').addEventListener('click', _guardarReceta);
-                    🔹 btn.addEventListener('click', () => {
-                    🔹 document.getElementById('btnAgregarIngModal').addEventListener('click', _agregarIngrediente);
-                    🔹 document.getElementById('btnAgregarPasoModal').addEventListener('click', () => {
                     🔹 export function cerrarModalReceta() {
-                    🔹 const modal = document.getElementById('modalRecetaSheet');
                     🔹 function _actualizarSelectorIngredientes() {
-                    🔹 const tipo = document.getElementById('recModalTipoIng').value;
-                    🔹 const select = document.getElementById('recModalSelectorIng');
-                    🔹 const prod = (state.productos || []).find(p => p.id == r.productoId);
                     🔹 function _pintarIngredientes() {
-                    🔹 const lista = document.getElementById('recModalIngredientesLista');
-                    🔹 btn.addEventListener('click', () => {
                     🔹 function _agregarIngrediente() {
-                    🔹 const tipo = document.getElementById('recModalTipoIng').value;
-                    🔹 const select = document.getElementById('recModalSelectorIng');
-                    🔹 const cantidad = parseFloat(document.getElementById('recModalCantidadIng').value);
-                    🔹 document.getElementById('recModalCantidadIng').value = '';
                     🔹 function _pintarPasos() {
-                    🔹 const editor = document.getElementById('recModalPasosEditor');
-                    🔹 input.addEventListener('input', (e) => {
-                    🔹 btn.addEventListener('click', () => {
-                    🔹 const nombre = document.getElementById('recModalNombre').value.trim();
-                    🔹 const capitulo = document.getElementById('recModalCapitulo').value.trim() || 'sin_categoria';
-                    🔹 const nivel = document.getElementById('recModalNivel').value.trim().toLowerCase();
-                    🔹 const esIntermedio = document.getElementById('recModalIntermedio').checked;
                     🔹 const pasosValidos = _pasosActuales.filter(p => p.trim());
                     🔹 const ingredientes = _ingredientesActuales.map(ing => ({
-                    🔹 let producto = productos.find(p => p.nombre.toLowerCase() === nombre.toLowerCase());
                 📄 detalle.js
                     🔹 export function mostrarDetalle(idReceta) {
-                    🔹 const receta = (state.recetas || []).find(r => r.id === idReceta || r.productoId == idReceta);
-                    🔹 const prod = (state.productos || []).find(p => p.id == receta.productoId);
-                    🔹 let modal = document.getElementById('modalRecetaDetalle');
-                    🔹 const vista = document.getElementById('view-recetas');
-                    🔹 document.getElementById('btnCerrarDetalle').addEventListener('click', cerrarDetalle);
-                    🔹 document.getElementById('btnCerrarDetalle2').addEventListener('click', cerrarDetalle);
-                    🔹 document.getElementById('btnExportarPDF').addEventListener('click', () => exportarPDF(receta.id));
-                    🔹 document.getElementById('detalleCosto').innerHTML = '';
+                    🔹 const insumo = insumos.find(i => i.nombre === nombre && i.tipo === tipoInsumo);
                     🔹 export function cerrarDetalle() {
-                    🔹 const m = document.getElementById('modalRecetaDetalle');
                     🔹 export function construirArbolIngredientes(ingredientes, state, profundidad) {
-                    🔹 const ingData = ingredientesState.find(i => i.id == ing.id);
+                    🔹 const insumoData = insumosState.find(i => i.id == ing.id);
                     🔹 const subReceta = recetasState.find(r => r.id == ing.id);
-                    🔹 const prod = subReceta ? productosState.find(p => p.id == subReceta.productoId) : null;
+                    🔹 function _obtenerStockSubreceta(subReceta, state) {
+                    🔹 const insumo = insumos.find(i => i.nombre === nombre && i.tipo === tipoInsumo);
                     🔹 export function exportarPDF(idReceta) {
-                    🔹 const receta = (state.recetas || []).find(r => r.id === idReceta || r.productoId == idReceta);
-                    🔹 const prod = (state.productos || []).find(p => p.id == receta.productoId);
-                    🔹 const ingData = ingredientesState.find(i => i.id == ing.id);
+                    🔹 const insumoData = insumosState.find(i => i.id == ing.id);
                     🔹 const sub = recetasState.find(r => r.id == ing.id);
-                    🔹 const p = sub ? (state.productos || []).find(p => p.id == sub.productoId) : null;
+                    🔹 const intentarImprimir = () => {
                 📄 edicion.js
                     🔹 export function mostrarVistaCompleta(idReceta) {
                 📄 ejecutar.js
                     🔹 function _getRepo() {
-                    🔹 const ingData = ingredientes.find(i => i.id == ing.id);
+                    🔹 const insumoData = insumos.find(i => i.id == ing.id);
                     🔹 const sub = recetas.find(r => r.id == ing.id);
-                    🔹 const prod = (state.productos || []).find(p => p.id == sub.productoId);
-                    🔹 const ingData = ingredientes.find(i => i.id == ing.id);
+                    🔹 const insumoData = insumos.find(i => i.id == ing.id);
                     🔹 const sub = recetas.find(r => r.id == ing.id);
-                    🔹 const contenedor = document.getElementById('recetas-contenedor');
                     🔹 export function pedirCantidad(titulo, mensaje, unidad) {
-                    🔹 document.getElementById('rec-aceptar-cantidad').addEventListener('click', () => {
-                    🔹 const val = parseFloat(document.getElementById('rec-cantidad-preparar').value);
                 📄 estado.js
                     🔹 export function getModo() { return _modo; }
                     🔹 export function setModo(valor) { _modo = valor; }
@@ -1780,63 +1012,34 @@
                     🔹 export function setCategorias(valor) { _categorias = valor; }
                 📄 renderer.js
                     🔹 export function pintar(modo) {
-                    🔹 const contenedor = document.getElementById('recetas-contenedor');
                     🔹 function _asegurarVista() {
-                    🔹 let main = document.getElementById('view-recetas');
                     🔹 function _construirVista(main) {
-                    🔹 tab.addEventListener('click', () => {
-                    🔹 document.getElementById('btnCerrarSidebar').addEventListener('click', cerrarSidebar);
-                    🔹 document.getElementById('recetasSidebarBackdrop').addEventListener('click', cerrarSidebar);
-                    🔹 document.getElementById('recetasBordeAgarre').addEventListener('click', () => abrirSidebar());
-                    🔹 const sidebarEl = document.getElementById('recetasSidebar');
-                    🔹 const backdropEl = document.getElementById('recetasSidebarBackdrop');
-                    🔹 document.addEventListener('touchstart', (e) => {
-                    🔹 if (document.getElementById('paginaDetalle')?.classList.contains('abierta')) return;
-                    🔹 document.addEventListener('touchmove', (e) => {
-                    🔹 document.addEventListener('touchend', (e) => {
                     🔹 function abrirSidebar() {
-                    🔹 const sidebarEl = document.getElementById('recetasSidebar');
-                    🔹 const backdropEl = document.getElementById('recetasSidebarBackdrop');
-                    🔹 const borde = document.getElementById('recetasBordeAgarre');
                     🔹 function cerrarSidebar() {
-                    🔹 const sidebarEl = document.getElementById('recetasSidebar');
-                    🔹 const backdropEl = document.getElementById('recetasSidebarBackdrop');
-                    🔹 const borde = document.getElementById('recetasBordeAgarre');
                     🔹 function _pintarSidebarCapitulos() {
-                    🔹 const container = document.getElementById('recetasSidebarCapitulos');
                     🔹 const count = recetas.filter(r => (r.categoria || 'sin_categoria') === cat.id &&
-                    🔹 btn.addEventListener('click', () => {
-                    🔹 pintarRecetario(document.getElementById('recetas-contenedor'));
                     🔹 function _obtenerCategorias(recetas) {
                     🔹 export function pintarRecetario(contenedor) {
-                    🔹 document.getElementById('recetas-buscar').addEventListener('input', e => {
                     🔹 function _pintarLibro(recetas, productos, categorias, esProduccion) {
-                    🔹 const paginas = document.getElementById('recetasLibroPaginas');
-                    🔹 const indice = document.getElementById('recetasLibroIndice');
-                    🔹 let filtradas = recetas.map(r => {
-                    🔹 const prod = productos.find(p => p.id == r.productoId);
                     🔹 const idsPresentes = categorias.map(c => c.id).filter(id => {
                     🔹 const cat = categorias.find(c => c.id === id) || { color: PALETA_CATEGORIAS[0], nombre: id };
-                    🔹 btn.addEventListener('click', () => {
                     🔹 const observer = new IntersectionObserver((entries) => {
-                    🔹 }, { root: document.getElementById('recetasLibroPaginas'), threshold: 0.1 });
                     🔹 const nivelesUnicos = [...new Set(filtradas.map(r => r.nivel || 'sin_nivel'))].sort();
-                    🔹 btn.addEventListener('click', () => {
                     🔹 const idsPresentes = categorias.map(c => c.id).filter(id => grupos[id] && grupos[id].length);
                     🔹 const items = grupos[id].sort((a, b) => a._nombre.localeCompare(b._nombre));
                     🔹 const cat = categorias.find(c => c.id === capActivo) || { color: PALETA_CATEGORIAS[0] };
                     🔹 const items = gruposNivel[niv].sort((a, b) => a._nombre.localeCompare(b._nombre));
-                    🔹 t.addEventListener('click', () => {
                     🔹 function _tarjetaLibro(r, cat) {
+                    🔹 function _obtenerStockInfo(r) {
+                    🔹 const insumo = insumos.find(i => i.nombre === r._nombre && i.tipo === tipoInsumo);
                     🔹 export function pintarStock(contenedor) {
                     🔹 const recetas = (state.recetas || []).filter(r => r.es_intermedio);
                     🔹 const stockItems = recetas.map(r => {
-                    🔹 const prod = productos.find(p => p.id == r.productoId);
-                    🔹 const alertaBaja = stockItems.filter(r => (r.stockActual || 0) <= 1);
-                    🔹 btn.addEventListener('click', () => ejecutarPreparacion(btn.dataset.receta));
-                    🔹 btn.addEventListener('click', () => mostrarDetalle(btn.dataset.receta));
+                    🔹 const insumo = insumos.find(i => i.nombre === nombre && i.tipo === tipoInsumo);
+                    🔹 const alertaBaja = stockItems.filter(r => r._stock <= 1);
                     🔹 export function pintarPlanificacion(contenedor) {
             📄 recetas.js
+                🔹 export const Recetas = {
         📁 reparto/
                 📄 acciones.js
                     🔹 const existeComanda = DB.comandas.find(c => c.deliveryId === deliveryId);
@@ -1846,132 +1049,62 @@
                     🔹 const itemsParaComanda = ped.items.map(it => ({
                 📄 ciclo-vida.js
                     🔹 function _renderCompleto() {
-                    🔹 const pedidosValidos = pedidos.filter(p => p && p.id);
+                    🔹 const pedidosDelivery = pedidos.filter(p => p && p.id && p.tipo === 'reparto');
                     🔹 export function activar() {
-                    🔹 const selectEstado = document.getElementById('repartoEstadoFilter');
-                    🔹 selectEstado.addEventListener('change', function () {
-                    🔹 const btnNuevo = document.getElementById('btnNuevoPedidoReparto');
-                    🔹 btnNuevo.addEventListener('click', () => mostrarModalNuevo(_renderCompleto), { signal });
                     🔹 const unsubscribeStore = Store.suscribir((state, action) => {
                     🔹 export function limpiar() {
                 📄 constantes.js
+                    🔹 export const ESTADO_BADGE = {
+                    🔹 export const ESTADO_LABEL = {
+                    🔹 export const ESTADOS = ['pendiente', 'en_preparacion', 'en_camino', 'entregado'];
+                    🔹 export const ESTADO_DEFAULT = 'default';
                 📄 modal-editar.js
                     🔹 export function mostrar(deliveryId, onCerrar) {
                     🔹 const ped = (Store.obtenerEstado().pedidosDelivery || []).find(p => p.id === deliveryId);
                     🔹 const items = (ped.items || []).map(it => ({
-                    🔹 let modal = document.getElementById('modalEditarItems');
-                    🔹 modal.querySelector('.btn-agregar-item-edicion').addEventListener('click', _agregarItemEdicion);
-                    🔹 modal.querySelector('#editBusquedaProducto').addEventListener('input', _filtrarProductosEdicion);
-                    🔹 modal.querySelector('#editCantidad').addEventListener('keydown', function (e) {
-                    🔹 modal.querySelector('#editItemsLista').addEventListener('click', function (e) {
-                    🔹 modal.querySelector('#editResultadosBusqueda').addEventListener('click', function (e) {
-                    🔹 document.getElementById('editBusquedaProducto').value = '';
-                    🔹 document.getElementById('editCantidad').value = 1;
-                    🔹 document.getElementById('editResultadosBusqueda').style.display = 'none';
                     🔹 export function cerrar() {
-                    🔹 const modal = document.getElementById('modalEditarItems');
                     🔹 function _filtrarProductosEdicion() {
-                    🔹 const input = document.getElementById('editBusquedaProducto');
-                    🔹 const res = document.getElementById('editResultadosBusqueda');
                     🔹 const prod = DB.productos.filter(p => p.activo !== false && p.nombre.toLowerCase().includes(term));
                     🔹 function _seleccionarProductoEdicion(el) {
-                    🔹 document.getElementById('editBusquedaProducto').value = el.dataset.nombre;
-                    🔹 document.getElementById('editResultadosBusqueda').style.display = 'none';
-                    🔹 document.getElementById('editCantidad').focus();
                     🔹 function _agregarItemEdicion() {
-                    🔹 const cant = parseInt(document.getElementById('editCantidad')?.value) || 1;
                     🔹 const prod = DB.productos.find(p => p.id === _productoSeleccionado.id);
                     🔹 const existente = items.find(it => it.prodId === prod.id);
-                    🔹 document.getElementById('editBusquedaProducto').value = '';
-                    🔹 document.getElementById('editCantidad').value = 1;
                     🔹 function _quitarItemEdicion(idx) {
                     🔹 function _renderItemsEdicion() {
-                    🔹 const container = document.getElementById('editItemsLista');
-                    🔹 document.getElementById('editTotal').value = '0';
                     🔹 const total = items.reduce((sum, it) => sum + it.precio * (it.qty || 1), 0);
-                    🔹 document.getElementById('editTotal').value = total.toFixed(2);
                     🔹 const nuevosItems = items.map(it => ({
                     🔹 const total = nuevosItems.reduce((sum, i) => sum + i.precio * i.qty, 0);
                 📄 modal-nuevo.js
                     🔹 export function getItemsTemporales() { return _itemsTemporales; }
                     🔹 export function setItemsTemporales(items) { _itemsTemporales = items; }
                     🔹 export function mostrar(onCerrar) {
-                    🔹 let modal = document.getElementById('modalReparto');
-                    🔹 modal.querySelector('.btn-agregar-item-reparto').addEventListener('click', _agregarItemAlPedido);
-                    🔹 modal.querySelector('#repBusquedaProducto').addEventListener('input', _filtrarProductos);
-                    🔹 modal.querySelector('#repCantidad').addEventListener('keydown', function (e) {
-                    🔹 modal.querySelector('#repItemsLista').addEventListener('click', function (e) {
-                    🔹 modal.querySelector('#repResultadosBusqueda').addEventListener('click', function (e) {
-                    🔹 document.getElementById('repDireccion').value = '';
-                    🔹 document.getElementById('repTelefono').value = '';
-                    🔹 document.getElementById('repTotal').value = '0';
-                    🔹 document.getElementById('repRepartidor').value = '';
-                    🔹 document.getElementById('repObservaciones').value = '';
-                    🔹 document.getElementById('repBusquedaProducto').value = '';
-                    🔹 document.getElementById('repCantidad').value = 1;
-                    🔹 document.getElementById('repResultadosBusqueda').style.display = 'none';
                     🔹 export function cerrar(onCerrar) {
-                    🔹 const modal = document.getElementById('modalReparto');
                     🔹 function _filtrarProductos() {
-                    🔹 const input = document.getElementById('repBusquedaProducto');
-                    🔹 const res = document.getElementById('repResultadosBusqueda');
                     🔹 const prod = DB.productos.filter(p => p.activo !== false && p.nombre.toLowerCase().includes(term));
                     🔹 function _seleccionarProducto(el) {
-                    🔹 document.getElementById('repBusquedaProducto').value = el.dataset.nombre;
-                    🔹 document.getElementById('repResultadosBusqueda').style.display = 'none';
-                    🔹 document.getElementById('repCantidad').focus();
                     🔹 function _agregarItemAlPedido() {
-                    🔹 const cant = parseInt(document.getElementById('repCantidad')?.value) || 1;
                     🔹 const prod = DB.productos.find(p => p.id === _productoSeleccionado.id);
                     🔹 const existente = _itemsTemporales.find(it => it.prodId === prod.id);
-                    🔹 document.getElementById('repBusquedaProducto').value = '';
-                    🔹 document.getElementById('repCantidad').value = 1;
-                    🔹 document.getElementById('repBusquedaProducto').focus();
                     🔹 function _quitarItemTemporal(idx) {
                     🔹 function _renderItemsTemporales() {
-                    🔹 const container = document.getElementById('repItemsLista');
-                    🔹 document.getElementById('repTotal').value = '0';
                     🔹 const total = _itemsTemporales.reduce((sum, it) => sum + it.precio * (it.qty || 1), 0);
-                    🔹 document.getElementById('repTotal').value = total.toFixed(2);
-                    🔹 const dir = document.getElementById('repDireccion').value.trim();
-                    🔹 const tel = document.getElementById('repTelefono').value.trim();
-                    🔹 const rep = document.getElementById('repRepartidor').value.trim();
-                    🔹 const obs = document.getElementById('repObservaciones').value.trim();
                     🔹 const total = itemsListos.reduce((s, i) => s + i.precio * i.qty, 0);
                 📄 tabla.js
                     🔹 export function getEstadoFiltro() { return _estadoFiltro; }
                     🔹 export function establecerEstadoFiltro(estado) { _estadoFiltro = estado; }
-                    🔹 let main = document.getElementById('view-reparto');
-                    🔹 const referencia = document.getElementById('toastContainer') || document.body.lastChild;
-                    🔹 const selectEstado = document.getElementById('repartoEstadoFilter');
-                    🔹 selectEstado.addEventListener('change', function () {
-                    🔹 const btnNuevo = document.getElementById('btnNuevoPedidoReparto');
-                    🔹 if (btnNuevo) btnNuevo.addEventListener('click', onNuevoPedido);
-                    🔹 const tbody = document.getElementById('repartoBody');
-                    🔹 tbody.addEventListener('click', function (e) {
                     🔹 export function renderTabla(pedidos) {
-                    🔹 const tbody = document.getElementById('repartoBody');
                     🔹 const ordenados = [...pedidos].sort((a, b) => {
                     🔹 const resumen = items.map(i => `${i.qty}x ${i.nombre}`).join(', ') || '—';
             📄 reparto.js
                 🔹 const pedidosValidos = pedidos.filter(p => p && p.id);
             📄 tickets.js
                 🔹 const Tickets = (() => {
+                🔹 function _obtenerConfig() {
                 🔹 const itemsHTML = items.map(it => `
                 🔹 const itemsHTML = grupos.map(g => `
                 🔹 const itemsHTML = grupos.map(g => `
-                🔹 document.getElementById(`${modalId}-close`).onclick = () => {
-                🔹 const modal = document.getElementById(lastId);
-                🔹 const closeBtn = document.getElementById(`${prefix}-close`);
-                🔹 const editBtn = document.getElementById(`${prefix}-editar`);
-                🔹 const extraBtn = document.getElementById(`${prefix}-extra`);
-                🔹 const printBtn = document.getElementById(`${prefix}-imprimir`);
-                🔹 const overlay = document.getElementById(prefix);
-                🔹 const contentDiv = document.getElementById(`${prefix}-content`);
-                🔹 const overlay = document.getElementById(prefix);
-                🔹 const contentDiv = document.getElementById(`${prefix}-content`);
                 🔹 function _agruparItems(items) {
-                🔹 function _imprimirEnVentana(contenido, titulo) {
+                🔹 function _imprimirConIframe(contenido, titulo) {
         📄 utils.js
             🔹 export function formatearDinero(n) {
             🔹 export function formatearDineroTicket(n) {
@@ -1982,343 +1115,24 @@
             🔹 export function tiempoDesde(ts) {
             🔹 export function calcularTotal(items) {
             🔹 export function mostrarToast(tipo, htmlMsg, ms = 3500) {
-            🔹 const cont  = document.getElementById('toastContainer');
             🔹 export function $id(id) { return document.getElementById(id); }
             🔹 export function $val(id) { return ($id(id)?.value || '').trim(); }
             🔹 export function obtenerColorDesdeNombre(nombre) {
             🔹 export function mostrarConfirmacion(titulo, mensaje, opciones = {}) {
             🔹 const cerrar = (confirmado) => {
-            🔹 card.querySelector('.confirmar-btn').addEventListener('click', () => cerrar(true));
-            🔹 card.querySelector('.cancelar-btn').addEventListener('click', () => cerrar(false));
-            🔹 card.querySelector('.modal-confirm-close').addEventListener('click', () => cerrar(false));
-            🔹 overlay.addEventListener('click', (e) => {
             🔹 const onKeyDown = (e) => {
-            🔹 document.addEventListener('keydown', onKeyDown);
             🔹 export function mostrarEntrada(titulo, mensaje, opciones = {}) {
             🔹 const cerrar = (valor) => {
-            🔹 card.querySelector('.aceptar-btn').addEventListener('click', () => cerrar(input.value));
-            🔹 card.querySelector('.cancelar-btn').addEventListener('click', () => cerrar(null));
-            🔹 card.querySelector('.modal-confirm-close').addEventListener('click', () => cerrar(null));
-            🔹 overlay.addEventListener('click', (e) => {
             🔹 const onKeyDown = (e) => {
-            🔹 document.addEventListener('keydown', onKeyDown);
-    📄 mapear_servicios.js
-        🔹 function analizarConexiones(rutaCompleta, archivo) {
-        🔹 function recorrerDirectorio(dir) {
-    📄 mapeartodo.js
-        🔹 function recorrerDirectorio(dir, nivel = 0) {
-        🔹 l.includes('document.getElementById') ||
-        🔹 l.includes('addEventListener')) {
-    📄 test-A-appwrite.html
-        🔹 var resultsEl = document.getElementById('results');
-        🔹 function assert(condition, msg) {
-        🔹 window.addEventListener('load', function() {
-    📄 test-A-auth.html
-        🔹 var resultsEl = document.getElementById('results');
-        🔹 function assert(condition, msg) {
-        🔹 function logSection(title, obj) {
-        🔹 window.addEventListener('load', function() {
-    📄 test-A-carga.html
-        🔹 var resultsEl = document.getElementById('results');
-        🔹 function assert(condition, msg) {
-        🔹 window.addEventListener('load', function() {
-    📄 test-A-colecciones.html
-        🔹 var resultado = document.getElementById('resultado');
-    📄 test-A-core.html
-        🔹 var resultsEl = document.getElementById('results');
-        🔹 function assert(condition, msg) {
-        🔹 function handler(data) { eventoRecibido = data; }
-        🔹 function listenerComanda(data) { eventosEmitidos.push(data); }
-        🔹 window.addEventListener('load', function() {
-    📄 test-A-flujo.html
-        🔹 var resultsEl = document.getElementById('results');
-        🔹 function assert(condition, msg) {
-        🔹 function logSection(title, obj) {
-        🔹 window.addEventListener('load', function() {
-    📄 test-A-unitarios-dominio.html
-        🔹 const resultsEl = document.getElementById('results');
-        🔹 function assert(condition, msg) {
-        🔹 let chain = ok1.encadenar(data => Resultado.ok(data.id * 2));
-        🔹 let chainFail = fail1.encadenar(data => Resultado.ok(99));
-        🔹 let chainEx = ok1.encadenar(() => { throw new Error('ups'); });
-    📄 test-B- prepedidos.html
-        🔹 var resultsEl = document.getElementById('results');
-        🔹 function assert(condition, msg) {
-        🔹 function esperar(ms) {
-        🔹 var modalPedido = document.getElementById('modalPedido');
-        🔹 window.addEventListener('load', function() {
-    📄 test-B-mesas.html
-        🔹 const resultsEl = document.getElementById('results');
-        🔹 function assert(condition, msg) {
-        🔹 const esperar = ms => new Promise(resolve => setTimeout(resolve, ms));
-    📄 test-B-precarga.html
-        🔹 const resultsEl = document.getElementById('results');
-        🔹 function log(msg) {
-        🔹 const mesa = window.DB.mesas.find(m => m.numero === action.payload.numeroMesa);
-        🔹 const existente = mesa.items.find(it =>
-        🔹 function assert(condition, msg) {
-        🔹 const esperar = ms => new Promise(resolve => setTimeout(resolve, ms));
-    📄 test-B-temporal.html
-        🔹 function resultado(ok, seccion, mensaje) {
-        🔹 document.getElementById('resultados').appendChild(div);
-        🔹 resultado(document.getElementById('view-despensa') !== null, 'Render', 'Vista de despensa creada');
-        🔹 resultado(document.getElementById('panelIzquierdo') !== null, 'Render', 'Panel izquierdo creado');
-        🔹 resultado(document.getElementById('panelDerecho') !== null, 'Render', 'Panel derecho creado');
-        🔹 const encontrado = lista.find(p => p.id === provId);
-        🔹 document.getElementById('view-despensa').style.display = 'none';
-        🔹 window.addEventListener('load', () => setTimeout(iniciarTests, 100));
-    📄 test-B2-kds.html
-        🔹 const c = comandasStore.find(x => x.id === action.payload.id);
-        🔹 const resultsEl = document.getElementById('results');
-        🔹 function assert(condition, msg) {
-        🔹 const esperar = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-        🔹 function simularToqueLargo(elemento, duracion = 700) {
-        🔹 function simularSwipe(elemento, deltaX) {
-        🔹 const crearTouch = (x, y) => new Touch({
-        🔹 assert(!!document.getElementById('kds-com_ambos_cocina'), 'Tarjeta virtual cocina visible');
-        🔹 assert(!!document.getElementById('kds-com_ambos_barra'), 'Tarjeta virtual barra visible');
-        🔹 assert(!document.getElementById('kds-com_ambos'), 'Original no se renderiza');
-        🔹 let tarjeta = document.getElementById('kds-com_cambio');
-        🔹 tarjeta = document.getElementById('kds-com_cambio');
-        🔹 tarjeta = document.getElementById('kds-com_cambio');
-        🔹 const lista = document.getElementById('kds-lista');
-        🔹 document.getElementById('view-cocina')?.remove();
-        🔹 window.addEventListener('load', () => runTests().catch(e => {
-    📄 test-B2-recetario.html
-        🔹 const resultsEl = document.getElementById('results');
-        🔹 function assert(condition, msg) {
-        🔹 const esperar = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-        🔹 if (!document.getElementById('toastContainer')) {
-        🔹 const recetaLocal = DB.recetas.find(r => r.id === recetaCreadaId);
-        🔹 const recetaRemota = recetasAppwrite.find(r => r.id === recetaCreadaId);
-        🔹 const recetaStore = state1.recetas.find(r => r.id === recetaCreadaId);
-        🔹 const editLocal = DB.recetas.find(r => r.id === recetaCreadaId);
-        🔹 const editRemoto = recetasEditRemoto.find(r => r.id === recetaCreadaId);
-        🔹 const recetaStoreEdit = state2.recetas.find(r => r.id === recetaCreadaId);
-        🔹 const ingRemoto = ingsRemotos.find(i => i.id === ingredienteTestId);
-        🔹 const ingPost = ingsPost.find(i => i.id === ingredienteTestId);
-        🔹 const intermediaPost = recetasPost.find(r => r.id === idIntermedia);
-        🔹 const localInter = DB.recetas.find(r => r.id === idIntermedia);
-        🔹 const modal = document.getElementById('modalRecetaDetalle');
-        🔹 const btnCerrar = document.getElementById('btnCerrarDetalle');
-        🔹 document.getElementById('view-recetas')?.remove();
-        🔹 window.addEventListener('load', () => setTimeout(runTests, 200));
-    📄 test-B2-recetas-sin-mocks.html
-        🔹 const resultsEl = document.getElementById('results');
-        🔹 function assert(condition, msg) {
-        🔹 const esperar = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-        🔹 if (!document.getElementById('toastContainer')) {
-        🔹 const recetaLocal = DB.recetas.find(r => r.id === recetaCreadaId);
-        🔹 const recetaRemota = recetasAppwrite.find(r => r.id === recetaCreadaId);
-        🔹 const recetaStore = state1.recetas.find(r => r.id === recetaCreadaId);
-        🔹 const editLocal = DB.recetas.find(r => r.id === recetaCreadaId);
-        🔹 const editRemoto = recetasEditRemoto.find(r => r.id === recetaCreadaId);
-        🔹 const recetaStoreEdit = state2.recetas.find(r => r.id === recetaCreadaId);
-        🔹 const ingRemoto = ingsRemotos.find(i => i.id === ingredienteTestId);
-        🔹 const ingPost = ingsPost.find(i => i.id === ingredienteTestId);
-        🔹 const intermediaPost = recetasPost.find(r => r.id === idIntermedia);
-        🔹 const localInter = DB.recetas.find(r => r.id === idIntermedia);
-        🔹 const modal = document.getElementById('modalRecetaDetalle');
-        🔹 const btnCerrar = document.getElementById('btnCerrarDetalle');
-        🔹 document.getElementById('view-recetas')?.remove();
-        🔹 window.addEventListener('load', () => setTimeout(runTests, 200));
-    📄 test-B3-caja.html
-        🔹 function log(canal, msg) {
-        🔹 const panel = document.getElementById('logPanel');
-        🔹 function esperar(ms) { return new Promise(r => setTimeout(r, ms)); }
-        🔹 function esperarElemento(selector, timeout = 3000) {
-        🔹 const check = () => {
-        🔹 function esperarCondicion(fn, timeout = 5000) {
-        🔹 const check = () => {
-        🔹 function agregarResultado(caso, paso, exito, detalle) {
-        🔹 const body = document.getElementById('resultadosBody');
-        🔹 const pasados = resultados.filter(r => r.exito).length;
-        🔹 const fallidos = resultados.filter(r => !r.exito).length;
-        🔹 function assert(condicion, mensaje) { if (!condicion) throw new Error(mensaje); }
-        🔹 function assertEqual(real, esperado, mensaje) {
-        🔹 function limpiarModales() {
-        🔹 function obtenerMesa(num) { return DB.mesas.find(m => m.numero === num); }
-        🔹 function obtenerPedido(id) { return DB.pedidos.find(p => p.id === id); }
-        🔹 function actualizarPedidoEnDB(id, cambios) {
-        🔹 const idx = DB.pedidos.findIndex(p => p.id === id);
-        🔹 function normalizarItemsPedido(pedido) {
-        🔹 document.getElementById('estadoTest').textContent = 'Listo. Presiona "Ejecutar todos los tests".';
-        🔹 document.getElementById('btnEjecutarTests').addEventListener('click', async () => {
-        🔹 document.getElementById('resultadosBody').innerHTML = '';
-        🔹 document.getElementById('logPanel').innerHTML = '';
-        🔹 const descuentoInput = document.getElementById('cierreDescuento');
-    📄 test-C-cliente.html
-        🔹 const resultados = document.getElementById('resultados');
-        🔹 function log(tipo, mensaje) {
-        🔹 function assert(condicion, descripcion) {
-        🔹 const panelOrden = document.getElementById('panelOrden');
-    📄 test-C-flujo-mesa.html
-        🔹 const resultados = document.getElementById('resultados');
-        🔹 const panelTest = document.getElementById('panelTest');
-        🔹 function log(tipo, mensaje) {
-        🔹 function assert(condicion, descripcion) {
-        🔹 document.getElementById('btnPaso1').addEventListener('click', () => {
-        🔹 const vista = document.getElementById('view-bienvenida');
-        🔹 const avatar = document.getElementById('bienvenidaAvatar');
-        🔹 const nombre = document.getElementById('bienvenidaNombre');
-        🔹 const inputMesa = document.getElementById('inputMesa');
-        🔹 const btnVincular = document.getElementById('btnGuardarMesa');
-        🔹 document.getElementById('btnPaso2').addEventListener('click', () => {
-        🔹 const inputMesa = document.getElementById('inputMesa');
-        🔹 const btnVincular = document.getElementById('btnGuardarMesa');
-        🔹 const estadoMesa = document.getElementById('estadoMesa');
-        🔹 const cardEspera = document.getElementById('cardEspera');
-        🔹 document.getElementById('btnPaso3').addEventListener('click', () => {
-        🔹 document.getElementById('btnPaso4').addEventListener('click', () => {
-        🔹 const cardGastro = document.getElementById('cardGastronomica');
-    📄 test-D- recetas.html
-        🔹 const resultado = document.getElementById('resultado');
-        🔹 function log(msg, tipo = 'info') {
-    📄 test-D- reparto.html
-        🔹 function showToast(tipo, msg) { toastMessages.push({tipo, msg}); }
-        🔹 const ped = this.pedidosDelivery.find(p => p.id === id);
-        🔹 function resultado(ok, seccion, mensaje) {
-        🔹 document.getElementById('resultados').appendChild(div);
-        🔹 document.getElementById('view-reparto').style.display = 'none';
-        🔹 window.addEventListener('load', () => setTimeout(iniciarTests, 150));
-    📄 test-D-config.html
-        🔹 function showToast(tipo, msg) { toastMessages.push({tipo, msg}); }
-        🔹 function resultado(ok, seccion, mensaje) {
-        🔹 document.getElementById('resultados').appendChild(div);
-        🔹 const precioInput = document.getElementById('prodPrecio');
-        🔹 document.getElementById('prodImagen').value = 'https://via.placeholder.com/150';
-        🔹 document.getElementById('prodImagen').value = '';
-        🔹 const vista = document.getElementById('view-config');
-        🔹 window.addEventListener('load', () => setTimeout(iniciarTests, 100));
-    📄 test-D-despensa.html
-        🔹 function resultado(ok, seccion, mensaje) {
-        🔹 document.getElementById('resultados').appendChild(div);
-        🔹 resultado(document.getElementById('view-despensa') !== null, 'Render', 'Vista de despensa creada');
-        🔹 resultado(document.getElementById('panelIzquierdo') !== null, 'Render', 'Panel izquierdo creado');
-        🔹 resultado(document.getElementById('panelDerecho') !== null, 'Render', 'Panel derecho creado');
-        🔹 const encontrado = lista.find(p => p.id === idGenerado);
-        🔹 document.getElementById('view-despensa').style.display = 'none';
-        🔹 window.addEventListener('load', () => setTimeout(iniciarTests, 100));
-    📄 test-D-despensa2.html
-        🔹 function resultado(ok, seccion, mensaje) {
-        🔹 document.getElementById('resultados').appendChild(div);
-        🔹 const encontrado = listaProv.find(p => p.id === provId);
-        🔹 const encontradoEdit = listaProv2.find(p => p.id === provId && p.nombre === provEdit.nombre);
-        🔹 const encontradoDel = listaProv3.find(p => p.id === provId);
-        🔹 const encontradoProd = listaProd.find(p => p.id === prodId);
-        🔹 const encontradoProdDel = listaProd3.find(p => p.id === prodId);
-        🔹 window.addEventListener('load', () => setTimeout(iniciarTests, 100));
-    📄 test-D-eventos-en-vivo.html
-        🔹 function showToast(tipo, msg) { toastMessages.push({tipo, msg}); }
-        🔹 function resultado(ok, seccion, mensaje) {
-        🔹 document.getElementById('resultados').appendChild(div);
-        🔹 resultado(document.getElementById('view-eventos-en-vivo') !== null, 'Render', 'Vista creada');
-        🔹 document.getElementById('selTipoEvento').value = 'votacion';
-        🔹 document.getElementById('nuevaOpcion').value = 'Opción A';
-        🔹 document.getElementById('nuevaOpcion').value = 'Opción B';
-        🔹 const vista = document.getElementById('view-eventos-en-vivo');
-        🔹 window.addEventListener('load', () => setTimeout(iniciarTests, 100));
-    📄 test-D-eventos.html
-        🔹 function showToast(tipo, msg) { toastMessages.push({tipo, msg}); }
-        🔹 function resultado(ok, seccion, mensaje) {
-        🔹 document.getElementById('resultados').appendChild(div);
-        🔹 const vista = document.getElementById('view-eventos');
-        🔹 const modal = document.getElementById('modalEvento');
-        🔹 window.addEventListener('load', () => setTimeout(iniciarTests, 100));
-    📄 test-E-flujo-completo.html
-        🔹 const resultsEl = document.getElementById('results');
-        🔹 function assert(condition, msg) {
-        🔹 const esperar = ms => new Promise(resolve => setTimeout(resolve, ms));
-        🔹 function resetDB() {
-        🔹 const mesa = DB.mesas.find(m => m.numero == comando.datos.numeroMesa);
-        🔹 const mesa = DB.mesas.find(m => m.numero == comando.datos.numeroMesa);
-        🔹 const prod = DB.productos.find(p => p.id === comando.datos.prodId);
-        🔹 const mesa = DB.mesas.find(m => m.numero === action.payload.numeroMesa);
-        🔹 const existente = mesa.items.find(it =>
-        🔹 const mesa = DB.mesas.find(m => m.numero === action.payload.numero);
-        🔹 function limpiarDOM() {
-        🔹 const popover = document.getElementById('popoverContainer');
-        🔹 const tc = document.getElementById('toastContainer');
-        🔹 const vistaInicio = document.getElementById('view-inicio');
-        🔹 let vistaBienvenida = document.getElementById('view-bienvenida');
-        🔹 vistaBienvenida = document.getElementById('view-bienvenida');
-        🔹 document.getElementById('inputMesa').value = 5;
-        🔹 document.getElementById('btnGuardarMesa').click();
-        🔹 assert(document.getElementById('cardEspera').style.display === 'block', 'Tarjeta espera visible');
-        🔹 document.getElementById('cardGastronomica').click();
-        🔹 const vistaMenu = document.getElementById('view-menu-digital');
-        🔹 document.getElementById('btnToggleOrden').click();
-        🔹 await document.getElementById('btnConfirmarOrden').click();
-        🔹 document.getElementById('cardEntretenimiento').click();
-        🔹 assert(!!document.getElementById('kds-com_ambos_cocina'), 'Tarjeta virtual de cocina visible');
-        🔹 assert(!!document.getElementById('kds-com_ambos_barra'), 'Tarjeta virtual de barra visible');
-        🔹 assert(!document.getElementById('kds-com_ambos'), 'La comanda original no se renderiza');
-        🔹 const producto = DB.productos.find(p => p.id === 'prod_1');
-        🔹 const vistaDespensa = document.getElementById('view-despensa');
-        🔹 const vistaRecetas = document.getElementById('view-recetas');
-        🔹 assert(!!document.getElementById('view-eventos-en-vivo'), 'Eventos: panel del animador creado');
-        🔹 document.getElementById('selTipoEvento').value = 'votacion';
-        🔹 assert(!!document.getElementById('nuevaOpcion'), 'Eventos: campo de nueva opción visible');
-        🔹 document.getElementById('nuevaOpcion').value = 'Opción A';
-        🔹 document.getElementById('nuevaOpcion').value = 'Opción B';
-        🔹 document.getElementById('view-eventos-en-vivo').style.display = 'none';
-        🔹 assert(!!document.getElementById('view-caja'), 'Caja se renderiza sin errores');
-        🔹 document.getElementById('view-caja').remove();
-    📄 test-avanzado-doble-verificacion.html
-        🔹 const resultsEl = document.getElementById('results');
-        🔹 function imprimirLog(tipo, mensaje, statusBadge) {
-        🔹 function assert(condicion, mensaje) {
-        🔹 const esperar = ms => new Promise(res => setTimeout(res, ms));
-        🔹 document.getElementById('btnEjecutar').addEventListener('click', async () => {
-        🔹 const removerListener = EventBus.on('mesa:actualizada', (data) => {
-        🔹 function h2(texto) {
-    📄 test-runner.html
-        🔹 document.getElementById('totalPass').textContent = `✔ ${totalPass}`;
-        🔹 document.getElementById('totalFail').textContent = `✘ ${totalFail}`;
-        🔹 document.getElementById('totalPending').textContent = `○ ${totalPending}`;
-        🔹 const suite = this.suites.find(s => s.id === id);
-        🔹 const progress = document.getElementById('progressBar');
-        🔹 const fill = document.getElementById('progressFill');
-        🔹 const assert = (condition, msg) => {
-        🔹 const container = document.getElementById('suitesContainer');
-        🔹 const passed = s.tests.filter(t => t.pass).length;
-        🔹 const failed = s.tests.filter(t => !t.pass).length;
-        🔹 const log = document.getElementById('logContent');
-📁 tests/
-    📁 admin/
-            📄 Test-Administracion.html
-                🔹 function showToast(tipo, msg) { toastMessages.push({tipo, msg}); }
-                🔹 function assert(cond, desc) {
-                🔹 document.getElementById('resultados').appendChild(div);
-                🔹 assert(document.getElementById('view-eventos-en-vivo') !== null, 'La vista se crea');
-                🔹 document.getElementById('selTipoEvento').value = 'bingo';
-                🔹 const btnReiniciar = document.getElementById('btnReiniciar');
-                🔹 document.getElementById('selTipoEvento').value = 'karaoke';
-                🔹 document.getElementById('letraKaraoke').value = 'Estribillo de prueba';
-                🔹 document.getElementById('selTipoEvento').value = 'votacion';
-                🔹 document.getElementById('nuevaOpcion').value = 'Opción A';
-                🔹 document.getElementById('nuevaOpcion').value = 'Opción B';
-                🔹 const panel = document.getElementById('panelEventoVivo');
-                🔹 window.addEventListener('load', () => setTimeout(ejecutarTests, 100));
-    📁 cliente/
-            📄 test-C-flujo-mesa.html
-                🔹 const resultados = document.getElementById('resultados');
-                🔹 function log(tipo, mensaje) {
-                🔹 function assert(condicion, descripcion) {
-                🔹 const inputMesa = document.getElementById('inputMesa');
-                🔹 const btnGuardar = document.getElementById('btnGuardarMesa');
-                🔹 const cardEspera = document.getElementById('cardEspera');
-                🔹 const badgePrepedidos = document.getElementById('badgePrepedidos');
-                🔹 const mensajeGastro = document.getElementById('mensajeGastro');
-        📄 test.js
-            🔹 const resultsEl = document.getElementById('results');
-            🔹 function assert(condition, msg) {
-            🔹 let faltantes = dependencias.filter(d => d.global === undefined).map(d => d.nombre);
-            🔹 let chain = ok1.encadenar(data => Resultado.ok(data.id * 2));
-            🔹 let chainFail = fail1.encadenar(data => Resultado.ok(99));
-            🔹 let chainEx = ok1.encadenar(() => { throw new Error('ups'); });
-    📁 ui/
-            📄 test-B-precarga.html
-                🔹 var resultsEl = document.getElementById('results');
-                🔹 function assert(condition, msg) {
-                🔹 window.addEventListener('load', function() {
+            🔹 export const fmtMoney         = formatearDinero;
+            🔹 export const fmtMoneyTicket   = formatearDineroTicket;
+            🔹 export const fmtFechaLarga    = formatearFechaLarga;
+            🔹 export const fmtHoraCompleta  = formatearHoraCompleta;
+            🔹 export const fmtHoraCorta     = formatearHoraCorta;
+            🔹 export const fmtFechaCorta    = formatearFechaCorta;
+            🔹 export const showToast        = mostrarToast;
+
+
+=== MAPEO COMPLETADO ===
+Total de funciones/declaraciones capturadas: 982
+Fecha de generación: 8/24/2026, 2:28:17 AM

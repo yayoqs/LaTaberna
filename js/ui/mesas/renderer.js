@@ -1,11 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MESAS SUBMÓDULO (ES6)
    Archivo: js/ui/mesas/renderer.js
-   Versión: 1.3.1
+   Versión: 1.3.2
    Propósito: Renderizado de la grilla, tarjetas, popover.
-              v1.3.1: Orden estable de tarjetas por número.
-                      Se elimina botón de bandeja (solo gesto).
-                      La construcción de la vista no conecta botones.
+              v1.3.2: Corregido sort para mesas virtuales con
+                      mesasFusionadas como string JSON.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -26,6 +25,16 @@ let _popoverCloseListeners = [];
 function _limpiarPopoverListeners() {
   _popoverCloseListeners.forEach(fn => fn());
   _popoverCloseListeners = [];
+}
+
+function _mesasFusionadasArray(mesa) {
+  if (!mesa) return [];
+  const mf = mesa.mesasFusionadas;
+  if (Array.isArray(mf)) return mf;
+  if (typeof mf === 'string') {
+    try { return JSON.parse(mf); } catch { return []; }
+  }
+  return [];
 }
 
 export function setModoSeleccion(valor) { _modoSeleccion = valor; }
@@ -90,12 +99,17 @@ export function renderGrid() {
   }
 
   mesas.sort((a, b) => {
-    const numA = a.esVirtual && a.mesasFusionadas && a.mesasFusionadas.length > 0
-      ? Math.min(...a.mesasFusionadas.map(Number))
+    const mfA = _mesasFusionadasArray(a);
+    const mfB = _mesasFusionadasArray(b);
+
+    const numA = a.esVirtual && mfA.length > 0
+      ? Math.min(...mfA.map(Number))
       : (parseInt(a.numero) || 9999);
-    const numB = b.esVirtual && b.mesasFusionadas && b.mesasFusionadas.length > 0
-      ? Math.min(...b.mesasFusionadas.map(Number))
+
+    const numB = b.esVirtual && mfB.length > 0
+      ? Math.min(...mfB.map(Number))
       : (parseInt(b.numero) || 9999);
+
     return numA - numB;
   });
 
@@ -308,7 +322,7 @@ export function mostrarPopover(mesa, card, event) {
   }
 }
 
-export function asegurarVista() {
+export function asegurarVista(callbacks = {}) {
   const main = document.getElementById('view-mesas');
   if (main && main.querySelector('.mesas-grid')) return;
 
@@ -318,14 +332,14 @@ export function asegurarVista() {
     nuevoMain.className = 'view active';
     const referencia = document.getElementById('toastContainer') || document.body.lastChild;
     document.body.insertBefore(nuevoMain, referencia);
-    _construirContenido(nuevoMain);
+    _construirContenido(nuevoMain, callbacks);
     return;
   }
 
-  _construirContenido(main);
+  _construirContenido(main, callbacks);
 }
 
-function _construirContenido(contenedor) {
+function _construirContenido(contenedor, callbacks) {
   contenedor.innerHTML = `
     <div class="view-toolbar">
       <h2><i class="fas fa-grip"></i> Salón — Mapa de Mesas</h2>
@@ -352,4 +366,14 @@ function _construirContenido(contenedor) {
     <div id="popoverContainer" style="position:fixed;z-index:9999;pointer-events:none;"></div>
     <div id="bandejaAtencionOverlay" class="bandeja-overlay" style="display:none;"></div>
   `;
+
+  document.getElementById('btnAgregarMesa')?.addEventListener('click', () => {
+    if (callbacks.onAgregarMesa) callbacks.onAgregarMesa();
+  });
+  document.getElementById('btnFusionar')?.addEventListener('click', () => {
+    if (callbacks.onToggleFusion) callbacks.onToggleFusion();
+  });
+  document.getElementById('btnConfirmarFusion')?.addEventListener('click', () => {
+    if (callbacks.onConfirmarFusion) callbacks.onConfirmarFusion();
+  });
 }

@@ -1,11 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — PERFIL SUBMÓDULO (ES6)
    Archivo: js/ui/perfil/admin-roles.js
-   Versión: 2.1.0
+   Versión: 2.1.3
    Propósito: Gestión canónica de personal (Staff) con roles múltiples,
               alta segura, token de vinculación y canje.
-              v2.1.0: jerarquía de asignación visual, multiselección
-                      real en alta y contraseña temporal visible.
+              v2.1.3: elimina uso de clase .seccion en HTML generado
+                      para evitar que se oculte dentro de #view-config.
    ================================================================ */
 
 import { Auth } from '../../auth.js';
@@ -13,7 +13,7 @@ import { Roles } from '../../roles.js';
 import { DB } from '../../db.js';
 import { DBAppwrite } from '../../db-appwrite.js';
 import { Logger } from '../../lib/logger.js';
-import { mostrarToast, mostrarEntrada, mostrarConfirmacion } from '../../utils.js';
+import { mostrarToast, mostrarEntrada } from '../../utils.js';
 
 function _obtenerEspacioId() {
   const local = Auth.obtenerLocalActivo?.();
@@ -43,16 +43,16 @@ function _parsearRoles(staff) {
 /**
  * Calcula los roles que el usuario actual PUEDE ASIGNAR según su jerarquía.
  * Temporalmente excluye 'artista' hasta que B4 defina su flujo.
+ * @param {string[]} rolesEfectivos
  * @returns {string[]}
  */
-function _obtenerRolesAsignables() {
+function _obtenerRolesAsignables(rolesEfectivos) {
   try {
-    const rolesActuales = Auth.obtenerRolesEfectivos();
     const permitidos = [];
 
-    rolesActuales.forEach(rol => {
+    rolesEfectivos.forEach(rol => {
       if (rol === 'master') {
-        permitidos.push('admin');
+        if (!permitidos.includes('admin')) permitidos.push('admin');
       } else {
         const jerarquiaRol = Roles.jerarquia[rol] || [];
         jerarquiaRol.forEach(r => {
@@ -134,7 +134,6 @@ function _abrirModalAlta(rolesAsignables) {
       if (e.target === overlay) cerrar(null);
     });
 
-    // Sincronizar rol principal con checkboxes
     const checksContainer = overlay.querySelector('#altaRolesChecks');
     const selectPrincipal = overlay.querySelector('#altaRolPrincipal');
 
@@ -145,7 +144,6 @@ function _abrirModalAlta(rolesAsignables) {
         : marcados.map(r => `<option value="${r}">${r.charAt(0).toUpperCase() + r.slice(1)}</option>`).join('');
       selectPrincipal.disabled = marcados.length === 0;
       if (marcados.length > 0) {
-        // Mantener selección previa si sigue disponible
         const seleccionAnterior = selectPrincipal.dataset.anterior;
         if (seleccionAnterior && marcados.includes(seleccionAnterior)) {
           selectPrincipal.value = seleccionAnterior;
@@ -185,7 +183,6 @@ function _abrirModalAlta(rolesAsignables) {
       cerrar({ nombreUsuario, nombreVisible, roles: rolesSeleccionados, rolPrincipal, estado });
     });
 
-    // Escape cierra
     const onKeyDown = (e) => {
       if (e.key === 'Escape') {
         cerrar(null);
@@ -265,8 +262,11 @@ export async function renderTabAdmin(usuarioActual, esMaster, contenedorId = 'ta
   const contenedor = document.getElementById(contenedorId);
   if (!contenedor) return;
 
+  // Obtener roles reales desde el usuarioActual o desde Auth
+  const rolesEfectivos = usuarioActual?.rolesEfectivos || Auth.obtenerRolesEfectivos();
   const espacioId = _obtenerEspacioId();
   let staff = [];
+
   try {
     staff = await DB.obtenerStaffPorEspacio(espacioId);
   } catch (e) {
@@ -274,17 +274,19 @@ export async function renderTabAdmin(usuarioActual, esMaster, contenedorId = 'ta
     staff = [];
   }
 
-  // Normalizar roles en cada staff
   staff = staff.map(s => ({ ...s, roles: _parsearRoles(s) }));
 
-  const rolesAsignables = _obtenerRolesAsignables();
+  const rolesAsignables = _obtenerRolesAsignables(rolesEfectivos);
+
+  // Mostrar el rol real del usuario en la nota de jerarquía
+  const rolPrincipalReal = usuarioActual?.rolPrincipal || rolesEfectivos[0] || 'staff';
 
   contenedor.innerHTML = `
     <div class="nota-privacidad">
-      🔑 Como <strong>${esMaster ? 'master' : 'admin'}</strong>, puedes gestionar al personal del local.
-      ${!esMaster ? ' El rol <strong>Admin</strong> solo puede asignarlo un <strong>Master</strong>.' : ''}
+      🔑 Como <strong>${rolPrincipalReal}</strong>, puedes gestionar al personal del local.
+      ${rolPrincipalReal !== 'master' ? ' El rol <strong>Admin</strong> solo puede asignarlo un <strong>Master</strong>.' : ''}
     </div>
-    <div class="seccion">
+    <div class="panel-admin">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
         <h3 style="margin:0;"><i class="fas fa-users"></i> Personal</h3>
         <button class="btn-primary" id="btnNuevoStaff"><i class="fas fa-user-plus"></i> Nuevo personal</button>
@@ -303,7 +305,7 @@ export async function renderTabAdmin(usuarioActual, esMaster, contenedorId = 'ta
         ${staff.length === 0 ? '<p style="color:var(--color-text-muted); font-size:12px;">No hay personal registrado.</p>' : ''}
       </div>
     </div>
-    <div class="seccion" style="margin-top:16px;">
+    <div class="panel-admin" style="margin-top:16px;">
       <h3><i class="fas fa-link"></i> Vincular cuenta con token</h3>
       <p style="font-size:12px; color:var(--color-text-muted); margin-bottom:8px;">
         Si ya creaste una ficha de personal y la persona tiene cuenta, entrégale el token para que se vincule desde su perfil.
@@ -320,9 +322,8 @@ export async function renderTabAdmin(usuarioActual, esMaster, contenedorId = 'ta
       fila.dataset.estado = s.estado || 'activo';
       fila.dataset.nombre = (s.nombre || '').toLowerCase();
 
-      // Roles a mostrar: asignables + roles ya poseídos (aunque no asignables)
-      const rolesMostrados = [...new Set([...rolesAsignables, ...s.roles])]
-        .filter(r => r !== 'cliente' && r !== 'master' && r !== 'artista');
+      // Solo mostramos roles asignables por el usuario actual
+      const rolesMostrados = rolesAsignables;
 
       fila.innerHTML = `
         <div class="usuario-row-top">
@@ -333,11 +334,9 @@ export async function renderTabAdmin(usuarioActual, esMaster, contenedorId = 'ta
         <div class="roles-checks">
           ${rolesMostrados.map(rol => {
             const tieneRol = s.roles.includes(rol);
-            const asignable = rolesAsignables.includes(rol);
-            const restringido = !asignable;
             return `
-              <label class="rol-check ${restringido ? 'bloqueado' : ''}">
-                <input type="checkbox" ${tieneRol ? 'checked' : ''} ${restringido ? 'disabled' : ''}
+              <label class="rol-check">
+                <input type="checkbox" ${tieneRol ? 'checked' : ''}
                   data-staff-id="${s.id}" data-rol="${rol}">
                 ${rol.charAt(0).toUpperCase() + rol.slice(1)}
               </label>
@@ -352,9 +351,7 @@ export async function renderTabAdmin(usuarioActual, esMaster, contenedorId = 'ta
       listaContainer.appendChild(fila);
     });
 
-    // Cambiar roles
     listaContainer.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
-      if (checkbox.disabled) return; // Los bloqueados no tienen listener
       checkbox.addEventListener('change', async function () {
         const staffId = this.dataset.staffId;
         const rol = this.dataset.rol;
@@ -375,7 +372,6 @@ export async function renderTabAdmin(usuarioActual, esMaster, contenedorId = 'ta
           return;
         }
 
-        // Si se removió el rolPrincipal, asignar el primer rol
         if (!nuevosRoles.includes(staffActual.rolPrincipal)) {
           staffActual.rolPrincipal = nuevosRoles[0];
         }
@@ -394,7 +390,6 @@ export async function renderTabAdmin(usuarioActual, esMaster, contenedorId = 'ta
       });
     });
 
-    // Copiar token
     listaContainer.querySelectorAll('.btn-copiar-token').forEach(btn => {
       btn.addEventListener('click', async () => {
         const token = btn.dataset.token;
@@ -409,7 +404,6 @@ export async function renderTabAdmin(usuarioActual, esMaster, contenedorId = 'ta
     });
   }
 
-  // Búsqueda
   contenedor.querySelector('#buscarPersonalInput')?.addEventListener('input', function () {
     const termino = this.value.toLowerCase();
     contenedor.querySelectorAll('.usuario-row').forEach(fila => {
@@ -418,7 +412,6 @@ export async function renderTabAdmin(usuarioActual, esMaster, contenedorId = 'ta
     });
   });
 
-  // Filtros de estado
   contenedor.querySelectorAll('.filtro-rol').forEach(btn => {
     btn.addEventListener('click', () => {
       contenedor.querySelectorAll('.filtro-rol').forEach(b => b.classList.remove('activo'));
@@ -431,7 +424,6 @@ export async function renderTabAdmin(usuarioActual, esMaster, contenedorId = 'ta
     });
   });
 
-  // Nuevo personal
   contenedor.querySelector('#btnNuevoStaff')?.addEventListener('click', async () => {
     const datos = await _abrirModalAlta(rolesAsignables);
     if (!datos) return;
@@ -453,7 +445,6 @@ export async function renderTabAdmin(usuarioActual, esMaster, contenedorId = 'ta
       }
       usuarioId = reg.usuarioId;
 
-      // Mostrar contraseña temporal de forma visible antes de continuar
       await _mostrarModalPasswordTemporal(datos.nombreUsuario, passwordTemporal);
     }
 
@@ -480,7 +471,6 @@ export async function renderTabAdmin(usuarioActual, esMaster, contenedorId = 'ta
     }
   });
 
-  // Canjear token
   contenedor.querySelector('#btnCanjearTokenStaff')?.addEventListener('click', async () => {
     const token = await mostrarEntrada('Vincular staff', 'Ingresa el token de vinculación entregado por tu administrador:');
     if (!token) return;

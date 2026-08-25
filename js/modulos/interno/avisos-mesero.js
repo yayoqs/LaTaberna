@@ -1,13 +1,17 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO INTERNO (ES6)
    Archivo: js/modulos/interno/avisos-mesero.js
-   Versión: 1.0.1
+   Versión: 1.1.0
    Propósito: Indicador visual de notificaciones para el mesero.
-              Corrección: limpiar() ahora desuscribe los listeners.
+              v1.1.0: Lee avisos y precargas persistentes desde
+                      Appwrite. Filtra por espacioId activo y no
+                      se muestra para rol cliente puro.
    ================================================================ */
 
 import { EventBus } from '../../lib/eventBus.js';
 import { Logger } from '../../lib/logger.js';
+import { Auth } from '../../auth.js';
+import { DBAppwrite } from '../../db-appwrite.js';
 
 const AvisosMesero = (() => {
   let _triangulo = null;
@@ -15,8 +19,28 @@ const AvisosMesero = (() => {
   let _vistaActiva = 'mesas';
   let _activado = false;
 
-  const _notificaciones = new Map();
+  const _avisos = new Map();
+  const _precargas = new Map();
   const _desuscripciones = [];
+
+  function _esSoloCliente() {
+    try {
+      const roles = Auth.obtenerRolesEfectivos?.();
+      if (!Array.isArray(roles) || roles.length === 0) return true;
+      return roles.length === 1 && roles[0] === 'cliente';
+    } catch (e) {
+      return true;
+    }
+  }
+
+  function _espacioIdActivo() {
+    try {
+      const local = Auth.obtenerLocalActivo?.();
+      return local?.id || 'lataberna';
+    } catch (e) {
+      return 'lataberna';
+    }
+  }
 
   function _crearTriangulo() {
     if (_triangulo) return;
@@ -49,9 +73,7 @@ const AvisosMesero = (() => {
     });
     _triangulo.addEventListener('click', () => {
       EventBus.emit('app:cambiarVista', 'mesas');
-      _contador = 0;
-      _notificaciones.clear();
-      _actualizarUI();
+      EventBus.emit('mesas:abrir_bandeja');
     });
 
     const icono = document.createElement('i');
@@ -95,79 +117,86 @@ const AvisosMesero = (() => {
     if (!contadorEl) return;
 
     const visible = _contador > 0 && _vistaActiva !== 'mesas';
-
     _triangulo.style.display = visible ? 'flex' : 'none';
     contadorEl.style.display = _contador > 0 ? 'flex' : 'none';
     contadorEl.textContent = _contador > 9 ? '9+' : _contador;
   }
 
-  function _agregarNotificacion(tipo, mesa) {
-    const clave = `${tipo}:${mesa}`;
-    if (!_notificaciones.has(clave)) {
-      _notificaciones.set(clave, { tipo, mesa });
-      _contador++;
-      _actualizarUI();
-      Logger.debug(`[AvisosMesero] Notificación agregada: ${clave} (total: ${_contador})`);
+  function _recalcularContador() {
+    _contador = _avisos.size + _precargas.size;
+    _actualizarUI();
+  }
+
+  async function _cargarAvisos() {
+    if (!DBAppwrite || !DBAppwrite.habilitado) return;
+
+    const espacioId = _espacioIdActivo();
+    try {
+      const avisos = await DBAppwrite.listar('avisos');
+      _avisos.clear();
+
+      avisos
+        .filter(a => a.estado === 'pendiente')
+        .filter(a => String(a.espacioId || '') === String(espacioId))
+        .forEach(a => {
+          if (!_avisos.has(a.id)) _avisos.set(a.id, a);
+        });
+
+      _recalcularContador();
+    } catch (e) {
+      Logger.warn('[AvisosMesero] No se pudieron cargar avisos:', e);
     }
   }
 
-  function _removerNotificacion(tipo, mesa) {
-    const clave = `${tipo}:${mesa}`;
-    if (_notificaciones.has(clave)) {
-      _notificaciones.delete(clave);
-      _contador = Math.max(0, _contador - 1);
-      _actualizarUI();
-      Logger.debug(`[AvisosMesero] Notificación removida: ${clave} (total: ${_contador})`);
+  async function _cargarPrecargas() {
+    if (!DBAppwrite || !DBAppwrite.habilitado) return;
+
+    const espacioId = _espacioIdActivo();
+    try {
+      const pedidos = await DBAppwrite.listar('pedidos');
+      _precargas.clear();
+
+      pedidos
+        .filter(p => p.estado === 'precarga')
+        .filter(p => p.origen === 'cliente')
+        .filter(p => String(p.espacioId || '') === String(espacioId))
+        .forEach(p => {
+          if (!_precargas.has(p.id)) _precargas.set(p.id, p);
+        });
+
+      _recalcularContador();
+    } catch (e) {
+      Logger.warn('[AvisosMesero] No se pudieron cargar precargas:', e);
     }
+  }
+
+  async function _refrescar() {
+    await Promise.all([_cargarAvisos(), _cargarPrecargas()]);
   }
 
   function activar() {
     if (_activado) return;
     _activado = true;
 
+    if (_esSoloCliente()) {
+      Logger.info('[AvisosMesero] No se activa para rol cliente puro.');
+      return;
+    }
+
     _crearTriangulo();
+    _refrescar();
 
-    _desuscripciones.push(EventBus.on('cliente:mesa_ingresada', (data) => {
-      if (data && data.mesa) _agregarNotificacion('esperando', data.mesa);
-    }));
-
-    _desuscripciones.push(EventBus.on('cliente:precarga_enviada', (data) => {
-      if (data && data.mesa) _agregarNotificacion('precarga', data.mesa);
-    }));
-
-    _desuscripciones.push(EventBus.on('cliente:llamar_garzon', (data) => {
-      if (data && data.mesa) _agregarNotificacion('llamado', data.mesa);
-    }));
-
-    _desuscripciones.push(EventBus.on('mesa:actualizada', (data) => {
-      if (data && data.estado === 'ocupada' && data.mesa) {
-        _removerNotificacion('esperando', data.mesa);
-      }
-    }));
-
-    _desuscripciones.push(EventBus.on('precarga:revisada', () => {
-      for (const [clave, valor] of _notificaciones) {
-        if (valor.tipo === 'precarga') {
-          _notificaciones.delete(clave);
-          _contador = Math.max(0, _contador - 1);
-        }
-      }
-      _actualizarUI();
-    }));
-
-    _desuscripciones.push(EventBus.on('mesas:limpiar_badge', (data) => {
-      if (data && data.mesa) {
-        _removerNotificacion('precarga', data.mesa);
-        _removerNotificacion('llamado', data.mesa);
-      }
-    }));
-
+    _desuscripciones.push(EventBus.on('avisos:actualizada', () => _cargarAvisos()));
+    _desuscripciones.push(EventBus.on('pedidos:actualizada', () => _cargarPrecargas()));
     _desuscripciones.push(EventBus.on('vista:cambiada', (vista) => {
       _vistaActiva = vista || 'mesas';
       _actualizarUI();
     }));
+    _desuscripciones.push(EventBus.on('mesas:abrir_bandeja', () => {
+      EventBus.emit('bandeja:abrir');
+    }));
 
-    Logger.info('[AvisosMesero] Módulo inicializado (v1.0.1).');
+    Logger.info('[AvisosMesero] Módulo activado (v1.1.0).');
   }
 
   function limpiar() {
@@ -178,15 +207,15 @@ const AvisosMesero = (() => {
       _triangulo.remove();
       _triangulo = null;
     }
-    _notificaciones.clear();
+    _avisos.clear();
+    _precargas.clear();
     _contador = 0;
     _activado = false;
-    Logger.info('[AvisosMesero] Módulo limpiado.');
   }
 
   activar();
 
-  return { activar, limpiar };
+  return { activar, limpiar, _refrescar };
 })();
 
 export { AvisosMesero };

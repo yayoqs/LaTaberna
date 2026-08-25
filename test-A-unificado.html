@@ -320,7 +320,8 @@
       resultsEl.innerHTML += '<h2>5. Normalización y fábrica</h2>';
       const prod1 = DBCore._normalizarProducto({ nombre: 'Test', precio: 100 });
       assert(prod1.activo === true, 'Producto sin campo activo → por defecto true');
-      assert(prod1.disponible === true, 'Producto sin campo disponible → por defecto true');
+      assert(prod1.estado === 'disponible', 'Producto sin estado → por defecto disponible');
+      assert(prod1.disponible === true, 'Producto disponible derivado true');
 
       const mesaStr = DBCore._normalizarMesa({ numero: '1' });
       assert(mesaStr.numero === '1', 'Mesa con numero string se conserva');

@@ -1,7 +1,7 @@
 # 📦 COLECCIONES.md — Estructura de la Base de Datos "EkyzD"
 
-**Versión:** 3.3.0
-**Fecha:** 17 de agosto de 2026
+**Versión:** 3.4.2
+**Fecha:** 25 de agosto de 2026
 **Base de datos:** `EkyzD` (ID: `6a0275cb0022ebf7d30d`)
 **Propósito:** Especificación canónica de colecciones, columnas, configuración, permisos y jerarquía de roles para Appwrite Cloud.
 
@@ -19,12 +19,12 @@
 | Rol | Nivel | Puede asignar |
 |-----|-------|---------------|
 | `master` | Plataforma | `admin` |
-| `admin` | Tenant | `gerente`, `chef`, `cocina_ayudante`, `barman`, `barra_ayudante`, `mesero`, `caja`, `repartidor`, `artista` |
-| `gerente` | Staff | `chef`, `cocina_ayudante`, `barman`, `barra_ayudante`, `mesero`, `caja`, `repartidor`, `artista` |
+| `admin` | Tenant | `gerente`, `chef`, `cocinaAyudante`, `barman`, `barraAyudante`, `mesero`, `caja`, `repartidor`, `artista` |
+| `gerente` | Staff | `chef`, `cocinaAyudante`, `barman`, `barraAyudante`, `mesero`, `caja`, `repartidor`, `artista` |
 | `chef` | Staff | No asigna roles |
-| `cocina_ayudante` | Staff | No asigna roles |
+| `cocinaAyudante` | Staff | No asigna roles |
 | `barman` | Staff | No asigna roles |
-| `barra_ayudante` | Staff | No asigna roles |
+| `barraAyudante` | Staff | No asigna roles |
 | `mesero` | Staff | No asigna roles |
 | `caja` | Staff | No asigna roles |
 | `repartidor` | Staff | No asigna roles |
@@ -54,9 +54,9 @@ Los usuarios pueden tener múltiples roles staff simultáneamente. El campo `rol
 | `admin` | CRUD |
 | `gerente` | CRUD |
 | `chef` | READ |
-| `cocina_ayudante` | — |
+| `cocinaAyudante` | — |
 | `barman` | READ |
-| `barra_ayudante` | — |
+| `barraAyudante` | — |
 | `mesero` | READ |
 | `caja` | READ |
 | `repartidor` | READ |
@@ -73,9 +73,9 @@ Los usuarios pueden tener múltiples roles staff simultáneamente. El campo `rol
 | `admin` | CRUD |
 | `gerente` | R/U |
 | `chef` | READ |
-| `cocina_ayudante` | — |
+| `cocinaAyudante` | — |
 | `barman` | READ |
-| `barra_ayudante` | — |
+| `barraAyudante` | — |
 | `mesero` | C/R/U |
 | `caja` | READ |
 | `repartidor` | R/U |
@@ -92,14 +92,16 @@ Los usuarios pueden tener múltiples roles staff simultáneamente. El campo `rol
 | `admin` | CRUD |
 | `gerente` | R/U |
 | `chef` | — |
-| `cocina_ayudante` | — |
+| `cocinaAyudante` | — |
 | `barman` | — |
-| `barra_ayudante` | — |
+| `barraAyudante` | — |
 | `mesero` | R/U |
 | `caja` | READ |
 | `repartidor` | — |
 | `artista` | — |
-| `cliente` | READ |
+| `cliente` | READ* |
+
+> **Nota:** El permiso `READ` para `cliente` en `laTaberna_Mesas` permite consultas puntuales de estado de su mesa. No habilita la vista de mapa de mesas en la UI; dicha vista se controla con `verMesas: false` en `roles.js`.
 
 ---
 
@@ -111,9 +113,9 @@ Los usuarios pueden tener múltiples roles staff simultáneamente. El campo `rol
 | `admin` | CRUD |
 | `gerente` | R/U |
 | `chef` | R/U |
-| `cocina_ayudante` | R/U |
+| `cocinaAyudante` | R/U |
 | `barman` | R/U |
-| `barra_ayudante` | R/U |
+| `barraAyudante` | R/U |
 | `mesero` | C/R |
 | `caja` | — |
 | `repartidor` | READ |
@@ -130,9 +132,9 @@ Los usuarios pueden tener múltiples roles staff simultáneamente. El campo `rol
 | `admin` | CRUD |
 | `gerente` | CRUD |
 | `chef` | READ |
-| `cocina_ayudante` | — |
+| `cocinaAyudante` | — |
 | `barman` | READ |
-| `barra_ayudante` | — |
+| `barraAyudante` | — |
 | `mesero` | — |
 | `caja` | — |
 | `repartidor` | — |
@@ -149,9 +151,9 @@ Los usuarios pueden tener múltiples roles staff simultáneamente. El campo `rol
 | `admin` | CRUD |
 | `gerente` | R/U |
 | `chef` | CRUD |
-| `cocina_ayudante` | READ |
+| `cocinaAyudante` | READ |
 | `barman` | CRUD (barra) |
-| `barra_ayudante` | READ |
+| `barraAyudante` | READ |
 | `mesero` | — |
 | `caja` | — |
 | `repartidor` | — |
@@ -168,9 +170,9 @@ Los usuarios pueden tener múltiples roles staff simultáneamente. El campo `rol
 | `admin` | CRUD |
 | `gerente` | C/R |
 | `chef` | READ |
-| `cocina_ayudante` | READ |
+| `cocinaAyudante` | READ |
 | `barman` | READ |
-| `barra_ayudante` | READ |
+| `barraAyudante` | READ |
 | `mesero` | READ |
 | `caja` | READ |
 | `repartidor` | READ |
@@ -250,6 +252,19 @@ Los usuarios pueden tener múltiples roles staff simultáneamente. El campo `rol
 | `mesero` | C/R/U |
 | `caja` | READ |
 | Resto de roles | — |
+
+---
+
+### 14. `laTaberna_Avisos`
+
+| Label | Permisos |
+|-------|----------|
+| `master` | CRUD |
+| `admin` | CRUD |
+| `gerente` | CRUD |
+| `mesero` | C/R/U |
+| `cliente` | C/R |
+| Resto de roles | READ |
 
 ---
 
@@ -581,11 +596,39 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 
 ---
 
+## 14. `laTaberna_Avisos`
+
+**Name:** laTaberna_Avisos
+**Table ID:** laTaberna_Avisos
+**Propósito:** Solicitudes transitorias generadas por clientes (vinculación, llamado). Las precargas no se almacenan aquí.
+
+| Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
+|---------|------|:----------:|-------------------|---------|
+| `tipo` | enum | Sí | `vinculacion`, `llamado`, `precarga` | — |
+| `mesaId` | varchar | Sí | 100 | — |
+| `usuarioId` | varchar | No | 100 | — |
+| `estado` | enum | Sí | `pendiente`, `atendido`, `descartado` | `pendiente` |
+| `creadoEn` | datetime | No | — | — |
+| `atendidoPor` | varchar | No | 100 | — |
+| `atendidoEn` | datetime | No | — | — |
+| `espacioId` | varchar | Sí | 100 | — |
+
+**Índices:**
+
+| Nombre | Tipo | Columna(s) |
+|--------|------|-----------|
+| `index_estado` | Key | `estado` |
+| `index_mesaId` | Key | `mesaId` |
+| `index_espacioId` | Key | `espacioId` |
+| `index_tipo` | Key | `tipo` |
+
+---
+
 ## 🌐 Colecciones globales (`global_*`)
 
 ---
 
-## 14. `global_Perfiles`
+## 15. `global_Perfiles`
 
 **Name:** global_Perfiles
 **Table ID:** global_Perfiles
@@ -615,7 +658,7 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 
 ---
 
-## 15. `global_Puntos`
+## 16. `global_Puntos`
 
 **Name:** global_Puntos
 **Table ID:** global_Puntos
@@ -640,7 +683,7 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 
 ---
 
-## 16. `global_Eventos`
+## 17. `global_Eventos`
 
 **Name:** global_Eventos
 **Table ID:** global_Eventos
@@ -666,7 +709,7 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 
 ---
 
-## 17. `global_Espacios`
+## 18. `global_Espacios`
 
 **Name:** global_Espacios
 **Table ID:** global_Espacios

@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — COMANDO JS (ES6)
    Archivo: js/comandos/agregar-mesa.js
-   Versión: 1.0.7
+   Versión: 1.0.8
    Propósito: Comando para agregar una nueva mesa.
-              v1.0.7: Despacha Store una sola vez, sin duplicados.
+              v1.0.8: asegura espacioId del local activo y loguea
+                      persistencia.
    ================================================================ */
 
 import { CommandBus } from '../lib/command-bus.js';
@@ -12,6 +13,7 @@ import { EventBus } from '../lib/eventBus.js';
 import { Store } from '../lib/store.js';
 import { mesaVacia } from '../db-core.js';
 import { Auth } from '../auth.js';
+import { Logger } from '../lib/logger.js';
 
 export function crearComandoAgregarMesa(datos) {
   return {
@@ -38,22 +40,23 @@ async function handleAgregarMesa(comando) {
   }
 
   const local = Auth.obtenerLocalActivo();
+  const espacioId = local?.id || 'lataberna';
+
   const nuevaMesa = {
     ...mesaVacia(numero, zona),
     numero,
     zona,
-    espacioId: local ? local.id : 'lataberna'
+    espacioId
   };
 
   try {
     await repo.agregarMesa(nuevaMesa);
+    Logger.info(`[agregarMesa] Mesa ${numero} persistida con espacioId ${espacioId}.`);
   } catch (e) {
     throw new Error('Error al agregar la mesa: ' + e.message);
   }
 
-  // Único despacho al Store, después de la persistencia exitosa
   Store.despachar({ type: 'MESA_AGREGAR', payload: nuevaMesa });
-
   EventBus.emit('mesa:agregada', nuevaMesa);
 
   return nuevaMesa;

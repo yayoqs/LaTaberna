@@ -1,296 +1,1024 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es-CL">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>Prueba D – Config v3 (Roles + Swipe)</title>
+  <title>Prueba D – Config</title>
+
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <!-- CSS reales de producción -->
+  <link rel="stylesheet" href="css/vars.css">
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/layout.css">
+  <link rel="stylesheet" href="css/config.css">
+  <link rel="stylesheet" href="css/modals.css">
+
   <style>
+    /* ===== Ajustes locales para la prueba (no se extraen a CSS) ===== */
+    html,
+    body {
+      height: 100%;
+      margin: 0;
+    }
+
+    body {
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
     :root {
-      --bg: #0f0f14; --panel: #1a1a24; --border: #2e2e42;
-      --text: #f1f5f9; --text-sec: #94a3b8; --accent: #f59e0b;
-      --danger: #ef4444; --success: #22c55e; --info: #3b82f6;
-      --radius: 12px; --radius-sm: 8px;
-      font-family: system-ui, sans-serif; background: var(--bg); color: var(--text);
-    }
-    body { margin: 0; display: flex; flex-direction: column; height: 100vh; height: 100dvh; overflow: hidden; }
-
-    .header {
-      display: flex; align-items: center; gap: 12px; padding: 10px 16px;
-      background: var(--panel); border-bottom: 1px solid var(--border); z-index: 20; flex-shrink: 0;
-    }
-    .header h2 { font-size: 16px; margin: 0; flex: 1; font-weight: 600; }
-    .header .icon-btn {
-      background: transparent; border: 1px solid var(--border); color: var(--text-sec);
-      border-radius: 8px; width: 36px; height: 36px; display: flex; align-items: center;
-      justify-content: center; cursor: pointer; font-size: 16px;
+      --header-h: 52px;
     }
 
-    .main-layout { display: flex; flex: 1; overflow: hidden; position: relative; }
-
-    /* Panel izquierdo: navegación */
-    .panel-izquierdo {
-      width: 220px; flex-shrink: 0; background: var(--panel); border-right: 1px solid var(--border);
-      display: flex; flex-direction: column; padding: 12px; gap: 4px;
-      z-index: 30; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .nav-btn {
-      background: transparent; border: 1px solid transparent; color: var(--text-sec);
-      padding: 10px 12px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 600;
-      cursor: pointer; display: flex; align-items: center; gap: 8px; transition: .2s; text-align: left;
-    }
-    .nav-btn:hover { background: #252535; color: var(--text); }
-    .nav-btn.activo { background: var(--accent); color: #000; border-color: var(--accent); }
-
-    /* Panel central */
-    .panel-central { flex: 1; overflow-y: auto; padding: 20px; background: var(--bg); }
-    .seccion {
-      background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
-      padding: 20px; margin-bottom: 16px; display: none;
-    }
-    .seccion.activo { display: block; }
-    .seccion h3 { margin: 0 0 12px; font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
-    .seccion h3 i { color: var(--accent); }
-
-    .campo { margin-bottom: 14px; }
-    .campo label { display: block; font-size: 11px; color: var(--text-sec); font-weight: 700; text-transform: uppercase; letter-spacing: .5px; margin-bottom: 4px; }
-    .campo input, .campo select {
-      width: 100%; background: #252535; border: 1px solid var(--border); color: var(--text);
-      padding: 10px 12px; border-radius: var(--radius-sm); font-size: 13px; outline: none;
-    }
-    .btn-primary {
-      background: var(--accent); border: none; color: #000; border-radius: 20px;
-      padding: 8px 16px; font-weight: 600; font-size: 13px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
-    }
-    .btn-secondary {
-      background: transparent; border: 1px solid var(--border); color: var(--text-sec);
-      border-radius: 20px; padding: 8px 16px; font-weight: 600; font-size: 13px; cursor: pointer;
-    }
-    .btn-danger {
-      background: var(--danger); border: none; color: #fff; border-radius: 20px;
-      padding: 8px 16px; font-weight: 600; font-size: 13px; cursor: pointer;
+    #view-config {
+      flex: 1;
+      min-height: 0;
     }
 
-    /* Zonas */
-    .zona-row { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
-    .zona-row input { flex: 1; }
-    .zona-row button { background: transparent; border: 1px solid var(--border); color: var(--text-sec); border-radius: 4px; cursor: pointer; }
+    #toastContainer {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 99999;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
 
-    /* Personal (roles) */
-    .filtros-roles { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
-    .filtro-rol {
-      background: transparent; border: 1px solid var(--border); color: var(--text-sec);
-      border-radius: 20px; padding: 5px 12px; font-size: 11px; cursor: pointer; transition: .2s;
+    .toast-local {
+      background: #1a1a24;
+      border: 1px solid #2e2e42;
+      color: #f1f5f9;
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 13px;
+      font-weight: 600;
+      box-shadow: 0 10px 30px rgba(0,0,0,.5);
+      opacity: 1;
+      transition: opacity .3s ease;
+      pointer-events: auto;
     }
-    .filtro-rol.activo { background: var(--accent); color: #000; border-color: var(--accent); }
-    .usuario-row {
-      background: #252535; border: 1px solid var(--border); border-radius: var(--radius-sm);
-      padding: 12px; margin-bottom: 8px;
-    }
-    .usuario-row-top { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-    .usuario-row-top .av {
-      width: 32px; height: 32px; border-radius: 50%; background: var(--info);
-      display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; flex-shrink: 0;
-    }
-    .usuario-row-top strong { font-size: 13px; flex: 1; }
-    .usuario-row-top .rol-actual { font-size: 10px; color: var(--text-sec); }
-    .roles-checks { display: flex; flex-wrap: wrap; gap: 6px; }
-    .rol-check {
-      display: flex; align-items: center; gap: 5px; background: var(--bg); border: 1px solid var(--border);
-      border-radius: 16px; padding: 5px 10px; font-size: 11px; cursor: pointer;
-    }
-    .rol-check input { accent-color: var(--info); width: 13px; height: 13px; }
-    .rol-check.bloqueado { opacity: .35; cursor: not-allowed; }
-    .rol-check.bloqueado input { pointer-events: none; }
-    .search-box {
-      display: flex; align-items: center; gap: 8px; background: #252535;
-      border: 1px solid var(--border); border-radius: 20px; padding: 8px 12px; margin-bottom: 12px;
-    }
-    .search-box input { flex: 1; background: transparent; border: none; color: var(--text); font-size: 13px; outline: none; }
+    .toast-local.success { border-color: #22c55e; }
+    .toast-local.error { border-color: #ef4444; }
+    .toast-local.info { border-color: #3b82f6; }
 
-    /* Overlay */
-    .overlay {
-      position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 25;
-      display: none; opacity: 0; transition: opacity 0.3s;
+    /* Nota de jerarquía similar a perfil.css */
+    .nota-privacidad-config {
+      display: flex;
+      gap: 9px;
+      align-items: flex-start;
+      background: rgba(99,102,241,0.15);
+      border: 1px solid rgba(99,102,241,0.3);
+      border-radius: 8px;
+      padding: 11px 13px;
+      font-size: 11px;
+      color: #c7d2fe;
+      margin-bottom: 15px;
+      line-height: 1.55;
     }
-    .overlay.activo { display: block; opacity: 1; }
 
-    /* Responsive */
-    @media (max-width: 768px) {
-      .panel-izquierdo {
-        position: fixed; top: var(--header-h); left: 0; bottom: 0;
-        transform: translateX(-100%); height: calc(100% - var(--header-h));
-      }
-      .panel-izquierdo.abierto { transform: translateX(0); }
+    /* Token row */
+    .token-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-top: 10px;
+      font-size: 11px;
+      color: #94a3b8;
+    }
+
+    .btn-copiar-token {
+      background: transparent;
+      border: 1px solid #2e2e42;
+      color: #94a3b8;
+      border-radius: 6px;
+      padding: 3px 10px;
+      cursor: pointer;
+      font-size: 11px;
+      transition: all .2s;
+    }
+    .btn-copiar-token:hover {
+      border-color: #f59e0b;
+      color: #f59e0b;
+    }
+
+    /* Selector rol simulado */
+    .selector-rol-simulado {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      font-size: 12px;
+      color: #94a3b8;
+    }
+    .selector-rol-simulado select {
+      background: #252535;
+      border: 1px solid #2e2e42;
+      color: #f1f5f9;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 12px;
+      outline: none;
+    }
+
+    /* ===== Zonas rediseñadas ===== */
+    .zona-card {
+      background: #252535;
+      border: 1px solid #2e2e42;
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 10px;
+      transition: border-color .2s;
+    }
+    .zona-card:hover {
+      border-color: #f59e0b;
+    }
+    .zona-card-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+    }
+    .zona-icono {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      background: rgba(245,158,11,.15);
+      color: #f59e0b;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+    .zona-info {
+      flex: 1;
+    }
+    .zona-info .zona-nombre {
+      font-weight: 700;
+      font-size: 14px;
+      color: #f1f5f9;
+      margin: 0;
+    }
+    .zona-info .zona-detalle {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+    .zona-stats {
+      display: flex;
+      gap: 6px;
+    }
+    .zona-stat {
+      background: #0f0f14;
+      border: 1px solid #2e2e42;
+      border-radius: 8px;
+      padding: 6px 10px;
+      text-align: center;
+      min-width: 50px;
+    }
+    .zona-stat .valor {
+      font-size: 16px;
+      font-weight: 800;
+      color: #f1f5f9;
+    }
+    .zona-stat .etiqueta {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+    .zona-card-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .zona-card-footer button {
+      background: transparent;
+      border: 1px solid #2e2e42;
+      color: #94a3b8;
+      border-radius: 6px;
+      padding: 5px 12px;
+      cursor: pointer;
+      font-size: 11px;
+      transition: all .2s;
+    }
+    .zona-card-footer button:hover {
+      border-color: #f59e0b;
+      color: #f59e0b;
+    }
+    .zona-card-footer .btn-zona-eliminar:hover {
+      border-color: #ef4444;
+      color: #ef4444;
+    }
+
+    .btn-anadir-zona {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      width: 100%;
+      background: transparent;
+      border: 1.5px dashed #2e2e42;
+      color: #94a3b8;
+      border-radius: 12px;
+      padding: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .btn-anadir-zona:hover {
+      border-color: #f59e0b;
+      color: #f59e0b;
+    }
+
+    /* Modal para zona */
+    .modal-zona-campos {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .modal-zona-campos .campo {
+      flex: 1;
+      min-width: 140px;
     }
   </style>
 </head>
 <body>
-  <div class="header">
-    <button class="icon-btn" id="btnToggleMenu" title="Menú">☰</button>
-    <h2>⚙️ Configuración</h2>
-  </div>
 
-  <div class="main-layout" id="mainLayout">
-    <!-- Panel izquierdo -->
-    <div class="panel-izquierdo" id="panelIzquierdo">
-      <button class="nav-btn activo" data-seccion="local">🏠 Datos del Local</button>
-      <button class="nav-btn" data-seccion="zonas">📍 Zonas</button>
-      <button class="nav-btn" data-seccion="personal">👥 Personal</button>
-      <button class="nav-btn" data-seccion="impresoras">🖨️ Impresoras</button>
-      <button class="nav-btn" data-seccion="contrasenas">🔑 Contraseñas</button>
+  <main id="view-config" class="view active">
+    <div class="config-header">
+      <button class="icon-btn" id="btnToggleMenuConfig" title="Menú">☰</button>
+      <h2>⚙️ Configuración</h2>
     </div>
 
-    <!-- Panel central -->
-    <div class="panel-central">
-      <div class="seccion activo" id="sec-local">
-        <h3><i class="fas fa-store"></i> Datos del Local</h3>
-        <div class="campo"><label>Nombre del Local</label><input type="text" value="La Taberna"></div>
-        <div class="campo"><label>Dirección</label><input type="text" value="Av. Corrientes 1234"></div>
-        <div class="campo"><label>CUIT / RUT</label><input type="text" value="30-12345678-9"></div>
-        <div class="campo"><label>Pie de ticket</label><input type="text" value="¡Gracias por visitarnos!"></div>
-        <label style="display:flex; align-items:center; gap:8px; margin:12px 0;">
-          <input type="checkbox" checked> Bloquear envío si falta stock
-        </label>
-        <button class="btn-primary"><i class="fas fa-save"></i> Guardar</button>
+    <div class="main-layout" id="configMainLayout">
+      <!-- Panel izquierdo -->
+      <div class="panel-izquierdo" id="panelIzquierdoConfig">
+        <button class="nav-btn activo" data-seccion="local">🏠 Datos del Local</button>
+        <button class="nav-btn" data-seccion="zonas">📍 Zonas</button>
+        <button class="nav-btn" data-seccion="personal">👥 Personal</button>
+        <button class="nav-btn" data-seccion="impresoras">🖨️ Impresoras</button>
       </div>
 
-      <div class="seccion" id="sec-zonas">
-        <h3><i class="fas fa-map-marker-alt"></i> Zonas / Espacios</h3>
-        <div id="zonasContainer">
-          <div class="zona-row"><input type="text" value="salon" placeholder="Nombre"><input type="number" value="12" min="0" style="width:80px;"><button>🗑️</button></div>
-          <div class="zona-row"><input type="text" value="terraza" placeholder="Nombre"><input type="number" value="4" min="0" style="width:80px;"><button>🗑️</button></div>
-        </div>
-        <button class="btn-secondary" style="margin-top:8px;"><i class="fas fa-plus"></i> Añadir Zona</button>
-        <button class="btn-danger" style="margin-top:12px;"><i class="fas fa-sync-alt"></i> Resetear Mesas</button>
-      </div>
+      <!-- Panel central -->
+      <div class="panel-central" id="panelCentralConfig">
 
-      <div class="seccion" id="sec-personal">
-        <h3><i class="fas fa-users"></i> Personal</h3>
-        <div class="search-box"><span>🔍</span><input type="text" placeholder="Buscar por nombre..."></div>
-        <div class="filtros-roles">
-          <button class="filtro-rol activo">Todos</button>
-          <button class="filtro-rol">Meseros</button>
-          <button class="filtro-rol">Cocina</button>
-          <button class="filtro-rol">Barra</button>
-          <button class="filtro-rol">Admin</button>
+        <!-- Datos del Local -->
+        <div class="seccion activo" id="sec-local">
+          <h3><i class="fas fa-store"></i> Datos del Local</h3>
+          <div class="campo">
+            <label>Nombre del Local</label>
+            <input type="text" id="cfgNombreLocal" value="La Taberna">
+          </div>
+          <div class="campo">
+            <label>Dirección</label>
+            <input type="text" id="cfgDireccion" value="Itinerante">
+          </div>
+          <div class="campo">
+            <label>CUIT / RUT</label>
+            <input type="text" id="cfgCuit" value="18431093">
+          </div>
+          <div class="campo">
+            <label>Pie de ticket</label>
+            <input type="text" id="cfgPie" value="Tu lugar especial">
+          </div>
+          <label style="display:flex; align-items:center; gap:8px; margin:12px 0;">
+            <input type="checkbox" id="cfgBloquearStock" checked>
+            Bloquear envío si falta stock
+          </label>
+          <button class="btn-primary" id="btnGuardarConfig"><i class="fas fa-save"></i> Guardar</button>
         </div>
-        <div class="usuario-row">
-          <div class="usuario-row-top"><div class="av">P</div><strong>Pedro Soto</strong><span class="rol-actual">mesero</span></div>
-          <div class="roles-checks">
-            <label class="rol-check"><input type="checkbox" checked>Mesero</label>
-            <label class="rol-check"><input type="checkbox">Barra</label>
-            <label class="rol-check"><input type="checkbox">Cocina</label>
-            <label class="rol-check"><input type="checkbox">Admin</label>
+
+        <!-- Zonas -->
+        <div class="seccion" id="sec-zonas">
+          <h3><i class="fas fa-map-marker-alt"></i> Zonas / Espacios</h3>
+          <div id="zonasContainer"></div>
+          <button class="btn-anadir-zona" id="btnAnadirZona">
+            <i class="fas fa-plus"></i> Añadir Zona
+          </button>
+          <button class="btn-danger" id="btnResetearMesas" style="margin-top:12px;">
+            <i class="fas fa-sync-alt"></i> Resetear Mesas
+          </button>
+        </div>
+
+        <!-- Personal -->
+        <div class="seccion" id="sec-personal">
+          <div class="selector-rol-simulado">
+            <label for="rolSimuladoSelect">Ver como:</label>
+            <select id="rolSimuladoSelect">
+              <option value="master">master</option>
+              <option value="admin" selected>admin</option>
+              <option value="gerente">gerente</option>
+            </select>
+          </div>
+
+          <div id="notaJerarquiaPersonal" class="nota-privacidad-config"></div>
+
+          <div class="search-box" style="margin-bottom:12px;">
+            <span>🔍</span>
+            <input type="text" id="buscarPersonalInput" placeholder="Buscar por nombre...">
+          </div>
+
+          <div class="filtros-roles">
+            <button class="filtro-rol activo" data-filtro="todos">Todos</button>
+            <button class="filtro-rol" data-filtro="activo">Activos</button>
+            <button class="filtro-rol" data-filtro="inactivo">Inactivos</button>
+            <button class="filtro-rol" data-filtro="vacaciones">Vacaciones</button>
+          </div>
+
+          <div id="listaPersonalContainer"></div>
+
+          <button class="btn-primary" id="btnNuevoStaff" style="margin-top:12px;">
+            <i class="fas fa-user-plus"></i> Nuevo personal
+          </button>
+
+          <div class="seccion" style="margin-top:16px;">
+            <h3><i class="fas fa-link"></i> Vincular cuenta con token</h3>
+            <p style="font-size:12px; color:#94a3b8; margin-bottom:8px;">
+              Si ya creaste una ficha de personal y la persona tiene cuenta, entrégale el token para que se vincule desde su perfil.
+            </p>
+            <button class="btn-secondary" id="btnCanjearTokenStaff"><i class="fas fa-ticket-alt"></i> Canjear token de staff</button>
           </div>
         </div>
-        <div class="usuario-row">
-          <div class="usuario-row-top"><div class="av">V</div><strong>Valentina Muñoz</strong><span class="rol-actual">barra, cocina</span></div>
-          <div class="roles-checks">
-            <label class="rol-check"><input type="checkbox">Mesero</label>
-            <label class="rol-check"><input type="checkbox" checked>Barra</label>
-            <label class="rol-check"><input type="checkbox" checked>Cocina</label>
-            <label class="rol-check"><input type="checkbox">Admin</label>
+
+        <!-- Impresoras -->
+        <div class="seccion" id="sec-impresoras">
+          <h3><i class="fas fa-print"></i> Impresoras</h3>
+          <div class="campo">
+            <label>Cocina</label>
+            <input type="text" id="impCocinaIP" value="192.168.1.100">
           </div>
-        </div>
-        <button class="btn-primary" style="margin-top:12px;"><i class="fas fa-user-plus"></i> Invitar como personal</button>
-      </div>
-
-      <div class="seccion" id="sec-impresoras">
-        <h3><i class="fas fa-print"></i> Impresoras</h3>
-        <div class="campo"><label>Cocina</label><input type="text" value="192.168.1.100"></div>
-        <div class="campo"><label>Barra</label><input type="text" value="192.168.1.101"></div>
-        <div class="campo"><label>Caja</label><input type="text" value="192.168.1.102"></div>
-        <p style="font-size:11px; color:var(--text-sec);">Para impresión directa instalá QZ Tray.</p>
-      </div>
-
-      <div class="seccion" id="sec-contrasenas">
-        <h3><i class="fas fa-key"></i> Contraseñas de Usuarios</h3>
-        <p style="font-size:12px; color:var(--text-sec); margin-bottom:12px;">Solo el master puede cambiar contraseñas.</p>
-        <div class="usuario-row">
-          <div class="usuario-row-top"><div class="av">A</div><strong>admin</strong></div>
-          <button class="btn-secondary">🔑 Cambiar contraseña</button>
-        </div>
-        <div class="usuario-row">
-          <div class="usuario-row-top"><div class="av">C</div><strong>cocina</strong></div>
-          <button class="btn-secondary">🔑 Cambiar contraseña</button>
+          <div class="campo">
+            <label>Barra</label>
+            <input type="text" id="impBarraIP" value="192.168.1.101">
+          </div>
+          <div class="campo">
+            <label>Caja</label>
+            <input type="text" id="impCajaIP" value="192.168.1.102">
+          </div>
+          <p style="font-size:11px; color:#94a3b8; margin-top:8px;">
+            Para impresión directa instala QZ Tray.
+          </p>
         </div>
       </div>
     </div>
-  </div>
 
-  <div class="overlay" id="overlay"></div>
+    <div class="overlay" id="configOverlay"></div>
+  </main>
 
-  <script>
-    const panelIzq = document.getElementById('panelIzquierdo');
-    const overlay = document.getElementById('overlay');
-    const mainLayout = document.getElementById('mainLayout');
+  <div id="toastContainer"></div>
 
-    // Navegación
-    document.querySelectorAll('.nav-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('activo'));
-        document.querySelectorAll('.seccion').forEach(s => s.classList.remove('activo'));
-        btn.classList.add('activo');
-        document.getElementById('sec-' + btn.dataset.seccion).classList.add('activo');
-        // En móvil, cerrar el panel al seleccionar
-        if (window.innerWidth <= 768) cerrarPanel();
+  <script type="module">
+    // ─────────────────────────────────────────────────────────────
+    // Datos locales de simulación
+    // ─────────────────────────────────────────────────────────────
+    const jerarquia = {
+      master: ['admin'],
+      admin: ['gerente', 'chef', 'cocinaAyudante', 'barman', 'barraAyudante', 'mesero', 'caja', 'repartidor'],
+      gerente: ['chef', 'cocinaAyudante', 'barman', 'barraAyudante', 'mesero', 'caja', 'repartidor']
+    };
+
+    const listaRoles = [
+      'master', 'admin', 'gerente', 'chef', 'cocinaAyudante',
+      'barman', 'barraAyudante', 'mesero', 'caja', 'repartidor', 'artista', 'cliente'
+    ];
+
+    const personalSimulado = [
+      { id: 'staff_1', nombre: 'Master', roles: ['master'], rolPrincipal: 'master', estado: 'activo', token: '' },
+      { id: 'staff_2', nombre: 'Pedro Soto', roles: ['mesero'], rolPrincipal: 'mesero', estado: 'activo', token: 'tk_abc123' },
+      { id: 'staff_3', nombre: 'Valentina Muñoz', roles: ['barman', 'barraAyudante'], rolPrincipal: 'barman', estado: 'activo', token: 'tk_def456' },
+      { id: 'staff_4', nombre: 'Diego Rojas', roles: ['chef'], rolPrincipal: 'chef', estado: 'vacaciones', token: '' },
+      { id: 'staff_5', nombre: 'Camila Torres', roles: ['caja'], rolPrincipal: 'caja', estado: 'inactivo', token: 'tk_ghi789' }
+    ];
+
+    let rolSimulado = 'admin';
+    let estadoFiltro = 'todos';
+
+    const zonasSimuladas = [
+      { nombre: 'salon', cantidad: 12, ocupadas: 4, libres: 8 },
+      { nombre: 'terraza', cantidad: 4, ocupadas: 1, libres: 3 }
+    ];
+
+    // ─────────────────────────────────────────────────────────────
+    // Helpers
+    // ─────────────────────────────────────────────────────────────
+    function mostrarToastLocal(tipo, mensaje) {
+      const cont = document.getElementById('toastContainer');
+      if (!cont) return;
+      const toast = document.createElement('div');
+      toast.className = `toast-local ${tipo}`;
+      toast.textContent = mensaje;
+      cont.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    function obtenerRolesAsignables(rol) {
+      if (rol === 'master') return ['admin'];
+      return [...(jerarquia[rol] || [])];
+    }
+
+    function generarTokenLocal() {
+      return 'tk_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+    }
+
+    function generarPasswordTemporalLocal() {
+      const letras = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789';
+      let pass = '';
+      for (let i = 0; i < 10; i++) pass += letras.charAt(Math.floor(Math.random() * letras.length));
+      return pass;
+    }
+
+    async function copiarTexto(texto) {
+      try {
+        await navigator.clipboard.writeText(texto);
+        return true;
+      } catch {
+        try {
+          const area = document.createElement('textarea');
+          area.value = texto;
+          document.body.appendChild(area);
+          area.select();
+          document.execCommand('copy');
+          area.remove();
+          return true;
+        } catch {
+          return false;
+        }
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Render de personal
+    // ─────────────────────────────────────────────────────────────
+    function renderNotaJerarquia() {
+      const nota = document.getElementById('notaJerarquiaPersonal');
+      if (!nota) return;
+      nota.innerHTML = `
+        🔑 Como <strong>${rolSimulado}</strong>, puedes gestionar al personal del local.
+        ${rolSimulado !== 'master' ? ' El rol <strong>Admin</strong> solo puede asignarlo un <strong>Master</strong>.' : ''}
+      `;
+    }
+
+    function renderPersonal() {
+      const contenedor = document.getElementById('listaPersonalContainer');
+      if (!contenedor) return;
+
+      const rolesAsignables = obtenerRolesAsignables(rolSimulado);
+      const termino = document.getElementById('buscarPersonalInput')?.value.toLowerCase() || '';
+      const filtradas = personalSimulado.filter(p => {
+        const coincideNombre = p.nombre.toLowerCase().includes(termino);
+        const coincideEstado = estadoFiltro === 'todos' || p.estado === estadoFiltro;
+        return coincideNombre && coincideEstado;
       });
-    });
 
-    // Filtros de roles
-    document.querySelectorAll('.filtro-rol').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.filtro-rol').forEach(b => b.classList.remove('activo'));
-        btn.classList.add('activo');
+      contenedor.innerHTML = '';
+
+      if (filtradas.length === 0) {
+        contenedor.innerHTML = '<p style="color:#94a3b8; font-size:12px;">No hay personal registrado.</p>';
+        return;
+      }
+
+      filtradas.forEach(p => {
+        const fila = document.createElement('div');
+        fila.className = 'usuario-row';
+        fila.dataset.id = p.id;
+        fila.innerHTML = `
+          <div class="usuario-row-top">
+            <div class="av">${p.nombre.charAt(0).toUpperCase()}</div>
+            <strong>${p.nombre}</strong>
+            <span class="rol-actual">${p.rolPrincipal || 'sin rol'} · ${p.estado}</span>
+          </div>
+          <div class="roles-checks">
+            ${rolesAsignables.map(rol => {
+              const checked = p.roles.includes(rol);
+              return `
+                <label class="rol-check">
+                  <input type="checkbox" data-staff-id="${p.id}" data-rol="${rol}" ${checked ? 'checked' : ''}>
+                  ${rol.charAt(0).toUpperCase() + rol.slice(1)}
+                </label>
+              `;
+            }).join('')}
+          </div>
+          <div class="token-row">
+            <span>🧷 ${p.token || 'Sin token'}</span>
+            <button class="btn-copiar-token" data-token="${p.token || ''}">Copiar token</button>
+          </div>
+        `;
+        contenedor.appendChild(fila);
       });
-    });
 
-    // Toggle del panel
-    document.getElementById('btnToggleMenu').addEventListener('click', () => {
-      if (panelIzq.classList.contains('abierto')) cerrarPanel();
-      else abrirPanel();
-    });
+      renderNotaJerarquia();
+    }
 
-    overlay.addEventListener('click', cerrarPanel);
+    function actualizarFiltrosActivos() {
+      document.querySelectorAll('#sec-personal .filtro-rol').forEach(btn => {
+        btn.classList.toggle('activo', btn.dataset.filtro === estadoFiltro);
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Zonas
+    // ─────────────────────────────────────────────────────────────
+    function renderZonas() {
+      const cont = document.getElementById('zonasContainer');
+      if (!cont) return;
+      cont.innerHTML = '';
+
+      zonasSimuladas.forEach((z, index) => {
+        const card = document.createElement('div');
+        card.className = 'zona-card';
+        card.innerHTML = `
+          <div class="zona-card-header">
+            <div class="zona-icono"><i class="fas fa-chair"></i></div>
+            <div class="zona-info">
+              <p class="zona-nombre">${z.nombre}</p>
+              <p class="zona-detalle">${z.cantidad} mesas configuradas</p>
+            </div>
+            <div class="zona-stats">
+              <div class="zona-stat">
+                <div class="valor">${z.cantidad}</div>
+                <div class="etiqueta">Total</div>
+              </div>
+              <div class="zona-stat">
+                <div class="valor" style="color:#22c55e;">${z.libres}</div>
+                <div class="etiqueta">Libres</div>
+              </div>
+              <div class="zona-stat">
+                <div class="valor" style="color:#ef4444;">${z.ocupadas}</div>
+                <div class="etiqueta">Ocupadas</div>
+              </div>
+            </div>
+          </div>
+          <div class="zona-card-footer">
+            <button class="btn-zona-editar" data-zona-editar="${index}">
+              <i class="fas fa-pencil-alt"></i> Editar
+            </button>
+            <button class="btn-zona-eliminar" data-zona-eliminar="${index}">
+              <i class="fas fa-trash-alt"></i> Eliminar
+            </button>
+          </div>
+        `;
+        cont.appendChild(card);
+      });
+    }
+
+    function abrirModalZona(modo = 'crear', index = null) {
+      const esEdicion = modo === 'editar' && index !== null;
+      const zonaActual = esEdicion ? zonasSimuladas[index] : { nombre: '', cantidad: 0 };
+
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.style.display = 'flex';
+      overlay.innerHTML = `
+        <div class="modal-small" style="max-width:420px;">
+          <div class="modal-header">
+            <h3><i class="fas fa-map-marker-alt"></i> ${esEdicion ? 'Editar zona' : 'Nueva zona'}</h3>
+            <button class="modal-close" id="btnCerrarModalZona"><i class="fas fa-times"></i></button>
+          </div>
+          <div class="modal-small-body">
+            <div class="modal-zona-campos">
+              <div class="campo">
+                <label>Nombre de zona</label>
+                <input type="text" id="zonaNombre" value="${zonaActual.nombre}" placeholder="Ej: salón">
+              </div>
+              <div class="campo">
+                <label>Cantidad de mesas</label>
+                <input type="number" id="zonaCantidad" value="${zonaActual.cantidad}" min="0" placeholder="0">
+              </div>
+            </div>
+          </div>
+          <div class="modal-small-footer">
+            <button class="btn-secondary" id="btnCancelarModalZona">Cancelar</button>
+            <button class="btn-primary" id="btnGuardarZona">Guardar</button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(overlay);
+
+      const cerrar = () => overlay.remove();
+
+      overlay.querySelector('#btnCerrarModalZona').addEventListener('click', cerrar);
+      overlay.querySelector('#btnCancelarModalZona').addEventListener('click', cerrar);
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) cerrar();
+      });
+
+      overlay.querySelector('#btnGuardarZona').addEventListener('click', () => {
+        const nombre = overlay.querySelector('#zonaNombre').value.trim();
+        const cantidad = Number(overlay.querySelector('#zonaCantidad').value) || 0;
+
+        if (!nombre) {
+          mostrarToastLocal('error', 'Debes ingresar un nombre de zona.');
+          return;
+        }
+        if (cantidad <= 0) {
+          mostrarToastLocal('error', 'La cantidad de mesas debe ser mayor a 0.');
+          return;
+        }
+
+        if (esEdicion) {
+          zonasSimuladas[index] = {
+            ...zonasSimuladas[index],
+            nombre,
+            cantidad,
+            libres: cantidad - zonasSimuladas[index].ocupadas,
+            ocupadas: Math.min(zonasSimuladas[index].ocupadas, cantidad)
+          };
+          mostrarToastLocal('success', 'Zona actualizada correctamente.');
+        } else {
+          zonasSimuladas.push({ nombre, cantidad, ocupadas: 0, libres: cantidad });
+          mostrarToastLocal('success', 'Zona agregada correctamente.');
+        }
+
+        overlay.remove();
+        renderZonas();
+      });
+
+      document.addEventListener('keydown', function onKey(e) {
+        if (e.key === 'Escape') {
+          cerrar();
+          document.removeEventListener('keydown', onKey);
+        }
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Modal de alta de personal
+    // ─────────────────────────────────────────────────────────────
+    function abrirModalAlta() {
+      const rolesAsignables = obtenerRolesAsignables(rolSimulado);
+      if (rolesAsignables.length === 0) {
+        mostrarToastLocal('error', 'No tienes permisos para asignar roles.');
+        return;
+      }
+
+      const overlay = document.createElement('div');
+      overlay.className = 'modal-overlay';
+      overlay.style.display = 'flex';
+      overlay.innerHTML = `
+        <div class="modal-small" style="max-width:480px;">
+          <div class="modal-header">
+            <h3><i class="fas fa-user-plus"></i> Nuevo personal</h3>
+            <button class="modal-close" id="btnCerrarAltaStaff"><i class="fas fa-times"></i></button>
+          </div>
+          <div class="modal-small-body">
+            <label>Nombre de usuario</label>
+            <input type="text" id="altaUsuario" placeholder="Ej: pedro.soto">
+
+            <label>Nombre visible</label>
+            <input type="text" id="altaNombreVisible" placeholder="Pedro Soto">
+
+            <label>Roles</label>
+            <div class="modal-alta-roles" id="altaRolesChecks">
+              ${rolesAsignables.map(rol => `
+                <label class="modal-alta-rol-check">
+                  <input type="checkbox" value="${rol}">
+                  ${rol.charAt(0).toUpperCase() + rol.slice(1)}
+                </label>
+              `).join('')}
+            </div>
+
+            <label>Rol principal</label>
+            <select id="altaRolPrincipal" disabled>
+              <option value="">— Selecciona roles —</option>
+            </select>
+
+            <label>Estado</label>
+            <select id="altaEstado">
+              <option value="activo" selected>Activo</option>
+              <option value="inactivo">Inactivo</option>
+              <option value="vacaciones">Vacaciones</option>
+            </select>
+          </div>
+          <div class="modal-small-footer">
+            <button class="btn-secondary" id="btnCancelarAltaStaff">Cancelar</button>
+            <button class="btn-primary" id="btnConfirmarAltaStaff">Crear personal</button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(overlay);
+
+      const checksContainer = overlay.querySelector('#altaRolesChecks');
+      const selectPrincipal = overlay.querySelector('#altaRolPrincipal');
+
+      function actualizarSelectPrincipal() {
+        const marcados = [...checksContainer.querySelectorAll('input:checked')].map(c => c.value);
+        selectPrincipal.innerHTML = marcados.length === 0
+          ? '<option value="">— Selecciona roles —</option>'
+          : marcados.map(r => `<option value="${r}">${r.charAt(0).toUpperCase() + r.slice(1)}</option>`).join('');
+        selectPrincipal.disabled = marcados.length === 0;
+        if (marcados.length > 0) {
+          const prev = selectPrincipal.dataset.anterior;
+          if (prev && marcados.includes(prev)) selectPrincipal.value = prev;
+          else selectPrincipal.value = marcados[0];
+        }
+      }
+
+      checksContainer.addEventListener('change', (e) => {
+        if (e.target.matches('input[type="checkbox"]')) {
+          selectPrincipal.dataset.anterior = selectPrincipal.value || '';
+          actualizarSelectPrincipal();
+        }
+      });
+
+      function cerrarModal(valor) {
+        overlay.remove();
+        if (valor) mostrarToastLocal('success', 'Personal agregado correctamente');
+      }
+
+      overlay.querySelector('#btnCerrarAltaStaff').addEventListener('click', () => cerrarModal(null));
+      overlay.querySelector('#btnCancelarAltaStaff').addEventListener('click', () => cerrarModal(null));
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) cerrarModal(null);
+      });
+
+      overlay.querySelector('#btnConfirmarAltaStaff').addEventListener('click', async () => {
+        const nombreUsuario = overlay.querySelector('#altaUsuario').value.trim();
+        const nombreVisible = overlay.querySelector('#altaNombreVisible').value.trim() || nombreUsuario;
+        const rolesSeleccionados = [...overlay.querySelectorAll('#altaRolesChecks input:checked')].map(c => c.value);
+        const rolPrincipal = overlay.querySelector('#altaRolPrincipal').value;
+        const estado = overlay.querySelector('#altaEstado').value;
+
+        if (!nombreUsuario) {
+          mostrarToastLocal('error', 'Debes ingresar un nombre de usuario.');
+          return;
+        }
+        if (rolesSeleccionados.length === 0) {
+          mostrarToastLocal('error', 'Selecciona al menos un rol.');
+          return;
+        }
+        if (!rolPrincipal || !rolesSeleccionados.includes(rolPrincipal)) {
+          mostrarToastLocal('error', 'El rol principal debe estar entre los roles seleccionados.');
+          return;
+        }
+
+        // Simulamos creación de cuenta nueva y mostramos contraseña temporal
+        const passwordTemporal = generarPasswordTemporalLocal();
+        overlay.remove();
+        await abrirModalPasswordTemporal(nombreUsuario, passwordTemporal);
+
+        const token = generarTokenLocal();
+        personalSimulado.push({
+          id: 'staff_' + Date.now(),
+          nombre: nombreVisible,
+          roles: rolesSeleccionados,
+          rolPrincipal,
+          estado,
+          token
+        });
+
+        renderPersonal();
+        mostrarToastLocal('success', 'Personal agregado correctamente');
+      });
+
+      document.addEventListener('keydown', function onKey(e) {
+        if (e.key === 'Escape') {
+          cerrarModal(null);
+          document.removeEventListener('keydown', onKey);
+        }
+      });
+    }
+
+    async function abrirModalPasswordTemporal(usuario, password) {
+      return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'modal-overlay';
+        overlay.style.display = 'flex';
+        overlay.innerHTML = `
+          <div class="modal-small" style="max-width:400px;">
+            <div class="modal-header">
+              <h3><i class="fas fa-key"></i> Contraseña temporal</h3>
+              <button class="modal-close" id="btnCerrarPasswordTemporal"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-small-body">
+              <p style="font-size:13px; color:#94a3b8;">
+                La cuenta <strong>${usuario}</strong> fue creada correctamente.<br>
+                Esta contraseña <strong>no se volverá a mostrar</strong>.
+              </p>
+              <div class="modal-password-box">
+                <input type="text" id="inputPasswordTemporal" value="${password}" readonly>
+                <button class="btn-secondary" id="btnCopiarPasswordTemporal"><i class="fas fa-copy"></i> Copiar</button>
+              </div>
+            </div>
+            <div class="modal-small-footer">
+              <button class="btn-primary" id="btnContinuarPasswordTemporal">Entendido</button>
+            </div>
+          </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        const cerrar = () => {
+          overlay.remove();
+          resolve();
+        };
+
+        overlay.querySelector('#btnCerrarPasswordTemporal').addEventListener('click', cerrar);
+        overlay.querySelector('#btnContinuarPasswordTemporal').addEventListener('click', cerrar);
+        overlay.addEventListener('click', (e) => {
+          if (e.target === overlay) cerrar();
+        });
+
+        overlay.querySelector('#btnCopiarPasswordTemporal').addEventListener('click', async () => {
+          const input = overlay.querySelector('#inputPasswordTemporal');
+          const ok = await copiarTexto(input.value);
+          mostrarToastLocal(ok ? 'success' : 'error', ok ? 'Contraseña copiada' : 'No se pudo copiar');
+        });
+
+        document.addEventListener('keydown', function onKey(e) {
+          if (e.key === 'Escape') {
+            cerrar();
+            document.removeEventListener('keydown', onKey);
+          }
+        });
+      });
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Eventos globales
+    // ─────────────────────────────────────────────────────────────
+    function inicializarEventos() {
+      // Navegación
+      document.querySelectorAll('#view-config .nav-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('#view-config .nav-btn').forEach(b => b.classList.remove('activo'));
+          document.querySelectorAll('#view-config .seccion').forEach(s => s.classList.remove('activo'));
+          btn.classList.add('activo');
+          document.getElementById('sec-' + btn.dataset.seccion)?.classList.add('activo');
+          if (window.innerWidth <= 768) cerrarPanel();
+        });
+      });
+
+      // Panel overlay
+      document.getElementById('btnToggleMenuConfig')?.addEventListener('click', () => {
+        const panel = document.getElementById('panelIzquierdoConfig');
+        panel?.classList.contains('abierto') ? cerrarPanel() : abrirPanel();
+      });
+      document.getElementById('configOverlay')?.addEventListener('click', cerrarPanel);
+
+      // Selector rol simulado
+      document.getElementById('rolSimuladoSelect')?.addEventListener('change', (e) => {
+        rolSimulado = e.target.value;
+        renderPersonal();
+      });
+
+      // Búsqueda
+      document.getElementById('buscarPersonalInput')?.addEventListener('input', () => renderPersonal());
+
+      // Filtros
+      document.querySelectorAll('#sec-personal .filtro-rol').forEach(btn => {
+        btn.addEventListener('click', () => {
+          estadoFiltro = btn.dataset.filtro;
+          actualizarFiltrosActivos();
+          renderPersonal();
+        });
+      });
+
+      // Nuevo staff
+      document.getElementById('btnNuevoStaff')?.addEventListener('click', abrirModalAlta);
+
+      // Canjear token
+      document.getElementById('btnCanjearTokenStaff')?.addEventListener('click', () => {
+        mostrarToastLocal('info', 'Flujo de canje de token no implementado en la prueba.');
+      });
+
+      // Cambio de roles en lista
+      document.getElementById('listaPersonalContainer')?.addEventListener('change', (e) => {
+        if (!e.target.matches('input[type="checkbox"]')) return;
+        const staffId = e.target.dataset.staffId;
+        const rol = e.target.dataset.rol;
+        const persona = personalSimulado.find(p => p.id === staffId);
+        if (!persona) return;
+
+        if (e.target.checked) {
+          if (!persona.roles.includes(rol)) persona.roles.push(rol);
+        } else {
+          persona.roles = persona.roles.filter(r => r !== rol);
+        }
+
+        if (persona.roles.length === 0) {
+          e.target.checked = true;
+          persona.roles.push(rol);
+          mostrarToastLocal('error', 'El personal debe tener al menos un rol.');
+          return;
+        }
+
+        if (!persona.roles.includes(persona.rolPrincipal)) {
+          persona.rolPrincipal = persona.roles[0];
+        }
+
+        renderPersonal();
+        mostrarToastLocal('success', `Roles de ${persona.nombre} actualizados`);
+      });
+
+      // Copiar token
+      document.getElementById('listaPersonalContainer')?.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.btn-copiar-token');
+        if (!btn) return;
+        const token = btn.dataset.token;
+        if (!token) return;
+        const ok = await copiarTexto(token);
+        mostrarToastLocal(ok ? 'success' : 'error', ok ? 'Token copiado' : 'No se pudo copiar');
+      });
+
+      // Guardar config local
+      document.getElementById('btnGuardarConfig')?.addEventListener('click', () => {
+        mostrarToastLocal('success', 'Configuración guardada correctamente');
+      });
+
+      // Zonas
+      document.getElementById('btnAnadirZona')?.addEventListener('click', () => {
+        abrirModalZona('crear');
+      });
+
+      document.getElementById('zonasContainer')?.addEventListener('click', (e) => {
+        const btnEditar = e.target.closest('[data-zona-editar]');
+        const btnEliminar = e.target.closest('[data-zona-eliminar]');
+        if (btnEditar) {
+          abrirModalZona('editar', Number(btnEditar.dataset.zonaEditar));
+        } else if (btnEliminar) {
+          const idx = Number(btnEliminar.dataset.zonaEliminar);
+          zonasSimuladas.splice(idx, 1);
+          renderZonas();
+          mostrarToastLocal('success', 'Zona eliminada correctamente.');
+        }
+      });
+
+      document.getElementById('btnResetearMesas')?.addEventListener('click', () => {
+        mostrarToastLocal('info', 'Mesas reseteadas según zonas');
+      });
+
+      // Swipe
+      const mainLayout = document.getElementById('configMainLayout');
+      let touchStartX = 0, touchStartY = 0;
+      mainLayout?.addEventListener('touchstart', (e) => {
+        touchStartX = e.touches[0].clientX;
+        touchStartY = e.touches[0].clientY;
+      });
+      mainLayout?.addEventListener('touchend', (e) => {
+        const dx = e.changedTouches[0].clientX - touchStartX;
+        const dy = e.changedTouches[0].clientY - touchStartY;
+        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
+          if (dx > 0 && touchStartX < 40) abrirPanel();
+          else if (dx < 0 && document.getElementById('panelIzquierdoConfig')?.classList.contains('abierto')) cerrarPanel();
+        }
+      });
+
+      // Ajuste header en responsive
+      const appHeader = document.querySelector('.app-header');
+      if (appHeader) {
+        const observer = new MutationObserver(() => {
+          const panel = document.getElementById('panelIzquierdoConfig');
+          if (!panel) return;
+          const oculto = appHeader.style.display === 'none';
+          panel.style.top = oculto ? '0' : 'var(--header-h)';
+          panel.style.height = oculto ? '100%' : 'calc(100% - var(--header-h))';
+        });
+        observer.observe(appHeader, { attributes: true, attributeFilter: ['style'] });
+      }
+    }
 
     function abrirPanel() {
-      _ajustarPosicionPanel(panelIzq);
-      panelIzq.classList.add('abierto');
-      overlay.classList.add('activo');
+      const panel = document.getElementById('panelIzquierdoConfig');
+      if (!panel) return;
+      ajustarPosicionPanel(panel);
+      panel.classList.add('abierto');
+      document.getElementById('configOverlay')?.classList.add('activo');
     }
 
     function cerrarPanel() {
-      panelIzq.classList.remove('abierto');
-      overlay.classList.remove('activo');
+      document.getElementById('panelIzquierdoConfig')?.classList.remove('abierto');
+      document.getElementById('configOverlay')?.classList.remove('activo');
     }
 
-    // Gestos swipe
-    let touchStartX = 0, touchStartY = 0;
-    mainLayout.addEventListener('touchstart', (e) => {
-      touchStartX = e.touches[0].clientX;
-      touchStartY = e.touches[0].clientY;
-    });
-
-    mainLayout.addEventListener('touchend', (e) => {
-      const dx = e.changedTouches[0].clientX - touchStartX;
-      const dy = e.changedTouches[0].clientY - touchStartY;
-      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 50) {
-        if (dx > 0 && touchStartX < 40) abrirPanel();
-        else if (dx < 0 && panelIzq.classList.contains('abierto')) cerrarPanel();
-      }
-    });
-
-    // Ajuste dinámico por header global
-    function _calcularTopPanel() {
-      return 'var(--header-h)';
-    }
-
-    function _ajustarPosicionPanel(panel) {
+    function ajustarPosicionPanel(panel) {
       if (!panel || window.innerWidth > 768) return;
-      const top = _calcularTopPanel();
+      const top = 'var(--header-h)';
       panel.style.top = top;
-      panel.style.height = top === '0' ? '100%' : `calc(100% - ${top})`;
+      panel.style.height = `calc(100% - ${top})`;
     }
+
+    // ─────────────────────────────────────────────────────────────
+    // Inicialización
+    // ─────────────────────────────────────────────────────────────
+    function iniciar() {
+      renderZonas();
+      renderPersonal();
+      inicializarEventos();
+    }
+
+    iniciar();
   </script>
 </body>
 </html>

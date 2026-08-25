@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>La Taberna — Especial Fiesta de la Longaniza</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Monoton&family=Caveat:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    :root {
+      --color-bg: #0c0806;
+      --color-card: #18110d;
+      --color-border: #341e14;
+      --neon-amber: #f59e0b;
+      --neon-red: #ef4444;
+      --neon-orange: #ea580c;
+      --neon-wine: #9f1239;
+      --color-text: #fdf8f6;
+      --color-text-sec: #a89a91;
+      --font-display: 'Monoton', cursive;
+      --font-script: 'Caveat', cursive;
+      --font-ui: 'Space Grotesk', sans-serif;
+      --font-body: 'Nunito', system-ui, sans-serif;
+      --radius: 10px;
+      --t: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+      --triangulo-ancho: 210px;
+      --triangulo-alto: 210px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%;
+      height: 100vh;
+      overflow: hidden;
+      background: var(--color-bg);
+      font-family: var(--font-body);
+      color: var(--color-text);
+    }
+
+    @keyframes neonPulse {
+      0%, 100% { box-shadow: 0 0 20px rgba(239, 68, 68, 0.2), 0 0 40px rgba(245, 158, 11, 0.1); }
+      50% { box-shadow: 0 0 30px rgba(239, 68, 68, 0.4), 0 0 55px rgba(245, 158, 11, 0.2); }
+    }
+    @keyframes floatIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes emberDrift {
+      0%, 100% { transform: translate(0,0); }
+      50% { transform: translate(4px,-6px); }
+    }
+
+    .view-container {
+      width: 100%;
+      height: 100vh;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      background:
+        radial-gradient(circle at 80% 10%, rgba(234, 88, 12, 0.12) 0%, transparent 40%),
+        radial-gradient(circle at 15% 85%, rgba(159, 18, 57, 0.1) 0%, transparent 45%),
+        linear-gradient(180deg, #140d0a 0%, #070403 100%);
+      position: relative;
+      box-shadow: inset 0 0 100px rgba(0,0,0,0.85);
+    }
+
+    .view-container::before,
+    .view-container::after {
+      content: '';
+      position: fixed;
+      width: 4px; height: 4px;
+      border-radius: 50%;
+      opacity: 0.5;
+      animation: emberDrift 7s ease-in-out infinite;
+      pointer-events: none;
+    }
+    .view-container::before { top: 30%; left: 10%; background: var(--neon-orange); }
+    .view-container::after { top: 75%; left: 85%; animation-delay: 2.5s; background: var(--neon-red); }
+
+    /* === Triángulo intacto === */
+    .login-corner {
+      position: absolute;
+      top: 0; right: 0;
+      width: var(--triangulo-ancho);
+      height: var(--triangulo-alto);
+      cursor: pointer;
+      clip-path: polygon(100% 0, 0 0, 100% 100%);
+      background: linear-gradient(135deg, var(--neon-amber) 0%, var(--neon-red) 75%);
+      padding: 1.5px;
+      animation: neonPulse 3.5s ease-in-out infinite;
+      transition: var(--t);
+      z-index: 100;
+    }
+    .login-corner:hover { transform: scale(1.02); }
+    .login-corner-inner {
+      background: rgba(12, 8, 6, 0.96);
+      width: 100%; height: 100%;
+      clip-path: polygon(100% 0, 0 0, 100% 100%);
+      display: flex; flex-direction: column;
+      align-items: flex-end; justify-content: flex-start;
+      padding: 24px 20px 0 0;
+    }
+    .login-title {
+      font-family: var(--font-display);
+      font-size: 0.82rem; letter-spacing: 1px;
+      color: var(--neon-amber);
+      text-shadow: 0 0 8px rgba(245,158,11,0.6);
+      margin-bottom: 6px; white-space: nowrap;
+    }
+    .login-subtitle {
+      font-family: var(--font-ui);
+      font-size: 0.65rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: 1px;
+      color: var(--neon-red);
+      text-decoration: none; transition: var(--t);
+    }
+    .login-subtitle:hover { color: #fff; text-shadow: 0 0 8px var(--neon-red); }
+
+    /* === Cabecera === */
+    .header-block {
+      align-self: flex-start;
+      margin-top: 8px;
+      max-width: calc(100% - 140px);
+      animation: floatIn 0.6s ease both;
+    }
+    .icono-marco {
+      width: 60px; height: 60px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #2a1810, #18110d 70%);
+      border: 2px solid rgba(234, 88, 12, 0.4);
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 8px;
+      box-shadow: 0 0 16px rgba(234, 88, 12, 0.22), inset 0 2px 4px rgba(0,0,0,0.5);
+    }
+    .icono-marco i {
+      font-size: 28px;
+      color: var(--neon-orange);
+      filter: drop-shadow(0 0 4px var(--neon-orange));
+    }
+    .nombre-contenedor {
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 4px;
+    }
+    .nombre {
+      font-family: var(--font-display);
+      font-size: 1.5rem; letter-spacing: 1px; line-height: 1.1;
+      background: linear-gradient(to right, var(--neon-amber), var(--neon-red));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.3));
+    }
+    .evento-tag {
+      font-family: var(--font-ui);
+      font-size: 0.58rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--neon-amber);
+      opacity: 0.9;
+    }
+    .eslogan {
+      font-family: var(--font-script);
+      font-size: 1.2rem; font-weight: 600;
+      color: var(--neon-amber);
+      text-shadow: 0 0 6px rgba(245,158,11,0.3);
+      transition: opacity 0.4s ease;
+    }
+
+    /* === Envoltura Principal === */
+    .main-wrapper {
+      width: 100%;
+      display: flex; flex-direction: column; gap: 14px;
+      margin-top: 10px; margin-bottom: 10px;
+      flex-grow: 1;
+      justify-content: center;
+    }
+
+    .vitrina-contenedor { width: 100%; animation: floatIn 0.7s ease both; }
+
+    .vitrina-titulo-seccion {
+      font-family: var(--font-ui);
+      font-size: 0.7rem; font-weight: 700;
+      letter-spacing: 1.5px; text-transform: uppercase;
+      margin-bottom: 6px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .vitrina-tragos .vitrina-titulo-seccion { color: var(--neon-wine); }
+    .vitrina-asador .vitrina-titulo-seccion { color: var(--neon-orange); }
+    .vitrina-shows .vitrina-titulo-seccion { color: var(--neon-amber); }
+
+    .vitrina-scroll {
+      display: flex; gap: 10px;
+      overflow-x: auto; scroll-snap-type: x mandatory;
+      scrollbar-width: none; width: 100%;
+    }
+    .vitrina-scroll::-webkit-scrollbar { display: none; }
+
+    /* === Tarjetas con Imagen === */
+    .vitrina-card {
+      position: relative;
+      flex: 0 0 76%;
+      scroll-snap-align: center;
+      border-radius: var(--radius);
+      height: 100px;
+      display: flex;
+      align-items: flex-end;
+      padding: 12px;
+      background-size: cover;
+      background-position: center;
+      border: 1px solid var(--color-border);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      transition: var(--t);
+      overflow: hidden; cursor: pointer;
+    }
+    .vitrina-card:hover {
+      border-color: rgba(245,158,11,0.3);
+      transform: translateY(-2px);
+    }
+    .vitrina-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to top, rgba(12,8,6,0.92) 0%, rgba(12,8,6,0.35) 60%, transparent 100%);
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .vitrina-texto { position: relative; z-index: 2; min-width: 0; }
+    .vitrina-titulo {
+      font-family: var(--font-ui);
+      font-size: 0.9rem; font-weight: 700;
+      color: #fff;
+      line-height: 1.2;
+      text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+    }
+    .vitrina-desc {
+      font-size: 0.68rem;
+      color: rgba(255,255,255,0.85);
+      text-shadow: 0 1px 2px rgba(0,0,0,0.9);
+      margin-top: 2px;
+    }
+
+    .vitrina-tag {
+      position: absolute;
+      top: 0; right: 0;
+      font-size: 0.52rem; font-weight: 800;
+      letter-spacing: 0.5px; text-transform: uppercase;
+      padding: 3px 8px; border-bottom-left-radius: 6px;
+      color: #fff; z-index: 3;
+    }
+    .vitrina-tragos .vitrina-tag { background: var(--neon-wine); }
+    .vitrina-asador .vitrina-tag { background: var(--neon-orange); color: #000; }
+    .vitrina-shows .vitrina-tag { background: var(--neon-amber); color: #000; }
+
+    /* === Modal === */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100vh;
+      background: rgba(5, 3, 2, 0.88);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      z-index: 200;
+      display: flex; align-items: center; justify-content: center;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.3s ease;
+      padding: 24px;
+    }
+    .modal-overlay.active { opacity: 1; pointer-events: auto; }
+
+    .modal-altar {
+      background: #160e0a;
+      border: 1px solid rgba(245, 158, 11, 0.15);
+      width: 100%; max-width: 360px;
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 25px 50px -12px rgba(0,0,0,0.85);
+      transform: scale(0.92);
+      transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    .modal-overlay.active .modal-altar { transform: scale(1); }
+
+    .modal-img-frame {
+      width: 100%; height: 180px;
+      background-size: cover; background-position: center;
+      position: relative;
+    }
+    .modal-img-frame::before {
+      content: ''; position: absolute;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: linear-gradient(to top, #160e0a 0%, transparent 60%);
+    }
+
+    .modal-badge {
+      position: absolute; top: 14px; left: 14px;
+      font-family: var(--font-ui);
+      font-size: 0.58rem; font-weight: 800;
+      text-transform: uppercase; letter-spacing: 1px;
+      padding: 4px 10px; border-radius: 20px;
+    }
+
+    .modal-body { padding: 20px; text-align: left; }
+    .modal-header-line {
+      display: flex; justify-content: space-between; align-items: baseline;
+      margin-bottom: 6px;
+    }
+    .modal-titulo { font-family: var(--font-ui); font-size: 1.3rem; font-weight: 700; color: #fff; }
+    .modal-ingredientes { font-size: 0.72rem; color: var(--neon-amber); font-weight: 600; font-family: var(--font-ui); }
+    .modal-lore { font-size: 0.82rem; color: var(--color-text-sec); line-height: 1.4; margin-bottom: 18px; }
+    
+    .modal-btn-action {
+      width: 100%; background: linear-gradient(90deg, var(--neon-orange), var(--neon-amber));
+      border: none; padding: 12px; border-radius: 8px;
+      font-family: var(--font-ui); font-size: 0.85rem; font-weight: 700;
+      color: #000; text-transform: uppercase; letter-spacing: 0.5px;
+      cursor: pointer; transition: var(--t);
+    }
+    .modal-btn-action:active { transform: scale(0.98); }
+
+    @media (max-width: 400px) {
+      .view-container { padding: 14px; }
+      #view-inicio { --triangulo-ancho: 165px; --triangulo-alto: 165px; }
+      .main-wrapper { gap: 10px; }
+      .vitrina-card { flex: 0 0 82%; height: 90px; }
+      .nombre { font-size: 1.25rem; }
+      .icono-marco { width: 50px; height: 50px; }
+      .icono-marco i { font-size: 24px; }
+      .eslogan { font-size: 1.1rem; }
+    }
+  </style>
+</head>
+<body>
+
+  <main class="view-container" id="view-inicio">
+
+    <!-- Triángulo intacto -->
+    <div class="login-corner" id="btnLoginCorner">
+      <div class="login-corner-inner">
+        <div class="login-title">Iniciar Sesión</div>
+        <a href="#" class="login-subtitle" id="btnRegistroCorner">Registrarse</a>
+      </div>
+    </div>
+
+    <!-- Cabecera -->
+    <header class="header-block">
+      <div class="icono-marco">
+        <i class="fa-solid fa-fire-burner"></i>
+      </div>
+      <div class="nombre-contenedor">
+        <div class="nombre">La Taberna</div>
+        <span class="evento-tag">★ Fiesta de la Longaniza</span>
+      </div>
+      <div class="eslogan" id="eslogan-dinamico">"Bebidas frías, misiones calientes"</div>
+    </header>
+
+    <!-- Vitrinas -->
+    <section class="main-wrapper">
+
+      <!-- Tragos Criollos -->
+      <div class="vitrina-contenedor vitrina-tragos">
+        <div class="vitrina-titulo-seccion">🍷 Tragos de la Casa</div>
+        <div class="vitrina-scroll">
+          
+          <div class="vitrina-card" 
+               style="background-image: url('https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=500&q=80');"
+               data-title="Terremoto Chillanejo" 
+               data-ingredientes="Vino blanco / Pipeño · Helado de piña · Granadina"
+               data-tag="El Clásico"
+               data-color="var(--neon-wine)"
+               data-img="https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=500&q=80"
+               data-lore="La receta de la casa: base de vino blanco pipeño bien frío del Valle del Itata, abundante helado de piña artesanal y un chorro generoso de granadina al fondo. Un sismo directo al paladar.">
+            <span class="vitrina-tag">El Clásico</span>
+            <div class="vitrina-texto">
+              <div class="vitrina-titulo">Terremoto Chillanejo</div>
+              <div class="vitrina-desc">Vino blanco pipeño, helado de piña y granadina</div>
+            </div>
+          </div>
+
+          <div class="vitrina-card" 
+               style="background-image: url('https://images.unsplash.com/photo-1541544741938-0af808871cc0?w=500&q=80');"
+               data-title="Borgoña del Itata" 
+               data-ingredientes="Vino tinto · Frutillas de la zona · Azúcar de caña"
+               data-tag="Macerado"
+               data-color="var(--neon-wine)"
+               data-img="https://images.unsplash.com/photo-1541544741938-0af808871cc0?w=500&q=80"
+               data-lore="Frutillas maduras maceradas desde la madrugada en vino tinto del valle. Un brebaje dulce, fresco y tradicional para capear el calor de la fiesta.">
+            <div class="vitrina-texto">
+              <div class="vitrina-titulo">Borgoña del Itata</div>
+              <div class="vitrina-desc">Vino tinto macerado con frutillas frescas</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Los Preferidos del Asador -->
+      <div class="vitrina-contenedor vitrina-asador">
+        <div class="vitrina-titulo-seccion">🔥 Los Preferidos del Asador</div>
+        <div class="vitrina-scroll">
+          
+          <div class="vitrina-card" 
+               style="background-image: url('https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?w=500&q=80');"
+               data-title="Choripán Tabernero" 
+               data-ingredientes="Longaniza de Chillán 100% cerdo · Marraqueta · Pebre"
+               data-tag="Top ventas"
+               data-color="var(--neon-orange)"
+               data-img="https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?w=500&q=80"
+               data-lore="Nuestra icónica longaniza artesanal asada a las brasas de roble, montada en marraqueta crujiente con pebre picado al momento.">
+            <span class="vitrina-tag">Top ventas</span>
+            <div class="vitrina-texto">
+              <div class="vitrina-titulo">Choripán Tabernero</div>
+              <div class="vitrina-desc">Longaniza a la brasa con pebre criollo</div>
+            </div>
+          </div>
+
+          <div class="vitrina-card" 
+               style="background-image: url('https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?w=500&q=80');"
+               data-title="Tabla del Arriero" 
+               data-ingredientes="Costillar al palo · Variedad de embutidos · Sopaipillas"
+               data-tag="Ahumado"
+               data-color="var(--neon-orange)"
+               data-img="https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?w=500&q=80"
+               data-lore="Costillar de cerdo ahumado a fuego lento acompañado de cecinas artesanales picadas, sopaipillas caseras y salsa de ají cacho de cabra.">
+            <div class="vitrina-texto">
+              <div class="vitrina-titulo">Tabla del Arriero</div>
+              <div class="vitrina-desc">Costillar ahumado, longanizas y sopaipillas</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Entretención y Eventos -->
+      <div class="vitrina-contenedor vitrina-shows">
+        <div class="vitrina-titulo-seccion">🎤 Entretención y Eventos</div>
+        <div class="vitrina-scroll">
+          
+          <div class="vitrina-card" 
+               style="background-image: url('https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=500&q=80');"
+               data-title="Show Folclórico & Cumbia" 
+               data-ingredientes="Escenario central · Grupos en vivo · Baile"
+               data-tag="En Vivo"
+               data-color="var(--neon-amber)"
+               data-img="https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=500&q=80"
+               data-lore="Música tradicional para calentar motores al atardecer y las mejores bandas tropicales para cerrar la jornada zapateando en La Taberna.">
+            <span class="vitrina-tag">En Vivo</span>
+            <div class="vitrina-texto">
+              <div class="vitrina-titulo">Show Folclórico & Cumbia</div>
+              <div class="vitrina-desc">Grupos locales y fiesta bailable en vivo</div>
+            </div>
+          </div>
+
+          <div class="vitrina-card" 
+               style="background-image: url('https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=500&q=80');"
+               data-title="Desafío Gourmet" 
+               data-ingredientes="Cata a ciegas · Concurso de pebre · Premios"
+               data-tag="Próximamente"
+               data-color="var(--neon-amber)"
+               data-img="https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=500&q=80"
+               data-lore="Competencia abierta para premiar al mejor pebre hecho en casa y cata a ciegas de las cecinas más destacadas del evento.">
+            <div class="vitrina-texto">
+              <div class="vitrina-titulo">Desafío Gourmet</div>
+              <div class="vitrina-desc">Competencia del mejor pebre y cata a ciegas</div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- Modal -->
+  <div class="modal-overlay" id="modalPortal">
+    <div class="modal-altar">
+      <div class="modal-img-frame" id="modalImg">
+        <span class="modal-badge" id="modalBadge"></span>
+      </div>
+      <div class="modal-body">
+        <div class="modal-header-line">
+          <h2 class="modal-titulo" id="modalTitulo"></h2>
+          <span class="modal-ingredientes" id="modalIngredientes"></span>
+        </div>
+        <p class="modal-lore" id="modalLore"></p>
+        <button class="modal-btn-action" id="modalActionBtn">Pedir con tu Cuenta</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Eslogan rotativo
+    const FRASES_ESLOGAN = [
+      "Bebidas frías, misiones calientes.",
+      "El mejor rincón en la Fiesta de la Longaniza.",
+      "Cócteles y brasa con sello chillanejo.",
+      "Sacia tu sed de tradición."
+    ];
+    const esloganEl = document.getElementById('eslogan-dinamico');
+    let indice = 0;
+    setInterval(() => {
+      esloganEl.style.opacity = '0';
+      setTimeout(() => {
+        indice = (indice + 1) % FRASES_ESLOGAN.length;
+        esloganEl.textContent = `"${FRASES_ESLOGAN[indice]}"`;
+        esloganEl.style.opacity = '1';
+      }, 400);
+    }, 6000);
+
+    // Modal
+    const cards = document.querySelectorAll('.vitrina-card');
+    const modal = document.getElementById('modalPortal');
+    const mImg = document.getElementById('modalImg');
+    const mBadge = document.getElementById('modalBadge');
+    const mTitulo = document.getElementById('modalTitulo');
+    const mIngredientes = document.getElementById('modalIngredientes');
+    const mLore = document.getElementById('modalLore');
+    const mActionBtn = document.getElementById('modalActionBtn');
+
+    cards.forEach(card => {
+      card.addEventListener('click', () => {
+        const title = card.getAttribute('data-title');
+        const ingredients = card.getAttribute('data-ingredientes');
+        const lore = card.getAttribute('data-lore');
+        const img = card.getAttribute('data-img');
+        const tag = card.getAttribute('data-tag') || 'Disponible';
+        const color = card.getAttribute('data-color') || 'var(--neon-amber)';
+
+        mTitulo.textContent = title;
+        mIngredientes.textContent = ingredients;
+        mLore.textContent = lore;
+        mImg.style.backgroundImage = `url('${img}')`;
+        mBadge.textContent = tag;
+        mBadge.style.backgroundColor = color;
+        mBadge.style.color = (color === 'var(--neon-amber)' || color === 'var(--neon-orange)') ? '#000' : '#fff';
+        
+        if(card.closest('.vitrina-shows')) {
+          mActionBtn.textContent = "Reservar Ubicación";
+        } else {
+          mActionBtn.textContent = "Pedir con tu Cuenta";
+        }
+
+        modal.classList.add('active');
+      });
+    });
+
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) modal.classList.remove('active');
+    });
+
+    mActionBtn.addEventListener('click', () => {
+      modal.classList.remove('active');
+      const loginCorner = document.getElementById('btnLoginCorner');
+      loginCorner.style.transform = 'scale(1.1)';
+      setTimeout(() => { loginCorner.style.transform = 'scale(1)'; }, 300);
+    });
+  </script>
+</body>
+</html>

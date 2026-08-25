@@ -1,11 +1,13 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-inventario.js
-   Versión: 1.1.3
+   Versión: 1.1.4
    Propósito: Gestión de insumos, recetas, stock y movimientos.
               Soporte para recetas anidadas (sub-recetas).
-              v1.1.3: obtenerRecetaConProducto obtiene productos
-                      desde Store en lugar de asumir this.productos.
+              v1.1.4: getInsumosDeProducto acepta cantidad, recetas
+                      e insumos como parámetros opcionales.
+                      Ajustada la actualización de stock local en
+                      consumirInsumosDeProducto.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -312,10 +314,10 @@ export const DBInventario = (function() {
 
   /* ── MÉTODOS DE CONSUMO ────────────────────────────────── */
 
-  module.getInsumosDeProducto = function(productoId) {
-    const receta = this.recetas.find(r => r.productoId === productoId);
+  module.getInsumosDeProducto = function(productoId, cantidad = 1, recetas = this.recetas, insumos = this.insumos) {
+    const receta = recetas.find(r => r.productoId === productoId);
     if (!receta) return [];
-    return _resolverInsumos(receta.id, 1, this.recetas, this.insumos);
+    return _resolverInsumos(receta.id, cantidad, recetas, insumos);
   };
 
   module.consumirInsumosDeProducto = async function(productoId, cantidad, motivo = 'Consumo') {
@@ -341,6 +343,10 @@ export const DBInventario = (function() {
           );
           if (resultado && typeof resultado.stock === 'number') {
             insumo.stock = resultado.stock;
+          } else {
+            // Si decrementarCampo no devuelve el stock,
+            // aplicamos el descuento local manualmente.
+            insumo.stock = Math.max(0, insumo.stock - cantidadADescontar);
           }
         } catch (e) {
           Logger.error('[DBInventario] Error al decrementar stock en Appwrite:', e);

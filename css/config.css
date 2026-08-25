@@ -1,23 +1,20 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/config.css
-   Versión: 3.0.1
+   Versión: 3.0.2
    Propósito: Estilos para la nueva vista de Configuración rediseñada
               con panel izquierdo, gestión de zonas, personal por roles,
               impresoras y contraseñas. Swipe y overlay en móvil.
-              v3.0.1: corrige conflicto de visibilidad con el sistema
-                      global de vistas (display/height solo en .active).
+              v3.0.2: agrega estilos para .panel-admin y .nota-privacidad
+                      para que la pestaña Personal se vea correctamente.
    ================================================================ */
 
 /* ── Contenedor principal ─────────────────────────────────── */
-/* ❌ Nunca forzar display ni height aquí: rompe el sistema de vistas.
-   Solo se aplican cuando #view-config está activo (clase .active). */
 #view-config {
   color: #f1f5f9;
   font-family: system-ui, -apple-system, sans-serif;
 }
 
-/* ✅ Cuando la vista está activa, usamos el comportamiento normal del sistema */
 #view-config.active {
   display: flex;
   flex-direction: column;
@@ -134,6 +131,40 @@
 }
 #view-config .seccion h3 i {
   color: #f59e0b;
+}
+
+/* ── BLOQUES INTERNOS DE PERSONAL (visible siempre) ───────── */
+#view-config .panel-admin {
+  background: #1a1a24;
+  border: 1px solid #2e2e42;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+#view-config .panel-admin h3 {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#view-config .panel-admin h3 i {
+  color: #f59e0b;
+}
+
+#view-config .nota-privacidad {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  background: rgba(99,102,241,.15);
+  border: 1px solid rgba(99,102,241,.3);
+  border-radius: 8px;
+  padding: 11px 13px;
+  font-size: 11px;
+  color: #c7d2fe;
+  margin-bottom: 15px;
+  line-height: 1.55;
 }
 
 /* ── CAMPOS ────────────────────────────────────────────────── */

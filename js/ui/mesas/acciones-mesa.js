@@ -1,10 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — MESAS SUBMÓDULO (ES6)
    Archivo: js/ui/mesas/acciones-mesa.js
-   Versión: 1.1.2
+   Versión: 1.1.5
    Propósito: Funciones de acción sobre mesas.
-              v1.1.2: Retirado workaround de resincronizado manual.
-                      Core ahora despacha MESA_AGREGAR una sola vez.
+              v1.1.5: Eliminado workaround temporal OT-5.
+                      La creación de mesas depende exclusivamente
+                      del comando agregarMesa vía CommandBus.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -38,16 +39,17 @@ async function agregarMesa() {
     });
 
     if (resultado.exito) {
-      // renderGrid() se dispara automáticamente por el listener del Store
-      // al despacharse MESA_AGREGAR. Se mantiene por robustez.
       renderGrid();
       mostrarToast('success', `Mesa ${nuevoNum} agregada (${zona})`);
-    } else {
-      mostrarToast('error', resultado.error || 'Error al agregar mesa');
+      return { exito: true, numero: nuevoNum };
     }
+
+    mostrarToast('error', resultado.error || 'Error al agregar mesa');
+    return { exito: false, numero: nuevoNum, error: resultado.error };
   } catch (err) {
     Logger.error('[Mesas] Error al ejecutar comando agregarMesa:', err);
     mostrarToast('error', 'Error inesperado al agregar mesa');
+    return { exito: false, error: err.message };
   }
 }
 

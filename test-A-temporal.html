@@ -71,9 +71,6 @@
       Deps.registrar('pedidoRepo', PedidoRepositoryLocal);
       Deps.registrar('inventarioService', { validarStockParaArticulos: () => ({ ok: true, faltantes: [] }) });
 
-      const espacioId = Auth.obtenerLocalActivo()?.id || 'lataberna';
-      log('info', 'Espacio activo: ' + espacioId);
-
       const numMesa = 'test_liberar_' + Date.now();
       log('info', 'Creando mesa ' + numMesa);
 
@@ -125,11 +122,25 @@
         log('fail', 'Error consulta global: ' + e.message);
       }
 
-      // Espera adicional y reverificar
-      await esperar(3000);
-      const mesasFiltradas2 = await DBAppwrite.listar('mesas');
-      const mesaFiltrada2 = mesasFiltradas2.find(m => m.numero === numMesa);
-      log('info', 'Mesa después de 3s: ' + JSON.stringify(mesaFiltrada2));
+      // Reintentos de verificación
+      for (let i = 0; i < 5; i++) {
+        await esperar(1000);
+        const mesas = await DBAppwrite.listar('mesas');
+        const mesa = mesas.find(m => m.numero === numMesa);
+        log(mesa?.estado === 'libre' ? 'pass' : 'fail', `Intento ${i + 1}: ${mesa ? mesa.estado : 'no encontrada'}`);
+        if (mesa?.estado === 'libre') {
+          // Limpiar
+          try {
+            await DBAppwrite.eliminar('mesas', mesa.id);
+            log('info', 'Mesa de prueba eliminada.');
+          } catch (e) {
+            log('fail', 'Error al limpiar mesa: ' + e.message);
+          }
+          return;
+        }
+      }
+
+      log('fail', 'La mesa no quedó libre en Appwrite después de 5 reintentos.');
     }
 
     document.getElementById('btnProbar').addEventListener('click', diagnosticar);

@@ -1,10 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — COMANDO JS (ES6)
    Archivo: js/comandos/marcar-agotado.js
-   Versión: 1.0.2
+   Versión: 1.0.3
    Propósito: Comando para marcar un producto como agotado.
-              Uso de nuevos nombres en español de utils y Store.
-              Todos los catch registran error.
+              v1.0.3: actualiza campo `estado` en lugar de `disponible`.
    ================================================================ */
 
 import { CommandBus } from '../lib/command-bus.js';
@@ -22,13 +21,13 @@ CommandBus.registrar('producto:marcar_agotado', async (cmd) => {
 
     Logger.info(`[producto:marcar_agotado] Marcando producto ${prodId} como agotado.`);
     try {
-        await DBAppwrite.actualizar('productos', prodId, { disponible: false });
+        await DBAppwrite.actualizar('productos', prodId, { estado: 'agotado' });
         
         EventBus.emit('producto:agotado', { prodId });
         
         Store.despachar({
             type: 'PRODUCTO_GUARDADO',
-            payload: { id: prodId, disponible: false }
+            payload: { id: prodId, estado: 'agotado' }
         });
         
         return { exito: true };

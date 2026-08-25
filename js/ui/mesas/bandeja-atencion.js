@@ -1,14 +1,18 @@
 /* ================================================================
    LaTaberna - PubPOS — MESAS SUBMÓDULO (ES6)
    Archivo: js/ui/mesas/bandeja-atencion.js
-   Versión: 1.1.0
+   Versión: 1.3.1
    Propósito: Bandeja lateral de atención para mesero.
-              v1.1.0: Despliegue por gesto swipe desde borde derecho.
-                      Sin botón. Encapsulado en vista mesas.
+              v1.3.1: Corrección de campo de aviso: usa mesaId en
+                      la colección laTaberna_Avisos. Las precargas
+                      siguen usando mesa en laTaberna_Pedidos.
    ================================================================ */
 
 import { EventBus } from '../../lib/eventBus.js';
 import { Logger } from '../../lib/logger.js';
+import { DBAppwrite } from '../../db-appwrite.js';
+import { Auth } from '../../auth.js';
+import { CommandBus } from '../../lib/command-bus.js';
 
 let _solicitudes = [];
 let _overlay = null;
@@ -17,6 +21,15 @@ let _vistaMesasActiva = false;
 
 let _touchStartX = 0;
 let _touchStartY = 0;
+
+function _espacioIdActivo() {
+  try {
+    const local = Auth.obtenerLocalActivo?.();
+    return local?.id || 'lataberna';
+  } catch {
+    return 'lataberna';
+  }
+}
 
 function _asegurarOverlay() {
   if (_overlay) return true;
@@ -44,10 +57,6 @@ function _asegurarOverlay() {
   return true;
 }
 
-function _actualizarContador() {
-  // Sin botón contador. Solo para depuración futura.
-}
-
 function _renderSolicitudes() {
   const lista = document.getElementById('bandejaLista');
   if (!lista) return;
@@ -58,8 +67,17 @@ function _renderSolicitudes() {
   }
 
   lista.innerHTML = _solicitudes.map(sol => {
-    const icono = sol.tipo === 'esperando' ? 'fa-clock' : sol.tipo === 'precarga' ? 'fa-bell' : 'fa-hand-point-up';
-    const texto = sol.tipo === 'esperando' ? 'quiere unirse' : sol.tipo === 'precarga' ? 'precarga de pedido' : 'llamado';
+    const icono = sol.tipo === 'vinculacion' ? 'fa-clock'
+      : sol.tipo === 'llamado' ? 'fa-hand-point-up'
+      : 'fa-bell';
+
+    const texto = sol.tipo === 'vinculacion' ? 'quiere unirse'
+      : sol.tipo === 'llamado' ? 'llamado'
+      : 'precarga de pedido';
+
+    const botones = sol.tipo === 'precarga'
+      ? `<button class="btn-mini bandeja-revisar" data-id="${sol.id}" data-mesa="${sol.mesa}">Revisar</button>`
+      : `<button class="btn-mini bandeja-atender" data-id="${sol.id}">Atender</button>`;
 
     return `
       <div class="bandeja-item" data-id="${sol.id}">
@@ -69,8 +87,8 @@ function _renderSolicitudes() {
           <p>${texto}</p>
         </div>
         <div class="bandeja-acciones">
-          <button class="btn-mini bandeja-ver" data-mesa="${sol.mesa}">Ver</button>
-          <button class="btn-mini secundario bandeja-cerrar-sol" data-id="${sol.id}">✕</button>
+          <button class="btn-mini secundario bandeja-ver" data-mesa="${sol.mesa}">Ver</button>
+          ${botones}
         </div>
       </div>`;
   }).join('');
@@ -83,25 +101,101 @@ function _renderSolicitudes() {
     });
   });
 
-  lista.querySelectorAll('.bandeja-cerrar-sol').forEach(btn => {
-    btn.addEventListener('click', () => {
-      _eliminarSolicitud(btn.dataset.id);
-    });
+  lista.querySelectorAll('.bandeja-atender').forEach(btn => {
+    btn.addEventListener('click', () => _atenderAviso(btn.dataset.id));
+  });
+
+  lista.querySelectorAll('.bandeja-revisar').forEach(btn => {
+    btn.addEventListener('click', () => _revisarPrecarga(btn.dataset.id));
   });
 }
 
-function _eliminarSolicitud(id) {
-  _solicitudes = _solicitudes.filter(s => s.id !== id);
+async function _atenderAviso(id) {
+  if (!DBAppwrite || !DBAppwrite.habilitado) return;
+
+  const usuario = Auth.obtenerNombre?.() || 'mesero';
+  try {
+    await DBAppwrite.actualizar('avisos', id, {
+      estado: 'atendido',
+      atendidoPor: usuario,
+      atendidoEn: new Date().toISOString()
+    });
+    Logger.info('[BandejaAtencion] Aviso ' + id + ' atendido.');
+    await _cargarSolicitudes();
+  } catch (e) {
+    Logger.error('[BandejaAtencion] Error al atender aviso:', e);
+  }
+}
+
+async function _revisarPrecarga(id) {
+  const precarga = _solicitudes.find(s => s.id === id);
+  if (!precarga) return;
+
+  try {
+    await CommandBus.ejecutar({
+      type: 'precarga:revisar',
+      datos: {
+        precargaId: id,
+        mesa: precarga.mesa,
+        id_usuario: precarga.id_usuario || '',
+        revisadoPor: Auth.obtenerNombre?.() || 'mesero'
+      }
+    });
+    Logger.info('[BandejaAtencion] Precarga ' + id + ' revisada.');
+    await _cargarSolicitudes();
+  } catch (e) {
+    Logger.error('[BandejaAtencion] Error al revisar precarga:', e);
+  }
+}
+
+async function _cargarSolicitudes() {
+  if (!DBAppwrite || !DBAppwrite.habilitado) return;
+
+  const espacioId = _espacioIdActivo();
+  const solicitudes = [];
+
+  try {
+    const avisos = await DBAppwrite.listar('avisos');
+    avisos
+      .filter(a => a.estado === 'pendiente')
+      .filter(a => a.tipo === 'vinculacion' || a.tipo === 'llamado')
+      .filter(a => String(a.espacioId || '') === String(espacioId))
+      .forEach(a => {
+        solicitudes.push({
+          id: a.id,
+          tipo: a.tipo,
+          mesa: a.mesaId || a.mesa,
+          id_usuario: a.id_usuario || a.usuarioId || null
+        });
+      });
+  } catch (e) {
+    Logger.warn('[BandejaAtencion] No se pudieron cargar avisos:', e);
+  }
+
+  try {
+    const pedidos = await DBAppwrite.listar('pedidos');
+    pedidos
+      .filter(p => p.estado === 'precarga')
+      .filter(p => p.origen === 'cliente')
+      .filter(p => String(p.espacioId || '') === String(espacioId))
+      .forEach(p => {
+        solicitudes.push({
+          id: p.id,
+          tipo: 'precarga',
+          mesa: p.mesa,
+          id_usuario: p.id_usuario || null
+        });
+      });
+  } catch (e) {
+    Logger.warn('[BandejaAtencion] No se pudieron cargar precargas:', e);
+  }
+
+  _solicitudes = solicitudes;
   _renderSolicitudes();
 }
 
-function _agregarSolicitud(tipo, mesa, datos = {}) {
-  const id = `${tipo}_${mesa}_${Date.now()}`;
-  const existente = _solicitudes.find(s => s.tipo === tipo && String(s.mesa) === String(mesa));
-  if (existente) return;
-
-  _solicitudes.push({ id, tipo, mesa, ...datos });
-  _renderSolicitudes();
+async function _refrescarSolicitudes() {
+  await _cargarSolicitudes();
 }
 
 function _onTouchStart(e) {
@@ -121,7 +215,6 @@ function _onTouchEnd(e) {
     if (overlayAbierto) {
       if (dx > 60) cerrarBandeja();
     } else {
-      // Swipe hacia la izquierda desde el borde derecho abre la bandeja
       if (dx < -60 && _touchStartX > window.innerWidth - 30) {
         abrirBandeja();
       }
@@ -132,7 +225,7 @@ function _onTouchEnd(e) {
 export function abrirBandeja() {
   if (!_asegurarOverlay()) return;
   _overlay.style.display = 'flex';
-  _renderSolicitudes();
+  _refrescarSolicitudes();
 }
 
 export function cerrarBandeja() {
@@ -144,34 +237,18 @@ export function activar() {
     _vistaMesasActiva = vista === 'mesas';
   }));
 
-  _escuchadores.push(EventBus.on('cliente:mesa_ingresada', (data) => {
-    if (data && data.mesa) _agregarSolicitud('esperando', data.mesa, {});
+  _escuchadores.push(EventBus.on('bandeja:abrir', abrirBandeja));
+  _escuchadores.push(EventBus.on('avisos:actualizada', () => {
+    if (_overlay && _overlay.style.display === 'flex') _refrescarSolicitudes();
   }));
-
-  _escuchadores.push(EventBus.on('cliente:precarga_enviada', (data) => {
-    if (data && data.mesa) _agregarSolicitud('precarga', data.mesa, { precargaId: data.id });
-  }));
-
-  _escuchadores.push(EventBus.on('cliente:llamar_garzon', (data) => {
-    if (data && data.mesa) _agregarSolicitud('llamado', data.mesa, {});
-  }));
-
-  _escuchadores.push(EventBus.on('mesa:actualizada', (data) => {
-    if (data && data.estado === 'ocupada') {
-      _solicitudes = _solicitudes.filter(s => !(s.tipo === 'esperando' && String(s.mesa) === String(data.mesa)));
-      _renderSolicitudes();
-    }
-  }));
-
-  _escuchadores.push(EventBus.on('precarga:revisada', () => {
-    _solicitudes = _solicitudes.filter(s => s.tipo !== 'precarga');
-    _renderSolicitudes();
+  _escuchadores.push(EventBus.on('pedidos:actualizada', () => {
+    if (_overlay && _overlay.style.display === 'flex') _refrescarSolicitudes();
   }));
 
   document.addEventListener('touchstart', _onTouchStart, { passive: true });
   document.addEventListener('touchend', _onTouchEnd, { passive: true });
 
-  Logger.info('[BandejaAtencion] Activada con gestos.');
+  Logger.info('[BandejaAtencion] Activada en modo persistente puro.');
 }
 
 export function limpiar() {
@@ -195,6 +272,5 @@ export const BandejaAtencion = {
   limpiar,
   abrirBandeja,
   cerrarBandeja,
-  agregarSolicitud: _agregarSolicitud,
-  eliminarSolicitud: _eliminarSolicitud
+  refrescar: _refrescarSolicitudes
 };

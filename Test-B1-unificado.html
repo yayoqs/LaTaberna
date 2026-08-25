@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Test B1 – Gran Test Unificado (v11 No Destructivo)</title>
+  <title>Test B1 – Gran Test Unificado (v10 No Destructivo)</title>
   <style>
     body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
     h1 { color: #f59e0b; }
@@ -16,8 +16,8 @@
   </style>
 </head>
 <body>
-  <h1>🧪 Test B1 – Gran Test Unificado (v11 No Destructivo)</h1>
-  <p class="info">Zonas → Mapa → Bandeja persistente → Fusión/Deshacer → Agregar mesa → Vinculación → Pedido → Comanda → Precarga → Cuenta.</p>
+  <h1>🧪 Test B1 – Gran Test Unificado (v10 No Destructivo)</h1>
+  <p class="info">Crea mesas de prueba después del máximo existente y limpia solo esas. Incluye polling.</p>
   <div id="results"></div>
 
   <script src="/js/appwrite.min.js"></script>
@@ -60,7 +60,8 @@
     async function esperarHasta(condicion, descripcion, timeout = 5000) {
       const inicio = Date.now();
       while (Date.now() - inicio < timeout) {
-        if (await condicion()) return true;
+        const resultado = await condicion();
+        if (resultado) return true;
         await esperar(200);
       }
       log(`Timeout esperando: ${descripcion}`);
@@ -72,7 +73,6 @@
     let mesaVinculada = null;
     let baseInicio = 0, baseFin = 0;
     let mesaNueva = null;
-    const idsCreados = [];
 
     try {
       log('Inicializando Appwrite...');
@@ -90,7 +90,7 @@
       Comanda.activar();
       PrecargaControl.activar();
 
-      // ═══ ZONA DE PRUEBA SIN DESTRUIR PRODUCCIÓN ═══
+      // ══ ZONA DE PRUEBA SIN DESTRUIR PRODUCCIÓN ══
       const mesasExistentes = await DBAppwrite.listar('mesas');
       const maxExistente = mesasExistentes.reduce((max, m) => {
         const n = parseInt(m.numero);
@@ -104,7 +104,7 @@
       const mesasPrueba = [];
       for (let i = baseInicio; i <= baseFin; i++) {
         const num = String(i);
-        const mesaCreada = await DBAppwrite.crear('mesas', num, {
+        await DBAppwrite.crear('mesas', num, {
           numero: num,
           estado: 'libre',
           pedidoId: '',
@@ -112,8 +112,7 @@
           zona: 'zona_test',
           esVirtual: false,
           espacioId: 'lataberna'
-        });
-        if (mesaCreada?.id) idsCreados.push({ coleccion: 'mesas', id: mesaCreada.id });
+        }).catch(e => Logger.warn(`No se pudo crear mesa ${num}:`, e));
         mesasPrueba.push(num);
       }
 
@@ -131,25 +130,19 @@
       recetaId = (await DBAppwrite.crear('recetas', 'unique()', {
         productoId: prodIdA, ingredientes: '[]', instrucciones: 'Armar y cocinar', es_intermedio: false, espacioId: 'lataberna'
       })).id;
-      idsCreados.push({ coleccion: 'productos', id: prodIdA });
-      idsCreados.push({ coleccion: 'productos', id: prodIdB });
-      idsCreados.push({ coleccion: 'recetas', id: recetaId });
 
       Store.despachar({ type: 'PRODUCTOS_INICIALIZAR', payload: await DBAppwrite.listar('productos') });
       Store.despachar({ type: 'RECETAS_INICIALIZAR', payload: await DBAppwrite.listar('recetas') });
 
-      // ═══ VISTA DE MESAS ═══
       const main = document.createElement('main');
       main.id = 'view-mesas';
       main.className = 'view active';
       document.body.appendChild(main);
-
-      // Llamamos a activar para que asegure la vista y active la bandeja
-      Mesas.activar();
       EventBus.emit('vista:cambiada', 'mesas');
+      Mesas.render();
       await esperar(300);
 
-      // ═══ SUITE 0: MAPA DE MESAS ═══
+      // ══ SUITE 0: Mapa de Mesas ══
       resultsEl.innerHTML += '<div class="suite"><h2>0. Mapa de Mesas</h2></div>';
       const mesasActuales = await DBAppwrite.listar('mesas');
       const cuentaPruebas = mesasPrueba.filter(n => mesasActuales.some(m => m.numero === n)).length;
@@ -213,50 +206,42 @@
       Mesas.render();
       await esperar(200);
 
-      // ═══ SUITE 1: BANDEJA PERSISTENTE ═══
-      resultsEl.innerHTML += '<div class="suite"><h2>1. Bandeja Persistente</h2></div>';
-
-      // Crear aviso persistente tipo llamado
-      const aviso = await DBAppwrite.crear('avisos', 'unique()', {
-        mesaId: String(baseInicio + 1),
-        tipo: 'llamado',
-        estado: 'pendiente',
-        espacioId: 'lataberna'
-      });
-      idsCreados.push({ coleccion: 'avisos', id: aviso.id });
-
-      // Crear precarga persistente
-      const precargaPersistente = await DBAppwrite.crear('pedidos', 'unique()', {
-        mesa: String(baseInicio + 2),
-        tipo: 'local',
-        origen: 'cliente',
-        estado: 'precarga',
-        comensales: 1,
-        items: '[]',
-        total: 0,
-        id_usuario: 'cliente_test_bandeja',
-        espacioId: 'lataberna'
-      });
-      idsCreados.push({ coleccion: 'pedidos', id: precargaPersistente.id });
-
-      // Abrir bandeja y verificar
+      // ══ SUITE 1: Bandeja de Atención ══
+      resultsEl.innerHTML += '<div class="suite"><h2>1. Bandeja de Atención</h2></div>';
+      const mesaEspera = baseInicio + 1;
+      const mesaPrecarga = baseInicio + 2;
+      EventBus.emit('cliente:mesa_ingresada', { mesa: mesaEspera });
+      EventBus.emit('cliente:precarga_enviada', { mesa: mesaPrecarga, id: 'precarga_test_1', items: [] });
+      await esperar(200);
       Mesas.BandejaAtencion.abrirBandeja();
-      await esperar(1200);
-
+      await esperar(200);
+      const overlayBandeja = document.getElementById('bandejaAtencionOverlay');
+      if (overlayBandeja && overlayBandeja.style.display === 'flex') pass('Bandeja se abre');
+      else fail('Bandeja no se abrió');
       const itemsBandeja = document.querySelectorAll('#bandejaLista .bandeja-item');
-      if (itemsBandeja.length === 2) pass('Bandeja muestra 2 solicitudes persistentes');
-      else fail(`Bandeja muestra ${itemsBandeja.length} solicitudes (esperado 2)`);
-
+      if (itemsBandeja.length === 2) pass('Bandeja muestra 2 solicitudes');
+      else fail(`Bandeja muestra ${itemsBandeja.length} solicitudes`);
       const textoBandeja = document.getElementById('bandejaLista')?.textContent || '';
-      if (textoBandeja.includes(`Mesa ${baseInicio + 1}`)) pass('Bandeja muestra aviso persistente');
-      else fail('Bandeja no muestra aviso persistente');
-      if (textoBandeja.includes(`Mesa ${baseInicio + 2}`)) pass('Bandeja muestra precarga persistente');
-      else fail('Bandeja no muestra precarga persistente');
-
+      if (textoBandeja.includes(`Mesa ${mesaEspera}`)) pass('Bandeja incluye mesa espera');
+      else fail('Bandeja no incluye mesa espera');
+      if (textoBandeja.includes(`Mesa ${mesaPrecarga}`)) pass('Bandeja incluye mesa precarga');
+      else fail('Bandeja no incluye mesa precarga');
       Mesas.BandejaAtencion.cerrarBandeja();
       await esperar(200);
+      if (overlayBandeja && overlayBandeja.style.display === 'none') pass('Bandeja se cierra');
+      else fail('Bandeja no se cerró');
 
-      // ═══ SUITE 2: FUSIÓN Y DESHACER FUSIÓN ═══
+      EventBus.emit('mesa:actualizada', { mesa: mesaEspera, estado: 'ocupada' });
+      await esperar(200);
+      Mesas.BandejaAtencion.abrirBandeja();
+      await esperar(200);
+      const itemsDespues = document.querySelectorAll('#bandejaLista .bandeja-item');
+      if (itemsDespues.length === 1) pass('Tras ocupar espera, queda 1 solicitud');
+      else fail(`Quedan ${itemsDespues.length} solicitudes`);
+      Mesas.BandejaAtencion.cerrarBandeja();
+      await esperar(100);
+
+      // ══ SUITE 2: Fusión y Deshacer Fusión ══
       resultsEl.innerHTML += '<div class="suite"><h2>2. Fusión y Deshacer Fusión</h2></div>';
       const nums = [baseInicio + 3, baseInicio + 4, baseInicio + 5];
       log(`Fusionando ${nums.join('+')} como "cumpleaños"...`);
@@ -326,7 +311,7 @@
       if (ascendente) pass('Orden ascendente');
       else fail('Orden no ascendente');
 
-      // ═══ SUITE 3: AGREGAR MESA NUEVA ═══
+      // ══ SUITE 3: Agregar Mesa Nueva ══
       resultsEl.innerHTML += '<div class="suite"><h2>3. Agregar Mesa Nueva</h2></div>';
       const resultadoAgregar = await agregarMesa();
       if (resultadoAgregar && resultadoAgregar.exito) {
@@ -353,7 +338,7 @@
       if (dom.includes(mesaNueva)) pass(`DOM: muestra mesa ${mesaNueva}`);
       else fail(`DOM: no muestra mesa ${mesaNueva}`);
 
-      // ═══ SUITE 4: VINCULACIÓN ═══
+      // ══ SUITE 4: Vinculación ══
       resultsEl.innerHTML += '<div class="suite"><h2>4. Vinculación de cliente</h2></div>';
       EventBus.emit('cliente:mesa_ingresada', { mesa: baseInicio });
       await esperar(200);
@@ -411,7 +396,7 @@
         Store.despachar({ type: 'PEDIDOS_INICIALIZAR', payload: DB.pedidos });
       }
 
-      // ═══ SUITE 5: TOMAR PEDIDO ═══
+      // ══ SUITE 5: Tomar Pedido ══
       resultsEl.innerHTML += '<div class="suite"><h2>5. Tomar Pedido</h2></div>';
       Comanda.establecerMesaActiva(mesaVinculada);
       const prod1 = { id: prodIdA, nombre: 'Hamburguesa (test)', precio: 1500, categoria: 'platos', destino: 'cocina' };
@@ -430,7 +415,7 @@
       if (totalQty === 3) pass('Cantidad total = 3');
       else fail(`Cantidad total: ${totalQty}`);
 
-      // ═══ SUITE 6: ENVIAR COMANDA ═══
+      // ══ SUITE 6: Enviar Comanda ══
       resultsEl.innerHTML += '<div class="suite"><h2>6. Enviar Comanda</h2></div>';
       const pendientes = items.map(i => ({ ...i, enviado: false }));
       const resEnvio = await CommandBus.ejecutar({
@@ -442,7 +427,7 @@
       if (DB.comandas.length >= 1) pass('Se creó al menos 1 comanda');
       else fail('No se crearon comandas');
 
-      // ═══ SUITE 7: PRECARGA ═══
+      // ══ SUITE 7: Precarga ══
       resultsEl.innerHTML += '<div class="suite"><h2>7. Precarga</h2></div>';
       const precargaItems = [
         { prodId: prodIdA, nombre: 'Hamburguesa (test)', precio: 1500, categoria: 'platos', destino: 'cocina', qty: 1, obs: 'sin cebolla' }
@@ -452,7 +437,6 @@
         items: JSON.stringify(precargaItems), total: 1500, id_usuario: 'cliente_test', espacioId: 'lataberna'
       });
       precargaDocId = precargaDoc.id;
-      idsCreados.push({ coleccion: 'pedidos', id: precargaDoc.id });
       EventBus.emit('cliente:precarga_enviada', {
         id: precargaDocId, mesa: baseInicio,
         items: precargaItems,
@@ -480,7 +464,7 @@
       if (totalFinal === 1) pass('Total tras precarga = 1');
       else fail(`Total tras precarga: ${totalFinal}`);
 
-      // ═══ SUITE 8: CUENTA ═══
+      // ══ SUITE 8: Cuenta ══
       resultsEl.innerHTML += '<div class="suite"><h2>8. Revisar Cuenta</h2></div>';
       try {
         Cuenta.pedirCuenta();
@@ -489,7 +473,7 @@
         fail('Error en pedirCuenta');
       }
 
-      // ═══ RESULTADOS ═══
+      // ══ RESULTADOS ══
       resultsEl.innerHTML += `<div class="summary">${passed} pasaron, ${failed} fallaron</div>`;
       if (!failed) resultsEl.innerHTML += '<div class="test pass">✔ Todos los tests pasaron.</div>';
       else resultsEl.innerHTML += '<div class="test fail">✘ Algunos tests fallaron.</div>';
@@ -498,15 +482,29 @@
       fail('ERROR: ' + e.message);
       console.error(e);
     } finally {
-      // ═══ LIMPIEZA SOLO DE ELEMENTOS DE PRUEBA ═══
-      for (const item of idsCreados) {
-        try { await DBAppwrite.eliminar(item.coleccion, item.id); } catch {}
+      // ══ LIMPIEZA SOLO DE MESAS DE PRUEBA ══
+      try {
+        const todas = await DBAppwrite.listar('mesas');
+        for (const m of todas) {
+          const n = parseInt(m.numero);
+          if ((n >= baseInicio && n <= baseFin) || m.numero === mesaNueva) {
+            await DBAppwrite.eliminar('mesas', m.id).catch(() => {});
+          }
+          if (m.numero === 'cumpleaños') {
+            await DBAppwrite.eliminar('mesas', m.id).catch(() => {});
+          }
+        }
+        if (pedidoId) await DBAppwrite.eliminar('pedidos', pedidoId).catch(() => {});
+        if (precargaDocId) await DBAppwrite.eliminar('pedidos', precargaDocId).catch(() => {});
+        if (prodIdA) await DBAppwrite.eliminar('productos', prodIdA).catch(() => {});
+        if (prodIdB) await DBAppwrite.eliminar('productos', prodIdB).catch(() => {});
+        if (recetaId) await DBAppwrite.eliminar('recetas', recetaId).catch(() => {});
+      } catch (e) {
+        console.warn('Error en limpieza final:', e);
       }
-      if (pedidoId) await DBAppwrite.eliminar('pedidos', pedidoId).catch(() => {});
-      if (precargaDocId) await DBAppwrite.eliminar('pedidos', precargaDocId).catch(() => {});
       document.querySelectorAll('.modal-overlay').forEach(o => o.remove());
       document.getElementById('view-mesas')?.remove();
-      log('🏁 Test finalizado. Se eliminaron solo elementos de prueba.');
+      log('🏁 Test finalizado. Se eliminaron solo mesas de prueba.');
     }
   </script>
 </body>

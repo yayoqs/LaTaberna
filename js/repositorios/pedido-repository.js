@@ -1,10 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — REPOSITORIO JS (ES6)
    Archivo: js/repositorios/pedido-repository.js
-   Versión: 1.1.12
+   Versión: 1.1.17
    Propósito: Implementación local del repositorio de pedidos con
               sincronización directa a Appwrite.
-              v1.1.12: liberarMesa elimina mesa virtual en Appwrite (M2).
+              v1.1.17: liberarMesa delega eliminación de mesa virtual
+                       a DBFusion.liberarMesasFusionadas (H6).
    ================================================================ */
 
 import { DB } from '../db.js';
@@ -87,21 +88,27 @@ const PedidoRepositoryLocal = (() => {
 
   async function _guardarEnAppwrite(coleccion, id, datos, esNuevo) {
     if (!DBAppwrite || !DBAppwrite.habilitado) return;
+
     try {
-      if (esNuevo) await DBAppwrite.crear(coleccion, id, datos);
-      else await DBAppwrite.actualizar(coleccion, id, datos);
-    } catch (e) {
-      if (esNuevo && e.code === 409) {
-        try { await DBAppwrite.actualizar(coleccion, id, datos); } catch (e2) {
-          Logger.error('[Repo] Error al reintentar actualizar ' + coleccion + ':', e2);
+      if (esNuevo) {
+        const creado = await DBAppwrite.crear(coleccion, id, datos);
+        if (!creado) {
+          const actualizado = await DBAppwrite.actualizar(coleccion, id, datos);
+          if (!actualizado) {
+            Logger.error(`[Repo] No se pudo crear ni actualizar ${coleccion} ${id}`);
+          }
         }
-      } else if (!esNuevo && e.code === 404) {
-        try { await DBAppwrite.crear(coleccion, id, datos); } catch (e2) {
-          Logger.error('[Repo] Error al reintentar crear ' + coleccion + ':', e2);
+      } else {
+        const actualizado = await DBAppwrite.actualizar(coleccion, id, datos);
+        if (!actualizado) {
+          const creado = await DBAppwrite.crear(coleccion, id, datos);
+          if (!creado) {
+            Logger.error(`[Repo] No se pudo actualizar ni crear ${coleccion} ${id}`);
+          }
         }
-      } else if (e.code !== 409) {
-        Logger.error('[Repo] Error al guardar ' + coleccion + ' ' + id + ':', e);
       }
+    } catch (e) {
+      Logger.error(`[Repo] Error al guardar ${coleccion} ${id}:`, e);
     }
   }
 
@@ -124,19 +131,16 @@ const PedidoRepositoryLocal = (() => {
     Logger.debug('[Repo] _syncMesa: sincronizando mesa ' + rowId + ' (estado: ' + mesa.estado + ')');
 
     try {
-      await DBAppwrite.actualizar('mesas', rowId, datos);
-      return true;
+      const actualizada = await DBAppwrite.actualizar('mesas', rowId, datos);
+      if (actualizada) return true;
+
+      const creada = await DBAppwrite.crear('mesas', rowId, datos);
+      if (creada) return true;
+
+      Logger.error('[Repo] _syncMesa: no se pudo actualizar ni crear mesa ' + rowId);
+      return false;
     } catch (e) {
-      if (e.code === 404) {
-        try {
-          await DBAppwrite.crear('mesas', rowId, datos);
-          return true;
-        } catch (e2) {
-          Logger.error('[Repo] Error al crear mesa tras 404:', e2);
-          return false;
-        }
-      }
-      Logger.error('[Repo] Error al actualizar mesa en Appwrite:', e);
+      Logger.error('[Repo] Error al sincronizar mesa en Appwrite:', e);
       return false;
     }
   }
@@ -411,10 +415,20 @@ const PedidoRepositoryLocal = (() => {
     if (!DB || !DB.mesas) throw new Error('DB no disponible');
     const existente = DB.mesas.find(m => m.numero === datosMesa.numero);
     if (existente) throw new Error(`Ya existe una mesa con el número ${datosMesa.numero}`);
+
+    if (!datosMesa.espacioId) {
+      datosMesa.espacioId = _obtenerEspacioId();
+    }
+
     DB.mesas.push(datosMesa);
     DB.saveMesas();
-    const ok = await _syncMesa(datosMesa);
-    if (!ok) throw new Error('No se pudo crear la mesa en Appwrite');
+
+    const persistida = await _syncMesa(datosMesa);
+    if (!persistida) {
+      throw new Error('No se pudo persistir la mesa en Appwrite');
+    }
+
+    Store.despachar({ type: 'MESA_AGREGAR', payload: datosMesa });
     return datosMesa;
   }
 
@@ -427,19 +441,8 @@ const PedidoRepositoryLocal = (() => {
       throw new Error(`La mesa ${numeroMesa} no se puede liberar en su estado actual (${mesa.estado})`);
     }
 
-    // Eliminar mesa virtual en Appwrite si aplica
-    if (mesa.esVirtual && DBAppwrite && DBAppwrite.habilitado) {
-      const rowIdVirtual = mesa._rowId || mesa.numero;
-      try {
-        await DBAppwrite.eliminar('mesas', String(rowIdVirtual));
-        Logger.info('[Repo] Mesa virtual ' + rowIdVirtual + ' eliminada en Appwrite.');
-      } catch (e) {
-        Logger.warn('[Repo] No se pudo eliminar mesa virtual en Appwrite:', e);
-      }
-    }
-
     if (mesa.esVirtual) {
-      DB.liberarMesasFusionadas(mesa);
+      await DB.liberarMesasFusionadas(mesa);
     } else {
       const idx = DB.mesas.findIndex(m => m.numero === mesa.numero);
       if (idx >= 0) DB.mesas[idx] = mesaVacia(mesa.numero);

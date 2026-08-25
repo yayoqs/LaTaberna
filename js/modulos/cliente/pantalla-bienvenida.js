@@ -1,15 +1,17 @@
 /* ================================================================
    LaTaberna - PubPOS — Módulo (ES6)
    Archivo: js/modulos/cliente/pantalla-bienvenida.js
-   Versión: 2.2.10
+   Versión: 2.3.1
    Propósito: Panel de control post-validación.
-              Verificación de permiso adaptada a la nueva estructura
-              de pedidos (laTaberna_Pedidos).
+              - Avisos con ID autogenerado (null en DBAppwrite.crear)
+              - Vistazo de pedidos con await en ID de usuario
    ================================================================ */
 
 import { EventBus } from '../../lib/eventBus.js';
 import { Store } from '../../lib/store.js';
 import { Auth } from '../../auth.js';
+import { DBAppwrite } from '../../db-appwrite.js';
+import { Logger } from '../../lib/logger.js';
 import { mostrarEntrada } from '../../utils.js';
 
 const PantallaBienvenida = (() => {
@@ -18,6 +20,10 @@ const PantallaBienvenida = (() => {
   let _permitePrepedidos = false;
   let _interfazActivada = false;
   let _activada = false;
+
+  // Control anti-duplicado para llamados al garzón
+  let _ultimoLlamado = 0;
+  const _cooldownLlamado = 10000; // 10 segundos
 
   let _abortController = null;
   let _abortControllerPanel = null;
@@ -130,6 +136,28 @@ const PantallaBienvenida = (() => {
     if (avatarEl) avatarEl.textContent = iniciales;
   }
 
+  function _obtenerEspacioId() {
+    const local = Auth.obtenerLocalActivo?.();
+    return local?.id || 'lataberna';
+  }
+
+  async function _crearAviso(tipo, mesaId) {
+    try {
+      const usuarioId = await Auth.obtenerIdUsuarioAppwrite?.() || '';
+      const espacioId = _obtenerEspacioId();
+      // ID autogenerado: usar null en lugar de 'unique()'
+      await DBAppwrite.crear('avisos', null, {
+        tipo,
+        mesaId: String(mesaId),
+        estado: 'pendiente',
+        usuarioId,
+        espacioId
+      });
+    } catch (e) {
+      Logger.error('[PantallaBienvenida] Error al crear aviso:', e);
+    }
+  }
+
   function _guardarMesa() {
     const input = document.getElementById('inputMesa');
     const valor = parseInt(input?.value, 10);
@@ -143,7 +171,13 @@ const PantallaBienvenida = (() => {
   function _vincular(mesaId, estadoEl) {
     _mesa = mesaId;
     if (estadoEl) estadoEl.textContent = `Vinculado a ${_mesa === 'barra' ? 'Barra' : 'Mesa ' + _mesa}.`;
+
+    // Feedback local inmediato
     EventBus.emit('cliente:mesa_ingresada', { mesa: _mesa });
+
+    // Persistir aviso en laTaberna_Avisos
+    _crearAviso('vinculacion', _mesa);
+
     const cardIngreso = document.getElementById('cardIngresoMesa');
     if (cardIngreso) cardIngreso.style.display = 'none';
 
@@ -169,7 +203,6 @@ const PantallaBienvenida = (() => {
     if (!_mesa) return;
     const state = Store.obtenerEstado();
     const pedidos = state.pedidos || [];
-    // Verificar si existe un pedido activo para esta mesa (abierto por el garzón)
     const pedidoActivo = pedidos.find(p => String(p.mesa) === String(_mesa) && p.estado === 'abierta');
     const permite = !!pedidoActivo;
 
@@ -257,6 +290,12 @@ const PantallaBienvenida = (() => {
   }
 
   function _llamarGarzon() {
+    const ahora = Date.now();
+    if (ahora - _ultimoLlamado < _cooldownLlamado) {
+      return; // Evitar duplicados en tiempo corto
+    }
+    _ultimoLlamado = ahora;
+
     EventBus.emit('cliente:llamar_garzon', { mesa: _mesa });
     const btn = document.getElementById('btnLlamarGarzon');
     if (btn) {
@@ -264,6 +303,8 @@ const PantallaBienvenida = (() => {
       btn.style.pointerEvents = 'none';
       setTimeout(() => { btn.innerHTML = '<i class="fa-solid fa-bell"></i> Llamar al Garzón'; btn.style.pointerEvents = ''; }, 3000);
     }
+
+    _crearAviso('llamado', _mesa);
   }
 
   async function _agregarComensal() {
@@ -278,10 +319,15 @@ const PantallaBienvenida = (() => {
     EventBus.emit('cliente:comensal_agregado', { mesa: _mesa, nombre, iniciales });
   }
 
-  function _actualizarVistazoPedido() {
+  async function _actualizarVistazoPedido() {
     const state = Store.obtenerEstado();
     const pedidos = state.pedidos || [];
-    const idUsuario = Auth.obtenerIdUsuarioAppwrite?.() || '';
+    let idUsuario = '';
+    try {
+      idUsuario = await Auth.obtenerIdUsuarioAppwrite?.() || '';
+    } catch (e) {
+      idUsuario = '';
+    }
     const misPrecargas = pedidos.filter(p => p.estado === 'precarga' && p.origen === 'cliente' && p.id_usuario === idUsuario);
     const texto = document.getElementById('textoEstadoPedido');
     const badge = document.getElementById('badgeCantidadPedidos');

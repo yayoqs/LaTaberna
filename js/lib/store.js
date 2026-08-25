@@ -1,10 +1,12 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/lib/store.js
-   Versión: 2.0.8
+   Versión: 2.0.9
    Propósito: Estado centralizado con slices 'cliente', 'menus',
-              'precargas_cliente' y 'usuario'. Métodos en español.
-              v2.0.8: Agrega slice 'usuario' y reducer para sesión.
+              'precargas_cliente', 'usuario' e 'insumos'.
+              v2.0.9: Renombra slice 'ingredientes' a 'insumos'.
+                      Mantiene compatibilidad temporal con tipos
+                      de acción antiguos.
    ================================================================ */
 
 import { EventBus } from './eventBus.js';
@@ -17,7 +19,7 @@ const Store = (() => {
     pedidosDelivery: [],
     comandas: [],
     productos: [],
-    ingredientes: [],
+    insumos: [],   // ← renombrado desde ingredientes
     recetas: [],
     mozos: [],
     config: {},
@@ -25,7 +27,7 @@ const Store = (() => {
     espacioActivo: null,
     menus: [],
     precargas_cliente: [],
-    usuario: null,   // ← nuevo slice
+    usuario: null,
     cliente: { permitePrepedidos: false, mesa: null }
   };
 
@@ -79,7 +81,7 @@ const Store = (() => {
     newState.pedidosDelivery    = deliveryReducer(newState.pedidosDelivery, action, newState);
     newState.comandas           = comandasReducer(newState.comandas, action, newState);
     newState.productos          = productosReducer(newState.productos, action, newState);
-    newState.ingredientes       = ingredientesReducer(newState.ingredientes, action, newState);
+    newState.insumos            = insumosReducer(newState.insumos, action, newState);   // ← actualizado
     newState.recetas            = recetasReducer(newState.recetas, action, newState);
     newState.mozos              = mozosReducer(newState.mozos, action, newState);
     newState.config             = configReducer(newState.config, action, newState);
@@ -87,7 +89,7 @@ const Store = (() => {
     newState.espacioActivo      = espacioActivoReducer(newState.espacioActivo, action, newState);
     newState.menus              = menusReducer(newState.menus, action);
     newState.precargas_cliente  = precargasClienteReducer(newState.precargas_cliente, action);
-    newState.usuario            = usuarioReducer(newState.usuario, action);   // ← nuevo reducer
+    newState.usuario            = usuarioReducer(newState.usuario, action);
     newState.cliente            = clienteReducer(newState.cliente, action);
 
     return newState;
@@ -208,12 +210,16 @@ const Store = (() => {
     }
   }
 
-  function ingredientesReducer(ingredientes, action) {
+  function insumosReducer(insumos, action) {
     switch (action.type) {
-      case 'INGREDIENTES_INICIALIZAR': return action.payload || [];
-      case 'INGREDIENTE_GUARDADO':
-        return [...ingredientes.filter(i => i.id !== action.payload.id), action.payload];
-      default: return ingredientes;
+      case 'INSUMOS_INICIALIZAR':
+      case 'INGREDIENTES_INICIALIZAR':   // alias temporal (una iteración)
+        return action.payload || [];
+      case 'INSUMOS_GUARDADO':
+      case 'INSUMO_GUARDADO':
+      case 'INGREDIENTE_GUARDADO':       // alias temporal (una iteración)
+        return [...insumos.filter(i => i.id !== action.payload.id), action.payload];
+      default: return insumos;
     }
   }
 

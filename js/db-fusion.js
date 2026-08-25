@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-fusion.js
-   Versión: 1.1.3
+   Versión: 1.1.4
    Propósito: Lógica de fusión y liberación de mesas virtuales.
-              v1.1.3: al fusionar, las mesas originales se marcan
-                      como fusionadas también en Appwrite.
+              v1.1.4: liberarMesasFusionadas ahora es asíncrona y
+                      elimina la mesa virtual en Appwrite.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -150,8 +150,19 @@ export const DBFusion = (function() {
     return mesaVirtual;
   };
 
-  module.liberarMesasFusionadas = function(mesaVirtual) {
+  module.liberarMesasFusionadas = async function(mesaVirtual) {
     if (!mesaVirtual.esVirtual || !mesaVirtual.mesasFusionadas) return;
+
+    // Eliminar mesa virtual en Appwrite
+    if (DBAppwrite && DBAppwrite.habilitado) {
+      const rowIdVirtual = mesaVirtual._rowId || mesaVirtual.numero;
+      try {
+        await DBAppwrite.eliminar('mesas', String(rowIdVirtual));
+        Logger.info('[DBFusion] Mesa virtual ' + rowIdVirtual + ' eliminada en Appwrite.');
+      } catch (e) {
+        Logger.warn('[DBFusion] No se pudo eliminar mesa virtual en Appwrite:', e);
+      }
+    }
 
     mesaVirtual.mesasFusionadas.forEach(num => {
       const idx = this.mesas.findIndex(m => m.numero === num);

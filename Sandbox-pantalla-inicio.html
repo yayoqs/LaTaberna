@@ -1,0 +1,1108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>La Taberna — Sandbox de Diseño</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b0d12; --panel:#12151c; --panel2:#181c26; --border:#252a37;
+  --text:#e5e9f0; --text-sec:#8992a6; --accent:#f59e0b; --accent2:#6366f1;
+  --danger:#ef4444; --ok:#22c55e;
+  --font-ui:'Space Grotesk',sans-serif; --font-mono:'JetBrains Mono',monospace;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:var(--font-ui);}
+.app{display:flex;flex-direction:column;height:100vh;}
+
+/* ===== Topbar ===== */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--border);
+  flex-shrink:0;gap:12px;flex-wrap:wrap;
+}
+.topbar h1{font-size:0.95rem;font-weight:700;margin:0;white-space:nowrap;}
+.topbar h1 span{color:var(--accent);}
+.tabs{display:flex;gap:6px;background:var(--panel2);padding:4px;border-radius:10px;}
+.tabs button{
+  border:none;background:transparent;color:var(--text-sec);font-family:var(--font-ui);
+  font-weight:600;font-size:0.78rem;padding:7px 14px;border-radius:7px;cursor:pointer;transition:.15s;
+}
+.tabs button.active{background:var(--accent);color:#000;}
+
+/* ===== Main layout ===== */
+main{flex:1;overflow:hidden;}
+.tab{display:none;height:100%;}
+.tab.active{display:flex;}
+
+#tab-editor{flex-direction:row;position:relative;}
+.mobile-subtabs{display:none;}
+.preview-pane{
+  flex:0 0 380px;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(circle at 50% 0%,#181c26,#0b0d12);
+  padding:20px;overflow:auto;border-right:1px solid var(--border);
+}
+.phone-frame{
+  width:340px;aspect-ratio:9/18.5;max-height:80vh;border-radius:36px;background:#000;
+  padding:10px;box-shadow:0 0 0 2px #2a2f3d,0 20px 60px rgba(0,0,0,.6);flex-shrink:0;
+}
+.phone-frame iframe{width:100%;height:100%;border:0;border-radius:26px;background:#0a0a0f;}
+
+.controls-pane{flex:1;overflow-y:auto;padding:16px;background:var(--bg);-webkit-overflow-scrolling:touch;}
+.controls-pane h2{font-size:0.7rem;text-transform:uppercase;letter-spacing:1px;color:var(--text-sec);margin:18px 0 8px;}
+.controls-pane h2:first-child{margin-top:0;}
+
+/* ===== Accordion / cards ===== */
+.acc-item{background:var(--panel);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden;}
+.acc-head{
+  display:flex;align-items:center;justify-content:space-between;padding:10px 12px;
+  cursor:pointer;user-select:none;gap:8px;
+}
+.acc-head strong{font-size:0.82rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.acc-head .swatch{width:14px;height:14px;border-radius:4px;flex-shrink:0;border:1px solid rgba(255,255,255,.2);}
+.acc-toggle{color:var(--text-sec);transition:transform .2s;font-size:0.7rem;}
+.acc-item.open .acc-toggle{transform:rotate(90deg);}
+.acc-body{display:none;padding:0 12px 14px;}
+.acc-item.open .acc-body{display:block;}
+
+.field{margin-bottom:10px;}
+.field label{display:block;font-size:0.68rem;color:var(--text-sec);margin-bottom:4px;font-weight:600;letter-spacing:.3px;}
+.field input[type=text],.field input[type=url],.field textarea{
+  width:100%;background:var(--panel2);border:1px solid var(--border);border-radius:8px;
+  color:var(--text);padding:8px 10px;font-family:var(--font-ui);font-size:0.8rem;
+}
+.field textarea{resize:vertical;min-height:52px;}
+.field input[type=color]{width:44px;height:32px;border:1px solid var(--border);border-radius:6px;background:none;padding:2px;cursor:pointer;}
+.row{display:flex;gap:8px;align-items:center;}
+.row .field{flex:1;margin-bottom:10px;}
+.checkbox-row{display:flex;align-items:center;gap:6px;font-size:0.75rem;color:var(--text-sec);margin-bottom:10px;}
+
+.img-preview{
+  width:100%;height:90px;border-radius:8px;background:#1e2230 center/cover no-repeat;
+  border:1px dashed var(--border);margin-bottom:6px;display:flex;align-items:center;justify-content:center;
+  color:var(--text-sec);font-size:0.68rem;
+}
+.upload-row{display:flex;gap:6px;}
+.upload-row label.filebtn{
+  flex:0 0 auto;background:var(--panel2);border:1px solid var(--border);border-radius:8px;
+  padding:8px 10px;font-size:0.72rem;cursor:pointer;color:var(--text-sec);
+}
+.upload-row label.filebtn:hover{color:var(--text);}
+.upload-row input[type=file]{display:none;}
+
+.card-block{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:10px;}
+.card-block-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.card-block-head span{font-size:0.72rem;color:var(--text-sec);font-weight:700;}
+
+.btn{
+  border:none;border-radius:8px;padding:8px 12px;font-family:var(--font-ui);font-weight:700;
+  font-size:0.72rem;cursor:pointer;transition:.15s;
+}
+.btn-add{background:rgba(99,102,241,.15);color:#a5b4fc;width:100%;margin-top:2px;}
+.btn-add:hover{background:rgba(99,102,241,.28);}
+.btn-danger{background:rgba(239,68,68,.12);color:#fca5a5;}
+.btn-danger:hover{background:rgba(239,68,68,.24);}
+.btn-ghost{background:var(--panel2);color:var(--text-sec);border:1px solid var(--border);}
+
+/* ===== Código tab ===== */
+#tab-codigo{flex-direction:column;padding:14px 16px;gap:10px;overflow:hidden;}
+.code-toolbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;}
+.code-tabs{display:flex;gap:6px;background:var(--panel2);padding:4px;border-radius:9px;}
+.code-tabs button{border:none;background:transparent;color:var(--text-sec);font-family:var(--font-mono);font-size:0.72rem;padding:6px 12px;border-radius:6px;cursor:pointer;}
+.code-tabs button.active{background:var(--accent2);color:#fff;}
+.code-actions{display:flex;gap:8px;}
+.code-actions button{background:var(--panel2);border:1px solid var(--border);color:var(--text);}
+#codeOutput{
+  flex:1;overflow:auto;background:#0a0c10;border:1px solid var(--border);border-radius:10px;
+  padding:16px;margin:0;font-family:var(--font-mono);font-size:0.74rem;line-height:1.55;
+  white-space:pre;color:#c9d1d9;
+}
+.toast{
+  position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  background:var(--ok);color:#052e16;padding:9px 18px;border-radius:20px;
+  font-size:0.78rem;font-weight:700;opacity:0;pointer-events:none;transition:.25s;z-index:999;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(-6px);}
+
+/* ===== Mobile ===== */
+@media (max-width:860px){
+  .topbar{padding:10px 12px;}
+  .topbar h1{font-size:0.78rem;}
+  .tabs button{padding:8px 12px;font-size:0.74rem;}
+
+  /* En celular, Editor pasa a ser 2 vistas independientes (previsualizar / editar)
+     en vez de apilarlas, para no tener que hacer scroll infinito para llegar a los campos */
+  .mobile-subtabs{
+    display:flex;gap:6px;background:var(--panel2);padding:4px;margin:10px 12px 0;
+    border-radius:10px;flex-shrink:0;
+  }
+  .mobile-subtabs button{
+    flex:1;border:none;background:transparent;color:var(--text-sec);font-family:var(--font-ui);
+    font-weight:600;font-size:0.76rem;padding:10px 8px;border-radius:7px;cursor:pointer;min-height:40px;
+  }
+  .mobile-subtabs button.active{background:var(--accent);color:#000;}
+
+  #tab-editor{flex-direction:column;overflow:hidden;}
+  .preview-pane,.controls-pane{display:none;flex:1;min-height:0;}
+  #tab-editor.show-preview .preview-pane{display:flex;}
+  #tab-editor.show-controls .controls-pane{display:block;overflow-y:auto;}
+
+  .preview-pane{border-right:none;padding:14px;}
+  .phone-frame{width:min(72vw,300px);max-height:100%;}
+
+  .controls-pane{padding:12px;padding-bottom:70px;} /* espacio extra al final para el pulgar */
+
+  /* Evita el zoom automático de iOS al enfocar inputs (mínimo 16px) */
+  .field input[type=text],.field input[type=url],.field textarea{font-size:16px;padding:10px 12px;}
+  .acc-head{min-height:46px;padding:12px;}
+  .btn,.btn-add,.btn-danger,.btn-ghost{min-height:42px;}
+  .upload-row label.filebtn{min-height:38px;display:flex;align-items:center;}
+  .field input[type=color]{width:48px;height:38px;}
+
+  /* Código: barra de acciones se apila mejor */
+  .code-toolbar{flex-direction:column;align-items:stretch;}
+  .code-tabs{overflow-x:auto;}
+  .code-tabs button{white-space:nowrap;}
+  .code-actions{justify-content:stretch;}
+  .code-actions button{flex:1;min-height:42px;}
+  #codeOutput{font-size:0.7rem;padding:12px;}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="topbar">
+    <h1>🍺 La Taberna — <span>Sandbox</span></h1>
+    <div class="tabs" id="mainTabs">
+      <button data-tab="editor" class="active">Editor</button>
+      <button data-tab="codigo">Código</button>
+    </div>
+  </div>
+
+  <main>
+    <section id="tab-editor" class="tab active show-preview">
+      <div class="mobile-subtabs" id="mobileSubtabs">
+        <button data-pane="preview" class="active">📱 Vista previa</button>
+        <button data-pane="controls">✏️ Editar</button>
+      </div>
+      <div class="preview-pane">
+        <div class="phone-frame"><iframe id="previewFrame" title="Vista previa"></iframe></div>
+      </div>
+      <div class="controls-pane" id="controlsRoot"></div>
+    </section>
+
+    <section id="tab-codigo" class="tab">
+      <div class="code-toolbar">
+        <div class="code-tabs" id="codeTabs">
+          <button data-code="html" class="active">HTML prototipo</button>
+          <button data-code="css">CSS (cliente-inicio.css)</button>
+          <button data-code="js">JS (pantalla-inicio.js)</button>
+        </div>
+        <div class="code-actions">
+          <button class="btn" id="btnCopy">📋 Copiar</button>
+          <button class="btn" id="btnDownload">⬇ Descargar</button>
+        </div>
+      </div>
+      <pre id="codeOutput"></pre>
+    </section>
+  </main>
+</div>
+
+<div class="toast" id="toast">Copiado</div>
+
+<script>
+/* =========================================================
+   ESTADO
+   ========================================================= */
+let state = {
+  nombre: "La Taberna",
+  icono: "fa-solid fa-beer-mug-empty",
+  eslogans: [
+    "Bebidas frías, misiones calientes.",
+    "El mejor bar para perder la sed.",
+    "Cócteles que cuentan historias.",
+    "Sacia tu sed de aventura."
+  ],
+  colorTriIni: "#f59e0b",
+  colorTriFin: "#6366f1",
+  colorFondo: "#0a0a0f",
+  imagenFondo: "",
+  eventoActivo: false,
+  eventoTexto: "★ Fiesta de la Longaniza",
+  vitrinas: [
+    {
+      id: "v1", titulo: "🍸 Cócteles de la casa", color: "#a855f7",
+      cards: [
+        { titulo:"Fuego Valirio", desc:"Gin, jalapeño y destello verde", tag:"2x1 hoy", mostrarTag:true,
+          ingredientes:"Gin · Jalapeño · Licor verde de la casa",
+          lore:"Extraído de los sótanos de la alquimia. Destilado con botánicos seleccionados y un sutil toque punzante de jalapeño que despierta los sentidos.",
+          img:"https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=500&q=80" },
+        { titulo:"Abismo Negro", desc:"Whisky ahumado y licor de mora", tag:"Místico", mostrarTag:false,
+          ingredientes:"Whisky ahumado · Mora silvestre · Carbón activo",
+          lore:"Una mezcla densa y oscura como las noches sin luna en el bosque viejo. El humo del whisky escocés colisiona con el dulzor ácido de las moras maceradas.",
+          img:"https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=500&q=80" }
+      ]
+    },
+    {
+      id: "v2", titulo: "🔥 Los Preferidos del Asador", color: "#f97316",
+      cards: [
+        { titulo:"La Forja", desc:"Doble carne premium y cheddar fundido", tag:"Top ventas", mostrarTag:true,
+          ingredientes:"250g Ternera · Cheddar maduro · Pan de carbón",
+          lore:"Forjada directamente sobre fuego vivo. Carne seleccionada con costra de sellado perfecta, inundada en queso cheddar fundido.",
+          img:"https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=500&q=80" },
+        { titulo:"Humo & Acero", desc:"Tocino crujiente con BBQ artesanal", tag:"Ahumado", mostrarTag:false,
+          ingredientes:"Costillar ahumado · BBQ artesanal de bourbon",
+          lore:"Madera de manzano y doce horas de paciencia en el ahumador. Bañada en una densa salsa barbacoa reducida con bourbon.",
+          img:"https://images.unsplash.com/photo-1550547660-d9450f859349?w=500&q=80" }
+      ]
+    },
+    {
+      id: "v3", titulo: "🎤 Entretención y Eventos", color: "#6366f1",
+      cards: [
+        { titulo:"Grito de Guerra", desc:"Clásicos del rock pesado en vivo", tag:"Viernes", mostrarTag:true,
+          ingredientes:"Escenario libre · Micrófono abierto · Sonido valvular",
+          lore:"La noche donde los clanes se reúnen a medir el poder de sus gargantas.",
+          img:"https://images.unsplash.com/photo-1516280440502-861053b92787?w=500&q=80" },
+        { titulo:"Torneo de Clanes", desc:"Trivia estratégica de comunidad", tag:"Próximamente", mostrarTag:false,
+          ingredientes:"Trivia interactiva · Tablero de honor · Rondas gratis",
+          lore:"Pon a prueba la agilidad mental de tu equipo. El clan dominante de la noche no paga su consumo.",
+          img:"https://images.unsplash.com/photo-1470229722913-7c092fb1380f?w=500&q=80" }
+      ]
+    }
+  ]
+};
+
+let openAcc = new Set(["general"]);
+let activeCodeTab = "html";
+
+/* =========================================================
+   HELPERS
+   ========================================================= */
+const $ = (sel, root=document) => root.querySelector(sel);
+const $$ = (sel, root=document) => [...root.querySelectorAll(sel)];
+const uid = () => Math.random().toString(36).slice(2,9);
+
+function esc(str){
+  return String(str ?? "").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+}
+function escJs(str){
+  return String(str ?? "").replace(/\\/g,"\\\\").replace(/`/g,"\\`").replace(/\$\{/g,"\\${");
+}
+function getByPath(obj, path){
+  return path.split(".").reduce((o,k)=> o==null?o:o[/^\d+$/.test(k)?+k:k], obj);
+}
+function setByPath(obj, path, value){
+  const keys = path.split(".");
+  let cur = obj;
+  for(let i=0;i<keys.length-1;i++){
+    const k = /^\d+$/.test(keys[i]) ? +keys[i] : keys[i];
+    cur = cur[k];
+  }
+  const lastKey = keys[keys.length-1];
+  cur[/^\d+$/.test(lastKey)?+lastKey:lastKey] = value;
+}
+
+/* =========================================================
+   GENERACIÓN DE MARKUP (compartido HTML/JS)
+   ========================================================= */
+function buildInnerHTML(){
+  const eslogan0 = esc(state.eslogans[0] || "");
+  const vitrinasHTML = state.vitrinas.map(v => `
+      <div class="vitrina-contenedor" style="--accent:${v.color}">
+        <div class="vitrina-titulo-seccion">${esc(v.titulo)}</div>
+        <div class="vitrina-scroll">
+${v.cards.map(c => `          <div class="vitrina-card"
+               style="background-image: url('${esc(c.img)}');"
+               data-title="${esc(c.titulo)}"
+               data-ingredientes="${esc(c.ingredientes)}"
+               data-tag="${esc(c.tag)}"
+               data-color="${v.color}"
+               data-img="${esc(c.img)}"
+               data-lore="${esc(c.lore)}">
+${c.mostrarTag && c.tag ? `            <span class="vitrina-tag">${esc(c.tag)}</span>\n` : ``}            <div class="vitrina-texto">
+              <div class="vitrina-titulo">${esc(c.titulo)}</div>
+              <div class="vitrina-desc">${esc(c.desc)}</div>
+            </div>
+          </div>`).join("\n")}
+        </div>
+      </div>`).join("\n");
+
+  return `<div class="login-corner" id="btnLoginCorner">
+        <div class="login-corner-inner">
+          <div class="login-title">Iniciar Sesión</div>
+          <a href="javascript:void(0)" class="login-subtitle" id="btnRegistroCorner">Registrarse</a>
+        </div>
+      </div>
+
+      <header class="header-block">
+        <div class="icono-marco">
+          <i class="${esc(state.icono)}"></i>
+        </div>
+        ${state.eventoActivo ? `<div class="nombre-contenedor">
+          <div class="nombre">${esc(state.nombre)}</div>
+          <span class="evento-tag">${esc(state.eventoTexto)}</span>
+        </div>` : `<div class="nombre">${esc(state.nombre)}</div>`}
+        <div class="eslogan" id="eslogan-dinamico">"${eslogan0}"</div>
+      </header>
+
+      <section class="main-wrapper">
+${vitrinasHTML}
+      </section>`;
+}
+
+function buildModalHTML(){
+  return `<div class="modal-overlay" id="modalPortal">
+    <div class="modal-altar">
+      <div class="modal-img-frame" id="modalImg">
+        <span class="modal-badge" id="modalBadge"></span>
+      </div>
+      <div class="modal-body">
+        <div class="modal-header-line">
+          <h2 class="modal-titulo" id="modalTitulo"></h2>
+          <span class="modal-ingredientes" id="modalIngredientes"></span>
+        </div>
+        <p class="modal-lore" id="modalLore"></p>
+        <button class="modal-btn-action" id="modalActionBtn">Invocar con tu Cuenta</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function buildCSS(){
+  return `/* ================================================================
+   LaTaberna - PubPOS — CSS
+   Archivo: css/cliente-inicio.css
+   Generado desde el Sandbox de Diseño
+   ================================================================ */
+
+#view-inicio {
+  --color-bg: ${state.colorFondo};
+  --color-card: #12121a;
+  --color-border: #222235;
+  --neon-amber: ${state.colorTriIni};
+  --neon-indigo: ${state.colorTriFin};
+  --color-text: #f1f5f9;
+  --color-text-sec: #94a3b8;
+  --font-display: 'Monoton', cursive;
+  --font-script: 'Caveat', cursive;
+  --font-ui: 'Space Grotesk', sans-serif;
+  --font-body: 'Nunito', system-ui, sans-serif;
+  --radius: 10px;
+  --t: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --triangulo-ancho: clamp(130px, 40vw, 210px);
+  --triangulo-alto: clamp(130px, 40vw, 210px);
+}
+
+#modalPortal {
+  --neon-amber: ${state.colorTriIni};
+  --neon-orange: #f97316;
+}
+
+#view-inicio *, #view-inicio *::before, #view-inicio *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+@keyframes neonPulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.2), 0 0 40px rgba(99, 102, 241, 0.1); }
+  50% { box-shadow: 0 0 30px rgba(245, 158, 11, 0.4), 0 0 55px rgba(99, 102, 241, 0.2); }
+}
+@keyframes floatIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes emberDrift { 0%, 100% { transform: translate(0,0); } 50% { transform: translate(4px,-6px); } }
+
+.view.active#view-inicio {
+  width: 100%; height: 100vh; padding: 20px;
+  display: flex; flex-direction: column; justify-content: space-between;
+  background:
+    ${state.imagenFondo ? `url('${state.imagenFondo}') center/cover no-repeat,` : ``}
+    radial-gradient(circle at 80% 10%, rgba(245, 158, 11, 0.08) 0%, transparent 40%),
+    radial-gradient(circle at 15% 85%, rgba(99, 102, 241, 0.06) 0%, transparent 45%),
+    linear-gradient(180deg, ${state.colorFondo} 0%, #060609 100%);
+  position: relative; box-shadow: inset 0 0 100px rgba(0,0,0,0.8);
+  font-family: var(--font-body); color: var(--color-text);
+}
+
+.view.active#view-inicio::before, .view.active#view-inicio::after {
+  content: ''; position: fixed; width: 4px; height: 4px; border-radius: 50%;
+  opacity: 0.4; animation: emberDrift 7s ease-in-out infinite; pointer-events: none;
+}
+.view.active#view-inicio::before { top: 30%; left: 10%; background: var(--neon-amber); }
+.view.active#view-inicio::after { top: 75%; left: 85%; animation-delay: 2.5s; background: var(--neon-indigo); }
+
+#view-inicio .login-corner {
+  position: absolute; top: 0; right: 0; width: var(--triangulo-ancho); height: var(--triangulo-alto);
+  cursor: pointer; clip-path: polygon(100% 0, 0 0, 100% 100%);
+  background: linear-gradient(135deg, var(--neon-amber) 0%, var(--neon-indigo) 75%);
+  padding: 1.5px; animation: neonPulse 3.5s ease-in-out infinite; transition: var(--t); z-index: 100;
+}
+#view-inicio .login-corner:hover { transform: scale(1.02); }
+#view-inicio .login-corner-inner {
+  background: rgba(10, 10, 15, 0.96); width: 100%; height: 100%;
+  clip-path: polygon(100% 0, 0 0, 100% 100%);
+  display: flex; flex-direction: column; align-items: flex-end; justify-content: flex-start;
+  padding: clamp(12px, 11%, 24px) clamp(10px, 9.5%, 20px) 0 0;
+}
+#view-inicio .login-title {
+  font-family: var(--font-display);
+  /* El tamaño se ata al ancho real del triángulo (no al viewport) para que
+     el texto siempre quede proporcional al espacio disponible dentro de él */
+  font-size: clamp(0.56rem, calc(var(--triangulo-ancho) * 0.062), 0.82rem);
+  font-weight: 700; letter-spacing: 1px;
+  color: var(--neon-amber); text-shadow: 0 0 8px rgba(245,158,11,0.6); margin-bottom: 6px; white-space: nowrap;
+}
+#view-inicio .login-subtitle {
+  font-family: var(--font-ui);
+  font-size: clamp(0.46rem, calc(var(--triangulo-ancho) * 0.05), 0.65rem);
+  font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+  color: var(--neon-indigo); text-decoration: none; transition: var(--t); white-space: nowrap;
+}
+#view-inicio .login-subtitle:hover { color: #fff; text-shadow: 0 0 8px var(--neon-indigo); }
+
+#view-inicio .header-block { align-self: flex-start; margin-top: 8px; max-width: calc(100% - 140px); animation: floatIn 0.6s ease both; }
+#view-inicio .icono-marco {
+  width: clamp(42px, 13vw, 60px); height: clamp(42px, 13vw, 60px); border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #1e1e2e, #12121a 70%);
+  border: 2px solid rgba(245, 158, 11, 0.4); display: flex; align-items: center; justify-content: center;
+  margin-bottom: 8px; box-shadow: 0 0 16px rgba(245, 158, 11, 0.22), inset 0 2px 4px rgba(0,0,0,0.4);
+}
+#view-inicio .icono-marco i { font-size: clamp(18px, 7vw, 28px); color: var(--neon-amber); filter: drop-shadow(0 0 4px var(--neon-amber)); }
+#view-inicio .nombre {
+  font-family: var(--font-display); font-size: clamp(1.15rem, 6.5vw, 1.8rem); font-weight: 400; letter-spacing: 1px; line-height: 1.1;
+  background: linear-gradient(to right, var(--neon-amber), var(--neon-indigo));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.3)); margin-bottom: 4px;
+}
+#view-inicio .nombre-contenedor { display: flex; flex-direction: column; margin-bottom: 4px; }
+#view-inicio .nombre-contenedor .nombre { margin-bottom: 0; }
+#view-inicio .evento-tag {
+  font-family: var(--font-ui); font-size: clamp(0.5rem, 2.4vw, 0.58rem); font-weight: 800;
+  text-transform: uppercase; letter-spacing: 1px; color: var(--neon-amber); opacity: 0.9;
+}
+#view-inicio .eslogan {
+  font-family: var(--font-script); font-size: clamp(0.95rem, 4.8vw, 1.25rem); font-weight: 600;
+  color: var(--neon-amber); text-shadow: 0 0 6px rgba(245,158,11,0.3); transition: opacity 0.4s ease;
+}
+
+#view-inicio .main-wrapper { width: 100%; display: flex; flex-direction: column; gap: 14px; margin-top: 10px; margin-bottom: 10px; flex-grow: 1; justify-content: center; }
+#view-inicio .vitrina-contenedor { width: 100%; animation: floatIn 0.7s ease both; }
+#view-inicio .vitrina-titulo-seccion {
+  font-family: var(--font-ui); font-size: clamp(0.62rem, 2.8vw, 0.7rem); font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+  margin-bottom: 6px; display: flex; align-items: center; gap: 6px; color: var(--accent);
+}
+#view-inicio .vitrina-scroll { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; width: 100%; }
+#view-inicio .vitrina-scroll::-webkit-scrollbar { display: none; }
+
+#view-inicio .vitrina-card {
+  position: relative; flex: 0 0 76%; scroll-snap-align: center; border-radius: var(--radius);
+  height: clamp(78px, 24vw, 100px);
+  display: flex; align-items: flex-end; padding: clamp(9px, 3vw, 12px); background-size: cover; background-position: center;
+  border: 1px solid var(--color-border); box-shadow: 0 4px 12px rgba(0,0,0,0.4); transition: var(--t);
+  overflow: hidden; cursor: pointer;
+}
+#view-inicio .vitrina-card:hover { border-color: rgba(255,255,255,0.15); transform: translateY(-2px); }
+#view-inicio .vitrina-card::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(to top, rgba(10,10,15,0.9) 0%, rgba(10,10,15,0.3) 60%, transparent 100%);
+  z-index: 1; pointer-events: none;
+}
+#view-inicio .vitrina-texto { position: relative; z-index: 2; min-width: 0; }
+#view-inicio .vitrina-titulo { font-family: var(--font-ui); font-size: clamp(0.78rem, 3.6vw, 0.9rem); font-weight: 700; color: #fff; line-height: 1.2; text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
+#view-inicio .vitrina-desc { font-size: clamp(0.6rem, 2.8vw, 0.68rem); color: rgba(255,255,255,0.8); text-shadow: 0 1px 2px rgba(0,0,0,0.8); margin-top: 2px; }
+#view-inicio .vitrina-tag {
+  position: absolute; top: 0; right: 0; font-size: clamp(0.46rem, 2.2vw, 0.52rem); font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase;
+  padding: 3px 8px; border-bottom-left-radius: 6px; color: #fff; z-index: 3; background: var(--accent);
+}
+
+#modalPortal.modal-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: rgba(5, 5, 8, 0.85);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); z-index: 200;
+  display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none;
+  transition: opacity 0.3s ease; padding: 24px;
+}
+#modalPortal.modal-overlay.active { opacity: 1; pointer-events: auto; }
+#modalPortal .modal-altar {
+  background: #111116; border: 1px solid rgba(255,255,255,0.08); width: 100%; max-width: 360px; border-radius: 16px;
+  overflow: hidden; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.7); transform: scale(0.92);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+#modalPortal.modal-overlay.active .modal-altar { transform: scale(1); }
+#modalPortal .modal-img-frame { width: 100%; height: 180px; background-size: cover; background-position: center; position: relative; }
+#modalPortal .modal-img-frame::before { content: ''; position: absolute; top:0; left:0; width:100%; height:100%; background: linear-gradient(to top, #111116 0%, transparent 60%); }
+#modalPortal .modal-badge { position: absolute; top: 14px; left: 14px; font-family: var(--font-ui,'Space Grotesk',sans-serif); font-size: clamp(0.5rem, 2.4vw, 0.58rem); font-weight: 800; text-transform: uppercase; letter-spacing: 1px; padding: 4px 10px; border-radius: 20px; }
+#modalPortal .modal-body { padding: clamp(14px, 4.5vw, 20px); text-align: left; }
+#modalPortal .modal-header-line { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; gap: 8px; flex-wrap: wrap; }
+#modalPortal .modal-titulo { font-family: var(--font-ui,'Space Grotesk',sans-serif); font-size: clamp(1.1rem, 5.5vw, 1.4rem); font-weight: 700; color: #fff; }
+#modalPortal .modal-ingredientes { font-size: clamp(0.62rem, 3vw, 0.72rem); color: var(--neon-amber); font-weight: 600; font-family: var(--font-ui,'Space Grotesk',sans-serif); }
+#modalPortal .modal-lore { font-size: clamp(0.74rem, 3.4vw, 0.82rem); color: var(--color-text-sec,#94a3b8); line-height: 1.4; margin-bottom: 18px; }
+#modalPortal .modal-btn-action {
+  width: 100%; background: linear-gradient(90deg, var(--neon-amber), var(--neon-orange));
+  border: none; padding: 12px; border-radius: 8px; font-family: var(--font-ui,'Space Grotesk',sans-serif);
+  font-size: clamp(0.76rem, 3.6vw, 0.85rem); font-weight: 700; color: #000; text-transform: uppercase; letter-spacing: 0.5px;
+  cursor: pointer; transition: var(--t,all 0.25s ease);
+}
+#modalPortal .modal-btn-action:active { transform: scale(0.98); }
+
+/* La tipografía y las formas ahora escalan de forma continua vía clamp(),
+   así que no se necesita un salto brusco de tamaños en un breakpoint fijo.
+   Este media query solo ajusta el espaciado general para pantallas muy angostas. */
+@media (max-width: 340px) {
+  .view.active#view-inicio { padding: 12px; }
+  #view-inicio .main-wrapper { gap: 8px; }
+}`;
+}
+
+function buildRuntimeJS(){
+  return `// Motor de eslogan + modal (idéntico al usado en pantalla-inicio.js)
+const FRASES_ESLOGAN = ${JSON.stringify(state.eslogans)};
+const esloganEl = document.getElementById('eslogan-dinamico');
+let indice = 0;
+setInterval(() => {
+  esloganEl.style.opacity = '0';
+  setTimeout(() => {
+    indice = (indice + 1) % FRASES_ESLOGAN.length;
+    esloganEl.textContent = \`"\${FRASES_ESLOGAN[indice]}"\`;
+    esloganEl.style.opacity = '1';
+  }, 400);
+}, 6000);
+
+function luminancia(hex){
+  const c = hex.replace('#','');
+  const r = parseInt(c.substr(0,2),16), g = parseInt(c.substr(2,2),16), b = parseInt(c.substr(4,2),16);
+  return (0.299*r + 0.587*g + 0.114*b) / 255;
+}
+
+const cards = document.querySelectorAll('.vitrina-card');
+const modal = document.getElementById('modalPortal');
+const mImg = document.getElementById('modalImg');
+const mBadge = document.getElementById('modalBadge');
+const mTitulo = document.getElementById('modalTitulo');
+const mIngredientes = document.getElementById('modalIngredientes');
+const mLore = document.getElementById('modalLore');
+const mActionBtn = document.getElementById('modalActionBtn');
+
+cards.forEach(card => {
+  card.addEventListener('click', () => {
+    const title = card.getAttribute('data-title');
+    const ingredients = card.getAttribute('data-ingredientes');
+    const lore = card.getAttribute('data-lore');
+    const img = card.getAttribute('data-img');
+    const tag = card.getAttribute('data-tag') || 'Disponible';
+    const color = card.getAttribute('data-color') || '#f59e0b';
+
+    mTitulo.textContent = title;
+    mIngredientes.textContent = ingredients;
+    mLore.textContent = lore;
+    mImg.style.backgroundImage = \`url('\${img}')\`;
+    mBadge.textContent = tag;
+    mBadge.style.backgroundColor = color;
+    mBadge.style.color = luminancia(color) > 0.6 ? '#000' : '#fff';
+
+    mActionBtn.textContent = card.closest('.vitrina-contenedor')?.querySelector('.vitrina-titulo-seccion')?.textContent.includes('🎤')
+      ? "Reservar Espacio en el Clan" : "Invocar con tu Cuenta";
+
+    modal.classList.add('active');
+  });
+});
+
+modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('active'); });
+mActionBtn.addEventListener('click', () => { modal.classList.remove('active'); });`;
+}
+
+function buildFullHTML(){
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>${esc(state.nombre)} — Pantalla de Inicio (Diseño)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Monoton&family=Caveat:wght@500;600;700&family=Nunito:wght@400;600;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+body{margin:0;padding:0;font-family:'Nunito',sans-serif;background:${state.colorFondo};overflow:hidden;}
+${buildCSS()}
+</style>
+</head>
+<body>
+  <main class="view active" id="view-inicio">
+${buildInnerHTML()}
+  </main>
+
+  ${buildModalHTML()}
+
+  <script>
+${buildRuntimeJS()}
+  <\/script>
+</body>
+</html>`;
+}
+
+function buildModuleJS(){
+  const inner = buildInnerHTML().split("\n").map(l=>"      "+l).join("\n");
+  return `/* ================================================================
+   LaTaberna - PubPOS — Módulo (ES6)
+   Archivo: js/modulos/cliente/pantalla-inicio.js
+   Generado desde el Sandbox de Diseño
+   ================================================================ */
+
+import { Auth } from '../../auth.js';
+
+const PantallaInicio = (() => {
+  let _vista = null;
+  let _intervaloEslogan = null;
+  let _activada = false;
+
+  const FRASES_ESLOGAN = ${JSON.stringify(state.eslogans, null, 2).split("\n").join("\n  ")};
+
+  let _cbLoginCorner, _cbModalClose, _cbModalAction;
+  let _cbCerrarModalLogin = null;
+  let _modalCards = [];
+
+  function _asegurarVista() {
+    if (_vista) return;
+
+    let main = document.getElementById('view-inicio');
+    if (!main) {
+      main = document.createElement('main');
+      main.id = 'view-inicio';
+      main.className = 'view';
+      document.body.appendChild(main);
+    }
+
+    _vista = main;
+    if (_vista.querySelector('.login-corner')) return;
+
+    _vista.innerHTML = \`
+${inner}
+    \`;
+
+    _crearModalPortal();
+  }
+
+  function _crearModalPortal() {
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.id = 'modalPortal';
+    modal.innerHTML = \`
+      <div class="modal-altar">
+        <div class="modal-img-frame" id="modalImg">
+          <span class="modal-badge" id="modalBadge"></span>
+        </div>
+        <div class="modal-body">
+          <div class="modal-header-line">
+            <h2 class="modal-titulo" id="modalTitulo"></h2>
+            <span class="modal-ingredientes" id="modalIngredientes"></span>
+          </div>
+          <p class="modal-lore" id="modalLore"></p>
+          <button class="modal-btn-action" id="modalActionBtn">Invocar con tu Cuenta</button>
+        </div>
+      </div>
+    \`;
+    document.body.appendChild(modal);
+  }
+
+  function _luminancia(hex){
+    const c = hex.replace('#','');
+    const r = parseInt(c.substr(0,2),16), g = parseInt(c.substr(2,2),16), b = parseInt(c.substr(4,2),16);
+    return (0.299*r + 0.587*g + 0.114*b) / 255;
+  }
+
+  function activar() {
+    if (_activada) return;
+    _activada = true;
+
+    _cbLoginCorner = () => _mostrarLogin();
+    document.getElementById('btnLoginCorner').addEventListener('click', _cbLoginCorner);
+
+    _iniciarEsloganDinamico();
+    _conectarModalPortal();
+  }
+
+  function limpiar() {
+    if (!_activada) return;
+    _activada = false;
+
+    if (_cbLoginCorner) {
+      document.getElementById('btnLoginCorner').removeEventListener('click', _cbLoginCorner);
+    }
+    if (_cbCerrarModalLogin) {
+      const btnCerrar = document.getElementById('btnCerrarModalLogin');
+      if (btnCerrar) btnCerrar.removeEventListener('click', _cbCerrarModalLogin);
+      _cbCerrarModalLogin = null;
+    }
+    if (_intervaloEslogan) { clearInterval(_intervaloEslogan); _intervaloEslogan = null; }
+
+    _desconectarModalPortal();
+  }
+
+  function _conectarModalPortal() {
+    const modal = document.getElementById('modalPortal');
+    const mImg = document.getElementById('modalImg');
+    const mBadge = document.getElementById('modalBadge');
+    const mTitulo = document.getElementById('modalTitulo');
+    const mIngredientes = document.getElementById('modalIngredientes');
+    const mLore = document.getElementById('modalLore');
+    const mActionBtn = document.getElementById('modalActionBtn');
+
+    _modalCards = document.querySelectorAll('.vitrina-card');
+
+    _modalCards.forEach(card => {
+      card.addEventListener('click', () => {
+        const title = card.getAttribute('data-title');
+        const ingredients = card.getAttribute('data-ingredientes');
+        const lore = card.getAttribute('data-lore');
+        const img = card.getAttribute('data-img');
+        const tag = card.getAttribute('data-tag') || 'Disponible';
+        const color = card.getAttribute('data-color') || '#f59e0b';
+
+        mTitulo.textContent = title;
+        mIngredientes.textContent = ingredients;
+        mLore.textContent = lore;
+        mImg.style.backgroundImage = \`url('\${img}')\`;
+        mBadge.textContent = tag;
+        mBadge.style.backgroundColor = color;
+        mBadge.style.color = _luminancia(color) > 0.6 ? '#000' : '#fff';
+
+        modal.classList.add('active');
+      });
+    });
+
+    _cbModalClose = (e) => { if (e.target === modal) modal.classList.remove('active'); };
+    modal.addEventListener('click', _cbModalClose);
+
+    _cbModalAction = () => {
+      modal.classList.remove('active');
+      _mostrarLogin();
+    };
+    mActionBtn.addEventListener('click', _cbModalAction);
+  }
+
+  function _desconectarModalPortal() {
+    const modal = document.getElementById('modalPortal');
+    if (_modalCards.length) {
+      _modalCards.forEach(card => { card.replaceWith(card.cloneNode(true)); });
+      _modalCards = [];
+    }
+    if (modal) {
+      if (_cbModalClose) modal.removeEventListener('click', _cbModalClose);
+      const mActionBtn = document.getElementById('modalActionBtn');
+      if (mActionBtn && _cbModalAction) mActionBtn.removeEventListener('click', _cbModalAction);
+    }
+  }
+
+  function _iniciarEsloganDinamico() {
+    const esloganEl = document.getElementById('eslogan-dinamico');
+    if (!esloganEl) return;
+    let indice = 0;
+    _intervaloEslogan = setInterval(() => {
+      esloganEl.style.opacity = '0';
+      setTimeout(() => {
+        indice = (indice + 1) % FRASES_ESLOGAN.length;
+        esloganEl.textContent = \`"\${FRASES_ESLOGAN[indice]}"\`;
+        esloganEl.style.opacity = '1';
+      }, 400);
+    }, 6000);
+  }
+
+  function _mostrarLogin() {
+    if (typeof Auth.mostrarLogin === 'function') Auth.mostrarLogin();
+
+    if (_cbCerrarModalLogin) {
+      const btnCerrarPrev = document.getElementById('btnCerrarModalLogin');
+      if (btnCerrarPrev) btnCerrarPrev.removeEventListener('click', _cbCerrarModalLogin);
+    }
+
+    _cbCerrarModalLogin = function() {
+      setTimeout(() => { PantallaInicio.mostrar(); }, 100);
+    };
+
+    setTimeout(() => {
+      const btnCerrar = document.getElementById('btnCerrarModalLogin');
+      if (btnCerrar) btnCerrar.addEventListener('click', _cbCerrarModalLogin);
+    }, 100);
+  }
+
+  function mostrar() {
+    _asegurarVista();
+    activar();
+    _vista.classList.add('active');
+  }
+
+  function ocultar() {
+    if (_vista) _vista.classList.remove('active');
+    limpiar();
+  }
+
+  return { mostrar, ocultar };
+})();
+
+export { PantallaInicio };`;
+}
+
+/* =========================================================
+   RENDER: CONTROLES
+   ========================================================= */
+function renderControls(){
+  const root = $("#controlsRoot");
+  const scrollY = root.scrollTop;
+
+  root.innerHTML = `
+    <h2>General</h2>
+    ${accItem("general","Datos del bar", "", `
+      <div class="field"><label>Nombre</label><input type="text" data-path="nombre" value="${esc(state.nombre)}"></div>
+      <div class="field"><label>Ícono cabecera (clase Font Awesome)</label><input type="text" data-path="icono" value="${esc(state.icono)}"></div>
+      <div class="field"><label>Eslóganes (uno por línea)</label><textarea data-path="__eslogans" rows="4">${esc(state.eslogans.join("\n"))}</textarea></div>
+      <div class="row">
+        <div class="field"><label>Triángulo — color inicio</label><input type="color" data-path="colorTriIni" value="${state.colorTriIni}"></div>
+        <div class="field"><label>Triángulo — color fin</label><input type="color" data-path="colorTriFin" value="${state.colorTriFin}"></div>
+      </div>
+      <label class="checkbox-row"><input type="checkbox" data-check="eventoActivo" ${state.eventoActivo?'checked':''}> Modo evento especial (etiqueta bajo el nombre, ej. "★ Fiesta de la Longaniza")</label>
+      ${state.eventoActivo ? `<div class="field"><label>Texto de la etiqueta de evento</label><input type="text" data-path="eventoTexto" value="${esc(state.eventoTexto)}"></div>` : ``}
+    `)}
+
+    <h2>Fondo</h2>
+    ${accItem("fondo","Fondo general", state.colorFondo, `
+      <div class="field"><label>Color base del fondo</label><input type="color" data-path="colorFondo" value="${state.colorFondo}"></div>
+      <div class="field"><label>Imagen de fondo (opcional, se ve muy tenue detrás de todo)</label>
+        <div class="img-preview" style="${state.imagenFondo?`background-image:url('${esc(state.imagenFondo)}')`:''}">${state.imagenFondo?'':'Sin imagen'}</div>
+        <div class="upload-row">
+          <label class="filebtn">Subir imagen<input type="file" accept="image/*" data-imgpath="imagenFondo"></label>
+          <input type="url" placeholder="o pega una URL…" data-path="imagenFondo" value="${esc(state.imagenFondo)}" style="flex:1">
+        </div>
+        ${state.imagenFondo?`<button class="btn btn-danger" data-clear-img="imagenFondo" style="margin-top:6px">Quitar imagen</button>`:''}
+      </div>
+    `)}
+
+    <h2>Vitrinas</h2>
+    ${state.vitrinas.map((v,vi)=> accItem(v.id, v.titulo||"Vitrina", v.color, `
+      <div class="field"><label>Título de sección (con emoji si quieres)</label><input type="text" data-path="vitrinas.${vi}.titulo" value="${esc(v.titulo)}"></div>
+      <div class="field"><label>Color de acento</label><input type="color" data-path="vitrinas.${vi}.color" value="${v.color}"></div>
+
+      ${v.cards.map((c,ci)=>`
+        <div class="card-block">
+          <div class="card-block-head">
+            <span>Tarjeta ${ci+1}</span>
+            <button class="btn btn-danger" data-remove-card="${vi}.${ci}">Eliminar</button>
+          </div>
+          <div class="img-preview" style="${c.img?`background-image:url('${esc(c.img)}')`:''}">${c.img?'':'Sin imagen'}</div>
+          <div class="upload-row">
+            <label class="filebtn">Subir<input type="file" accept="image/*" data-imgpath="vitrinas.${vi}.cards.${ci}.img"></label>
+            <input type="url" placeholder="o pega una URL…" data-path="vitrinas.${vi}.cards.${ci}.img" value="${esc(c.img)}" style="flex:1">
+          </div>
+          <div class="field"><label>Título</label><input type="text" data-path="vitrinas.${vi}.cards.${ci}.titulo" value="${esc(c.titulo)}"></div>
+          <div class="field"><label>Descripción corta (se ve en la tarjeta)</label><input type="text" data-path="vitrinas.${vi}.cards.${ci}.desc" value="${esc(c.desc)}"></div>
+          <div class="row">
+            <div class="field"><label>Etiqueta / tag</label><input type="text" data-path="vitrinas.${vi}.cards.${ci}.tag" value="${esc(c.tag)}"></div>
+          </div>
+          <label class="checkbox-row"><input type="checkbox" data-check="vitrinas.${vi}.cards.${ci}.mostrarTag" ${c.mostrarTag?'checked':''}> Mostrar cintillo de etiqueta en la tarjeta</label>
+          <div class="field"><label>Ingredientes / detalle (se ve en el modal)</label><input type="text" data-path="vitrinas.${vi}.cards.${ci}.ingredientes" value="${esc(c.ingredientes)}"></div>
+          <div class="field"><label>Lore / descripción larga (modal)</label><textarea data-path="vitrinas.${vi}.cards.${ci}.lore" rows="3">${esc(c.lore)}</textarea></div>
+        </div>
+      `).join("")}
+      <button class="btn btn-add" data-add-card="${vi}">+ Añadir tarjeta</button>
+      <button class="btn btn-danger" style="width:100%;margin-top:6px" data-remove-vitrina="${vi}">Eliminar vitrina completa</button>
+    `)).join("")}
+
+    <button class="btn btn-add" id="btnAddVitrina" style="margin-top:4px">+ Añadir vitrina</button>
+  `;
+
+  // abrir/cerrar acordeones
+  $$(".acc-head", root).forEach(h=>{
+    h.addEventListener("click", ()=>{
+      const item = h.closest(".acc-item");
+      const id = item.dataset.id;
+      if(openAcc.has(id)) openAcc.delete(id); else openAcc.add(id);
+      item.classList.toggle("open");
+    });
+  });
+
+  // inputs de texto / color / url -> actualizan estado sin re-render total
+  $$("[data-path]", root).forEach(inp=>{
+    inp.addEventListener("input", ()=>{
+      const path = inp.dataset.path;
+      if(path === "__eslogans"){
+        state.eslogans = inp.value.split("\n").map(s=>s.trim()).filter(Boolean);
+        if(state.eslogans.length===0) state.eslogans=["Bienvenido a La Taberna."];
+      } else {
+        setByPath(state, path, inp.value);
+      }
+      updatePreviewAndCode();
+      syncAccentSwatches();
+    });
+  });
+
+  // checkboxes
+  $$("[data-check]", root).forEach(chk=>{
+    chk.addEventListener("change", ()=>{
+      setByPath(state, chk.dataset.check, chk.checked);
+      renderControls();
+      updatePreviewAndCode();
+    });
+  });
+
+  // subir imagen
+  $$("[data-imgpath]", root).forEach(fileInp=>{
+    fileInp.addEventListener("change", ()=>{
+      const file = fileInp.files[0];
+      if(!file) return;
+      const reader = new FileReader();
+      reader.onload = ()=>{
+        setByPath(state, fileInp.dataset.imgpath, reader.result);
+        renderControls();
+        updatePreviewAndCode();
+      };
+      reader.readAsDataURL(file);
+    });
+  });
+
+  // quitar imagen de fondo
+  const clearBtn = $("[data-clear-img]", root);
+  if(clearBtn){
+    clearBtn.addEventListener("click", ()=>{
+      setByPath(state, clearBtn.dataset.clearImg, "");
+      renderControls();
+      updatePreviewAndCode();
+    });
+  }
+
+  // añadir/eliminar tarjeta
+  $$("[data-add-card]", root).forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const vi = +btn.dataset.addCard;
+      state.vitrinas[vi].cards.push({
+        titulo:"Nueva tarjeta", desc:"Descripción breve", tag:"Nuevo", mostrarTag:false,
+        ingredientes:"Ingrediente A · Ingrediente B",
+        lore:"Cuenta aquí la historia o el detalle de este ítem.",
+        img:"https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=500&q=80"
+      });
+      renderControls(); updatePreviewAndCode();
+    });
+  });
+  $$("[data-remove-card]", root).forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const [vi,ci] = btn.dataset.removeCard.split(".").map(Number);
+      state.vitrinas[vi].cards.splice(ci,1);
+      renderControls(); updatePreviewAndCode();
+    });
+  });
+
+  // añadir/eliminar vitrina
+  $("#btnAddVitrina", root).addEventListener("click", ()=>{
+    state.vitrinas.push({
+      id:"v"+uid(), titulo:"✨ Nueva vitrina", color:"#22c55e",
+      cards:[{ titulo:"Ítem nuevo", desc:"Descripción breve", tag:"Nuevo", mostrarTag:true,
+        ingredientes:"Detalle A · Detalle B", lore:"Descripción larga para el modal.",
+        img:"https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=500&q=80" }]
+    });
+    renderControls(); updatePreviewAndCode();
+  });
+  $$("[data-remove-vitrina]", root).forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      if(!confirm("¿Eliminar esta vitrina completa?")) return;
+      state.vitrinas.splice(+btn.dataset.removeVitrina,1);
+      renderControls(); updatePreviewAndCode();
+    });
+  });
+
+  root.scrollTop = scrollY;
+}
+
+function accItem(id, titulo, color, bodyHTML){
+  const open = openAcc.has(id) ? "open" : "";
+  return `
+    <div class="acc-item ${open}" data-id="${id}">
+      <div class="acc-head">
+        <div style="display:flex;align-items:center;gap:8px;min-width:0;">
+          ${color ? `<span class="swatch" style="background:${color}"></span>`:''}
+          <strong>${esc(titulo)}</strong>
+        </div>
+        <span class="acc-toggle">▶</span>
+      </div>
+      <div class="acc-body">${bodyHTML}</div>
+    </div>
+  `;
+}
+
+function syncAccentSwatches(){
+  $$(".acc-item .swatch").forEach((sw,i)=>{
+    // el primer swatch pertenece a "fondo" si existe; simplificamos re-renderizando color en vivo solo vía input listeners de color
+  });
+}
+
+/* =========================================================
+   RENDER: PREVIEW + CÓDIGO
+   ========================================================= */
+function updatePreviewAndCode(){
+  $("#previewFrame").srcdoc = buildFullHTML();
+  renderCodeOutput();
+}
+
+function renderCodeOutput(){
+  const out = $("#codeOutput");
+  const map = { html: buildFullHTML(), css: buildCSS(), js: buildModuleJS() };
+  out.textContent = map[activeCodeTab];
+}
+
+/* =========================================================
+   TABS
+   ========================================================= */
+$$("#mainTabs button").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    $$("#mainTabs button").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    $$(".tab").forEach(t=>t.classList.remove("active"));
+    $("#tab-"+btn.dataset.tab).classList.add("active");
+    if(btn.dataset.tab==="codigo") renderCodeOutput();
+  });
+});
+
+$$("#mobileSubtabs button").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    $$("#mobileSubtabs button").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    const editorSection = $("#tab-editor");
+    editorSection.classList.remove("show-preview","show-controls");
+    editorSection.classList.add(btn.dataset.pane === "preview" ? "show-preview" : "show-controls");
+  });
+});
+
+$$("#codeTabs button").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    $$("#codeTabs button").forEach(b=>b.classList.remove("active"));
+    btn.classList.add("active");
+    activeCodeTab = btn.dataset.code;
+    renderCodeOutput();
+  });
+});
+
+$("#btnCopy").addEventListener("click", ()=>{
+  navigator.clipboard.writeText($("#codeOutput").textContent).then(()=> showToast("Copiado al portapapeles"));
+});
+
+$("#btnDownload").addEventListener("click", ()=>{
+  const names = { html:"pantalla-inicio-preview.html", css:"cliente-inicio.css", js:"pantalla-inicio.js" };
+  const blob = new Blob([$("#codeOutput").textContent], {type:"text/plain"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = names[activeCodeTab];
+  a.click();
+  showToast("Descargando " + names[activeCodeTab]);
+});
+
+function showToast(msg){
+  const t = $("#toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"), 1800);
+}
+
+/* =========================================================
+   INIT
+   ========================================================= */
+renderControls();
+updatePreviewAndCode();
+</script>
+</body>
+</html>

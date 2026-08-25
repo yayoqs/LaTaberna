@@ -1,10 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MESAS SUBMÓDULO (ES6)
    Archivo: js/ui/mesas/ciclo-vida.js
-   Versión: 1.2.1
+   Versión: 1.2.2
    Propósito: Ciclo de vida (activar/limpiar) con AbortController.
-              v1.2.1: Conexión robusta de botones. Sin botón bandeja.
-                      La bandeja se despliega solo por gesto.
+              v1.2.2: Integra AvisosMesero persistente.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -15,6 +14,7 @@ import { addNotificacion } from './notificaciones.js';
 import { toggleModoFusion, fusionarMesasSeleccionadas } from './fusion.js';
 import { agregarMesa, setBadge, clearBadge } from './acciones-mesa.js';
 import { BandejaAtencion } from './bandeja-atencion.js';
+import { AvisosMesero } from '../../modulos/interno/avisos-mesero.js';
 
 let _abortController = null;
 let _desuscripciones = [];
@@ -25,10 +25,8 @@ export function activar() {
   _abortController = new AbortController();
   const { signal } = _abortController;
 
-  // Asegurar la vista ANTES de conectar botones
   asegurarVista();
 
-  // Conexión directa y robusta de botones
   document.getElementById('btnAgregarMesa')?.addEventListener('click', agregarMesa, { signal });
   document.getElementById('btnFusionar')?.addEventListener('click', toggleModoFusion, { signal });
   document.getElementById('btnConfirmarFusion')?.addEventListener('click', fusionarMesasSeleccionadas, { signal });
@@ -81,6 +79,7 @@ export function activar() {
   }));
 
   BandejaAtencion.activar();
+  AvisosMesero.activar();
 }
 
 export function limpiar() {
@@ -92,4 +91,5 @@ export function limpiar() {
   _desuscripciones = [];
 
   BandejaAtencion.limpiar();
+  AvisosMesero.limpiar();
 }

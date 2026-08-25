@@ -1,4 +1,19 @@
 
+js/lib/*
+· js/dominio/*
+· js/servicios/*
+· js/comandos/*
+· js/repositorios/*
+· js/managers/*
+· js/utils.js
+· y los tests (test-A-unificado.html, test-A-exploracion.html)
+
+
+
+
+
+
+
 tar --owner=0 --group=0 --numeric-owner -czvf code.tar.gz index.js package.json
 
 

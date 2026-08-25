@@ -1,10 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/mesa-detalles.js
-   Versión: 3.2.1
+   Versión: 3.2.4
    Propósito: Centro de operaciones de mesa.
-              v3.2.1: Deshacer Fusión es acción adicional en mesas
-                      virtuales, manteniendo acciones operativas.
+              v3.2.4: deshacerFusion espera la liberación local y
+                      elimina la llamada redundante a DBAppwrite.eliminar.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -246,7 +246,6 @@ const MesaDetalles = (() => {
         <div class="action-card roja"><div class="action-icon"><i class="fas fa-check-circle"></i></div><div class="action-details"><h4>Cerrar Mesa</h4><p>Procesar pago y liberar</p></div><div class="action-arrow"><i class="fas fa-angle-right"></i></div></div>`;
     }
 
-    // Si es mesa virtual, agregar acción Deshacer Fusión al final
     if (_mesaActual && _mesaActual.esVirtual) {
       html += `
         <div class="action-card virtual" style="margin-top:10px; border-color: rgba(139,92,246,.4); background: rgba(139,92,246,.06);">
@@ -371,29 +370,17 @@ const MesaDetalles = (() => {
     if (!confirmado) return;
 
     const originales = Array.isArray(_mesaActual.mesasFusionadas) ? _mesaActual.mesasFusionadas : [];
-    let virtualRowId = _mesaActual._rowId;
-
-    if (!virtualRowId && DBAppwrite && DBAppwrite.habilitado) {
-      try {
-        const mesasAppwrite = await DBAppwrite.listar('mesas');
-        const virtualAppwrite = mesasAppwrite.find(m => m.numero === _mesaActual.numero);
-        if (virtualAppwrite) virtualRowId = virtualAppwrite.id;
-      } catch (e) {
-        Logger.warn('[MesaDetalles] No se pudo obtener rowId de la virtual:', e);
-      }
-    }
-    if (!virtualRowId) virtualRowId = _mesaActual.numero;
 
     try {
-      DB.liberarMesasFusionadas(_mesaActual);
+      // Ahora liberarMesasFusionadas es async y elimina la virtual en Appwrite
+      await DB.liberarMesasFusionadas(_mesaActual);
 
+      // Restaurar originales en Appwrite
       if (DBAppwrite && DBAppwrite.habilitado) {
         for (const num of originales) {
           await DBAppwrite.actualizar('mesas', String(num), { estado: 'libre', pedidoId: '' })
             .catch(e => Logger.warn(`[MesaDetalles] Error al restaurar mesa ${num}:`, e));
         }
-        await DBAppwrite.eliminar('mesas', String(virtualRowId))
-          .catch(e => Logger.warn('[MesaDetalles] Error al eliminar mesa virtual:', e));
       }
 
       Store.despachar({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
@@ -408,7 +395,7 @@ const MesaDetalles = (() => {
 
   EventBus.on('mesa:seleccionada', (numMesa) => { if (!_panelVisible) abrir(numMesa); });
 
-  Logger.info('[MesaDetalles] Módulo inicializado v3.2.1.');
+  Logger.info('[MesaDetalles] Módulo inicializado v3.2.4.');
 
   return { abrir, cerrar, pedirCuenta, cerrarMesa, aceptarVinculacion, cargarPrecarga, deshacerFusion, _mesaActual: null };
 })();

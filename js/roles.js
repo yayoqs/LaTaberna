@@ -1,11 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/roles.js
-   Versión: 2.0.2
+   Versión: 2.0.3
    Propósito: Definición de roles, jerarquía y matriz de permisos.
-              v2.0.2: corregido verMesas para cliente (false).
-                      Ajustados permisos de acceso según matriz
-                      acordada. Sin roles obsoletos.
+              v2.0.3: documentada la decisión de mantener verMesas
+                      false para cliente. El READ en Appwrite sobre
+                      laTaberna_Mesas no habilita la vista de mesas.
    ================================================================ */
 
 export const Roles = {
@@ -326,6 +326,10 @@ export const Roles = {
       gestionarEventos: true
     },
     cliente: {
+      // verMesas se mantiene false para evitar acceso a la vista de
+      // mapa de mesas. El permiso READ en Appwrite sobre laTaberna_Mesas
+      // solo permite consultas puntuales de estado de mesa, no habilita
+      // esta vista.
       verMesas: false,
       verCocina: false,
       verCaja: false,

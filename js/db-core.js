@@ -1,11 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-core.js
-   Versión: 1.1.4
+   Versión: 1.1.5
    Propósito: Núcleo de datos: mesas, pedidos, productos, proveedores,
               persistencia local.
-              v1.1.4: _normalizarMesa parsea mesasFusionadas si viene
-                      como string JSON.
+              v1.1.5: _normalizarProducto alineado a campo estado.
+                      Métodos legacy de delivery marcados como deprecados.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -20,6 +20,8 @@ export const DBCore = (function() {
   module.comandas = [];
   module.config = {};
   module.mozos = [];
+  // DEPRECADO: se mantiene por compatibilidad con Célula D.
+  // En la migración a pedidos unificados se eliminará.
   module.pedidosDelivery = [];
   module.proveedores = [];
 
@@ -55,8 +57,14 @@ export const DBCore = (function() {
     return estados.includes(val) ? val : 'libre';
   }
 
+  function _validarEstadoProducto(val) {
+    const estados = ['disponible', 'agotado'];
+    return estados.includes(val) ? val : 'disponible';
+  }
+
   /* ── NORMALIZACIONES ─────────────────────────────────────── */
   module._normalizarProducto = function(p) {
+    const estado = _validarEstadoProducto(p.estado);
     return {
       id: _validarId(p.id, 'prod'),
       nombre: _validarString(p.nombre, 'Sin nombre'),
@@ -66,7 +74,9 @@ export const DBCore = (function() {
       descripcion: _validarString(p.descripcion, ''),
       activo: _validarBooleano(p.activo, true),
       imagen: _validarString(p.imagen, ''),
-      disponible: _validarBooleano(p.disponible, true)
+      estado: estado,
+      // Derivado para compatibilidad con consumidores que aún usan disponible
+      disponible: estado !== 'agotado'
     };
   };
 
@@ -95,6 +105,7 @@ export const DBCore = (function() {
     };
   };
 
+  // DEPRECADO: este normalizador se mantiene temporalmente.
   module._normalizarPedidoDelivery = function(pd) {
     return {
       id: _validarId(pd.id, 'deliv'),
@@ -243,6 +254,7 @@ export const DBCore = (function() {
     }
   };
 
+  // DEPRECADO
   module._cargarPedidosDeliveryLocal = function() {
     const raw = localStorage.getItem('pubpos_pedidos_delivery');
     if (raw) {
@@ -308,6 +320,7 @@ export const DBCore = (function() {
     localStorage.setItem('pubpos_mozos', JSON.stringify(this.mozos));
   };
 
+  // DEPRECADO
   module.savePedidosDelivery = function() {
     localStorage.setItem('pubpos_pedidos_delivery', JSON.stringify(this.pedidosDelivery));
     EventBus.emit('pedidosDelivery:guardados', this.pedidosDelivery);
@@ -357,7 +370,9 @@ export const DBCore = (function() {
     return this.mesas.find(m => m.numero == num);
   };
 
-  /* ── GESTIÓN DE DELIVERY (compatibilidad temporal) ───────── */
+  /* ── GESTIÓN DE DELIVERY (DEPRECADO) ─────────────────────── */
+
+  // DEPRECADO: usar colección unificada `pedidos` con tipo 'reparto'.
   module.crearPedidoDelivery = function(datos) {
     const nuevo = this._normalizarPedidoDelivery({
       ...datos,

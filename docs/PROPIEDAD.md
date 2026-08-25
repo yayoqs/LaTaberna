@@ -1,6 +1,6 @@
 # Mapa de Propiedad de Archivos — La Taberna
 
-**Versión 1.3.0** — Actualizado el 2026-08-04
+**Versión 1.3.1** — Actualizado el 2026-08-21
 
 ---
 
@@ -36,7 +36,7 @@
 
 ---
 
-## Célula B1 — Mesero (23 archivos)
+## Célula B1 — Mesero (24 archivos)
 
   · js/ui/mesas.js
   · js/ui/mesas/constantes.js
@@ -46,6 +46,7 @@
   · js/ui/mesas/fusion.js
   · js/ui/mesas/ciclo-vida.js
   · js/ui/mesas/acciones-mesa.js
+  · js/ui/mesas/bandeja-atencion.js
   · js/ui/pedido-ui.js
   · js/ui/comanda.js
   · js/ui/carta.js
@@ -53,7 +54,7 @@
   · js/ui/cuenta.js
   · js/modulos/interno/precarga-control.js
   · js/modulos/interno/guia-mesero.js
-  · js/modulos/interno/avisos-mesero.js (nuevo)
+  · js/modulos/interno/avisos-mesero.js
   · css/mesas.css
   · css/mesa-detalles.css
   · css/pedido.css
@@ -143,7 +144,7 @@
   · css/reparto.css
   · css/perfil.css
   · css/config.css
-  · css/menu-editor.css (nuevo, extraído de inline JS)
+  · css/menu-editor.css
 
 ---
 
@@ -163,7 +164,7 @@
   · css/layout.css
   · css/responsive.css
   · css/extra.css
-  · css/modals.css (transferido desde D)
+  · css/modals.css
   · js/appwrite.min.js
   · js/utils.js — Uso permitido para todas las células.
 
@@ -171,4 +172,4 @@
 ---
 
 *Documento mantenido por el Coordinador de Integración.*
-*Versión 1.3.0 — 2026-08-04*
+*Versión 1.3.1 — 2026-08-21*

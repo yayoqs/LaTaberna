@@ -1,10 +1,14 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-appwrite.js
-   Versión: 1.7.2
+   Versión: 1.7.5
    Propósito: Cliente de Appwrite (API TablesDB), Realtime y operadores.
               Soporte multi-espacio con espacioId dinámico.
-              v1.7.2: consulta staff por usuario+espacio sin and (M1).
+              v1.7.5: documentado el parámetro opcional `forzarError`
+                      en crear, actualizar y eliminar.
+                      `forzarError` permite optar por excepciones en
+                      lugar de retorno null/false. Actualmente no se
+                      usa en producción, queda como utilidad de control.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -34,6 +38,7 @@ export const DBAppwrite = (function() {
     proveedores: 'laTaberna_Proveedores',
     entradas: 'laTaberna_Entradas',
     comensales: 'laTaberna_Comensales',
+    avisos: 'laTaberna_Avisos',
     global_perfiles: 'global_Perfiles',
     global_puntos: 'global_Puntos',
     global_eventos: 'global_Eventos',
@@ -134,8 +139,21 @@ export const DBAppwrite = (function() {
     }
   };
 
-  modulo.crear = async function(coleccion, idFila, datos, permisos, idTransaccion) {
-    if (!modulo.habilitado || !modulo.baseDeDatos) return null;
+  /**
+   * Crea una fila.
+   * @param {string} coleccion - clave de COLECCIONES.
+   * @param {string|null} idFila - ID personalizado o null para autogenerar.
+   * @param {object} datos - campos a guardar.
+   * @param {Array} [permisos] - permisos opcionales.
+   * @param {string} [idTransaccion] - transacción opcional.
+   * @param {boolean} [forzarError=false] - si true, lanza excepción en
+   *   lugar de retornar null ante error.
+   */
+  modulo.crear = async function(coleccion, idFila, datos, permisos, idTransaccion, forzarError = false) {
+    if (!modulo.habilitado || !modulo.baseDeDatos) {
+      if (forzarError) throw new Error('DBAppwrite no está habilitado');
+      return null;
+    }
     try {
       const id = idFila || Appwrite.ID.unique();
       const datosLimpios = Object.assign({}, datos);
@@ -165,13 +183,26 @@ export const DBAppwrite = (function() {
       const respuesta = await modulo.baseDeDatos.createRow(params);
       return _limpiarFila(respuesta);
     } catch (e) {
+      if (forzarError) throw e;
       if (e.code !== 409) Logger.error('[Appwrite] Error al crear en ' + coleccion + ':', e);
       return null;
     }
   };
 
-  modulo.actualizar = async function(coleccion, id, cambios, idTransaccion) {
-    if (!modulo.habilitado || !modulo.baseDeDatos) return null;
+  /**
+   * Actualiza una fila.
+   * @param {string} coleccion - clave de COLECCIONES.
+   * @param {string} id - rowId de la fila.
+   * @param {object} cambios - campos a actualizar.
+   * @param {string} [idTransaccion] - transacción opcional.
+   * @param {boolean} [forzarError=false] - si true, lanza excepción en
+   *   lugar de retornar null ante error.
+   */
+  modulo.actualizar = async function(coleccion, id, cambios, idTransaccion, forzarError = false) {
+    if (!modulo.habilitado || !modulo.baseDeDatos) {
+      if (forzarError) throw new Error('DBAppwrite no está habilitado');
+      return null;
+    }
     try {
       const cambiosLimpios = Object.assign({}, cambios);
       delete cambiosLimpios.creadoEn;
@@ -192,13 +223,25 @@ export const DBAppwrite = (function() {
       const respuesta = await modulo.baseDeDatos.updateRow(params);
       return _limpiarFila(respuesta);
     } catch (e) {
+      if (forzarError) throw e;
       if (e.code !== 404) Logger.error('[Appwrite] Error al actualizar ' + coleccion + ':', e);
       return null;
     }
   };
 
-  modulo.eliminar = async function(coleccion, id, idTransaccion) {
-    if (!modulo.habilitado || !modulo.baseDeDatos) return false;
+  /**
+   * Elimina una fila.
+   * @param {string} coleccion - clave de COLECCIONES.
+   * @param {string} id - rowId de la fila.
+   * @param {string} [idTransaccion] - transacción opcional.
+   * @param {boolean} [forzarError=false] - si true, lanza excepción en
+   *   lugar de retornar false ante error.
+   */
+  modulo.eliminar = async function(coleccion, id, idTransaccion, forzarError = false) {
+    if (!modulo.habilitado || !modulo.baseDeDatos) {
+      if (forzarError) throw new Error('DBAppwrite no está habilitado');
+      return false;
+    }
     try {
       const params = {
         databaseId: modulo.idBaseDeDatos,
@@ -209,6 +252,7 @@ export const DBAppwrite = (function() {
       await modulo.baseDeDatos.deleteRow(params);
       return true;
     } catch (e) {
+      if (forzarError) throw e;
       Logger.error('[Appwrite] Error al eliminar en ' + coleccion + ':', e);
       return false;
     }

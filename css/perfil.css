@@ -1,23 +1,20 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/perfil.css
-   Versión: 2.0.8
+   Versión: 2.0.9
    Propósito: Estilos encapsulados para la nueva vista de Perfil.
               Diseño de taberna: identidad, vitrina RPG y resumen.
-              v2.0.8: corrige conflicto de visibilidad con el sistema
-                      global de vistas.
+              v2.0.9: agrega .panel-admin y ajusta .nota-privacidad
+                      para administración de roles.
    ================================================================ */
 
 /* ── Contenedor principal ─────────────────────────────────── */
-/* ❌ Nunca forzar display ni height aquí: rompe el sistema de vistas.
-   Solo se aplican cuando #view-perfil está activo (clase .active). */
 #view-perfil {
   color: #f1f5f9;
   font-family: 'Nunito', system-ui, sans-serif;
   background: #0f0f14;
 }
 
-/* ✅ Cuando la vista está activa, usamos el comportamiento normal del sistema */
 #view-perfil.active {
   display: flex;
   flex-direction: column;
@@ -596,4 +593,21 @@
     transform: translateX(100%); box-shadow: 0 0 40px rgba(0,0,0,0.5);
   }
   #view-perfil .panel-derecho.abierto { transform: translateX(0); }
+}
+
+/* ── BLOQUES ADMIN (nuevo) ────────────────────────────────── */
+#view-perfil .panel-admin {
+  background: #1a1a24;
+  border: 1px solid #2e2e42;
+  border-radius: 12px;
+  padding: 18px;
+  margin-bottom: 16px;
+}
+#view-perfil .panel-admin h3 {
+  margin: 0 0 12px;
+  font-size: 15px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }

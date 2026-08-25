@@ -1,43 +1,34 @@
-┌──────────────────────────────────────────────────────────┐
-│ REMITENTE: Coordinador de Integración                   │
-│ FECHA:     2026-08-01 08:00 UTC                        │
-│ TIPO:      DOCUMENTO OFICIAL                           │
-│ REFERENCIA: Catálogo de Eventos del Sistema v4.0        │
-└──────────────────────────────────────────────────────────┘
+# 📡 Catálogo de Eventos del Sistema – La Taberna (v5.1.0)
 
-# 📡 Catálogo de Eventos del Sistema – La Taberna (v4.0)
-
-**Última actualización:** 2026-08-01
+**Última actualización:** 2026-08-25
 
 ---
 
-## Cambios en v4.0 respecto a v3.1
+## Cambios en v5.1.0 respecto a v5.0
 
-- **Agregados**: eventos de autenticación con Appwrite Auth (`auth:login_exitoso`, `auth:login_fallido`, `auth:registro_completado`).
-- **Agregados**: eventos de perfil global (`perfil:actualizado`, `perfil:cargado`).
-- **Agregados**: eventos de multi-espacio (`espacio:cambiado`).
-- **Actualizados**: emisor de `cliente:cuenta_creada` ahora incluye `perfil_global`.
-- **Actualizados**: payload de `app:cambiarVista` ahora incluye `espacioActivoId`.
+- Se incorpora `avisos:actualizada` para la nueva colección
+  `laTaberna_Avisos`.
 
 ---
 
 ## Convenciones
 
-- **Nombre del evento:** `modulo:accion` (ej: `mesa:actualizada`, `cliente:precarga_enviada`)
-- **Payload:** objeto JSON con los datos del evento
-- **Emisor:** módulo que emite el evento
-- **Consumidores:** módulos que se suscriben al evento
+- Nombre del evento: `modulo:accion`, por ejemplo `mesa:actualizada`, `avisos:actualizada`.
+- Payload: objeto JSON con los datos del evento.
+- Emisor: módulo que emite el evento.
+- Consumidores: módulos que se suscriben.
 
 ---
 
-## 1. Eventos del Núcleo (Core)
+## 1. Eventos del Núcleo
 
 | Evento | Emisor | Payload | Consumidores |
 |--------|--------|---------|--------------|
-| `db:inicializada` | DB (db.js) | *(sin payload)* | Todas las vistas |
-| `sincronizacion:completada` | DB (db.js) | *(sin payload)* | Vistas principales |
-| `vista:cambiada` | App (app.js) | `string` (nombre de vista) | Módulos de cliente, guía, KDS |
-| `state:cambiado` | Store (store.js) | `{ state, action }` | Cualquier suscriptor del Store |
+| `db:inicializada` | DB | *(sin payload)* | Todas las vistas |
+| `sincronizacion:completada` | DB | *(sin payload)* | Vistas principales |
+| `vista:cambiada` | App | `string` (nombre de vista) | Módulos de cliente, guía, KDS |
+| `vista:activada` | App | `string` (nombre de vista) | Módulos que renderizan al entrar |
+| `state:cambiado` | Store | `{ state, action }` | Cualquier suscriptor del Store |
 
 ---
 
@@ -45,18 +36,18 @@
 
 | Evento | Emisor | Payload | Consumidores |
 |--------|--------|---------|--------------|
-| `mesa:seleccionada` | Mesas (renderer.js) | `number` (número de mesa) | MesaDetalles, Pedido |
-| `mesa:actualizada` | DB / Store / Comanda | `{ mesa: number, estado: string }` | Mesas, KDS, Caja, Cliente |
-| `mesa:liberada` | PedidoRepository | `{ numero: number }` | Mesas, Store |
-| `mesa:abierta` | Pedido (pedido-ui.js) | `objeto mesa` | Comanda |
-| `mesa:cerrada` | Pedido (pedido-ui.js) | *(sin payload)* | — |
-| `mesas:guardadas` | DB (db-core.js) | `array de mesas` | App (para re-render) |
+| `mesa:seleccionada` | Mesas | `string` (número o identificador de mesa) | MesaDetalles, Pedido |
+| `mesa:actualizada` | DB / Store / Comanda | `{ mesa: string, estado: string }` | Mesas, KDS, Caja, Cliente |
+| `mesa:liberada` | PedidoRepository | `{ numero: string }` | Mesas, Store |
+| `mesa:abierta` | Pedido | `objeto mesa` | Comanda |
+| `mesa:cerrada` | Pedido | *(sin payload)* | Componentes internos |
+| `mesas:guardadas` | DBCore | `array de mesas` | App |
 | `mesa:agregada` | Comando agregarMesa | `objeto mesa` | Mesas |
-| `mesa:badge_click` | Mesas (renderer.js) | `{ mesa: number, precargaId: string }` | PrecargaControl |
-| `mesas:limpiar_badge` | Comanda | `{ mesa: number }` | Mesas |
-| `mesa-detalle:abierto` | MesaDetalles | *(sin payload)* | Pedido (bloqueo de apertura) |
-| `mesa-detalle:cerrado` | MesaDetalles | *(sin payload)* | Pedido (desbloqueo de apertura) |
-| `mesa:tomar_pedido` | MesaDetalles | `{ mesa: number }` | Pedido |
+| `mesa:badge_click` | Mesas | `{ mesa: string, precargaId: string }` | PrecargaControl |
+| `mesas:limpiar_badge` | Comanda / PrecargaControl | `{ mesa: string }` | Mesas |
+| `mesa-detalle:abierto` | MesaDetalles | *(sin payload)* | Pedido |
+| `mesa-detalle:cerrado` | MesaDetalles | *(sin payload)* | Pedido |
+| `mesa:tomar_pedido` | MesaDetalles | `{ mesa: string }` | Pedido |
 
 ---
 
@@ -64,44 +55,45 @@
 
 | Evento | Emisor | Payload | Consumidores |
 |--------|--------|---------|--------------|
-| `pedido:creado` | PedidoService | `objeto pedido` | Store |
-| `pedido:cerrado` | PedidoService / Cobro | `{ mesa, pedidoId, total, formaPago }` | App (Caja.render), Store |
+| `pedido:creado` | PedidoService / Comando crearPedidoMesa | `objeto pedido` | Store, Caja |
+| `pedido:cerrado` | PedidoService / Cobro | `{ mesa, pedidoId, total, formaPago }` | App, Store |
 | `pedido:item_agregado` | PedidoService | `{ pedidoId, nombre, cantidad }` | Store |
 | `pedido:transaccion_agregada` | PedidoService | `{ pedidoId, persona, monto, formaPago, saldoRestante, pedidoCerrado }` | Store |
-| `comanda:enviada` | PedidoRepository | `objeto comanda` | KDS, App (para re-render) |
-| `comanda:lista` | KDS | `{ id: string, mesa: number }` | App, Store |
-| `comanda:completada` | Comando completarSubcomanda | `{ id: string, mesa: number }` | Store |
+| `pedidos:actualizada` | Realtime / DB | `objeto pedido` | PantallaBienvenida, Reparto, Caja |
+| `comanda:enviada` | PedidoRepository | `objeto comanda` | KDS, App |
+| `comanda:lista` | KDS | `{ id, mesa }` | App, Store |
+| `comanda:completada` | Comando completarSubcomanda | `{ id, mesa }` | Store |
 | `comanda:subcomanda_completada` | Comando completarSubcomanda | `{ id, destino, ambasListas }` | KDS |
-| `comandas:guardadas` | DB (db-core.js) | `array de comandas` | App (KDS.refresh) |
+| `comandas:guardadas` | DBCore | `array de comandas` | App, KDS |
 | `producto:seleccionado` | Carta | `objeto producto` | Comanda |
-| `cuenta:solicitada` | Cuenta | *(sin payload)* | Cuenta (autoinvocado) |
+| `cuenta:solicitada` | Cuenta | *(sin payload)* | Cuenta |
 | `cobro:solicitado` | Cuenta / MesaDetalles | *(sin payload)* | Cobro |
-| `pago:confirmado` | Cobro | `{ mesa, pedidoId, total }` | Pedido (cerrar modal), Store |
+| `pago:confirmado` | Cobro | `{ mesa, pedidoId, total }` | Pedido, Store |
 
 ---
 
-## 4. Eventos de Productos e Inventario
+## 4. Eventos de Productos, Insumos e Inventario
 
 | Evento | Emisor | Payload | Consumidores |
 |--------|--------|---------|--------------|
-| `productos:cargados` | DB (db.js) | `array de productos` | Recetas, Menu, App |
-| `productos:actualizada` | Realtime (Appwrite) | `objeto producto` | Vistas de menú |
-| `producto:agotado` | Comando marcarAgotado | `{ prodId: string }` | KDS, Menu, Carta |
-| `ingredientes:actualizados` | DBInventario | `array de ingredientes` | Store |
-| `inventario:actualizado` | DBInventario | *(sin payload)* | Store |
-| `inventario:stock_bajo` | DBInventario | `{ ingrediente, stock, unidad }` | App (mostrarToast) |
+| `productos:cargados` | DB | `array de productos` | Recetas, Menu, App |
+| `productos:actualizada` | Realtime / DB | `objeto producto` | Vistas de menú |
+| `producto:agotado` | Comando marcarAgotado | `{ prodId }` | KDS, Menu, Carta |
+| `insumos:actualizados` | DBInventario | `array de insumos` | Store, Despensa |
+| `inventario:actualizado` | DBInventario | *(sin payload)* | Store, Despensa |
+| `inventario:stock_bajo` | DBInventario | `{ insumo, stock, unidad }` | App |
 | `recetas:actualizadas` | DBInventario | *(sin payload)* | Recetas, App |
 
 ---
 
-## 5. Eventos de Delivery
+## 5. Eventos de Reparto y Pedidos Unificados
 
 | Evento | Emisor | Payload | Consumidores |
 |--------|--------|---------|--------------|
+| `pedidos:actualizada` | Realtime / DB | `objeto pedido` | Reparto, Caja, Cliente |
 | `delivery:creado` | DeliveryService | `objeto delivery` | Store |
-| `delivery:enviado_a_cocina` | PedidoManager | `{ deliveryId, items }` | Store |
+| `delivery:enviado_a_cocina` | PedidoManager / DeliveryService | `{ deliveryId, items }` | Store |
 | `delivery:listo` | KDS | `{ deliveryId, comandaId, estado }` | Store |
-| `pedidosDelivery:guardados` | DB (db-core.js) | `array de pedidos` | Reparto, App |
 
 ---
 
@@ -109,9 +101,9 @@
 
 | Evento | Emisor | Payload | Consumidores |
 |--------|--------|---------|--------------|
-| `turno:iniciado` | PedidoManager | `objeto turno` | App (Caja.render) |
+| `turno:iniciado` | PedidoManager | `objeto turno` | App, Caja |
 | `turno:solicitar_cierre` | PedidoManager | *(sin payload)* | TurnoManager |
-| `turno:cerrado` | TurnoManager | `{ timestamp: string }` | App (Caja.render, mostrarToast) |
+| `turno:cerrado` | TurnoManager | `{ timestamp }` | App, Caja |
 | `audit:actualizado` | PedidoManager | `{ turnoId, total }` | App |
 
 ---
@@ -120,16 +112,15 @@
 
 | Evento | Emisor | Payload | Consumidores |
 |--------|--------|---------|--------------|
-| `cliente:mesa_ingresada` | PantallaBienvenida | `{ mesa: number }` | Mesas (badge de espera) |
-| `cliente:cuenta_creada` | Auth | `{ nombre, timestamp, perfil_global }` | ClienteModulo (cambio de vista) |
-| `cliente:precarga_enviada` | MenuDigital | `{ id, mesa, items, clienteId, id_usuario, nombre_comensal }` | PrecargaControl |
-| `cliente:llamar_garzon` | PantallaBienvenida | `{ mesa: number }` | Mesas (notificación visual) |
+| `cliente:mesa_ingresada` | PantallaBienvenida | `{ mesa: string }` | Mesas, AvisosMesero |
+| `cliente:cuenta_creada` | Auth | `{ nombreUsuario, usuarioId, perfilGlobal }` | ClienteModulo |
+| `cliente:precarga_enviada` | MenuDigital | `{ id, mesa, items, clienteId, id_usuario, nombreComensal }` | PrecargaControl |
+| `cliente:llamar_garzon` | PantallaBienvenida | `{ mesa: string }` | Mesas, AvisosMesero |
 | `cliente:comensal_agregado` | PantallaBienvenida | `{ mesa, nombre, iniciales }` | Mesas |
-| `precarga:nueva` | PrecargaControl | `{ mesa, cantidad, precargaId }` | Mesas (setBadge) |
-| `precarga:items_listos` | PrecargaControl | `{ mesa, items, precargaId }` | Comanda (agregarItems) |
+| `precarga:nueva` | PrecargaControl | `{ mesa, cantidad, precargaId }` | Mesas |
+| `precarga:items_listos` | PrecargaControl | `{ mesa, items, precargaId }` | Comanda |
 | `precarga:cargar_en_comanda` | MesaDetalles | `{ precargaId, mesa }` | PrecargaControl |
-| `precarga:revisada` | PrecargaControl | `{ precargaId, revisadoPor, timestamp }` | EventBus (registro) |
-| `precargas_cliente:actualizada` | Realtime (Appwrite) | `objeto precarga` | PantallaBienvenida |
+| `precarga:revisada` | PrecargaControl | `{ precargaId, revisadoPor, timestamp }` | EventBus |
 
 ---
 
@@ -137,17 +128,18 @@
 
 | Evento | Emisor | Payload | Consumidores |
 |--------|--------|---------|--------------|
-| `config:actualizada` | Config | *(sin payload)* | Mesas (ciclo-vida: renderGrid + renderZoneButtons) |
+| `config:actualizada` | Config | *(sin payload)* | Mesas, App |
 
 ---
 
-## 9. Eventos de Sincronización
+## 9. Eventos de Sincronización y Realtime
 
 | Evento | Emisor | Payload | Consumidores |
 |--------|--------|---------|--------------|
-| `sync:colaActualizada` | DBShim | `number` (pendientes) | App (badge) |
-| `sync:completada` | DBShim | `timestamp` | App (indicador visual) |
-| `realtime:documento_actualizado` | DBAppwrite | `{ coleccion, tipo, datos }` | — (interno) |
+| `sync:colaActualizada` | DBShim | `number` (pendientes) | App |
+| `sync:completada` | DBShim | `timestamp` | App |
+| `realtime:documento_actualizado` | DBAppwrite | `{ coleccion, tipo, datos }` | Interno |
+| `avisos:actualizada` | DBAppwrite / Realtime | `objeto aviso` | B1 (bandeja), C (cliente) |
 
 ---
 
@@ -155,57 +147,55 @@
 
 | Evento | Emisor | Payload | Consumidores |
 |--------|--------|---------|--------------|
-| `app:cambiarVista` | Auth / EventBus | `{ vista: string, espacioActivoId: string }` | App (showView) |
-| `app:error` | DB | `string` (mensaje) | App (mostrarToast) |
+| `app:cambiarVista` | Auth / EventBus | `string` (nombre de vista) | App |
+| `app:error` | DB | `string` (mensaje) | App |
 
 ---
 
-## 11. Eventos de Autenticación (v4.0 — Appwrite Auth)
+## 11. Eventos de Autenticación y Staff
 
 | Evento | Emisor | Payload | Consumidores |
 |--------|--------|---------|--------------|
 | `auth:mostrarRegistro` | Auth | *(sin payload)* | PantallaInicio |
-| `auth:login_exitoso` | Auth (login) | `{ nombre, rol, vistaInicial }` | App, Store (sincronizar estado) |
-| `auth:login_fallido` | Auth (login) | `{ nombre, motivo }` | App (mostrarToast) |
-| `auth:registro_completado` | Auth (registrarCliente) | `{ nombre, perfil_global }` | App, ClienteModulo |
-| `auth:sesion_expirada` | Auth (logout) | *(sin payload)* | App (redirigir a inicio) |
+| `auth:login_exitoso` | Auth | `{ nombreUsuario, usuarioId, roles, rolPrincipal, vistaInicial }` | App, Store |
+| `auth:login_fallido` | Auth | `{ nombreUsuario, motivo }` | App |
+| `auth:registro_completado` | Auth | `{ nombreUsuario, usuarioId, perfilGlobal }` | App, ClienteModulo |
+| `auth:sesion_expirada` | Auth | *(sin payload)* | App |
+| `staff:creado` | DB | `objeto staff` | Store, D |
+| `staff:actualizado` | DB | `objeto staff` | Store, D |
+| `staff:vinculado` | Auth | `{ usuarioId, espacioId, roles }` | Store, D |
 
 ---
 
-## 12. Eventos de Perfil Global (v4.0 — multi-espacio)
+## 12. Eventos de Perfil Global
 
 | Evento | Emisor | Payload | Consumidores |
 |--------|--------|---------|--------------|
-| `perfil:actualizado` | Auth / Perfil UI | `{ usuarioId, cambios }` | Store (global_perfiles), vistas de perfil |
-| `perfil:cargado` | Auth (login) | `{ usuarioId, perfil }` | PantallaBienvenida, Perfil |
-| `espacio:cambiado` | Auth (cambiarEspacio) | `{ espacioId, nombre, rol }` | App (reiniciar Store con nuevo espacioId) |
+| `perfil:actualizado` | Auth / Perfil UI | `{ usuarioId, cambios }` | Store, vistas de perfil |
+| `perfil:cargado` | Auth | `{ usuarioId, perfil }` | PantallaBienvenida, Perfil |
 
 ---
 
-## 13. Cómo suscribirse a un evento
+## 13. Cómo suscribirse
 
-    // Suscripción simple
-    EventBus.on('mesa:actualizada', (data) => {
-      console.log('Mesa', data.mesa, 'cambió a estado', data.estado);
+    EventBus.on('avisos:actualizada', (aviso) => {
+      console.log('Nuevo aviso:', aviso);
     });
 
-    // Suscripción con limpieza
-    const callback = (data) => { /* ... */ };
-    const unsubscribe = EventBus.on('comanda:enviada', callback);
-    // Para dejar de escuchar:
+    const unsubscribe = EventBus.on('mesa:actualizada', callback);
     unsubscribe();
 
 ---
 
 ## 14. Convención para nuevos eventos
 
-1. Usar el formato `modulo:accion` (ej: `receta:creada`, `cliente:pedido_confirmado`).
-2. Documentar el evento en este archivo antes de hacer el PR.
-3. Incluir siempre el payload en la emisión para que los consumidores puedan reaccionar.
-4. Usar `EventBus.emit()` para emitir y `EventBus.on()` para suscribirse.
-5. La función `EventBus.on()` devuelve una función de limpieza; usarla para evitar memory leaks.
+1. Usar `modulo:accion`.
+2. Documentar antes del PR.
+3. Incluir siempre payload.
+4. Usar `EventBus.emit` y `EventBus.on`.
+5. Guardar la función de limpieza para evitar memory leaks.
 
 ---
 
 *Documento mantenido por el Coordinador de Integración.*
-*Versión 4.0 — 2026-08-01*
+*Versión 5.1.0 — 2026-08-25*

@@ -1,18 +1,19 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/config.js
-   Versión: 3.2.1
+   Versión: 3.2.3
    Propósito: Vista de configuración rediseñada con panel izquierdo,
               gestión de zonas delegada a B1, personal por roles,
               impresoras y contraseñas ocultas temporalmente.
-              v3.2.1: sección Contraseñas oculta. No usa Auth.cambiarPassword.
+              v3.2.3: _guardarConfig filtra por espacio activo y
+                      normaliza documento legacy sin espacioId.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
 import { EventBus } from '../lib/eventBus.js';
 import { Logger } from '../lib/logger.js';
 import { Auth } from '../auth.js';
-import { mostrarToast, mostrarConfirmacion, mostrarEntrada } from '../utils.js';
+import { mostrarToast } from '../utils.js';
 import { DB } from '../db.js';
 import { DBAppwrite } from '../db-appwrite.js';
 import { renderTabAdmin } from './perfil/admin-roles.js';
@@ -119,9 +120,33 @@ const Config = (() => {
 
     if (typeof DBAppwrite !== 'undefined' && DBAppwrite.habilitado) {
       try {
-        var datosConfig = { clave: 'global', valor: JSON.stringify(config) };
-        var existente = await DBAppwrite.listar('configuracion');
-        var docGlobal = existente.find(function(d) { return d.clave === 'global'; });
+        const espacioId = Auth.obtenerLocalActivo?.()?.id || 'lataberna';
+        const datosConfig = {
+          clave: 'global',
+          valor: JSON.stringify(config),
+          espacioId
+        };
+
+        const existente = await DBAppwrite.listar('configuracion');
+
+        // Filtrar por espacio activo, no solo por clave
+        let docGlobal = existente.find(function (d) {
+          return d.clave === 'global' && d.espacioId === espacioId;
+        });
+
+        // Si hay un documento legacy con clave global pero sin espacioId,
+        // lo adoptamos y normalizamos.
+        if (!docGlobal) {
+          const docLegacy = existente.find(function (d) {
+            return d.clave === 'global' && !d.espacioId;
+          });
+          if (docLegacy) {
+            await DBAppwrite.actualizar('configuracion', docLegacy.id, datosConfig);
+            Logger.info('[Config] Documento global legacy normalizado con espacioId.');
+            return;
+          }
+        }
+
         if (docGlobal) {
           await DBAppwrite.actualizar('configuracion', docGlobal.id, datosConfig);
         } else {

@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db.js
-   Versión: 1.4.1
+   Versión: 1.4.2
    Propósito: Orquestador de base de datos (Appwrite + localStorage).
-              v1.4.1: corregida validación jerárquica de roles (A2).
+              v1.4.2: corregida creación de staff con ID automático
+                      (null en lugar de 'unique()').
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -128,7 +129,9 @@ export const DB = (function() {
         await appwrite.actualizar('staff', existente.id, registro);
         resultado = { ...existente, ...registro, id: existente.id };
       } else {
-        resultado = await appwrite.crear('staff', 'unique()', registro);
+        // ID automático: pasamos null para que DBAppwrite genere
+        // un ID único mediante Appwrite.ID.unique()
+        resultado = await appwrite.crear('staff', null, registro);
       }
     } else {
       this.staff = this.staff || [];

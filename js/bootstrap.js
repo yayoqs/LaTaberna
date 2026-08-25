@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/bootstrap.js
-   Versión: 1.0.17
+   Versión: 1.0.18
    Propósito: Secuencia de arranque: Auth, DB, Store, dependencias.
-              Integración con Auth v2.0.1. Sincroniza sesión con Store.
+              Integración con Auth v2.1.3 y modelo de insumos.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -12,6 +12,7 @@ import { Store } from './lib/store.js';
 import { Deps } from './lib/deps.js';
 import { Auth } from './auth.js';
 import { DB } from './db.js';
+import { DBAppwrite } from './db-appwrite.js';
 import { PedidoService } from './servicios/pedido-service.js';
 import { DeliveryService } from './servicios/delivery-service.js';
 import { InventarioService } from './servicios/inventario-service.js';
@@ -33,7 +34,6 @@ const Bootstrap = (() => {
       Auth.iniciar();
       Logger.info('[Bootstrap] Auth listo.');
 
-      // Sincronizar sesión inicial con Store
       const usuario = Auth.obtenerUsuarioActual();
       if (usuario) {
         Store.despachar({ type: 'USUARIO_ACTUALIZAR', payload: usuario });
@@ -58,13 +58,15 @@ const Bootstrap = (() => {
     }
 
     // 3. Poblar Store con los datos iniciales
-    Store.despachar({ type: 'MESAS_INICIALIZAR',       payload: DB.mesas || [] });
-    Store.despachar({ type: 'PEDIDOS_INICIALIZAR',     payload: DB.pedidos || [] });
-    Store.despachar({ type: 'PRODUCTOS_INICIALIZAR',   payload: DB.productos || [] });
-    Store.despachar({ type: 'INGREDIENTES_INICIALIZAR', payload: DB.ingredientes || [] });
-    Store.despachar({ type: 'RECETAS_INICIALIZAR',      payload: DB.recetas || [] });
-    Store.despachar({ type: 'MOZOS_INICIALIZAR',        payload: DB.mozos || [] });
-    Store.despachar({ type: 'CONFIG_INICIALIZAR',       payload: DB.config || {} });
+    Store.despachar({ type: 'MESAS_INICIALIZAR',        payload: DB.mesas || [] });
+    Store.despachar({ type: 'PEDIDOS_INICIALIZAR',      payload: DB.pedidos || [] });
+    Store.despachar({ type: 'PRODUCTOS_INICIALIZAR',    payload: DB.productos || [] });
+    Store.despachar({ type: 'INSUMOS_INICIALIZAR',      payload: DB.insumos || [] });
+    // Alias temporal para vistas que aún despachan el tipo anterior
+    Store.despachar({ type: 'INGREDIENTES_INICIALIZAR', payload: DB.insumos || [] });
+    Store.despachar({ type: 'RECETAS_INICIALIZAR',       payload: DB.recetas || [] });
+    Store.despachar({ type: 'MOZOS_INICIALIZAR',         payload: DB.mozos || [] });
+    Store.despachar({ type: 'CONFIG_INICIALIZAR',        payload: DB.config || {} });
     Store.despachar({ type: 'PEDIDOSDELIVERY_INICIALIZAR', payload: DB.pedidosDelivery || [] });
     Logger.info('[Bootstrap] Store poblado con datos iniciales.');
 
@@ -111,7 +113,7 @@ const Bootstrap = (() => {
     }
 
     // 6. Activar tiempo real de Appwrite
-    if (typeof DBAppwrite !== 'undefined' && DBAppwrite.habilitado) {
+    if (DBAppwrite && DBAppwrite.habilitado) {
       DBAppwrite.iniciarRealtime();
       Logger.info('[Bootstrap] Realtime de Appwrite iniciado.');
     }
