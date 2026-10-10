@@ -1,0 +1,123 @@
+/* ================================================================
+   LaTaberna - PubPOS — CSS MODULAR
+   Archivo: css/caja-movimientos.css
+   Versión: 1.0.0
+   Propósito: Modales de movimiento de caja y listado de movimientos.
+              Todos los estilos están encapsulados bajo #modalMovimiento
+              y #modalListaMovimientos.
+   ================================================================ */
+
+/* ═══════════════════════════════════════════════════════════════
+   SECCIÓN 1 — CONTENEDORES DE LOS MODALES
+   ═══════════════════════════════════════════════════════════════ */
+
+#modalMovimiento .modal-small,
+#modalListaMovimientos .modal-small {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  width: 100%;
+  max-width: 420px;
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  max-height: 92vh;
+  overflow: hidden;
+}
+#modalListaMovimientos .modal-small { max-width: 480px; }
+
+/* ═══════════════════════════════════════════════════════════════
+   SECCIÓN 2 — CABECERA
+   ═══════════════════════════════════════════════════════════════ */
+
+#modalMovimiento .modal-header,
+#modalListaMovimientos .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px 8px;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+#modalMovimiento .modal-header h3,
+#modalListaMovimientos .modal-header h3 {
+  font-size: 16px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+#modalMovimiento .modal-header .icon-accent,
+#modalListaMovimientos .modal-header .icon-accent { color: var(--color-accent); }
+
+#modalMovimiento .modal-close,
+#modalListaMovimientos .modal-close {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 20px;
+  cursor: pointer;
+  min-width: 36px;
+  min-height: 36px;
+}
+#modalMovimiento .modal-close:hover,
+#modalListaMovimientos .modal-close:hover { color: var(--color-text); }
+
+/* ═══════════════════════════════════════════════════════════════
+   SECCIÓN 3 — CUERPO
+   ═══════════════════════════════════════════════════════════════ */
+
+#modalMovimiento .modal-body,
+#modalListaMovimientos .modal-body {
+  padding: 20px;
+  overflow-y: auto;
+}
+
+#modalMovimiento .form-group { margin-bottom: 14px; }
+#modalMovimiento .form-group label {
+  display: block;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--color-text-muted);
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+#modalMovimiento .form-group input,
+#modalMovimiento .form-group select {
+  width: 100%;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  padding: 11px 13px;
+  font-size: 14px;
+  outline: none;
+  transition: var(--t);
+  min-height: 42px;
+}
+#modalMovimiento .form-group input:focus,
+#modalMovimiento .form-group select:focus { border-color: var(--color-accent); }
+
+/* ═══════════════════════════════════════════════════════════════
+   SECCIÓN 4 — PIE
+   ═══════════════════════════════════════════════════════════════ */
+
+#modalMovimiento .modal-footer,
+#modalListaMovimientos .modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 0 20px 20px;
+  border-top: 1px solid var(--color-border);
+  padding-top: 14px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SECCIÓN 5 — RESPONSIVE
+   ═══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 600px) {
+  #modalMovimiento .modal-small,
+  #modalListaMovimientos .modal-small { max-width: 100%; }
+}

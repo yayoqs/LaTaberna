@@ -1,9 +1,14 @@
 /* ================================================================
    LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/pedido-ui.js
-   Versión: 2.2.5
+   Versión: 2.2.7
    Propósito: Modal de pedido.
-              v2.2.5: Agregada normalización de items en cerrar.
+
+   v2.2.7: Paquete 4 — integración con ModalOpciones.
+             · Import y activar()/limpiar() de ModalOpciones en el
+               ciclo de vida del modal de pedido.
+
+   v2.2.6: data-rol actualizado a owner,master.
    ================================================================ */
 
 import { CommandBus } from '../lib/command-bus.js';
@@ -17,6 +22,7 @@ import { Carta } from './carta.js';
 import { Cuenta } from './cuenta.js';
 import { Cobro } from './cobro.js';
 import { Tickets } from './tickets.js';
+import { ModalOpciones } from './pedido/modal-opciones.js';
 import { Auth } from '../auth.js';
 import { mesaVacia } from '../db-core.js';
 import { mostrarToast, $id, mostrarEntrada } from '../utils.js';
@@ -45,7 +51,7 @@ const Pedido = (() => {
       <div class="modal-pedido">
         <div class="modal-header">
           <div class="modal-title"><i class="fas fa-chair"></i><span id="modalMesaTitulo">Mesa</span><span class="estado-badge" id="modalEstadoBadge">Libre</span></div>
-          <button class="btn-icon" data-action="mostrarSelectorTransferencia" title="Cambiar Mesa" style="background:transparent; border:1px solid var(--color-border); border-radius:var(--radius-sm); padding:6px 12px; color:var(--color-text-sec); margin-right:8px;" data-rol="admin,master"><i class="fas fa-exchange-alt"></i> Cambiar Mesa</button>
+          <button class="btn-icon" data-action="mostrarSelectorTransferencia" title="Cambiar Mesa" style="background:transparent; border:1px solid var(--color-border); border-radius:var(--radius-sm); padding:6px 12px; color:var(--color-text-sec); margin-right:8px;" data-rol="owner,master"><i class="fas fa-exchange-alt"></i> Cambiar Mesa</button>
           <button class="modal-close" data-action="cerrar" aria-label="Cerrar" style="margin-left: auto;"><i class="fas fa-times"></i></button>
         </div>
         <div class="modal-body">
@@ -57,7 +63,7 @@ const Pedido = (() => {
             <div class="comanda-footer">
               <div class="comanda-total"><span>Subtotal</span><span class="total-monto" id="subtotalDisplay">$0</span></div>
               <div class="comanda-actions"><button class="btn-comanda btn-todo" data-action="revisarComanda" style="grid-column:span 3;"><i class="fas fa-check-double"></i> Revisar Comandas</button></div>
-              <div class="comanda-actions-2"><button class="btn-cuenta" data-action="pedirCuenta" data-rol="mesero,admin,master,caja"><i class="fas fa-file-invoice-dollar"></i> Pedir Cuenta</button><button class="btn-cerrar-mesa" data-action="cerrarMesa" data-rol="caja,admin,master"><i class="fas fa-check-circle"></i> Cerrar Mesa</button></div>
+              <div class="comanda-actions-2"><button class="btn-cuenta" data-action="pedirCuenta" data-rol="mesero,admin,owner,caja"><i class="fas fa-file-invoice-dollar"></i> Pedir Cuenta</button><button class="btn-cerrar-mesa" data-action="cerrarMesa" data-rol="caja,admin,owner,master"><i class="fas fa-check-circle"></i> Cerrar Mesa</button></div>
             </div>
           </section>
         </div>
@@ -85,6 +91,7 @@ const Pedido = (() => {
   function _abrirModalPedido(mesa) {
     _asegurarModalPedido();
     Comanda.activar();
+    ModalOpciones.activar();
     document.getElementById('modalMesaTitulo').textContent = mesa.esVirtual ? 'Mesas ' + mesa.mesasFusionadas.join(', ') : 'Mesa ' + mesa.numero;
     const badge = document.getElementById('modalEstadoBadge');
     badge.textContent = Mesas.labelEstado(mesa.estado);
@@ -104,6 +111,7 @@ const Pedido = (() => {
 
   async function cerrar() {
     Carta.limpiar();
+    ModalOpciones.limpiar();
     const modal = $id('modalPedido');
     if (modal) modal.style.display = 'none';
     const mesa = Comanda.obtenerMesaActiva();
@@ -218,7 +226,10 @@ const Pedido = (() => {
   }
 
   function transferirMesa(origen, destino) {
-    if (!Auth.esAdmin()) return mostrarToast('error', 'Solo administradores pueden transferir pedidos');
+    const roles = Auth.obtenerRolesEfectivos?.() || [];
+    if (!roles.includes('owner') && !roles.includes('master')) {
+      return mostrarToast('error', 'Solo administradores pueden transferir pedidos');
+    }
     const mesas = Store.obtenerEstado().mesas || [];
     const mOrigen = mesas.find(m => m.numero == origen), mDestino = mesas.find(m => m.numero == destino);
     if (!mOrigen || !mDestino) return mostrarToast('error', 'Una de las mesas no existe.');

@@ -1,10 +1,10 @@
 /* ================================================================
-   LaTaberna - PubPOS — PERFIL SUBMÓDULO (ES6)
+   LaTaberna - Ecosistema Elisekai — PERFIL SUBMÓDULO (ES6)
    Archivo: js/ui/perfil/ciclo-vida.js
-   Versión: 1.0.2
+   Versión: 1.0.5
    Propósito: Ciclo de vida de la vista de perfil modularizada.
-              v1.0.2: elimina remoción de clase 'active' en limpiar
-                      (causaba que la vista no se mostrara).
+              v1.0.5: migración de 'cliente' a 'jugador' como rol
+                      base del ecosistema.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -22,8 +22,8 @@ async function _renderContenido() {
   if (!usuario) return;
 
   const extras = cargarExtras(usuario.nombre);
-  const rol = usuario.rolEfectivo || 'cliente';
-  const esStaff = rol !== 'cliente';
+  const rol = usuario.rolEfectivo || 'jugador';
+  const esStaff = rol !== 'jugador';
   const esAdmin = Auth.esAdmin();
   const esMaster = Auth.esMasterReal();
 
@@ -33,7 +33,6 @@ async function _renderContenido() {
   renderPanelDerecho(usuario, extras);
   aplicarVisibilidadRoles(esStaff, esAdmin);
 
-  // Mostrar/ocultar el modo switch
   const modoSwitch = document.getElementById('perfilModoSwitch');
   if (modoSwitch) modoSwitch.style.display = esStaff ? 'flex' : 'none';
 }
@@ -45,14 +44,12 @@ export function activar() {
 
   asegurarVista();
 
-  // Listeners de UI
   document.getElementById('btnToggleIzqPerfil')?.addEventListener('click', _toggleIzq, { signal });
   document.getElementById('btnToggleDerPerfil')?.addEventListener('click', _toggleDer, { signal });
   document.getElementById('perfilOverlay')?.addEventListener('click', _cerrarPaneles, { signal });
   document.getElementById('btnEditarPerfil')?.addEventListener('click', _mostrarEdicion, { signal });
   document.getElementById('btnVolverVitrina')?.addEventListener('click', _mostrarVitrina, { signal });
 
-  // Tabs de edición
   document.querySelectorAll('.central-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       if (!tab.classList.contains('visible')) return;
@@ -63,7 +60,6 @@ export function activar() {
     }, { signal });
   });
 
-  // Modo switch
   document.querySelectorAll('#perfilModoSwitch button').forEach(btn => {
     btn.addEventListener('click', () => {
       if (btn.disabled) return;
@@ -92,12 +88,10 @@ export function limpiar() {
   const main = document.getElementById('view-perfil');
   if (main) {
     main.innerHTML = '';
-    // ❌ No remover la clase 'active': eso lo gestiona App.showView
-    // main.classList.remove('active');
   }
 }
 
-// ── HELPERS DE UI ──────────────────────────────────────
+// Helpers (se mantienen sin cambios)
 function _toggleIzq() {
   const panel = document.getElementById('panelIzquierdoPerfil');
   if (panel) { _ajustarPosicionPanel(panel); panel.classList.toggle('abierto'); document.getElementById('perfilOverlay')?.classList.toggle('activo'); }
@@ -123,7 +117,6 @@ function _mostrarVitrina() {
   if (edicion) edicion.style.display = 'none';
   if (vitrina) vitrina.style.display = 'flex';
 }
-
 function _calcularTopPanel() {
   const appHeader = document.querySelector('.app-header');
   if (!appHeader) return '0';
@@ -135,7 +128,6 @@ function _ajustarPosicionPanel(panel) {
   panel.style.top = top;
   panel.style.height = top === '0' ? '100%' : `calc(100% - ${top})`;
 }
-
 function _configurarAjusteHeader(signal) {
   const appHeader = document.querySelector('.app-header');
   if (!appHeader) return;
@@ -150,7 +142,6 @@ function _configurarAjusteHeader(signal) {
   });
   _observerHeader.observe(appHeader, { attributes: true, attributeFilter: ['style'] });
 }
-
 function _configurarSwipe(signal) {
   const mainLayout = document.getElementById('perfilMainLayout');
   if (!mainLayout) return;

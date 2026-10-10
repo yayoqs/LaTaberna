@@ -1,259 +1,186 @@
 # Tablero de Integración — La Taberna
 
-**Fecha:** 2026-08-25
+**Versión:** 3.0.0
+**Fecha:** 9 de octubre de 2026
+**Propósito:** Estado consolidado de cada célula, contratos
+vigentes y puntos de integración. Se actualiza al cierre de cada
+iteración.
 
 ---
 
-## Estado de células
+## Estado por célula
 
-| Célula | Estado | Archivos clave | Pruebas |
-|--------|:------:|----------------|:-------:|
-| A — Core | ✅ | auth, db, colecciones, repositorios, comandos | 119/119 |
-| B1 — Mesero | ✅ | mesas, bandeja, avisos, comanda, pedido | 44/44 |
-| B2 — Cocina y Barra | ✅ | KDS, recetas | Operativo |
-| B3 — Caja | ✅ | caja, cobro, tickets, managers | Operativo |
-| B4 — Animador | ✅ | eventos-en-vivo | Operativo |
-| C — Cliente | ✅ | registro, login, menú, precargas, avisos | Operativo |
-| D — Administración | ✅ | personal, despensa, reparto, menú, perfil | 85/85 |
-| E — Infraestructura | ✅ | app, bootstrap, Store, EventBus, CSS | Operativo |
+| Célula | Estado | Último hito |
+|--------|:------:|-------------|
+| A — Core | ✅ | A.74 movimientos, A.71 fix CORS, A.65 rama jugador |
+| B1 — Mesero | ✅ | Paquete 4 variantes, B1.9 revisadoPor, B1.10 CommandBus |
+| B2 — Cocina y Barra | ✅ | Paquete 5 badges de variantes en KDS |
+| B3 — Caja | ✅ | Paquete 7 tickets con opciones |
+| B4 — Animador | ✅ | Panel eventos en vivo operativo |
+| C — Cliente | ✅ | Paquete 6 variantes en menú digital |
+| D — Administración | ✅ | Paquete 5 race autoguardado, Paquete 3 asignación |
+| E — Infraestructura | ✅ | Slice movimientos, CommandBus E.x14 |
 
 ---
 
 ## Contratos vigentes
 
-- `docs/API-GUIA.md` v5.0.0
-- `docs/EVENTOS.md` v5.1.0
-- `docs/COLECCIONES.md` v3.4.1
-- `docs/PROPIEDAD.md` v1.3.1
+| Documento | Versión | Responsable |
+|-----------|---------|-------------|
+| `docs/API-GUIA.md` | 6.2.0 | Coordinación |
+| `docs/EVENTOS.md` | 1.8.0 | Célula A |
+| `docs/COLECCIONES.md` | 4.9.0 | Célula A |
+| `docs/PROPIEDAD.md` | 1.4.1 | Coordinación |
+| `docs/ARQUITECTURA-VARIANTES.md` | 1.3.0 | Coordinación |
+| `docs/ARQUITECTURA-CARTAS.md` | 1.0.0 | Coordinación |
+| `docs/EstadoAppwrite.md` | 2.9.0 | Célula A |
+| `docs/FUNCIONES-SERVERLESS.md` | 1.3.0 | Célula A |
+| `docs/REGLA-CONTROL-REGRESIONES.md` | 1.0.0 | Coordinación |
 
 ---
 
-## Documentos de referencia
+## Puntos de conexión canónicos
 
-| Documento | Propósito |
-|-----------|-----------|
-| `COLECCIONES.md` | Estructura de la base de datos |
-| `API-GUIA.md` | Reglas de integración y API |
-| `EVENTOS.md` | Catálogo de eventos |
-| `PROPIEDAD.md` | Mapa de propiedad de archivos |
-| `ESTADO.md` | Estado general del sistema |
+- **Store** — estado centralizado de solo lectura.
+  `Store.obtenerEstado()`, `Store.despachar()`,
+  `Store.suscribir()`.
+- **EventBus** — comunicación entre módulos.
+  `EventBus.on()` devuelve función de limpieza.
+- **CommandBus** — operaciones con lógica de negocio.
+  `CommandBus.registrar()` y `CommandBus.ejecutar()`. El wrapper
+  inspecciona `data.exito` del handler y propaga el fallo.
+- **DBAppwrite** — acceso a Appwrite. Métodos públicos:
+  `listar`, `crear`, `actualizar`, `eliminar`,
+  `incrementarCampo`, `decrementarCampo`, `crearTransaccion`,
+  `confirmarTransaccion`, `cancelarTransaccion`,
+  `crearPrecargaCliente`, `invocarAsignarRol`.
+- **DB** — orquestador de datos locales y remotos.
+- **Auth** — autenticación y roles. Métodos clave:
+  `iniciarSesion`, `cerrarSesion`, `registrarUsuario`,
+  `obtenerJWT`, `obtenerRolesEfectivos`, `tienePermiso`,
+  `vincularCuentaStaff`.
+- **DBInventario** — gestión de insumos, recetas, movimientos.
+  Métodos clave: `ajustarStock`, `consumirInsumosDeProducto`,
+  `obtenerMovimientos`, `obtenerCostoUnitario`.
 
 ---
 
-## Puntos de conexión
-
-- `Store`: estado central de solo lectura.
-- `EventBus`: comunicación por eventos.
-- `CommandBus`: operaciones de escritura con lógica de negocio.
-- `DBAppwrite`: acceso a Appwrite.
-- `DB`: orquestador de datos locales y remotos.
-- `Auth`: autenticación y roles.
-
----
-
-## Acceso a vistas
+## Acceso a vistas por rol
 
 | Vista | Roles con acceso |
 |-------|------------------|
-| mesas | master, admin, gerente, mesero |
-| cocina | master, admin, gerente, chef, cocinaAyudante, barman, barraAyudante |
-| caja | master, admin, gerente, caja |
-| despensa | master, admin, gerente, chef |
-| recetas | master, admin, gerente, chef, cocinaAyudante, barman, barraAyudante |
-| reparto | master, admin, gerente, repartidor |
-| menu | master, admin, gerente, mesero, cliente |
-| eventos | master, admin, gerente, artista |
-| eventos-en-vivo | master, admin, gerente, artista |
-| perfil | todos |
-| config | master, admin |
-| carta-editor | master, admin |
+| inicio | público |
+| bienvenida | jugador, master, owner, admin, mesero, caja, chef, cocinaAyudante, barman, barraAyudante, repartidor, artista |
+| menu-digital | jugador, master, owner, admin, mesero |
+| eventos-cliente | jugador, master, owner, admin, artista |
+| mesas | master, owner, admin, mesero |
+| cocina | master, owner, admin, chef, cocinaAyudante, barman, barraAyudante |
+| caja | master, owner, admin, caja |
+| despensa | master, owner, admin, chef |
+| recetas | master, owner, admin, chef, cocinaAyudante, barman, barraAyudante |
+| reparto | master, owner, admin, repartidor |
+| menu | master, owner, admin, mesero, jugador |
+| eventos | master, owner, admin, artista |
+| eventos-en-vivo | master, owner, admin, artista |
+| perfil | todos los roles autenticados |
+| config | master, owner, admin |
+| carta-editor | master, owner, admin |
+
+---
+
+## Contratos entre células (activos)
+
+| Contrato | Emisor | Consumidores | Estado |
+|----------|--------|--------------|--------|
+| `pedido:creado` | Comando crearPedidoMesa | Store, Caja | Vigente |
+| `pedido:cerrado` | PedidoService / Cobro | App, Store | Vigente |
+| `pedido:transaccion_agregada` | PedidoService | Store | Vigente |
+| `comanda:enviada` | PedidoRepository | KDS, App | Vigente |
+| `comanda:completada` | Comando completarSubcomanda | Store | Vigente |
+| `comanda:subcomanda_completada` | Comando completarSubcomanda | KDS | Vigente |
+| `mesa:actualizada` | DB / Store / Realtime | Mesas, KDS, Caja, Cliente | Vigente |
+| `mesa:liberada` | PedidoRepository | Mesas, Store | Vigente |
+| `mesa:badge_click` | Mesas | PrecargaControl | Vigente |
+| `cliente:mesa_ingresada` | PantallaBienvenida | Mesas, AvisosMesero | Vigente |
+| `cliente:precarga_enviada` | MenuDigital | PrecargaControl | Vigente |
+| `cliente:llamar_garzon` | PantallaBienvenida | Mesas, AvisosMesero | Vigente |
+| `cliente:comensal_agregado` | PantallaBienvenida | Mesas | Vigente |
+| `cliente:producto_con_variantes` | MenuDigital (cliente) | modal-opciones (cliente) | Vigente |
+| `cliente:producto_agregado_a_orden` | modal-opciones (cliente) | MenuDigital (cliente) | Vigente |
+| `cliente:alergias_actualizadas` | alergias-cliente | MenuDigital (cliente) | Vigente |
+| `precarga:nueva` | PrecargaControl | Mesas | Vigente |
+| `precarga:items_listos` | PrecargaControl | Comanda | Vigente |
+| `precarga:cargar_en_comanda` | MesaDetalles | PrecargaControl | Vigente |
+| `precarga:revisada` | PrecargaControl | EventBus | Vigente |
+| `producto:seleccionado` | Carta | Comanda | Vigente |
+| `producto:con_variantes` | Carta | modal-opciones (mesero) | Vigente |
+| `producto:agregado_a_comanda` | modal-opciones (mesero) | Pedido | Vigente |
+| `producto:agotado` | Comando marcarAgotado | KDS, Menu, Carta | Vigente |
+| `variantes:actualizadas` | variante-repository | Store, vistas | Vigente |
+| `movimientos:actualizados` | db-inventario | Despensa | Vigente |
+| `inventario:actualizado` | DBInventario | Store, Despensa | Vigente |
+| `inventario:stock_bajo` | DBInventario | App | Vigente |
+| `inventario:descuento_incompleto` | enviar-comanda | Despensa | Vigente |
+| `config:actualizada` | Config | Mesas, App | Vigente |
+| `turno:iniciado` | PedidoManager | App, Caja | Vigente |
+| `turno:solicitar_cierre` | PedidoManager | TurnoManager | Vigente |
+| `turno:cerrado` | TurnoManager | App, Caja | Vigente (una sola emisión) |
+| `auth:staff_vinculado` | Auth | Store, D | Vigente |
+| `jugador:cuenta_creada` | Auth | ClienteModulo | Vigente |
+| `app:cambiarVista` | Auth / EventBus | App | Vigente |
+| `app:error` | DB | App | Vigente |
 
 ---
 
 ## Checklist de validación integral
 
-- [ ] Iniciar sesión con todos los roles.
-- [ ] Alta de staff con cuenta existente y nueva.
-- [ ] Asignación jerárquica de roles.
-- [ ] Crear mesa y verificar persistencia en Appwrite.
-- [ ] Abrir mesa y crear pedido.
-- [ ] Enviar comanda a cocina.
-- [ ] Enviar comanda a barra.
-- [ ] Usuario con roles combinados alternar Cocina/Barra.
-- [ ] Cliente genera aviso de vinculación.
-- [ ] Cliente llama al garzón.
-- [ ] Mesero visualiza avisos en otro dispositivo.
-- [ ] Cliente envía precarga.
-- [ ] Mesero revisa precarga.
-- [ ] Pedir cuenta y cerrar mesa.
-- [ ] Fusionar y deshacer fusión.
-- [ ] Registrar insumo y entrada.
-- [ ] Crear receta intermedia y ejecutar preparación.
-- [ ] Configurar local por espacio.
-- [ ] Validar menú digital.
-- [ ] Validar vista de reparto.
+- [x] Iniciar sesión con todos los roles.
+- [x] Alta de staff con cuenta existente y nueva.
+- [x] Asignación jerárquica de roles.
+- [x] Crear mesa y verificar persistencia en Appwrite.
+- [x] Abrir mesa y crear pedido.
+- [x] Enviar comanda a cocina.
+- [x] Enviar comanda a barra.
+- [x] Usuario con roles combinados alternar Cocina/Barra.
+- [x] Cliente genera aviso de vinculación.
+- [x] Cliente llama al garzón.
+- [x] Mesero visualiza avisos en otro dispositivo.
+- [x] Cliente envía precarga.
+- [x] Mesero revisa precarga.
+- [x] Cliente envía precarga con variantes.
+- [x] Mesero recibe precarga con opciones.
+- [x] Cliente selecciona variante con insumos_delta.
+- [x] KDS muestra badges de variantes.
+- [x] Caja imprime ticket con opciones.
+- [x] Descuento de stock al enviar comanda aplica deltas de variantes.
+- [x] Ajuste manual de stock persiste en Appwrite y Store.
+- [x] Movimiento aparece en panel de Despensa sin recargar.
+- [x] Pedir cuenta y cerrar mesa.
+- [x] Fusionar y deshacer fusión.
+- [x] Registrar insumo y entrada.
+- [x] Crear receta intermedia y ejecutar preparación.
+- [x] Configurar local por espacio.
+- [x] Validar menú digital.
+- [x] Validar vista de reparto.
+- [x] Editor de variantes: crear, editar, desactivar.
+- [x] Editor de cartas: Modo Lienzo y Modo Variantes.
+- [x] Asignación de variantes a productos.
 
 ---
 
 ## Pendientes de coordinación
 
-1. Prueba integral general con todas las células.
-2. Definición formal del rol artista con B4.
-3. Revisión de deuda técnica de Store y DBAppwrite.
-4. Inicio de reforma del flujo de dinero con B3.
-5. Evaluación de servidor local para operación offline.
-
-
-
-
-......
-
-
-┌──────────────────────────────────────────────┐
-│ REMITENTE: Coordinador de Integración        │
-│ FECHA:     2026-07-02 00:00 UTC              │
-│ TIPO:      DOCUMENTO OFICIAL                 │
-│ REFERENCIA: Tablero de Integración v2.0      │
-└──────────────────────────────────────────────┘
-
-# 📋 Tablero de Integración – La Taberna (v2.0)
-
-**Última actualización:** 2026-07-02
-
----
-
-## 🟢 Célula A — Core Backend
-
-- **Estado:** Operativa
-- **Responsable:** Equipo Core
-- **Archivos propios:** 25 (dominio, DB, comandos, repositorios, auth, roles)
-- **Último hito completado:** Parche D7 (comando `marcar-agotado.js`), D1 (ciclo de managers roto), P3 (imports de dominio), P4 (código muerto eliminado), unificación de timestamps, fallback `cantidad || qty` en pedido.js v1.1.5
-- **Próximo hito:** Migrar renderizado de vistas a `activar()` (a futuro)
-- **Bloqueos:** Ninguno
-- **Último reporte:** 2026-07-01 — Acuse de recibo del Mapa de Propiedad v1.0.0
-
----
-
-## 🟢 Célula B1 — Mesero
-
-- **Estado:** Operativa
-- **Responsable:** Equipo Mesero
-- **Archivos propios:** 17 (mesas, pedido-ui, comanda, carta, mesa-detalles, cuenta, precarga-control, guia-mesero, CSS)
-- **Último hito completado:** Desacoplamientos D2, D3, D6 completados. Corrección de cobro.js a v2.0.2. Consulta técnica sobre Store respondida. Unificación de `obtenerColorDesdeNombre` en menu.js v1.0.3
-- **Próximo hito:** Prueba integral del flujo completo con `test-E-flujo-completo.html`
-- **Bloqueos:** Ninguno
-- **Último reporte:** 2026-07-01 — Reporte de implementación de D2, D3, D6
-
----
-
-## 🟢 Célula B2 — Cocina y Barra
-
-- **Estado:** Operativa
-- **Responsable:** Equipo Cocina y Barra
-- **Archivos propios:** 5 (kds.js, recetas.js, css/kds.css, tests)
-- **Último hito completado:** Integración de kds.js v2.0.2 (botón de pánico con CommandBus). Unificación de `obtenerColorDesdeNombre` en recetas.js v2.0.3
-- **Próximo hito:** Actualizar test-B-kds.html para mockear CommandBus
-- **Bloqueos:** Ninguno
-- **Último reporte:** 2026-07-01 — Confirmación de integración de kds.js v2.0.2
-
----
-
-## 🟢 Célula B3 — Caja
-
-- **Estado:** Operativa
-- **Responsable:** Equipo Caja
-- **Archivos propios:** 10 (cobro, caja, tickets, managers, pedido-service, CSS)
-- **Último hito completado:** Corrección de cobro.js (desacoplado de Comanda). Eliminación del stub `agregarItemAPedido` en pedido-manager.js v1.0.4. Propiedad de managers formalizada
-- **Próximo hito:** Verificación de tests con nuevas versiones del Store
-- **Bloqueos:** Ninguno
-- **Último reporte:** 2026-07-01 — Decisión sobre stub y reporte de discrepancia de versiones
-
----
-
-## 🟢 Célula B4 — Animador
-
-- **Estado:** Operativa
-- **Responsable:** Equipo Animador
-- **Archivos propios:** 2 (eventos-en-vivo.js, css/eventos-en-vivo.css)
-- **Último hito completado:** eventos-en-vivo.js v1.2.0 (historial de bolas en bingo). Propiedad transferida desde Célula D
-- **Próximo hito:** —
-- **Bloqueos:** Ninguno
-- **Último reporte:** 2026-07-01 — Declaración de propiedad
-
----
-
-## 🟢 Célula C — Frontend Cliente
-
-- **Estado:** Operativa
-- **Responsable:** Equipo Frontend Cliente
-- **Archivos propios:** 12 (principal, pantallas, menú digital, orden, CSS)
-- **Último hito completado:** Desacoplamiento D4 (Store cliente). Eliminación de `window.ClienteModulo` (P2). Export de `ClienteModulo` para tests. Unificación de `obtenerColorDesdeNombre` en menu-digital.js v1.1.6
-- **Próximo hito:** —
-- **Bloqueos:** Ninguno
-- **Último reporte:** 2026-07-01 — Mapa de propiedad y export para tests
-
----
-
-## 🟢 Célula D — Administración
-
-- **Estado:** Operativa
-- **Responsable:** Equipo Administración
-- **Archivos propios:** 18 (despensa, config, perfil, eventos, reparto, servicios, CSS)
-- **Último hito completado:** Desacoplamiento D5 (config:actualizada). Transferencia de eventos-en-vivo.js a B4. Unificación de `obtenerColorDesdeNombre`
-- **Próximo hito:** —
-- **Bloqueos:** Ninguno
-- **Último reporte:** 2026-07-01 — Mapa de propiedad
-
----
-
-## 🟢 Célula E — Infraestructura
-
-- **Estado:** Operativa
-- **Responsable:** Equipo Infraestructura
-- **Archivos propios:** 14 (index.html, app.js, bootstrap.js, librerías, CSS globales)
-- **Último hito completado:** Parche P1 (export de App). Restauración de reducers COMANDA_ITEM_* en Store v2.0.2. Análisis de doble renderizado (sin cambios inmediatos). Unificación de timestamps en Store
-- **Próximo hito:** Validar IDs del DOM en index.html contra el reporte automático de fallas
-- **Bloqueos:** Ninguno
-- **Último reporte:** 2026-07-01 — Respuesta a consulta de Store y análisis de renderizado
-
----
-
-## 📋 Contratos entre células (resumen)
-
-| Contrato | Emisor | Consumidores | Estado |
-|----------|--------|--------------|--------|
-| `turno:solicitar_cierre` | B3 (PedidoManager) | B3 (TurnoManager) | Nuevo, implementado |
-| `pago:confirmado` | B3 (Cobro) | B1 (Pedido) | Nuevo, implementado |
-| `config:actualizada` | D (Config) | B1 (ciclo-vida) | Nuevo, implementado |
-| `producto:agotado` | A (comando) | B2 (KDS), B1 (Carta, Menu) | Nuevo, implementado |
-| `precarga:nueva` | B1 (PrecargaControl) | B1 (Mesas) | Nuevo, implementado |
-| `precarga:items_listos` | B1 (PrecargaControl) | B1 (Comanda) | Nuevo, implementado |
-| `precarga:cargar_en_comanda` | B1 (MesaDetalles) | B1 (PrecargaControl) | Nuevo, implementado |
-| `mesa-detalle:abierto` | B1 (MesaDetalles) | B1 (Pedido) | Nuevo, implementado |
-| `mesa-detalle:cerrado` | B1 (MesaDetalles) | B1 (Pedido) | Nuevo, implementado |
-| `cliente:precarga_enviada` | C (MenuDigital) | B1 (PrecargaControl) | Vigente |
-| `cliente:cuenta_creada` | A (Auth) | C (ClienteModulo) | Vigente |
-| `eventos_en_vivo:actualizada` | Realtime (Appwrite) | B4, C | Automático y vigente |
-| `Auth.registrarCliente` | A (Auth) | C (PantallaInicio) | Vigente |
-| `App.showView('inicio')` | E (App) | C (PantallaInicio) | Vigente |
-| `Store.dispatch(CLIENTE_*)` | C (PantallaBienvenida) | C (MenuDigital) | Vigente |
-| `CommandBus 'producto:marcar_agotado'` | B2 (KDS) | A (DBAppwrite) | Vigente |
-| `CommandBus 'precarga:revisar'` | B1 (PrecargaControl) | A (DBAppwrite) | Vigente |
-
----
-
-## 📋 Reglas de oro (recordatorio)
-
-1. Ningún módulo accede directamente a DB. Usar DBAppwrite, Store (lectura) y EventBus/CommandBus.
-2. Eventos nuevos deben documentarse en docs/EVENTOS.md antes del PR.
-3. No modificar db-appwrite.js sin coordinación con la Célula A y el Coordinador.
-4. Los tests de core/ no deben romperse.
-5. Prohibido el acoplamiento entre módulos de distintas células.
-6. Toda comunicación técnica entre células pasa por el Coordinador.
-7. Los PRs que modifiquen archivos de otra célula sin autorización serán rechazados.
-8. Cada archivo tiene una única célula dueña definida en docs/PROPIEDAD.md.
+1. Cierre de la Fase D del paquete movimientos (ajustes de
+   renderer y ciclo-vida en Despensa).
+2. Paquete de saneamiento de repositorios (A.51–A.60).
+3. Reescritura de documentación histórica (en curso).
+4. Prueba integral general con todas las células.
+5. Reforma del flujo de dinero con Célula B3.
+6. Evaluación de servidor local para operación offline.
+7. Definición formal del rol `artista` con B4.
+8. Unificación de nomenclatura snake/camel.
 
 ---
 
 *Documento mantenido por el Coordinador de Integración.*
-*Versión 2.0 — 2026-07-02*
+*Versión 3.0.0 — 9 de octubre de 2026*

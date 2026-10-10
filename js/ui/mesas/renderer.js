@@ -1,14 +1,17 @@
 /* ================================================================
    LaTaberna - PubPOS — MESAS SUBMÓDULO (ES6)
    Archivo: js/ui/mesas/renderer.js
-   Versión: 1.3.2
+   Versión: 1.3.6
    Propósito: Renderizado de la grilla, tarjetas, popover.
-              v1.3.2: Corregido sort para mesas virtuales con
-                      mesasFusionadas como string JSON.
+              v1.3.6: Roles actualizados en data-rol (owner/master).
+                      _espacioIdActivo sin fallback a lataberna.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
 import { EventBus } from '../../lib/eventBus.js';
+import { Logger } from '../../lib/logger.js';
+import { DBAppwrite } from '../../db-appwrite.js';
+import { Auth } from '../../auth.js';
 import { ICONOS, LABELS, ZONA_COLORS } from './constantes.js';
 import { getNotificaciones, removeNotificacion } from './notificaciones.js';
 import { getEstadoComandas, colorEstado } from './estado-comandas.js';
@@ -21,6 +24,8 @@ let _vistaActiva = true;
 let _longPressTimer = null;
 let _longPressMesa = null;
 let _popoverCloseListeners = [];
+
+let _notificacionesPersistentes = new Map();
 
 function _limpiarPopoverListeners() {
   _popoverCloseListeners.forEach(fn => fn());
@@ -35,6 +40,63 @@ function _mesasFusionadasArray(mesa) {
     try { return JSON.parse(mf); } catch { return []; }
   }
   return [];
+}
+
+function _espacioIdActivo() {
+  try {
+    const local = Auth.obtenerLocalActivo?.();
+    return local?.id || null;
+  } catch {
+    return null;
+  }
+}
+
+export async function actualizarAvisosPersistentes() {
+  if (!DBAppwrite || !DBAppwrite.habilitado) return;
+
+  const espacioId = _espacioIdActivo();
+  if (!espacioId) return;
+
+  const mapa = new Map();
+
+  try {
+    const avisos = await DBAppwrite.listar('avisos');
+    avisos
+      .filter(a => a.estado === 'pendiente')
+      .filter(a => a.tipo === 'vinculacion' || a.tipo === 'llamado')
+      .filter(a => String(a.espacioId || '') === String(espacioId))
+      .forEach(a => {
+        const mesa = a.mesaId || a.mesa;
+        if (!mesa) return;
+        if (!mapa.has(mesa)) mapa.set(mesa, []);
+        mapa.get(mesa).push({ tipo: a.tipo, id: a.id });
+      });
+  } catch (e) {
+    Logger.warn('[Renderer] No se pudieron cargar avisos persistentes:', e);
+  }
+
+  try {
+    const pedidos = await DBAppwrite.listar('pedidos');
+    pedidos
+      .filter(p => p.estado === 'precarga')
+      .filter(p => p.origen === 'cliente')
+      .filter(p => String(p.espacioId || '') === String(espacioId))
+      .forEach(p => {
+        if (!p.mesa) return;
+        if (!mapa.has(p.mesa)) mapa.set(p.mesa, []);
+        mapa.get(p.mesa).push({
+          tipo: 'precarga',
+          id: p.id,
+          cantidad: 1,
+          id_usuario: p.id_usuario || null
+        });
+      });
+  } catch (e) {
+    Logger.warn('[Renderer] No se pudieron cargar precargas persistentes:', e);
+  }
+
+  _notificacionesPersistentes = mapa;
+  renderGrid();
 }
 
 export function setModoSeleccion(valor) { _modoSeleccion = valor; }
@@ -119,11 +181,15 @@ export function renderGrid() {
     const card = document.createElement('article');
     let clases = `mesa-card ${mesa.estado}`;
     if (mesa.esVirtual) clases += ' mesa-virtual';
+
+    const zonaIdx = (Store.obtenerEstado().config?.zonas || []).findIndex(z => z.nombre === (mesa.zona || 'salon'));
+    clases += ` zona-${zonaIdx >= 0 ? zonaIdx : 0}`;
+
     card.className = clases;
 
     const colorZona = _getZonaColor(mesa.zona || 'salon');
-    card.style.borderLeft = `5px solid ${colorZona}`;
-    card.style.background = `linear-gradient(135deg, ${colorZona}10 0%, var(--color-card) 100%)`;
+    card.style.borderLeft = `6px solid ${colorZona}`;
+    card.style.background = '';
 
     const puedeSeleccionar = _modoSeleccion && 
                              (mesa.estado === 'libre' || mesa.estado === 'ocupada' || mesa.estado === 'esperando') && 
@@ -131,106 +197,126 @@ export function renderGrid() {
 
     card.innerHTML = _htmlMesa(mesa, puedeSeleccionar, colorZona);
 
-    card.addEventListener('mousedown', (e) => {
-      if (e.target.closest('.precarga-badge') || e.target.closest('.micro-badge') || e.target.closest('.esperando-cliente-badge')) return;
-      _longPressMesa = mesa.numero;
-      _longPressTimer = setTimeout(() => {
-        mostrarPopover(mesa, card, e);
-        _longPressTimer = null;
-      }, 400);
-    });
-
-    card.addEventListener('mouseup', (e) => {
-      if (_longPressTimer) {
-        clearTimeout(_longPressTimer);
-        _longPressTimer = null;
-        if (_longPressMesa === mesa.numero && !e.target.closest('.precarga-badge') && !e.target.closest('.micro-badge') && !e.target.closest('.esperando-cliente-badge')) {
-          if (puedeSeleccionar) {
-            const cb = card.querySelector('.mesa-checkbox');
-            if (cb) {
-              cb.checked = !cb.checked;
-              if (cb.checked) _mesasSeleccionadas.add(mesa.numero);
-              else _mesasSeleccionadas.delete(mesa.numero);
-            }
-          } else {
-            EventBus.emit('mesa:seleccionada', mesa.numero);
-          }
-        }
-      }
-      _longPressMesa = null;
-    });
-
-    card.addEventListener('mouseleave', () => {
-      if (_longPressTimer) { clearTimeout(_longPressTimer); _longPressTimer = null; _longPressMesa = null; }
-    });
-
-    card.addEventListener('touchstart', (e) => {
-      if (e.target.closest('.precarga-badge') || e.target.closest('.micro-badge') || e.target.closest('.esperando-cliente-badge')) return;
-      _longPressMesa = mesa.numero;
-      _longPressTimer = setTimeout(() => {
-        mostrarPopover(mesa, card, e);
-        _longPressTimer = null;
-      }, 400);
-    });
-
-    card.addEventListener('touchend', (e) => {
-      if (_longPressTimer) {
-        clearTimeout(_longPressTimer);
-        _longPressTimer = null;
-        if (_longPressMesa === mesa.numero && !e.target.closest('.precarga-badge') && !e.target.closest('.micro-badge') && !e.target.closest('.esperando-cliente-badge')) {
-          if (puedeSeleccionar) {
-            const cb = card.querySelector('.mesa-checkbox');
-            if (cb) { cb.checked = !cb.checked; if (cb.checked) _mesasSeleccionadas.add(mesa.numero); else _mesasSeleccionadas.delete(mesa.numero); }
-          } else {
-            EventBus.emit('mesa:seleccionada', mesa.numero);
-          }
-        }
-      }
-      _longPressMesa = null;
-    });
-
-    card.addEventListener('touchmove', () => {
-      if (_longPressTimer) { clearTimeout(_longPressTimer); _longPressTimer = null; _longPressMesa = null; }
-    });
-
-    card.addEventListener('click', (e) => {
-      const badge = e.target.closest('.precarga-badge');
-      if (badge) {
-        e.stopPropagation();
-        const notificaciones = getNotificaciones(mesa.numero);
-        const precarga = notificaciones.find(n => n.tipo === 'precarga');
-        if (precarga) EventBus.emit('mesa:badge_click', { mesa: mesa.numero, precargaId: precarga.precargaId });
-        return;
-      }
-      const checkbox = e.target.closest('.mesa-checkbox');
-      if (checkbox) {
-        e.stopPropagation();
-        if (checkbox.checked) _mesasSeleccionadas.add(mesa.numero);
-        else _mesasSeleccionadas.delete(mesa.numero);
-        return;
-      }
-    });
+    _agregarEventListenersCard(card, mesa, puedeSeleccionar);
 
     grid.appendChild(card);
   });
 }
 
+function _agregarEventListenersCard(card, mesa, puedeSeleccionar) {
+  card.addEventListener('mousedown', (e) => {
+    if (e.target.closest('.precarga-badge') || e.target.closest('.micro-badge') || e.target.closest('.esperando-cliente-badge') || e.target.closest('.llamado-badge')) return;
+    _longPressMesa = mesa.numero;
+    _longPressTimer = setTimeout(() => {
+      mostrarPopover(mesa, card, e);
+      _longPressTimer = null;
+    }, 400);
+  });
+
+  card.addEventListener('mouseup', (e) => {
+    if (_longPressTimer) {
+      clearTimeout(_longPressTimer);
+      _longPressTimer = null;
+      if (_longPressMesa === mesa.numero && !e.target.closest('.precarga-badge') && !e.target.closest('.micro-badge') && !e.target.closest('.esperando-cliente-badge') && !e.target.closest('.llamado-badge')) {
+        if (puedeSeleccionar) {
+          const cb = card.querySelector('.mesa-checkbox');
+          if (cb) {
+            cb.checked = !cb.checked;
+            if (cb.checked) _mesasSeleccionadas.add(mesa.numero);
+            else _mesasSeleccionadas.delete(mesa.numero);
+          }
+        } else {
+          EventBus.emit('mesa:seleccionada', mesa.numero);
+        }
+      }
+    }
+    _longPressMesa = null;
+  });
+
+  card.addEventListener('mouseleave', () => {
+    if (_longPressTimer) { clearTimeout(_longPressTimer); _longPressTimer = null; _longPressMesa = null; }
+  });
+
+  card.addEventListener('touchstart', (e) => {
+    if (e.target.closest('.precarga-badge') || e.target.closest('.micro-badge') || e.target.closest('.esperando-cliente-badge') || e.target.closest('.llamado-badge')) return;
+    _longPressMesa = mesa.numero;
+    _longPressTimer = setTimeout(() => {
+      mostrarPopover(mesa, card, e);
+      _longPressTimer = null;
+    }, 400);
+  });
+
+  card.addEventListener('touchend', (e) => {
+    if (_longPressTimer) {
+      clearTimeout(_longPressTimer);
+      _longPressTimer = null;
+      if (_longPressMesa === mesa.numero && !e.target.closest('.precarga-badge') && !e.target.closest('.micro-badge') && !e.target.closest('.esperando-cliente-badge') && !e.target.closest('.llamado-badge')) {
+        if (puedeSeleccionar) {
+          const cb = card.querySelector('.mesa-checkbox');
+          if (cb) { cb.checked = !cb.checked; if (cb.checked) _mesasSeleccionadas.add(mesa.numero); else _mesasSeleccionadas.delete(mesa.numero); }
+        } else {
+          EventBus.emit('mesa:seleccionada', mesa.numero);
+        }
+      }
+    }
+    _longPressMesa = null;
+  });
+
+  card.addEventListener('touchmove', () => {
+    if (_longPressTimer) { clearTimeout(_longPressTimer); _longPressTimer = null; _longPressMesa = null; }
+  });
+
+  card.addEventListener('click', (e) => {
+    const badge = e.target.closest('.precarga-badge');
+    if (badge) {
+      e.stopPropagation();
+      const notificaciones = getNotificaciones(mesa.numero);
+      const precarga = notificaciones.find(n => n.tipo === 'precarga');
+      if (precarga) EventBus.emit('mesa:badge_click', { mesa: mesa.numero, precargaId: precarga.precargaId });
+      return;
+    }
+    const checkbox = e.target.closest('.mesa-checkbox');
+    if (checkbox) {
+      e.stopPropagation();
+      if (checkbox.checked) _mesasSeleccionadas.add(mesa.numero);
+      else _mesasSeleccionadas.delete(mesa.numero);
+      return;
+    }
+  });
+}
+
 function _htmlMesa(mesa, puedeSeleccionar, colorZona) {
   const notificaciones = getNotificaciones(mesa.numero);
-  let badgeHTML = '';
+  const avisosMesa = _notificacionesPersistentes.get(mesa.numero) || [];
+
+  let badgesHTML = '';
+
   const precargaNotif = notificaciones.find(n => n.tipo === 'precarga');
   if (precargaNotif) {
     const cant = precargaNotif.cantidad || 0;
-    badgeHTML = `<span class="precarga-badge" title="Precarga pendiente"><i class="fas fa-bell"></i> ${cant}</span>`;
+    badgesHTML += `<span class="precarga-badge" title="Precarga pendiente"><i class="fas fa-bell"></i> ${cant}</span>`;
   }
 
-  let esperandoHTML = '';
+  const avisoPrecarga = avisosMesa.find(a => a.tipo === 'precarga');
+  if (avisoPrecarga && !precargaNotif) {
+    const cant = avisoPrecarga.cantidad || 1;
+    badgesHTML += `<span class="precarga-badge" title="Precarga persistente"><i class="fas fa-bell"></i> ${cant}</span>`;
+  }
+
   const esperaNotif = notificaciones.find(n => n.tipo === 'esperando');
   if (esperaNotif && mesa.estado === 'libre') {
-    esperandoHTML = `<span class="esperando-cliente-badge" title="Cliente esperando validación"><i class="fas fa-clock"></i></span>`;
+    badgesHTML += `<span class="esperando-cliente-badge" title="Cliente esperando validación"><i class="fas fa-clock"></i></span>`;
   } else if (esperaNotif) {
     removeNotificacion(mesa.numero, 'esperando');
   }
+
+  const avisoLlamado = avisosMesa.find(a => a.tipo === 'llamado' || a.tipo === 'vinculacion');
+  if (avisoLlamado) {
+    const icono = avisoLlamado.tipo === 'llamado' ? 'fa-hand-point-up' : 'fa-clock';
+    badgesHTML += `<span class="llamado-badge" title="Aviso persistente ${avisoLlamado.tipo}"><i class="fas ${icono}"></i></span>`;
+  }
+
+  const badgesContainer = badgesHTML ? `<div class="badges-container">${badgesHTML}</div>` : '';
 
   const estados = getEstadoComandas(mesa.numero);
   const microCocina = `<span class="micro-badge micro-cocina" style="background:${colorEstado(estados.cocina)};" title="Cocina: ${estados.cocina}"><i class="fas fa-utensils"></i></span>`;
@@ -238,26 +324,27 @@ function _htmlMesa(mesa, puedeSeleccionar, colorZona) {
 
   const icono = ICONOS[mesa.estado] || 'fa-chair';
   const numeroMostrado = mesa.numero;
+  const claseZona = mesa.zona || 'salon';
 
   if (puedeSeleccionar) {
     const checked = _mesasSeleccionadas.has(mesa.numero) ? 'checked' : '';
     return `
       <input type="checkbox" class="mesa-checkbox" data-num="${mesa.numero}" ${checked}>
+      ${badgesContainer}
       <i class="fas ${icono} mesa-icon"></i>
       <strong class="mesa-numero">${numeroMostrado}</strong>
       <span class="mesa-estado-label">${LABELS[mesa.estado] || mesa.estado}</span>
       <div class="micro-insignias">${microCocina}${microBarra}</div>
-      ${badgeHTML}${esperandoHTML}
-      <span class="mesa-zona-badge" style="background:${colorZona}; color:white;">${mesa.zona}</span>`;
+      <span class="mesa-zona-badge" style="background:${colorZona}; color:white;">${claseZona}</span>`;
   } else {
     return `
+      ${badgesContainer}
       <i class="fas ${icono} mesa-icon"></i>
       <strong class="mesa-numero">${numeroMostrado}</strong>
       <span class="mesa-estado-label">${LABELS[mesa.estado] || mesa.estado}</span>
       ${mesa.esVirtual ? '<span class="mesa-virtual-badge"><i class="fas fa-link"></i> Unión</span>' : ''}
       <div class="micro-insignias">${microCocina}${microBarra}</div>
-      ${badgeHTML}${esperandoHTML}
-      <span class="mesa-zona-badge" style="background:${colorZona}; color:white;">${mesa.zona}</span>`;
+      <span class="mesa-zona-badge" style="background:${colorZona}; color:white;">${claseZona}</span>`;
   }
 }
 
@@ -351,10 +438,10 @@ function _construirContenido(contenedor, callbacks) {
           <span class="badge cuenta">Cuenta</span>
         </span>
         <div id="zonaButtonsContainer" style="display: flex; gap: 4px;"></div>
-        <button class="btn-secondary" id="btnAgregarMesa" data-rol="admin,master">
+        <button class="btn-secondary" id="btnAgregarMesa" data-rol="owner,master">
           <i class="fas fa-plus"></i> Nueva Mesa
         </button>
-        <button id="btnFusionar" class="btn-secondary" data-rol="mesero,admin,master">
+        <button id="btnFusionar" class="btn-secondary" data-rol="owner,master">
           <i class="fas fa-object-group"></i> Fusionar Mesas
         </button>
         <button id="btnConfirmarFusion" class="btn-primary" style="display:none;">

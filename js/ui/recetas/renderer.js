@@ -1,11 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — RECETAS SUBMÓDULO (ES6)
    Archivo: js/ui/recetas/renderer.js
-   Versión: 2.2.1
+   Versión: 2.2.2
    Propósito: Layout libro con sidebar de capítulos e índice lateral
               de colores. Migrado a state.insumos.
-              Uso de DBInventario.obtenerRecetaConProducto para el nombre.
-              Hallazgo 15: búsqueda de stock con filtro por destino.
+              v2.2.2: búsqueda de stock por tipo 'cocina' únicamente.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -34,8 +33,8 @@ export function pintar(modo) {
 
   if (modo) setModo(modo);
   else {
-    const rol = Auth.obtenerRol();
-    setModo((rol === 'admin' || rol === 'master' || rol === 'cocina' || rol === 'barra') ? 'produccion' : 'consulta');
+    const rol = Auth.obtenerRolPrincipal();
+    setModo((['owner', 'admin', 'master', 'chef', 'barman'].includes(rol)) ? 'produccion' : 'consulta');
   }
 
   _asegurarVista();
@@ -188,7 +187,7 @@ function _pintarSidebarCapitulos() {
   const termino = getBusqueda().toLowerCase();
 
   let html = '';
-  categorias.forEach((cat, i) => {
+  categorias.forEach((cat) => {
     const count = recetas.filter(r => (r.categoria || 'sin_categoria') === cat.id &&
       (!termino || (DBInventario.obtenerRecetaConProducto(r.id)?.nombre || '').toLowerCase().includes(termino))).length;
     html += `<button class="recetas-sidebar-item ${getCategoriaActiva() === cat.id ? 'activo' : ''}" data-cap="${cat.id}" style="--cap-color:${cat.color}">
@@ -225,16 +224,13 @@ function _obtenerCategorias(recetas) {
     }
   });
   const arr = Array.from(cats.values());
-  arr.forEach((cat, i) => {
-    cat.color = PALETA_CATEGORIAS[i % PALETA_CATEGORIAS.length];
-  });
+  arr.forEach((cat, i) => { cat.color = PALETA_CATEGORIAS[i % PALETA_CATEGORIAS.length]; });
   return arr;
 }
 
 export function pintarRecetario(contenedor) {
   const state = Store.obtenerEstado();
   const recetas = state.recetas || [];
-  const productos = state.productos || [];
   const esProduccion = getModo() === 'produccion';
   const categorias = _obtenerCategorias(recetas);
 
@@ -260,10 +256,10 @@ export function pintarRecetario(contenedor) {
     document.getElementById('recetas-boton-nueva').addEventListener('click', () => mostrarModalReceta());
   }
 
-  _pintarLibro(recetas, productos, categorias, esProduccion);
+  _pintarLibro(recetas, categorias, esProduccion);
 }
 
-function _pintarLibro(recetas, productos, categorias, esProduccion) {
+function _pintarLibro(recetas, categorias, esProduccion) {
   const paginas = document.getElementById('recetasLibroPaginas');
   const indice = document.getElementById('recetasLibroIndice');
   if (!paginas) return;
@@ -291,9 +287,7 @@ function _pintarLibro(recetas, productos, categorias, esProduccion) {
 
   if (indice) {
     if (capActivo === 'todas') {
-      const idsPresentes = categorias.map(c => c.id).filter(id => {
-        return filtradas.some(r => (r.categoria || 'sin_categoria') === id);
-      });
+      const idsPresentes = categorias.map(c => c.id).filter(id => filtradas.some(r => (r.categoria || 'sin_categoria') === id));
       if (idsPresentes.length > 1 && !termino) {
         indice.innerHTML = idsPresentes.map((id, i) => {
           const cat = categorias.find(c => c.id === id) || { color: PALETA_CATEGORIAS[0], nombre: id };
@@ -327,7 +321,7 @@ function _pintarLibro(recetas, productos, categorias, esProduccion) {
         indice.querySelectorAll('.recetas-indice-tab').forEach(btn => {
           btn.addEventListener('click', () => {
             setFiltroNivel(btn.dataset.nivel === getFiltroNivel() ? 'todos' : btn.dataset.nivel);
-            _pintarLibro(recetas, productos, categorias, esProduccion);
+            _pintarLibro(recetas, categorias, esProduccion);
           });
         });
       } else {
@@ -347,7 +341,6 @@ function _pintarLibro(recetas, productos, categorias, esProduccion) {
       (grupos[cat] = grupos[cat] || []).push(r);
     });
     const idsPresentes = categorias.map(c => c.id).filter(id => grupos[id] && grupos[id].length);
-    
     paginas.innerHTML = idsPresentes.map(id => {
       const cat = categorias.find(c => c.id === id) || { nombre: id, color: PALETA_CATEGORIAS[0], icono: 'fa-box' };
       const items = grupos[id].sort((a, b) => a._nombre.localeCompare(b._nombre));
@@ -369,7 +362,6 @@ function _pintarLibro(recetas, productos, categorias, esProduccion) {
       (gruposNivel[niv] = gruposNivel[niv] || []).push(r);
     });
     const nivelesPresentes = Object.keys(gruposNivel).sort();
-
     paginas.innerHTML = nivelesPresentes.map((niv, i) => {
       const items = gruposNivel[niv].sort((a, b) => a._nombre.localeCompare(b._nombre));
       const colorNivel = PALETA_CATEGORIAS[i % PALETA_CATEGORIAS.length];
@@ -398,7 +390,6 @@ function _tarjetaLibro(r, cat) {
   const tipoBadge = r.es_intermedio
     ? '<span class="recetas-badge-intermedio">Prep</span>'
     : '<span class="recetas-badge-final">Final</span>';
-  const numIng = r.ingredientes ? r.ingredientes.length : 0;
   const stockInfo = _obtenerStockInfo(r);
   return `
     <div class="recetas-tarjeta-libro" data-receta="${r.id}" style="--cap-color:${color}">
@@ -412,8 +403,7 @@ function _obtenerStockInfo(r) {
   if (!r.es_intermedio) return '';
   const state = Store.obtenerEstado();
   const insumos = state.insumos || [];
-  const tipoInsumo = (r.destino === 'barra') ? 'barra' : 'cocina';
-  const insumo = insumos.find(i => i.nombre === r._nombre && i.tipo === tipoInsumo);
+  const insumo = insumos.find(i => i.nombre === r._nombre && i.tipo === 'cocina');
   const stock = insumo ? insumo.stock : 0;
   const unidad = insumo ? insumo.unidad : (r.unidadStock || '');
   return `<span class="recetas-badge-stock">${stock} ${unidad}</span>`;
@@ -428,8 +418,7 @@ export function pintarStock(contenedor) {
   const stockItems = recetas.map(r => {
     const recetaConNombre = DBInventario.obtenerRecetaConProducto(r.id);
     const nombre = recetaConNombre ? recetaConNombre.nombre : (r.productoId || 'Sin nombre');
-    const tipoInsumo = (r.destino === 'barra') ? 'barra' : 'cocina';
-    const insumo = insumos.find(i => i.nombre === nombre && i.tipo === tipoInsumo);
+    const insumo = insumos.find(i => i.nombre === nombre && i.tipo === 'cocina');
     return {
       ...r,
       _nombre: nombre,

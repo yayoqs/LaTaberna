@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — RECETAS SUBMÓDULO (ES6)
    Archivo: js/ui/recetas/ejecutar.js
-   Versión: 2.0.0
+   Versión: 2.0.1
    Propósito: Ejecución de preparaciones. Crea/actualiza el insumo
               asociado en laTaberna_Insumos. Migrado a state.insumos.
+              v2.0.1: tipo de insumo siempre 'cocina'.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -32,14 +33,13 @@ export async function ejecutarPreparacion(idReceta) {
   const insumos = state.insumos || [];
   const recetas = state.recetas || [];
 
-  // Verificar stock de insumos necesarios
   for (const ing of (receta.ingredientes || [])) {
     const tipo = ing.tipo || 'insumo';
     if (tipo === 'insumo') {
       const insumoData = insumos.find(i => i.id == ing.id);
       if (!insumoData) { mostrarToast('error', `Insumo ${ing.id} no encontrado`); return; }
       if ((insumoData.stock || 0) < ing.cantidad * cantidad) {
-        mostrarToast('error', `Stock insuficiente de ${insumoData.nombre}. Necesitas ${ing.cantidad * cantidad} ${insumoData.unidad}, hay ${insumoData.stock || 0}.`);
+        mostrarToast('error', `Stock insuficiente de ${insumoData.nombre}.`);
         return;
       }
     } else if (tipo === 'subreceta') {
@@ -47,16 +47,15 @@ export async function ejecutarPreparacion(idReceta) {
       if (!sub || !sub.es_intermedio) { mostrarToast('error', `Sub-receta ${ing.id} no válida`); return; }
       const subConProducto = DBInventario.obtenerRecetaConProducto(sub.id);
       const nombreSub = subConProducto ? subConProducto.nombre : sub.productoId;
-      const insumoSub = insumos.find(i => i.nombre === nombreSub && (i.tipo === 'cocina' || i.tipo === 'barra'));
+      const insumoSub = insumos.find(i => i.nombre === nombreSub && i.tipo === 'cocina');
       const stockSub = insumoSub ? insumoSub.stock : 0;
       if (stockSub < ing.cantidad * cantidad) {
-        mostrarToast('error', `Stock insuficiente de ${nombreSub}. Necesitas ${ing.cantidad * cantidad} ${sub.unidadStock}, hay ${stockSub}.`);
+        mostrarToast('error', `Stock insuficiente de ${nombreSub}.`);
         return;
       }
     }
   }
 
-  // Descontar insumos
   for (const ing of (receta.ingredientes || [])) {
     const tipo = ing.tipo || 'insumo';
     if (tipo === 'insumo') {
@@ -70,7 +69,7 @@ export async function ejecutarPreparacion(idReceta) {
       if (sub && sub.es_intermedio) {
         const subConProducto = DBInventario.obtenerRecetaConProducto(sub.id);
         const nombreSub = subConProducto ? subConProducto.nombre : sub.productoId;
-        const insumoSub = insumos.find(i => i.nombre === nombreSub && (i.tipo === 'cocina' || i.tipo === 'barra'));
+        const insumoSub = insumos.find(i => i.nombre === nombreSub && i.tipo === 'cocina');
         if (insumoSub) {
           const nuevoStock = Math.max(0, (insumoSub.stock || 0) - ing.cantidad * cantidad);
           await repo.actualizarStockInsumo(insumoSub.id, nuevoStock);
@@ -79,15 +78,13 @@ export async function ejecutarPreparacion(idReceta) {
     }
   }
 
-  // Buscar o crear el insumo asociado a esta preparación
   const recetaConProducto = DBInventario.obtenerRecetaConProducto(idReceta);
   const nombreProducto = recetaConProducto ? recetaConProducto.nombre : receta.productoId;
-  const tipoInsumo = (receta.destino === 'barra') ? 'barra' : 'cocina';
-  
+  const tipoInsumo = 'cocina';
+
   let insumoAsociado = insumos.find(i => i.nombre === nombreProducto && i.tipo === tipoInsumo);
-  
+
   if (!insumoAsociado) {
-    // Crear el insumo por primera vez
     insumoAsociado = await repo.guardarInsumo({
       nombre: nombreProducto,
       unidad: receta.unidadStock || 'u',
@@ -98,7 +95,6 @@ export async function ejecutarPreparacion(idReceta) {
     });
   }
 
-  // Aumentar stock del insumo
   const nuevoStock = (insumoAsociado.stock || 0) + cantidad;
   await repo.actualizarStockInsumo(insumoAsociado.id, nuevoStock);
 

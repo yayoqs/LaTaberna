@@ -1,11 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO INTERNO (ES6)
    Archivo: js/modulos/interno/avisos-mesero.js
-   Versión: 1.1.0
+   Versión: 1.2.0
    Propósito: Indicador visual de notificaciones para el mesero.
-              v1.1.0: Lee avisos y precargas persistentes desde
-                      Appwrite. Filtra por espacioId activo y no
-                      se muestra para rol cliente puro.
+              v1.2.0: Rol base migrado de `cliente` a `jugador`.
+                      Función _esSoloCliente renombrada a
+                      _esSoloJugador.
    ================================================================ */
 
 import { EventBus } from '../../lib/eventBus.js';
@@ -23,11 +23,11 @@ const AvisosMesero = (() => {
   const _precargas = new Map();
   const _desuscripciones = [];
 
-  function _esSoloCliente() {
+  function _esSoloJugador() {
     try {
       const roles = Auth.obtenerRolesEfectivos?.();
       if (!Array.isArray(roles) || roles.length === 0) return true;
-      return roles.length === 1 && roles[0] === 'cliente';
+      return roles.length === 1 && roles[0] === 'jugador';
     } catch (e) {
       return true;
     }
@@ -36,9 +36,9 @@ const AvisosMesero = (() => {
   function _espacioIdActivo() {
     try {
       const local = Auth.obtenerLocalActivo?.();
-      return local?.id || 'lataberna';
+      return local?.id || null;
     } catch (e) {
-      return 'lataberna';
+      return null;
     }
   }
 
@@ -131,6 +131,8 @@ const AvisosMesero = (() => {
     if (!DBAppwrite || !DBAppwrite.habilitado) return;
 
     const espacioId = _espacioIdActivo();
+    if (!espacioId) return;
+
     try {
       const avisos = await DBAppwrite.listar('avisos');
       _avisos.clear();
@@ -152,6 +154,8 @@ const AvisosMesero = (() => {
     if (!DBAppwrite || !DBAppwrite.habilitado) return;
 
     const espacioId = _espacioIdActivo();
+    if (!espacioId) return;
+
     try {
       const pedidos = await DBAppwrite.listar('pedidos');
       _precargas.clear();
@@ -178,8 +182,8 @@ const AvisosMesero = (() => {
     if (_activado) return;
     _activado = true;
 
-    if (_esSoloCliente()) {
-      Logger.info('[AvisosMesero] No se activa para rol cliente puro.');
+    if (_esSoloJugador()) {
+      Logger.info('[AvisosMesero] No se activa para rol jugador puro.');
       return;
     }
 
@@ -196,7 +200,7 @@ const AvisosMesero = (() => {
       EventBus.emit('bandeja:abrir');
     }));
 
-    Logger.info('[AvisosMesero] Módulo activado (v1.1.0).');
+    Logger.info('[AvisosMesero] Módulo activado (v1.2.0).');
   }
 
   function limpiar() {

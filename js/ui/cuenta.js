@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — UI JS (ES6)
    Archivo: js/ui/cuenta.js
-   Versión: 1.0.6
-   Propósito: Solicitud de cuenta. Adaptada al nuevo modelo
-              (lectura de ítems desde el Pedido).
+   Versión: 1.0.7
+   Propósito: Solicitud de cuenta.
+              v1.0.7: Roles actualizados: owner en lugar de master.
    ================================================================ */
 
 import { Auth } from '../auth.js';
@@ -16,11 +16,12 @@ import { Comanda } from './comanda.js';
 import { Tickets } from './tickets.js';
 
 const Cuenta = (() => {
-
   function pedirCuenta() {
-    const rol = Auth.obtenerRol();
-    const rolesPermitidos = ['mesero', 'admin', 'master', 'caja'];
-    if (!rolesPermitidos.includes(rol)) {
+    const roles = Auth.obtenerRolesEfectivos?.() || [];
+    const rolesPermitidos = ['mesero', 'admin', 'owner', 'caja'];
+    const permitido = roles.some(r => rolesPermitidos.includes(r));
+
+    if (!permitido) {
       mostrarToast('error', 'No tienes permiso para pedir la cuenta');
       return;
     }

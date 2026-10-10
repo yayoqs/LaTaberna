@@ -16,410 +16,1289 @@
 </head>
 <body>
   <h1>🧪 Test A — Unificado Core</h1>
-  <p>Batería completa: sanidad, autenticación, registro, jerarquía de roles, staff, mesas, comandas, factories y dominio.</p>
+  <p>Batería completa: sanidad, autenticación, registro, jerarquía de roles, mesas, comandas, factories, dominio, casos extremos, cartas, variantes, Realtime, motor de descuento sin receta y chequeo de ciclos.</p>
   <div id="results"></div>
 
   <script src="/js/appwrite.min.js"></script>
 
   <script type="module">
-    import { Logger } from './js/lib/logger.js';
-    import { EventBus } from './js/lib/eventBus.js';
-    import { Store } from './js/lib/store.js';
-    import { CommandBus } from './js/lib/command-bus.js';
-    import { Deps } from './js/lib/deps.js';
-    import { DBAppwrite } from './js/db-appwrite.js';
-    import { DB } from './js/db.js';
-    import { Auth } from './js/auth.js';
-    import { inicializarAuth } from './js/auth.js';
-    import { Roles } from './js/roles.js';
-    import { PedidoManager } from './js/managers/pedido-manager.js';
-    import { PedidoRepositoryLocal } from './js/repositorios/pedido-repository.js';
-    import { DBCore, mesaVacia } from './js/db-core.js';
-    import { PedidoAgregado, reconstruirPedidoAgregado } from './js/dominio/pedido.js';
-    import { Delivery, reconstruirDelivery } from './js/dominio/delivery.js';
-    import { Cantidad, crearCantidad } from './js/dominio/cantidad.js';
-    import { Dinero, crearDinero } from './js/dominio/dinero.js';
-    import { Resultado } from './js/dominio/resultado.js';
-    import { $id, formatearDinero, mostrarToast, calcularTotal, formatearHoraCorta } from './js/utils.js';
-    import './js/comandos/agregar-mesa.js';
-    import './js/comandos/crear-pedido-mesa.js';
-    import './js/comandos/enviar-comanda.js';
-    import './js/comandos/liberar-mesa.js';
-    import './js/comandos/completar-subcomanda.js';
 
-    window.crearCantidad = crearCantidad;
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║ SECCIÓN 2 — IMPORTS                                              ║
+// ║ Todas las dependencias del bundle que se van a testear.          ║
+// ╚══════════════════════════════════════════════════════════════════╝
+// ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
 
-    const resultsEl = document.getElementById('results');
-    let passed = 0, failed = 0;
+import { Logger } from './js/lib/logger.js';
+import { EventBus } from './js/lib/eventBus.js';
+import { Store } from './js/lib/store.js';
+import { CommandBus } from './js/lib/command-bus.js';
+import { Deps } from './js/lib/deps.js';
+import { DBAppwrite } from './js/db-appwrite.js';
+import { DB } from './js/db.js';
+import { Auth } from './js/auth.js';
+import { inicializarAuth } from './js/auth.js';
+import { Roles } from './js/roles.js';
+import { PedidoManager } from './js/managers/pedido-manager.js';
+import { PedidoRepositoryLocal } from './js/repositorios/pedido-repository.js';
+import { crearVarianteRepo } from './js/repositorios/variante-repository.js';
+import { crearRecetaRepo } from './js/repositorios/receta-repository.js';
+import { DBCore, mesaVacia } from './js/db-core.js';
+import { PedidoAgregado, reconstruirPedidoAgregado } from './js/dominio/pedido.js';
+import { Delivery, reconstruirDelivery } from './js/dominio/delivery.js';
+import { Cantidad, crearCantidad } from './js/dominio/cantidad.js';
+import { Dinero, crearDinero } from './js/dominio/dinero.js';
+import { Resultado } from './js/dominio/resultado.js';
+import { $id, formatearDinero, mostrarToast, calcularTotal, formatearHoraCorta } from './js/utils.js';
+import { ID_FUNCION_ASIGNAR_ROL } from './js/config-appwrite.js';
+import './js/comandos/agregar-mesa.js';
+import './js/comandos/crear-pedido-mesa.js';
+import './js/comandos/enviar-comanda.js';
+import './js/comandos/liberar-mesa.js';
+import './js/comandos/completar-subcomanda.js';
 
-    function assert(cond, msg) {
-      if (cond) { passed++; resultsEl.innerHTML += `<div class="test pass">✔ ${msg}</div>`; }
-      else { failed++; resultsEl.innerHTML += `<div class="test fail">✘ ${msg}</div>`; }
+window.crearCantidad = crearCantidad;
+
+// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+// ▲ FIN SECCIÓN 2
+// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║ SECCIÓN 3 — UTILIDADES DE TESTING                                ║
+// ║ Contadores de asserts, helpers de output, y espera asíncrona.    ║
+// ╚══════════════════════════════════════════════════════════════════╝
+// ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
+
+const resultsEl = document.getElementById('results');
+let passed = 0, failed = 0;
+
+function assert(cond, msg) {
+  if (cond) { passed++; resultsEl.innerHTML += `<div class="test pass">✔ ${msg}</div>`; }
+  else { failed++; resultsEl.innerHTML += `<div class="test fail">✘ ${msg}</div>`; }
+}
+function info(msg) { resultsEl.innerHTML += `<div class="test info">ℹ️ ${msg}</div>`; }
+function suite(msg) { resultsEl.innerHTML += `<h2>${msg}</h2>`; }
+const esperar = ms => new Promise(r => setTimeout(r, ms));
+
+// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+// ▲ FIN SECCIÓN 3
+// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║ SECCIÓN 4 — ESTADO DE HUELLA Y LIMPIEZA                          ║
+// ║ El test crea filas temporales en Appwrite. Aquí se rastrean y    ║
+// ║ se limpian al final para no dejar basura en la base de datos.    ║
+// ╚══════════════════════════════════════════════════════════════════╝
+// ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
+
+const idsCreados = {
+  mesas: [], pedidos: [], comandas: [], perfiles: [], espacios: [],
+  variantes: [], cartas: [], insumos: [], productos: []
+};
+
+async function limpiarSesion() { try { await Auth.cerrarSesion(); } catch {} }
+
+async function limpiarHuella() {
+  for (const id of idsCreados.comandas) { try { await DBAppwrite.eliminar('comandas', id); } catch {} }
+  for (const id of idsCreados.pedidos) { try { await DBAppwrite.eliminar('pedidos', id); } catch {} }
+  for (const id of idsCreados.mesas) { try { await DBAppwrite.eliminar('mesas', id); } catch {} }
+  for (const id of idsCreados.perfiles) { try { await DBAppwrite.eliminar('global_perfiles', id); } catch {} }
+  for (const id of idsCreados.espacios) { try { await DBAppwrite.eliminar('global_espacios', id); } catch {} }
+  for (const id of idsCreados.variantes) { try { await DBAppwrite.eliminar('variantes', id); } catch {} }
+  for (const id of idsCreados.cartas) { try { await DBAppwrite.eliminar('cartas', id); } catch {} }
+  for (const id of idsCreados.insumos) { try { await DBAppwrite.eliminar('insumos', id); } catch {} }
+  for (const id of idsCreados.productos) { try { await DBAppwrite.eliminar('productos', id); } catch {} }
+  idsCreados.mesas = []; idsCreados.pedidos = []; idsCreados.comandas = [];
+  idsCreados.perfiles = []; idsCreados.espacios = []; idsCreados.variantes = [];
+  idsCreados.cartas = []; idsCreados.insumos = []; idsCreados.productos = [];
+}
+
+// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+// ▲ FIN SECCIÓN 4
+// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║ SECCIÓN 5 — HELPER DE REGISTRO                                   ║
+// ║ Crea un usuario temporal, captura su perfil y su espacio         ║
+// ║ personal para poder limpiarlos después.                          ║
+// ╚══════════════════════════════════════════════════════════════════╝
+// ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
+
+async function registrarYRegistrarPerfil(nombre, password) {
+  const reg = await Auth.registrarUsuario(nombre, password);
+  if (!reg.exito) return null;
+  const perfil = await DBAppwrite.obtenerPerfilPorUsuarioId(reg.usuarioId);
+  if (perfil) idsCreados.perfiles.push(perfil.id);
+  const espacioId = `mirefugio_${reg.usuarioId}`;
+  try {
+    await DBAppwrite.obtenerEspacioPorId(espacioId);
+    idsCreados.espacios.push(espacioId);
+  } catch {}
+  return { nombre, password, usuarioId: reg.usuarioId, perfilId: perfil?.id || null };
+}
+
+// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+// ▲ FIN SECCIÓN 5
+// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║ SECCIÓN 6 — CUERPO PRINCIPAL DE run()                            ║
+// ║ Ejecuta todas las sub-suites en orden. Cada sub-suite (6.0 a     ║
+// ║ 6.14) es independiente y tiene su propio bloque de asserts.      ║
+// ╚══════════════════════════════════════════════════════════════════╝
+// ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
+
+async function run() {
+  Logger.setLevel('ERROR');
+  resultsEl.innerHTML = '';
+  Deps.registrar('auth', Auth);
+
+  // ═════════════════════════════════════════════════════════════════
+  // SUITE 6.0 — SANIDAD DE MÓDULOS Y BUNDLE
+  // ═════════════════════════════════════════════════════════════════
+  suite('6.0 Sanidad de módulos y bundle');
+  info('Verificando que todos los módulos y utilidades estén definidos.');
+  assert(typeof window.Appwrite !== 'undefined', 'SDK Appwrite cargado');
+  assert(typeof Logger !== 'undefined', 'Logger existe');
+  assert(typeof EventBus !== 'undefined', 'EventBus existe');
+  assert(typeof Store !== 'undefined', 'Store existe');
+  assert(typeof CommandBus !== 'undefined', 'CommandBus existe');
+  assert(typeof Deps !== 'undefined', 'Deps existe');
+  assert(typeof DB !== 'undefined', 'DB existe');
+  assert(typeof DBAppwrite !== 'undefined', 'DBAppwrite existe');
+  assert(typeof Roles !== 'undefined', 'Roles existe');
+  assert(typeof PedidoManager !== 'undefined', 'PedidoManager existe');
+  assert(typeof PedidoRepositoryLocal !== 'undefined', 'PedidoRepositoryLocal existe');
+  assert(typeof crearVarianteRepo === 'function', 'crearVarianteRepo es función');
+  assert(typeof DBCore !== 'undefined', 'DBCore existe');
+  assert(typeof mesaVacia === 'function', 'mesaVacia es función');
+  assert(typeof $id === 'function', '$id es función');
+  assert(typeof formatearDinero === 'function', 'formatearDinero es función');
+  assert(typeof mostrarToast === 'function', 'mostrarToast es función');
+  assert(typeof calcularTotal === 'function', 'calcularTotal es función');
+  assert(typeof formatearHoraCorta === 'function', 'formatearHoraCorta es función');
+  assert(typeof crearCantidad === 'function', 'crearCantidad es función');
+  assert(typeof crearDinero === 'function', 'crearDinero es función');
+  assert(typeof Resultado !== 'undefined', 'Resultado existe');
+  assert(DBAppwrite.COLECCIONES.cartas === 'laTaberna_Cartas', 'COLECCIONES.cartas = laTaberna_Cartas');
+  assert(DBAppwrite.COLECCIONES.variantes === 'laTaberna_Variantes', 'COLECCIONES.variantes = laTaberna_Variantes');
+  assert(DBAppwrite.COLECCIONES.menus === undefined, 'COLECCIONES.menus ya no existe');
+  assert(Array.isArray(Store.obtenerEstado().variantes), 'Store tiene slice variantes (array)');
+
+  // ═════════════════════════════════════════════════════════════════
+  // SUITE 6.1 — AUTENTICACIÓN E INICIALIZACIÓN
+  // ═════════════════════════════════════════════════════════════════
+  suite('6.1 Autenticación e inicialización');
+  info('Inicializando Auth y Appwrite...');
+  await inicializarAuth();
+  if (!(await DBAppwrite.iniciar())) { assert(false, 'No se pudo inicializar Appwrite'); return; }
+  await limpiarSesion();
+  if (!(await Auth.iniciarSesion('jefePub', 'jefe1234'))) { assert(false, 'No se pudo autenticar como jefePub'); return; }
+  assert(true, 'jefePub autenticado');
+  assert(Auth.obtenerLocalActivo()?.id === 'PubPrueba', 'Espacio resuelto automáticamente: PubPrueba');
+  await DB.init();
+  PedidoManager.init({ pedidoRepo: PedidoRepositoryLocal });
+  Deps.registrar('pedidoRepo', PedidoRepositoryLocal);
+  Deps.registrar('inventarioService', { validarStockParaArticulos: () => ({ ok: true, faltantes: [] }) });
+  info('DB y PedidoManager inicializados');
+
+  // ═════════════════════════════════════════════════════════════════
+  // SUITE 6.2 — REGISTRO Y PERFIL GLOBAL
+  // ═════════════════════════════════════════════════════════════════
+  suite('6.2 Registro y perfil global');
+  const nombreJugador = 'test_jugador_' + Date.now();
+  const passwordJugador = 'pass12345';
+  const jugador = await registrarYRegistrarPerfil(nombreJugador, passwordJugador);
+  assert(jugador !== null, 'Usuario registrado mediante función');
+  assert(jugador?.usuarioId !== undefined, 'usuarioId devuelto');
+  await limpiarSesion();
+  assert(await Auth.iniciarSesion(nombreJugador, passwordJugador), 'Jugador inicia sesión');
+  assert(Auth.obtenerRolesEfectivos().includes('jugador'), 'Rol inicial jugador');
+  const perfilJugador = Auth.obtenerUsuarioActual()?.perfil;
+  assert(!!perfilJugador, 'Perfil global cargado');
+  assert(perfilJugador?.nombreUsuario === nombreJugador, 'Perfil con nombreUsuario correcto');
+  assert(perfilJugador?.nombre === nombreJugador, 'Perfil con nombre visible correcto');
+  const perfilAppwrite = await DBAppwrite.obtenerPerfilPorUsuarioId(jugador.usuarioId);
+  assert(!!perfilAppwrite, 'Perfil global existe en Appwrite');
+  assert(perfilAppwrite?.nombreUsuario === nombreJugador, 'Perfil en Appwrite con nombreUsuario correcto');
+  const espacioPersonalId = `mirefugio_${jugador.usuarioId}`;
+  const espacioPersonal = await DBAppwrite.obtenerEspacioPorId(espacioPersonalId);
+  assert(!!espacioPersonal, 'Espacio personal de MiRefugio creado automáticamente');
+  assert(espacioPersonal?.app === 'mirefugio', 'Espacio personal con app correcta');
+  assert(espacioPersonal?.tipo === 'hogar', 'Espacio personal con tipo hogar');
+  assert(espacioPersonal?.adminAsignado === jugador.usuarioId, 'Espacio personal asignado al jugador');
+  if (espacioPersonal) idsCreados.espacios.push(espacioPersonalId);
+
+  // ═════════════════════════════════════════════════════════════════
+  // SUITE 6.3 — JERARQUÍA DE ROLES
+  // ═════════════════════════════════════════════════════════════════
+  suite('6.3 Jerarquía de roles');
+  assert(Roles.puedeAsignar('owner', 'admin') === true, 'owner puede asignar admin');
+  assert(Roles.puedeAsignar('owner', 'mesero') === true, 'owner puede asignar mesero');
+  assert(Roles.puedeAsignar('owner', 'owner') === false, 'owner NO puede asignar owner');
+  assert(Roles.puedeAsignar('admin', 'mesero') === true, 'admin puede asignar mesero');
+  assert(Roles.puedeAsignar('admin', 'admin') === false, 'admin NO puede asignar admin');
+  assert(Roles.puedeAsignar('mesero', 'mesero') === false, 'mesero NO puede asignar mesero');
+  assert(Roles.puedeAsignar('master', 'owner') === true, 'master puede asignar owner');
+
+  // ═════════════════════════════════════════════════════════════════
+  // SUITE 6.4 — MESAS, PEDIDOS Y COMANDAS
+  // ═════════════════════════════════════════════════════════════════
+  suite('6.4 Mesas, pedidos y comandas');
+  await limpiarSesion();
+  await Auth.iniciarSesion('jefePub', 'jefe1234');
+  const numMesa = 'test_mesa_' + Date.now();
+  const rAgregar = await CommandBus.ejecutar({ type: 'agregarMesa', datos: { numero: numMesa, zona: 'salon' } });
+  assert(rAgregar.exito === true, 'Mesa creada');
+  idsCreados.mesas.push(numMesa);
+  await esperar(500);
+  const rPedido = await CommandBus.ejecutar({ type: 'crearPedidoMesa', datos: { numeroMesa: numMesa, mozo: 'Test', comensales: 2 } });
+  assert(rPedido.exito === true, 'Pedido creado en mesa');
+  const pedidoId = rPedido.data?.id;
+  if (pedidoId) idsCreados.pedidos.push(pedidoId);
+  await esperar(500);
+  const itemPrueba = { prodId: 'prod_test', nombre: 'Hamburguesa', precio: 1500, qty: 1, destino: 'cocina', obs: '', enviado: false };
+  await DB.actualizarPedido(pedidoId, { items: [itemPrueba] });
+  await esperar(300);
+  const mesaActual = (await DBAppwrite.listar('mesas')).find(m => m.numero === numMesa);
+  assert(!!mesaActual, 'Mesa existe en Appwrite');
+  assert(mesaActual?.estado === 'ocupada', 'Mesa ocupada');
+  assert(!!mesaActual?.pedidoId, 'Mesa con pedidoId');
+  const rEnviar = await CommandBus.ejecutar({ type: 'enviarComanda', datos: { mesa: mesaActual, mozo: 'Test', comensales: 2, observaciones: '', itemsPendientes: [itemPrueba] } });
+  assert(rEnviar.exito === true, 'Comanda enviada');
+  const comandasCreadas = rEnviar.data?.comandas || [];
+  comandasCreadas.forEach(c => idsCreados.comandas.push(c.id));
+  assert(comandasCreadas.length >= 1, 'Al menos una comanda creada');
+  await esperar(1500);
+  const comandaEnAppwrite = comandasCreadas.length ? (await DBAppwrite.listar('comandas')).find(c => c.id === comandasCreadas[0].id) : null;
+  assert(!!comandaEnAppwrite, 'Comanda en Appwrite');
+  assert(comandaEnAppwrite?.destino === 'cocina', 'Destino cocina correcto');
+  const rCompletar = await CommandBus.ejecutar({ type: 'completarSubcomanda', datos: { idOriginal: comandaEnAppwrite.id, destino: 'cocina' } });
+  assert(rCompletar.exito === true, 'Subcomanda completada');
+  assert(rCompletar.data?.ambasListas === true, 'Ambas listas');
+  await esperar(500);
+  const comandaCompletada = (await DBAppwrite.listar('comandas')).find(c => c.id === comandaEnAppwrite.id);
+  assert(comandaCompletada?.estado === 'completada', 'Comanda principal completada');
+  const rLiberar = await CommandBus.ejecutar({ type: 'liberarMesa', datos: { numeroMesa: numMesa } });
+  assert(rLiberar.exito === true, 'Mesa liberada');
+  await esperar(500);
+  const mesaLiberada = (await DBAppwrite.listar('mesas')).find(m => m.numero === numMesa);
+  assert(mesaLiberada?.estado === 'libre', 'Mesa libre');
+
+  // ═════════════════════════════════════════════════════════════════
+  // SUITE 6.5 — NORMALIZACIÓN Y FÁBRICA
+  // ═════════════════════════════════════════════════════════════════
+  suite('6.5 Normalización y fábrica');
+  const prod1 = DBCore._normalizarProducto({ nombre: 'Test', precio: 100 });
+  assert(prod1.activo === true, 'Producto sin campo activo → por defecto true');
+  assert(prod1.estado === 'disponible', 'Producto sin estado → por defecto disponible');
+  assert(prod1.disponible === true, 'Producto disponible derivado true');
+  const mesaStr = DBCore._normalizarMesa({ numero: '1' });
+  assert(mesaStr.numero === '1', 'Mesa con numero string se conserva');
+  assert(mesaStr.estado === 'libre', 'Mesa sin estado → por defecto libre');
+  assert(mesaStr.items === undefined, 'Mesa NO tiene campo items (eliminado)');
+  assert(mesaStr.mozo === undefined, 'Mesa NO tiene campo mozo (eliminado)');
+  const nueva = mesaVacia(50, 'salon');
+  assert(nueva.numero === '50', 'mesaVacia: numero es string');
+  assert(nueva.estado === 'libre', 'mesaVacia: estado libre');
+  assert(nueva.esVirtual === false, 'mesaVacia: esVirtual = false');
+  assert(nueva.items === undefined, 'mesaVacia: sin campo items');
+  assert(nueva.mozo === undefined, 'mesaVacia: sin campo mozo');
+
+  // ═════════════════════════════════════════════════════════════════
+  // SUITE 6.6 — FACTORIES
+  // ═════════════════════════════════════════════════════════════════
+  suite('6.6 Factories');
+  const pedRec = reconstruirPedidoAgregado({ id: 'ped_recon_test', mesa: 1, mozo: 'Trini', comensales: 2, items: [], descuento: 0, estado: 'abierto', observaciones: '' });
+  assert(pedRec instanceof PedidoAgregado, 'reconstruirPedidoAgregado devuelve un PedidoAgregado');
+  assert(pedRec.estado === 'abierto', 'El estado del pedido reconstruido es correcto');
+  const delRec = reconstruirDelivery({ id: 'del_recon_test', direccion: { calle: 'Corrientes', numero: '1234' }, repartidor: 'Alex', items: [], estado: 'pendiente', observaciones: '' });
+  assert(delRec instanceof Delivery, 'reconstruirDelivery devuelve un Delivery');
+  assert(delRec.estado === 'pendiente', 'El estado del delivery reconstruido es correcto');
+
+  // ═════════════════════════════════════════════════════════════════
+  // SUITE 6.7 — DOMINIO
+  // ═════════════════════════════════════════════════════════════════
+  suite('6.7 Dominio');
+  let c = crearCantidad(3);
+  assert(c !== null, 'crearCantidad(3) retorna instancia');
+  assert(c.valor === 3, 'Cantidad: valor es 3');
+  assert(crearCantidad(0) === null, 'crearCantidad(0) falla');
+  assert(crearCantidad(-1) === null, 'crearCantidad(-1) falla');
+  let c2 = c.sumar(new Cantidad(2));
+  assert(c2.valor === 5, 'Cantidad: 3 + 2 = 5');
+  assert(c.valor === 3, 'Cantidad: original sigue 3 (inmutable)');
+  assert(c.esMayorQue(new Cantidad(2)), 'Cantidad: 3 > 2');
+  assert(c.esMenorQue(new Cantidad(5)), 'Cantidad: 3 < 5');
+  assert(c.esIgual(new Cantidad(3)), 'Cantidad: 3 == 3');
+  let d = crearDinero(1500);
+  assert(d !== null, 'crearDinero(1500) retorna instancia');
+  assert(d.monto === 1500, 'Dinero: monto es 1500');
+  assert(crearDinero(-10) === null, 'crearDinero(-10) falla');
+  assert(crearDinero(NaN) === null, 'crearDinero(NaN) falla');
+  let d2 = d.sumar(new Dinero(300));
+  assert(d2.monto === 1800, 'Dinero: 1500 + 300 = 1800');
+  assert(d.monto === 1500, 'Dinero: original sigue 1500 (inmutable)');
+  let d3 = d.restar(new Dinero(2000));
+  assert(d3.monto === 0, 'Dinero: 1500 - 2000 = 0 (nunca negativo)');
+  let d4 = d.multiplicar(3);
+  assert(d4.monto === 4500, 'Dinero: 1500 * 3 = 4500');
+  assert(d.esMayorQue(new Dinero(1000)), 'Dinero: 1500 > 1000');
+  assert(d.esMenorQue(new Dinero(2000)), 'Dinero: 1500 < 2000');
+  assert(d.esIgual(new Dinero(1500)), 'Dinero: 1500 == 1500');
+  assert(!d.esCero(), 'Dinero: 1500 no es cero');
+  assert(d.toString() === '$1500', 'Dinero: CLP sin separador de miles');
+  const kyu = crearDinero(2500, 'KYU');
+  assert(kyu !== null, 'crearDinero(2500, KYU) retorna instancia');
+  assert(kyu.monto === 2500, 'KYU: monto entero 2500');
+  assert(kyu.moneda === 'KYU', 'KYU: moneda correcta');
+  assert(kyu.toString().includes('2.5'), 'KYU: formateo muestra 2.5');
+  assert(kyu.toString().includes('KYU'), 'KYU: incluye texto KYU');
+  const clp = crearDinero(2500, 'CLP');
+  assert(clp.toString() === '$2500', 'CLP: formateo sin separador de miles');
+  assert(!clp.toString().includes('.'), 'CLP: no tiene decimales');
+  const redondeo = crearDinero(333, 'CLP').multiplicar(1.5);
+  assert(redondeo.monto === 500, 'CLP: 333 * 1.5 redondea a 500');
+  const redondeoKYU = crearDinero(1000, 'KYU').multiplicar(1.333);
+  assert(redondeoKYU.monto === 1333, 'KYU: 1000 * 1.333 redondea a 1333');
+  const kyuSuma = crearDinero(1500, 'KYU').sumar(new Dinero(500, 'KYU'));
+  assert(kyuSuma.monto === 2000, 'KYU: suma exacta');
+  const kyuResta = crearDinero(2000, 'KYU').restar(new Dinero(333, 'KYU'));
+  assert(kyuResta.monto === 1667, 'KYU: resta exacta');
+  let ok1 = Resultado.ok({ id: 5 });
+  assert(ok1.exito, 'Resultado: ok tiene exito=true');
+  assert(ok1.datos.id === 5, 'Resultado: ok conserva datos');
+  assert(ok1.error === null, 'Resultado: ok no tiene error');
+  let fail1 = Resultado.fallo('boom');
+  assert(!fail1.exito, 'Resultado: fallo tiene exito=false');
+  assert(fail1.error === 'boom', 'Resultado: fallo conserva error');
+  assert(fail1.datos === null, 'Resultado: fallo no tiene datos');
+  let chain = ok1.encadenar(data => Resultado.ok(data.id * 2));
+  assert(chain.exito, 'Resultado: encadenar ok retorna ok');
+  assert(chain.datos === 10, 'Resultado: encadenar transforma datos (5*2=10)');
+  let chainFail = fail1.encadenar(data => Resultado.ok(99));
+  assert(!chainFail.exito, 'Resultado: encadenar sobre fallo retorna fallo');
+  assert(chainFail.error === 'boom', 'Resultado: y mantiene el error original');
+  let chainEx = ok1.encadenar(() => { throw new Error('ups'); });
+  assert(!chainEx.exito, 'Resultado: encadenar captura excepción');
+  assert(chainEx.error === 'ups', 'Resultado: error es el mensaje de la excepción');
+
+  // ═════════════════════════════════════════════════════════════════
+  // SUITE 6.8 — CASOS EXTREMOS Y EXCEPCIONES
+  // ═════════════════════════════════════════════════════════════════
+  suite('6.8 Casos extremos y excepciones');
+  await limpiarSesion();
+  await Auth.iniciarSesion('jefePub', 'jefe1234');
+  const mesasVisibles = await DBAppwrite.listar('mesas');
+  assert(!mesasVisibles.some(m => m.espacioId === 'LaTaberna'), 'No hay fuga de mesas entre espacios');
+  const mesasPaginaIds = [];
+  for (let i = 0; i < 30; i++) {
+    const id = `temp_pagina_${Date.now()}_${i}`;
+    await DBAppwrite.crear('mesas', id, { numero: `8000${i}`, estado: 'libre', pedidoId: '', comensales: 1, zona: 'test_paginacion', esVirtual: false });
+    mesasPaginaIds.push(id);
+  }
+  const pagina1 = await DBAppwrite.listar('mesas', { limite: 25, desplazamiento: 0 });
+  const pagina2 = await DBAppwrite.listar('mesas', { limite: 25, desplazamiento: 25 });
+  assert(pagina1.length === 25, 'Paginación: página 1 tiene 25 filas');
+  assert(pagina2.length >= 5, 'Paginación: página 2 tiene al menos 5 filas');
+  for (const id of mesasPaginaIds) { await DBAppwrite.eliminar('mesas', id).catch(() => {}); }
+  const productosPlatos = await DBAppwrite.listar('productos', { filtros: [Appwrite.Query.equal('categoria', 'platos')] });
+  assert(productosPlatos.length >= 1, 'Filtros: productos de categoría platos');
+  const insumoId = 'PubPrueba_ins_pan';
+  const antesInsumos = await DBAppwrite.listar('insumos');
+  const insumoAntes = antesInsumos.find(i => i.id === insumoId);
+  assert(!!insumoAntes, 'Operación atómica: insumo de prueba encontrado');
+  if (insumoAntes) {
+    await DBAppwrite.decrementarCampo('insumos', insumoId, 'stock', 5, 0);
+    const despuesInsumos = await DBAppwrite.listar('insumos');
+    const insumoDespues = despuesInsumos.find(i => i.id === insumoId);
+    assert(insumoDespues?.stock === insumoAntes.stock - 5, 'Operación atómica: stock decrementado');
+    await DBAppwrite.incrementarCampo('insumos', insumoId, 'stock', 5);
+  }
+  let recibidoRealtime = false;
+  const alRecibirRealtime = () => { recibidoRealtime = true; };
+  const limpiar1 = EventBus.on('mesas:actualizada', alRecibirRealtime);
+  const limpiar2 = EventBus.on('realtime:documento_actualizado', alRecibirRealtime);
+  await DBAppwrite.iniciarRealtime();
+  await esperar(1500);
+  const mesaRealtimeId = 'temp_realtime_' + Date.now();
+  await DBAppwrite.crear('mesas', mesaRealtimeId, { numero: '999', estado: 'libre', pedidoId: '', comensales: 1, zona: 'test_realtime', esVirtual: false });
+  await esperar(3500);
+  await DBAppwrite.eliminar('mesas', mesaRealtimeId);
+  limpiar1(); limpiar2();
+  assert(recibidoRealtime, 'Realtime: evento recibido');
+  const nombreJugadorExtremo = 'jugador_extremo_' + Date.now();
+  const regExtremo = await registrarYRegistrarPerfil(nombreJugadorExtremo, 'pass12345');
+  assert(regExtremo !== null, 'Jugador extremo registrado');
+  if (regExtremo) {
+    await limpiarSesion();
+    const loginExtremo = await Auth.iniciarSesion(nombreJugadorExtremo, 'pass12345');
+    assert(loginExtremo === true, 'Jugador extremo inicia sesión');
+    const usuarioExtremo = Auth.obtenerUsuarioActual();
+    assert(usuarioExtremo?.rolesEfectivos.includes('jugador'), 'Jugador extremo tiene rol jugador');
+    assert(usuarioExtremo?.espacioActivoId?.startsWith('mirefugio_'), 'Jugador extremo con espacio personal');
+    const mesasJugador = await DBAppwrite.listar('mesas');
+    assert(mesasJugador.length === 0, 'Jugador no ve mesas');
+  }
+  await limpiarSesion();
+  const loginMalo = await Auth.iniciarSesion('jefePub', 'password_incorrecta');
+  assert(loginMalo === false, 'Login incorrecto rechazado');
+  await limpiarSesion();
+  await Auth.iniciarSesion('jefePub', 'jefe1234');
+  assert(typeof DBAppwrite.desconectarRealtime === 'function', 'desconectarRealtime existe');
+  assert(typeof DBAppwrite.reconfigurarRealtime === 'function', 'reconfigurarRealtime existe');
+  try {
+    const filasSelectTtl = await DBAppwrite.listar('productos', { select: ['nombre'], ttl: 60 });
+    assert(Array.isArray(filasSelectTtl), 'Listado con select y ttl devuelve arreglo');
+  } catch (e) {
+    assert(false, 'Listado con select y ttl no debería fallar: ' + e.message);
+  }
+
+
+  // ═════════════════════════════════════════════════════════════════
+  // SUITE 6.9 — RENAME laTaberna_Cartas (A.44) + carga inicial (A.76)
+  // Cobertura: procesador _procesarCartas (DB.cartas) + reducer
+  // cartasReducer del Store. NO cubre poblamiento por bootstrap; ese
+  // flujo vive en test-A-integración-bootstrap.html. Sin claim de
+  // ciclo cerrado.
+  // ═════════════════════════════════════════════════════════════════
+  suite('6.9 Rename laTaberna_Cartas (A.44) + carga inicial (A.76)');
+  const cartasLista = await DBAppwrite.listar('cartas');
+  assert(Array.isArray(cartasLista), 'Listar cartas devuelve array');
+  const cartaId = 'temp_carta_' + Date.now();
+  const cartaCreada = await DBAppwrite.crear('cartas', cartaId, {
+    nombre: 'Carta Temporal Unificado', estado: 'borrador',
+    productos: JSON.stringify(['PubPrueba_prod_hamburguesa']),
+    fondo: '#1a1a2e', tipografia: "'Inter', sans-serif", grilla: false
+  });
+  assert(cartaCreada !== null, 'Carta creada vía DBAppwrite.crear');
+  if (cartaCreada) {
+    idsCreados.cartas.push(cartaId);
+    assert(cartaCreada.espacioId === 'PubPrueba', 'Carta con espacioId=PubPrueba forzado');
+    assert(cartaCreada.nombre === 'Carta Temporal Unificado', 'Carta con nombre correcto');
+  }
+  const cartaLeida = (await DBAppwrite.listar('cartas')).find(c => c.id === cartaId);
+  assert(!!cartaLeida, 'Carta aparece en listado del espacio activo');
+  const cartaActualizada = await DBAppwrite.actualizar('cartas', cartaId, { estado: 'publicado' });
+  assert(cartaActualizada !== null, 'Carta actualizada');
+  if (cartaActualizada) assert(cartaActualizada.estado === 'publicado', 'Carta con estado=publicado');
+  const cartaEliminada = await DBAppwrite.eliminar('cartas', cartaId);
+  assert(cartaEliminada === true, 'Carta eliminada');
+  const cartaFinal = (await DBAppwrite.listar('cartas')).find(c => c.id === cartaId);
+  assert(cartaFinal === undefined, 'Carta ya no aparece en el listado');
+  idsCreados.cartas = idsCreados.cartas.filter(id => id !== cartaId);
+  
+  // ─── A.76: cobertura del procesador y del reducer ───
+  // Cobertura parcial. Procesador: DB.cartas tras init(). Reducer:
+  // respuesta a CARTAS_INICIALIZAR. El poblamiento por bootstrap NO
+  // se cubre aquí. Vive en test-A-integración-bootstrap.html.
+  info('A.76: verificando procesador y reducer del slice cartas.');
+  assert(Array.isArray(DB.cartas), 'A.76 DB.cartas es array tras init()');
+  assert(Array.isArray(Store.obtenerEstado().cartas), 'A.76 Store.cartas es array');
+  assert(
+    Store.obtenerEstado().cartas.length === (DB.cartas || []).length,
+    'A.76 coherencia mínima DB.cartas ↔ Store.cartas (no implica poblamiento por bootstrap)'
+  );
+  // Reducer: crear carta en Appwrite y despachar CARTAS_INICIALIZAR
+  // manualmente. Verifica el reducer, no el flujo de bootstrap.
+  const cartaSyncId = 'temp_carta_sync_' + Date.now();
+  const cartaSyncCreada = await DBAppwrite.crear('cartas', cartaSyncId, {
+    nombre: 'Carta Sync Test', estado: 'borrador',
+    productos: JSON.stringify([]),
+    fondo: '#1a1a2e', tipografia: "'Inter', sans-serif", grilla: false
+  });
+  assert(cartaSyncCreada !== null, 'A.76 carta sync creada');
+  if (cartaSyncCreada) {
+    idsCreados.cartas.push(cartaSyncId);
+    const cartaParaStore = {
+      ...cartaSyncCreada,
+      productos: Array.isArray(cartaSyncCreada.productos) ? cartaSyncCreada.productos : []
+    };
+    const stateActual = Store.obtenerEstado();
+    const cartasActuales = [...(stateActual.cartas || [])];
+    if (!cartasActuales.find(c => c.id === cartaSyncId)) {
+      cartasActuales.push(cartaParaStore);
     }
-
-    function info(msg) { resultsEl.innerHTML += `<div class="test info">ℹ️ ${msg}</div>`; }
-
-    const esperar = ms => new Promise(r => setTimeout(r, ms));
-
-    const idsCreados = { mesas: [], pedidos: [], comandas: [], staff: [], perfiles: [] };
-
-    async function limpiarSesion() { try { await Auth.cerrarSesion(); } catch {} }
-
-    async function limpiarHuella() {
-      for (const id of idsCreados.comandas) { try { await DBAppwrite.eliminar('comandas', id); } catch {} }
-      for (const id of idsCreados.pedidos) { try { await DBAppwrite.eliminar('pedidos', id); } catch {} }
-      for (const id of idsCreados.mesas) { try { await DBAppwrite.eliminar('mesas', id); } catch {} }
-      for (const id of idsCreados.staff) { try { await DBAppwrite.eliminar('staff', id); } catch {} }
-      for (const id of idsCreados.perfiles) { try { await DBAppwrite.eliminar('global_perfiles', id); } catch {} }
-      idsCreados.mesas = [];
-      idsCreados.pedidos = [];
-      idsCreados.comandas = [];
-      idsCreados.staff = [];
-      idsCreados.perfiles = [];
+    Store.despachar({ type: 'CARTAS_INICIALIZAR', payload: cartasActuales });
+    const enStore = Store.obtenerEstado().cartas.find(c => c.id === cartaSyncId);
+    assert(!!enStore, 'A.76 carta aparece en Store tras despacho CARTAS_INICIALIZAR (reducer)');
+    if (enStore) {
+      assert(enStore.nombre === 'Carta Sync Test', 'A.76 Store con nombre correcto');
+      assert(Array.isArray(enStore.productos), 'A.76 Store con productos como array');
     }
+    await DBAppwrite.eliminar('cartas', cartaSyncId).catch(() => {});
+    idsCreados.cartas = idsCreados.cartas.filter(id => id !== cartaSyncId);
+  }
+  
 
-    async function registrarYRegistrarPerfil(nombre, password) {
-      const reg = await Auth.registrarUsuario(nombre, password);
-      if (!reg.exito) return null;
-      const perfil = await DBAppwrite.obtenerPerfilPorUsuarioId(reg.usuarioId);
-      if (perfil) idsCreados.perfiles.push(perfil.id);
-      return { nombre, password, usuarioId: reg.usuarioId, perfilId: perfil?.id || null };
-    }
+  // ═════════════════════════════════════════════════════════════════
+  // SUITE 6.10 — REPOSITORIO DE VARIANTES + STORE (A.45/A.46/A.49/A.50/A.55.bis)
+  // ═════════════════════════════════════════════════════════════════
+  suite('6.10 Repositorio de variantes + Store (A.45/A.46/A.49/A.50/A.55.bis)');
+  const repoVariantes = crearVarianteRepo();
+  const variantesIniciales = await repoVariantes.cargarVariantes();
+  assert(Array.isArray(variantesIniciales), 'cargarVariantes() retorna array');
+  assert(Store.obtenerEstado().variantes.length === variantesIniciales.length, 'Store.variantes sincronizado con cargarVariantes()');
+  let eventoGuardar = null;
+  const limpiarEventoGuardar = EventBus.on('variantes:actualizadas', (v) => { eventoGuardar = v; });
+  const varianteDatos = {
+    nombre: 'Sabor Test Unificado', descripcion: 'Variante creada por test-A-unificado',
+    tipo: 'unica', requerido: false, min_seleccion: 0, max_seleccion: 1,
+    opciones: [{ id: 'sabor_clasica_' + Date.now(), nombre: 'Clásica', precio_delta: 0, activo: true, alergenos: [], insumos_delta: [], pasos_delta: [] }],
+    activo: true, orden: 0
+  };
+  const varianteGuardada = await repoVariantes.guardarVariante(varianteDatos);
+  assert(!!varianteGuardada && !!varianteGuardada.id, 'Variante guardada con id');
+  if (varianteGuardada && varianteGuardada.id) idsCreados.variantes.push(varianteGuardada.id);
+  assert(eventoGuardar !== null, 'Evento variantes:actualizadas emitido en guardar');
+  if (eventoGuardar) assert(eventoGuardar.id === varianteGuardada.id, 'Evento lleva la variante guardada');
+  limpiarEventoGuardar();
+  const enStore = Store.obtenerEstado().variantes.find(v => v.id === varianteGuardada.id);
+  assert(!!enStore, 'Variante aparece en Store.variantes tras guardar');
+  if (enStore) {
+    assert(enStore.nombre === 'Sabor Test Unificado', 'Store con nombre correcto');
+    assert(Array.isArray(enStore.opciones), 'Store con opciones como array');
+    assert(enStore.opciones.length === 1, 'Store con 1 opción');
+  }
+  const varianteEnAppwrite = (await DBAppwrite.listar('variantes')).find(v => v.id === varianteGuardada.id);
+  assert(!!varianteEnAppwrite, 'Variante persiste en Appwrite');
+  if (varianteEnAppwrite) assert(varianteEnAppwrite.espacioId === 'PubPrueba', 'Variante con espacioId=PubPrueba');
+  let eventoDesactivar = null;
+  const limpiarEventoDesactivar = EventBus.on('variantes:actualizadas', (v) => { eventoDesactivar = v; });
+  const varianteDesactivada = await repoVariantes.desactivarVariante(varianteGuardada.id);
+  assert(varianteDesactivada.activo === false, 'desactivarVariante retorna activo=false');
+  assert(eventoDesactivar !== null && eventoDesactivar.activo === false, 'Evento emitido con activo=false');
+  limpiarEventoDesactivar();
+  const enStoreDesactivada = Store.obtenerEstado().variantes.find(v => v.id === varianteGuardada.id);
+  assert(!!enStoreDesactivada && enStoreDesactivada.activo === false, 'Store refleja activo=false tras desactivar');
+  const varianteReactivada = await repoVariantes.reactivarVariante(varianteGuardada.id);
+  assert(varianteReactivada.activo === true, 'reactivarVariante retorna activo=true');
+  const enStoreReactivada = Store.obtenerEstado().variantes.find(v => v.id === varianteGuardada.id);
+  assert(!!enStoreReactivada && enStoreReactivada.activo === true, 'Store refleja activo=true tras reactivar');
 
-    async function crearStaffYRegistrar(datos) {
-      const resultado = await DB.crearOActualizarStaff(datos);
-      if (resultado?.id) idsCreados.staff.push(resultado.id);
-      return resultado;
-    }
+  // ─── 6.10.6 — A.49: guardarProducto persiste variantes_ids ───
+  info('Validando roundtrip de variantes_ids en productos.');
+  const repoReceta = crearRecetaRepo();
+  const prodGuardado = await repoReceta.guardarProducto({
+    nombre: 'Producto Test Variantes IDs ' + Date.now(),
+    activo: true, destino: 'cocina',
+    variantes_ids: ['var_uno_test', 'var_dos_test']
+  });
+  assert(prodGuardado !== null, 'A.49 guardarProducto retorna producto');
+  if (prodGuardado && prodGuardado.id) idsCreados.productos.push(prodGuardado.id);
+  const prodEnAppwrite = prodGuardado ? (await DBAppwrite.listar('productos')).find(p => p.id === prodGuardado.id) : null;
+  assert(!!prodEnAppwrite, 'A.49 producto persiste en Appwrite');
+  if (prodEnAppwrite) {
+    assert(typeof prodEnAppwrite.variantes_ids === 'string', 'A.49 fila cruda: variantes_ids es string JSON');
+    const prodNormalizado = DBCore._normalizarProducto(prodEnAppwrite);
+    assert(Array.isArray(prodNormalizado.variantes_ids), 'A.49 normalizado: variantes_ids es array');
+    assert(prodNormalizado.variantes_ids.length === 2, 'A.49 normalizado: 2 elementos');
+    assert(prodNormalizado.variantes_ids[0] === 'var_uno_test', 'A.49 normalizado: primer elemento es var_uno_test');
+    assert(prodNormalizado.variantes_ids[1] === 'var_dos_test', 'A.49 normalizado: segundo elemento es var_dos_test');
+  }
 
-    async function run() {
-      Logger.setLevel('ERROR');
-      resultsEl.innerHTML = '';
+  // ─── 6.10.7 — A.50: normalizador defensivo ───
+  const prodSinVariantes = DBCore._normalizarProducto({ nombre: 'Test', precio: 100 });
+  assert(Array.isArray(prodSinVariantes.variantes_ids), 'A.50 sin campo → array vacío');
+  assert(prodSinVariantes.variantes_ids.length === 0, 'A.50 sin campo → longitud 0');
+  const prodConString = DBCore._normalizarProducto({ nombre: 'Test', precio: 100, variantes_ids: '["a","b"]' });
+  assert(Array.isArray(prodConString.variantes_ids), 'A.50 string JSON → array');
+  assert(prodConString.variantes_ids.length === 2, 'A.50 string JSON con 2 elementos');
+  const prodConArray = DBCore._normalizarProducto({ nombre: 'Test', precio: 100, variantes_ids: ['x', 'y', 'z'] });
+  assert(Array.isArray(prodConArray.variantes_ids), 'A.50 array → se preserva');
+  assert(prodConArray.variantes_ids.length === 3, 'A.50 array con 3 elementos');
+  const prodConStringRoto = DBCore._normalizarProducto({ nombre: 'Test', precio: 100, variantes_ids: 'no-json' });
+  assert(Array.isArray(prodConStringRoto.variantes_ids), 'A.50 string no-JSON → array vacío');
+  assert(prodConStringRoto.variantes_ids.length === 0, 'A.50 string no-JSON con longitud 0');
 
-      // ── Suite 0: Sanidad de módulos y utilidades ──────
-      resultsEl.innerHTML += '<h2>0. Sanidad de módulos y utilidades</h2>';
-      info('Verificando que todos los módulos y utilidades estén definidos.');
+  // ─── 6.10.8 — A.55.bis: saveRecetas emite recetas:actualizadas ───
+  info('Validando emisión de recetas:actualizadas en saveRecetas.');
+  let payloadRecetas = null;
+  const limpiarRecetas = EventBus.on('recetas:actualizadas', (p) => { payloadRecetas = p; });
+  DB.saveRecetas();
+  assert(payloadRecetas !== null, 'A.55.bis: recetas:actualizadas emitido por saveRecetas');
+  assert(Array.isArray(payloadRecetas), 'A.55.bis: payload es array');
+  limpiarRecetas();
 
-      assert(typeof window.Appwrite !== 'undefined', 'SDK Appwrite cargado');
-      assert(typeof Logger !== 'undefined', 'Logger existe');
-      assert(typeof EventBus !== 'undefined', 'EventBus existe');
-      assert(typeof Store !== 'undefined', 'Store existe');
-      assert(typeof CommandBus !== 'undefined', 'CommandBus existe');
-      assert(typeof Deps !== 'undefined', 'Deps existe');
-      assert(typeof DB !== 'undefined', 'DB existe');
-      assert(typeof DBAppwrite !== 'undefined', 'DBAppwrite existe');
-      assert(typeof Roles !== 'undefined', 'Roles existe');
-      assert(typeof PedidoManager !== 'undefined', 'PedidoManager existe');
-      assert(typeof PedidoRepositoryLocal !== 'undefined', 'PedidoRepositoryLocal existe');
-      assert(typeof DBCore !== 'undefined', 'DBCore existe');
-      assert(typeof mesaVacia === 'function', 'mesaVacia es función');
-      assert(typeof $id === 'function', '$id es función');
-      assert(typeof formatearDinero === 'function', 'formatearDinero es función');
-      assert(typeof mostrarToast === 'function', 'mostrarToast es función');
-      assert(typeof calcularTotal === 'function', 'calcularTotal es función');
-      assert(typeof formatearHoraCorta === 'function', 'formatearHoraCorta es función');
-      assert(typeof crearCantidad === 'function', 'crearCantidad es función');
-      assert(typeof crearDinero === 'function', 'crearDinero es función');
-      assert(typeof Resultado !== 'undefined', 'Resultado existe');
+  // ═════════════════════════════════════════════════════════════════
+  // SUITE 6.11 — REALTIME VARIANTES
+  // ═════════════════════════════════════════════════════════════════
+  suite('6.11 Realtime variantes');
+  let realtimeVarianteRecibido = false;
+  const limpiarRtVariante = EventBus.on('variantes:actualizada', () => { realtimeVarianteRecibido = true; });
+  await DBAppwrite.iniciarRealtime();
+  await esperar(1500);
+  const varianteRt = await repoVariantes.guardarVariante({
+    nombre: 'Variante Realtime Unificado', tipo: 'unica', requerido: false,
+    min_seleccion: 0, max_seleccion: 1, opciones: [], activo: true, orden: 0
+  });
+  if (varianteRt && varianteRt.id) idsCreados.variantes.push(varianteRt.id);
+  await esperar(3500);
+  limpiarRtVariante();
+  assert(realtimeVarianteRecibido, 'Realtime: evento variantes:actualizada recibido');
 
-      // ── Autenticación e inicialización ─────────────────
-      info('Inicializando Auth y Appwrite...');
-      await inicializarAuth();
-      if (!(await DBAppwrite.iniciar())) {
-        assert(false, 'No se pudo inicializar Appwrite');
-        return;
+  // ═════════════════════════════════════════════════════════════════
+  // SUITE 6.12 — MOTOR DE DESCUENTO SIN RECETA (A.48)
+  // ═════════════════════════════════════════════════════════════════
+  suite('6.12 Motor de descuento sin receta (A.48)');
+  const insumoHieloId = 'test_ins_hielo_' + Date.now();
+  const insumoHieloCreado = await DBAppwrite.crear('insumos', insumoHieloId, {
+    nombre: 'Hielo Test A.48', stock: 100, stock_minimo: 5, unidad: 'u',
+    tipo: 'cocina', categoria: 'test', destino: 'cocina'
+  });
+  assert(insumoHieloCreado !== null, 'A.48 setup: insumo de test creado en Appwrite');
+  if (insumoHieloCreado) {
+    idsCreados.insumos.push(insumoHieloId);
+    DB.insumos.push(insumoHieloCreado);
+  }
+  const prodSinRecetaId = 'test_prod_bebida_' + Date.now();
+  const opcionesSumar = [{ varianteId: 'var_hielo_test', opcionId: 'extra_hielo', insumos_delta: [{ insumoId: insumoHieloId, cantidad: 2, accion: 'sumar' }] }];
+  const resultadoSumar = await DB.consumirInsumosDeProducto(
+    { tipo: 'producto', id: prodSinRecetaId, qty: 1, opciones: opcionesSumar }, 1, 'Test A.48 sumar'
+  );
+  assert(resultadoSumar.ok === true, 'A.48 sumar: ok=true');
+  assert(Array.isArray(resultadoSumar.exitosos), 'A.48 sumar: exitosos es array');
+  assert(resultadoSumar.exitosos.length === 1, 'A.48 sumar: 1 insumo descontado');
+  if (resultadoSumar.exitosos.length === 1) {
+    assert(resultadoSumar.exitosos[0].insumoId === insumoHieloId, 'A.48 sumar: insumo es hielo');
+    assert(resultadoSumar.exitosos[0].cantidad === 2, 'A.48 sumar: cantidad 2');
+  }
+  assert(resultadoSumar.fallidos.length === 0, 'A.48 sumar: sin fallidos');
+  await esperar(500);
+  const insumoPost = (await DBAppwrite.listar('insumos')).find(i => i.id === insumoHieloId);
+  assert(insumoPost?.stock === 98, 'A.48 sumar: stock pasó de 100 a 98 en Appwrite');
+  const resultadoSinOpciones = await DB.consumirInsumosDeProducto(
+    { tipo: 'producto', id: prodSinRecetaId, qty: 1, opciones: [] }, 1, 'Test A.48 sin opciones'
+  );
+  assert(resultadoSinOpciones.ok === true, 'A.48 sin opciones: ok=true');
+  assert(resultadoSinOpciones.exitosos.length === 0, 'A.48 sin opciones: sin descuento');
+  assert(resultadoSinOpciones.fallidos.length === 0, 'A.48 sin opciones: sin fallos');
+  const opcionesQuitar = [{ varianteId: 'var_quitar_test', opcionId: 'quitar_hielo', insumos_delta: [{ insumoId: insumoHieloId, cantidad: 5, accion: 'quitar' }] }];
+  const resultadoQuitar = await DB.consumirInsumosDeProducto(
+    { tipo: 'producto', id: prodSinRecetaId, qty: 1, opciones: opcionesQuitar }, 1, 'Test A.48 quitar sin base'
+  );
+  assert(resultadoQuitar.ok === true, 'A.48 quitar sin base: ok=true');
+  assert(resultadoQuitar.exitosos.length === 0, 'A.48 quitar sin base: sin descuento');
+  const insumosReceta = DB.getInsumosDeProducto('PubPrueba_prod_hamburguesa', 1);
+  assert(Array.isArray(insumosReceta), 'A.48 regresión: getInsumosDeProducto retorna array');
+  assert(insumosReceta.length >= 1, 'A.48 regresión: receta resuelve al menos 1 insumo');
+
+  // ═════════════════════════════════════════════════════════════════
+  // SUITE 6.13 — CHEQUEO DE CICLOS EN RECETAS (A.61)
+  // ═════════════════════════════════════════════════════════════════
+  suite('6.13 Chequeo de ciclos en recetas (A.61)');
+  info('Validando detección de ciclos en _resolverInsumos.');
+
+  // 6.13.1 — Caso sin ciclo: A usa B, B usa insumo
+  const recetasOk = [
+    { id: 'rec_A_test', productoId: 'prod_A_test', ingredientes: [
+      { tipo: 'subreceta', id: 'rec_B_test', cantidad: 2 }
+    ] },
+    { id: 'rec_B_test', productoId: 'prod_B_test', ingredientes: [
+      { tipo: 'insumo', id: 'ins_X_test', cantidad: 1 }
+    ] }
+  ];
+  const insumosOk = [{ id: 'ins_X_test', nombre: 'Insumo X', unidad: 'u' }];
+  const resultadoOk = DB.getInsumosDeProducto('prod_A_test', 1, recetasOk, insumosOk);
+  assert(Array.isArray(resultadoOk), 'A.61 sin ciclo: retorna array');
+  assert(resultadoOk.length === 1, 'A.61 sin ciclo: 1 insumo base');
+  assert(resultadoOk[0].insumoId === 'ins_X_test', 'A.61 sin ciclo: insumo correcto');
+  assert(resultadoOk[0].cantidadNecesaria === 2, 'A.61 sin ciclo: cantidad = 1×2 = 2');
+
+  // 6.13.2 — Ciclo directo: A usa B, B usa A
+  Logger.setCollect(true);
+  Logger.setLevel('WARN');
+
+  const recetasCiclo = [
+    { id: 'rec_A_c', productoId: 'prod_A_c', ingredientes: [
+      { tipo: 'subreceta', id: 'rec_B_c', cantidad: 1 }
+    ] },
+    { id: 'rec_B_c', productoId: 'prod_B_c', ingredientes: [
+      { tipo: 'subreceta', id: 'rec_A_c', cantidad: 1 }
+    ] }
+  ];
+  const resultadoCiclo = DB.getInsumosDeProducto('prod_A_c', 1, recetasCiclo, []);
+
+  const logsCiclo = Logger.getLogs();
+  const hayWarningCiclo = logsCiclo.some(l =>
+    typeof l.message === 'string' && l.message.includes('Ciclo')
+  );
+
+  Logger.setCollect(false);
+  Logger.setLevel('ERROR');
+
+  assert(Array.isArray(resultadoCiclo), 'A.61 con ciclo: retorna array sin colgar');
+  assert(resultadoCiclo.length === 0, 'A.61 con ciclo: rama con ciclo devuelve vacío');
+  assert(hayWarningCiclo, 'A.61 con ciclo: warning logueado');
+
+  // 6.13.3 — Ciclo transitivo: A → B → C → A
+  Logger.setCollect(true);
+  Logger.setLevel('WARN');
+
+  const recetasTrans = [
+    { id: 'rec_A_t', productoId: 'prod_A_t', ingredientes: [
+      { tipo: 'subreceta', id: 'rec_B_t', cantidad: 1 }
+    ] },
+    { id: 'rec_B_t', productoId: 'prod_B_t', ingredientes: [
+      { tipo: 'subreceta', id: 'rec_C_t', cantidad: 1 }
+    ] },
+    { id: 'rec_C_t', productoId: 'prod_C_t', ingredientes: [
+      { tipo: 'subreceta', id: 'rec_A_t', cantidad: 1 }
+    ] }
+  ];
+  const resultadoTrans = DB.getInsumosDeProducto('prod_A_t', 1, recetasTrans, []);
+
+  const logsTrans = Logger.getLogs();
+  const hayWarningTrans = logsTrans.some(l =>
+    typeof l.message === 'string' && l.message.includes('Ciclo')
+  );
+
+  Logger.setCollect(false);
+  Logger.setLevel('ERROR');
+
+  assert(Array.isArray(resultadoTrans), 'A.61 ciclo transitivo: retorna array sin colgar');
+  assert(resultadoTrans.length === 0, 'A.61 ciclo transitivo: vacío');
+  assert(hayWarningTrans, 'A.61 ciclo transitivo: warning logueado');
+
+  // 6.13.4 — Regresión: dos llamadas independientes a la misma
+  // sub-receta no generan falsos positivos (el Set es por rama).
+  const recetasCompartida = [
+    { id: 'rec_P1', productoId: 'prod_P1', ingredientes: [
+      { tipo: 'subreceta', id: 'rec_Compartida', cantidad: 1 }
+    ] },
+    { id: 'rec_P2', productoId: 'prod_P2', ingredientes: [
+      { tipo: 'subreceta', id: 'rec_Compartida', cantidad: 2 }
+    ] },
+    { id: 'rec_Compartida', productoId: 'prod_Comp', ingredientes: [
+      { tipo: 'insumo', id: 'ins_Y', cantidad: 1 }
+    ] }
+  ];
+  const insumosY = [{ id: 'ins_Y', nombre: 'Y', unidad: 'u' }];
+  const resultadoP1 = DB.getInsumosDeProducto('prod_P1', 1, recetasCompartida, insumosY);
+  const resultadoP2 = DB.getInsumosDeProducto('prod_P2', 1, recetasCompartida, insumosY);
+
+  assert(resultadoP1.length === 1, 'A.61 compartida: P1 resuelve OK');
+  assert(resultadoP2.length === 1, 'A.61 compartida: P2 resuelve OK (sin falso ciclo)');
+  assert(resultadoP1[0].cantidadNecesaria === 1, 'A.61 compartida: P1 cantidad = 1');
+  assert(resultadoP2[0].cantidadNecesaria === 2, 'A.61 compartida: P2 cantidad = 2');
+
+
+  // ═════════════════════════════════════════════════════════════════
+  // SUITE 6.15 — RAMA RESTRINGIDA PARA JUGADOR EN asignar-rol (A.65)
+  // Invocación por SDK oficial (no fetch directo, bloqueado por CORS).
+  // ═════════════════════════════════════════════════════════════════
+  suite('6.15 Rama restringida para jugador en asignar-rol (A.65)');
+  info('Validando creación de precarga por jugador sin Team vía SDK.');
+  
+  // 6.15.1 — Registrar un jugador temporal sin Team
+  // Nombre corto para no exceder el límite de 30 caracteres de
+  // registrar-usuario (usamos base36 de Date.now).
+  const nombreJugadorPrecarga = 'jp_' + Date.now().toString(36);
+  const passwordJugadorPrecarga = 'pass12345';
+  const regPrecarga = await Auth.registrarUsuario(nombreJugadorPrecarga, passwordJugadorPrecarga);
+  assert(regPrecarga.exito === true, 'A.65 jugador temporal registrado');
+  if (regPrecarga.exito && regPrecarga.usuarioId) {
+  idsCreados.perfiles.push(regPrecarga.usuarioId);
+  idsCreados.espacios.push('mirefugio_' + regPrecarga.usuarioId);
+  }
+  
+  // 6.15.2 — Login del jugador
+  await limpiarSesion();
+  const loginPrecarga = await Auth.iniciarSesion(nombreJugadorPrecarga, passwordJugadorPrecarga);
+  assert(loginPrecarga === true, 'A.65 jugador inicia sesión');
+  const usuarioPrecarga = Auth.obtenerUsuarioActual();
+  assert(usuarioPrecarga?.rolesEfectivos.includes('jugador'), 'A.65 jugador tiene rol jugador');
+  assert(usuarioPrecarga?.espacioActivoId?.startsWith('mirefugio_'),
+  'A.65 jugador sin Team (espacio activo es personal)');
+  
+  // 6.15.3 — Obtener usuarioId real para validar contra el de la fila
+  const usuarioIdReal = await Auth.obtenerIdUsuarioAppwrite();
+  assert(!!usuarioIdReal, 'A.65 usuarioId real obtenido');
+  
+  // 6.15.4 — Invocación por SDK con payload válido
+  // El SDK usa el dominio de Appwrite Cloud (no el de la función),
+  // así que no lo bloquea CORS y Appwrite inyecta el JWT de la sesión.
+  let resultadoInvocacion = null;
+  let errorInvocacion = null;
+  try {
+  const funciones = new window.Appwrite.Functions(DBAppwrite.cliente);
+  const ejecucion = await funciones.createExecution({
+    functionId: ID_FUNCION_ASIGNAR_ROL,
+    body: JSON.stringify({
+      accion: 'crear',
+      coleccion: 'pedidos',
+      datos: {
+        mesa: '5',
+        tipo: 'local',
+        origen: 'cliente',
+        estado: 'precarga',
+        mozo: '',
+        comensales: 2,
+        items: JSON.stringify([{ prodId: 'prod_test', nombre: 'Test', precio: 100, qty: 1 }]),
+        total: 100,
+        observaciones: '',
+        transacciones: '[]',
+        descuento: 0,
+        id_usuario: 'valor-falso-que-debe-ser-ignorado',
+        nombre_comensal: 'Test',
+        espacioId: 'PubPrueba'
       }
-      await limpiarSesion();
-      if (!(await Auth.iniciarSesion('master', 'master123'))) {
-        assert(false, 'No se pudo autenticar como master');
-        return;
+    }),
+    async: false
+  });
+  const cuerpo = ejecucion.responseBody || ejecucion.body || ejecucion.response;
+  try {
+    resultadoInvocacion = JSON.parse(cuerpo);
+  } catch (e) {
+    resultadoInvocacion = { _error_parse: String(cuerpo).substring(0, 500) };
+  }
+  } catch (e) {
+  errorInvocacion = e;
+  }
+  
+  assert(errorInvocacion === null, 'A.65 SDK invocó sin excepción');
+  assert(resultadoInvocacion?.exito === true,
+  'A.65 función respondió con exito:true para payload válido');
+  
+  if (resultadoInvocacion?.row?.$id) {
+  idsCreados.pedidos.push(resultadoInvocacion.row.$id);
+  }
+  
+  // 6.15.5 — Verificar campos de la fila creada
+  if (resultadoInvocacion?.row) {
+  const row = resultadoInvocacion.row;
+  assert(row.espacioId === 'PubPrueba',
+    'A.65 precarga creada en el espacioId del payload (PubPrueba)');
+  assert(row.origen === 'cliente',
+    'A.65 precarga con origen cliente');
+  assert(row.estado === 'precarga',
+    'A.65 precarga con estado precarga');
+  assert(row.id_usuario === usuarioIdReal,
+    'A.65 id_usuario viene del JWT (no del payload)');
+  
+  // Validar permisos de fila generados
+  const permisos = row.$permissions || [];
+  const tieneReadTeam = permisos.some(p => p === 'read("team:PubPrueba")');
+  const tieneUpdateMesero = permisos.some(p => p === 'update("team:PubPrueba/mesero")');
+  const tieneDeleteOwner = permisos.some(p => p === 'delete("team:PubPrueba/owner")');
+  assert(tieneReadTeam, 'A.65 permisos: read team:PubPrueba');
+  assert(tieneUpdateMesero, 'A.65 permisos: update mesero');
+  assert(tieneDeleteOwner, 'A.65 permisos: delete owner');
+  }
+  
+  // 6.15.6 — Verificar persistencia en Appwrite (login como jefePub
+  // porque el jugador no puede leer PubPrueba).
+  if (resultadoInvocacion?.row?.$id) {
+  await limpiarSesion();
+  await Auth.iniciarSesion('jefePub', 'jefe1234');
+  await esperar(500);
+  const pedidoEnAppwrite = (await DBAppwrite.listar('pedidos'))
+    .find(p => p.id === resultadoInvocacion.row.$id);
+  assert(!!pedidoEnAppwrite, 'A.65 precarga persiste en Appwrite');
+  }
+  
+  // 6.15.7 — Volver a login del jugador para tests negativos
+  await limpiarSesion();
+  await Auth.iniciarSesion(nombreJugadorPrecarga, passwordJugadorPrecarga);
+  
+  // 6.15.8 — Payload inválido: colección distinta de 'pedidos'
+  let rechazoColeccion = null;
+  try {
+  const funciones = new window.Appwrite.Functions(DBAppwrite.cliente);
+  const ejecucion = await funciones.createExecution({
+    functionId: ID_FUNCION_ASIGNAR_ROL,
+    body: JSON.stringify({
+      accion: 'crear',
+      coleccion: 'mesas',
+      datos: { numero: '999', estado: 'libre', espacioId: 'PubPrueba' }
+    }),
+    async: false
+  });
+  const cuerpo = ejecucion.responseBody || ejecucion.body || ejecucion.response;
+  try { rechazoColeccion = JSON.parse(cuerpo); } catch { rechazoColeccion = { _error: 'parse' }; }
+  } catch (e) {
+  rechazoColeccion = { _error_exception: e.message };
+  }
+  assert(rechazoColeccion?.exito === false,
+  'A.65 jugador no puede crear filas en otras colecciones');
+  assert(typeof rechazoColeccion?.error === 'string' && rechazoColeccion.error.includes('pedidos'),
+  'A.65 rechazo por colección menciona "pedidos"');
+  
+  // 6.15.9 — Payload inválido: estado distinto de 'precarga'
+  let rechazoEstado = null;
+  try {
+  const funciones = new window.Appwrite.Functions(DBAppwrite.cliente);
+  const ejecucion = await funciones.createExecution({
+    functionId: ID_FUNCION_ASIGNAR_ROL,
+    body: JSON.stringify({
+      accion: 'crear',
+      coleccion: 'pedidos',
+      datos: {
+        mesa: '5',
+        tipo: 'local',
+        origen: 'cliente',
+        estado: 'abierta',
+        espacioId: 'PubPrueba'
       }
-      assert(true, 'Master autenticado');
-
-      await DB.init();
-      PedidoManager.init({ pedidoRepo: PedidoRepositoryLocal });
-      Deps.registrar('pedidoRepo', PedidoRepositoryLocal);
-      Deps.registrar('inventarioService', { validarStockParaArticulos: () => ({ ok: true, faltantes: [] }) });
-      info('DB y PedidoManager inicializados');
-
-      // ── Suite 1: Registro y perfil global ─────────────
-      resultsEl.innerHTML += '<h2>1. Registro y perfil global</h2>';
-      const nombreCliente = 'test_uni_' + Date.now();
-      const passwordCliente = 'pass12345';
-      const cliente = await registrarYRegistrarPerfil(nombreCliente, passwordCliente);
-      assert(cliente !== null, 'Usuario registrado mediante función');
-      assert(cliente?.usuarioId !== undefined, 'usuarioId devuelto');
-
-      await limpiarSesion();
-      assert(await Auth.iniciarSesion(nombreCliente, passwordCliente), 'Cliente inicia sesión');
-      assert(Auth.obtenerRolesEfectivos().includes('cliente'), 'Rol inicial cliente');
-      const perfilCliente = Auth.obtenerUsuarioActual()?.perfil;
-      assert(!!perfilCliente, 'Perfil global cargado');
-      assert(perfilCliente?.nombreUsuario === nombreCliente, 'Perfil con nombreUsuario correcto');
-      assert(perfilCliente?.nombre === nombreCliente, 'Perfil con nombre visible correcto');
-
-      const perfilAppwrite = await DBAppwrite.obtenerPerfilPorUsuarioId(cliente.usuarioId);
-      assert(!!perfilAppwrite, 'Perfil global existe en Appwrite');
-      assert(perfilAppwrite?.nombreUsuario === nombreCliente, 'Perfil en Appwrite con nombreUsuario correcto');
-
-      // ── Suite 2: Jerarquía de roles ───────────────────
-      resultsEl.innerHTML += '<h2>2. Jerarquía de roles</h2>';
-      await limpiarSesion();
-      await Auth.iniciarSesion('master', 'master123');
-
-      const adminUser = await registrarYRegistrarPerfil('test_admin_' + Date.now(), 'pass12345');
-      const adminStaff = await crearStaffYRegistrar({
-        nombre: 'Admin Test ' + adminUser.usuarioId,
-        usuarioId: adminUser.usuarioId,
-        espacioId: 'lataberna',
-        roles: ['admin'],
-        rolPrincipal: 'admin',
-        estado: 'activo',
-        tokenVinculacion: ''
-      });
-      assert(!!adminStaff, 'master asigna admin correctamente');
-
-      await limpiarSesion();
-      assert(await Auth.iniciarSesion(adminUser.nombre, adminUser.password), 'Admin inicia sesión');
-      assert(Auth.obtenerRolesEfectivos().includes('admin'), 'Admin tiene rol admin');
-      assert(Auth.puedeAsignarGerente() === true, 'Admin puede asignar gerente');
-      assert(Auth.puedeAsignarAdmin() === false, 'Admin NO puede asignar admin');
-      assert(Auth.puedeAsignarStaff() === true, 'Admin puede asignar staff');
-
-      const gerenteUser = await registrarYRegistrarPerfil('test_ger_' + Date.now(), 'pass12345');
-      const gerenteStaff = await crearStaffYRegistrar({
-        nombre: 'Gerente Test ' + gerenteUser.usuarioId,
-        usuarioId: gerenteUser.usuarioId,
-        espacioId: 'lataberna',
-        roles: ['gerente'],
-        rolPrincipal: 'gerente',
-        estado: 'activo',
-        tokenVinculacion: ''
-      });
-      assert(!!gerenteStaff, 'Admin asigna gerente correctamente');
-
-      await limpiarSesion();
-      assert(await Auth.iniciarSesion(gerenteUser.nombre, gerenteUser.password), 'Gerente inicia sesión');
-      assert(Auth.obtenerRolesEfectivos().includes('gerente'), 'Gerente tiene rol gerente');
-      assert(Auth.puedeAsignarStaff() === true, 'Gerente puede asignar staff');
-      assert(Auth.puedeAsignarGerente() === false, 'Gerente NO puede asignar gerente');
-      assert(Auth.puedeAsignarAdmin() === false, 'Gerente NO puede asignar admin');
-
-      const meseroUser = await registrarYRegistrarPerfil('test_mes_' + Date.now(), 'pass12345');
-      const meseroStaff = await crearStaffYRegistrar({
-        nombre: 'Mesero Test ' + meseroUser.usuarioId,
-        usuarioId: meseroUser.usuarioId,
-        espacioId: 'lataberna',
-        roles: ['mesero'],
-        rolPrincipal: 'mesero',
-        estado: 'activo',
-        tokenVinculacion: ''
-      });
-      assert(!!meseroStaff, 'Gerente asigna mesero correctamente');
-
-      await limpiarSesion();
-      assert(await Auth.iniciarSesion(meseroUser.nombre, meseroUser.password), 'Mesero inicia sesión');
-      assert(Auth.obtenerRolesEfectivos().includes('mesero'), 'Mesero tiene rol mesero');
-      assert(Auth.puedeAsignarStaff() === false, 'Mesero NO puede asignar staff');
-      assert(Auth.puedeAsignarGerente() === false, 'Mesero NO puede asignar gerente');
-      assert(Auth.puedeAsignarAdmin() === false, 'Mesero NO puede asignar admin');
-
-      await limpiarSesion();
-      await Auth.iniciarSesion(gerenteUser.nombre, gerenteUser.password);
-      let errorAsignacion = null;
-      try {
-        await crearStaffYRegistrar({
-          nombre: 'Admin No Permitido',
-          usuarioId: 'usr_invalido_' + Date.now(),
-          espacioId: 'lataberna',
-          roles: ['admin'],
-          rolPrincipal: 'admin',
-          estado: 'activo'
-        });
-      } catch (e) {
-        errorAsignacion = e.message;
+    }),
+    async: false
+  });
+  const cuerpo = ejecucion.responseBody || ejecucion.body || ejecucion.response;
+  try { rechazoEstado = JSON.parse(cuerpo); } catch { rechazoEstado = { _error: 'parse' }; }
+  } catch (e) {
+  rechazoEstado = { _error_exception: e.message };
+  }
+  assert(rechazoEstado?.exito === false,
+  'A.65 jugador no puede crear pedidos con estado distinto de precarga');
+  
+  // 6.15.10 — Payload inválido: espacioId fuera de lataberna
+  let rechazoEspacio = null;
+  try {
+  const funciones = new window.Appwrite.Functions(DBAppwrite.cliente);
+  const ejecucion = await funciones.createExecution({
+    functionId: ID_FUNCION_ASIGNAR_ROL,
+    body: JSON.stringify({
+      accion: 'crear',
+      coleccion: 'pedidos',
+      datos: {
+        mesa: '5',
+        tipo: 'local',
+        origen: 'cliente',
+        estado: 'precarga',
+        espacioId: 'espacio_inexistente_test'
       }
-      assert(errorAsignacion !== null, 'Gerente no puede asignar admin (validación jerárquica)');
+    }),
+    async: false
+  });
+  const cuerpo = ejecucion.responseBody || ejecucion.body || ejecucion.response;
+  try { rechazoEspacio = JSON.parse(cuerpo); } catch { rechazoEspacio = { _error: 'parse' }; }
+  } catch (e) {
+  rechazoEspacio = { _error_exception: e.message };
+  }
+  assert(rechazoEspacio?.exito === false,
+  'A.65 jugador no puede crear en espacio inexistente o ajeno a lataberna');
+  
+  // 6.15.11 — Aislamiento: jugador desde MiRefugio no ve pedidos PubPrueba
+  const pedidosMirefugio = await DBAppwrite.listar('pedidos');
+  assert(!pedidosMirefugio.some(p => p.espacioId === 'PubPrueba'),
+  'A.65 jugador desde MiRefugio no ve pedidos de PubPrueba');
+  
+  // 6.15.12 — Restaurar sesión de jefePub
+  await limpiarSesion();
+  await Auth.iniciarSesion('jefePub', 'jefe1234');
 
-      // ── Suite 3: Staff y token de vinculación ─────────
-      resultsEl.innerHTML += '<h2>3. Staff y token de vinculación</h2>';
-      await limpiarSesion();
-      await Auth.iniciarSesion('master', 'master123');
+  // ═════════════════════════════════════════════════════════════════
+  // SUITE 6.16 — crearPrecargaCliente (A.70)
+  // ═════════════════════════════════════════════════════════════════
+  suite('6.16 crearPrecargaCliente (A.70)');
+  info('Validando el método para precargas de cliente sin Team.');
+  
+  // 6.16.1 — Registrar jugador temporal
+  const nombreJugadorCrearPrecarga = 'cp_' + Date.now().toString(36);
+  const regCrearPrecarga = await Auth.registrarUsuario(nombreJugadorCrearPrecarga, 'pass12345');
+  assert(regCrearPrecarga.exito === true, 'A.70 jugador temporal registrado');
+  if (regCrearPrecarga.exito && regCrearPrecarga.usuarioId) {
+    idsCreados.perfiles.push(regCrearPrecarga.usuarioId);
+    idsCreados.espacios.push('mirefugio_' + regCrearPrecarga.usuarioId);
+  }
+  
+  // 6.16.2 — Login del jugador
+  await limpiarSesion();
+  const loginCrearPrecarga = await Auth.iniciarSesion(nombreJugadorCrearPrecarga, 'pass12345');
+  assert(loginCrearPrecarga === true, 'A.70 jugador inicia sesión');
+  
+  // 6.16.3 — Sin espacioId → null
+  const sinEspacio = await DBAppwrite.crearPrecargaCliente(
+    { mesa: '5', tipo: 'local', origen: 'cliente', estado: 'precarga', items: '[]' },
+    null
+  );
+  assert(sinEspacio === null, 'A.70 sin espacioId devuelve null');
+  
+  // 6.16.4 — EspacioId vacío → null
+  const espacioVacio = await DBAppwrite.crearPrecargaCliente(
+    { mesa: '5', tipo: 'local', origen: 'cliente', estado: 'precarga', items: '[]' },
+    ''
+  );
+  assert(espacioVacio === null, 'A.70 espacioId vacío devuelve null');
+  
+  // 6.16.5 — EspacioId de otro app → null
+  const espacioAjeno = await DBAppwrite.crearPrecargaCliente(
+    { mesa: '5', tipo: 'local', origen: 'cliente', estado: 'precarga', items: '[]' },
+    'mirefugio_usr_test'
+  );
+  assert(espacioAjeno === null, 'A.70 espacioId ajeno devuelve null');
+  
+  // 6.16.6 — EspacioId inexistente → null
+  const espacioInexistente = await DBAppwrite.crearPrecargaCliente(
+    { mesa: '5', tipo: 'local', origen: 'cliente', estado: 'precarga', items: '[]' },
+    'espacio_que_no_existe_' + Date.now()
+  );
+  assert(espacioInexistente === null, 'A.70 espacioId inexistente devuelve null');
+  
+  // 6.16.7 — EspacioId válido + payload válido → fila creada
+  const precargaCreada = await DBAppwrite.crearPrecargaCliente(
+    {
+      mesa: '5',
+      tipo: 'local',
+      origen: 'cliente',
+      estado: 'precarga',
+      mozo: '',
+      comensales: 2,
+      items: JSON.stringify([{ prodId: 'prod_test', nombre: 'Test', precio: 100, qty: 1 }]),
+      total: 100,
+      observaciones: '',
+      transacciones: '[]',
+      descuento: 0,
+      nombre_comensal: 'Test'
+    },
+    'PubPrueba'
+  );
+  
+  assert(precargaCreada !== null, 'A.70 precarga creada con espacio válido');
+  if (precargaCreada) {
+    idsCreados.pedidos.push(precargaCreada.id);
+    assert(precargaCreada.espacioId === 'PubPrueba',
+      'A.70 precarga con espacioId del parámetro (no del espacio activo)');
+    assert(precargaCreada.origen === 'cliente',
+      'A.70 precarga con origen cliente');
+    assert(precargaCreada.estado === 'precarga',
+      'A.70 precarga con estado precarga');
+  }
+  
+  // 6.16.8 — Verificar persistencia
+  if (precargaCreada?.id) {
+    await limpiarSesion();
+    await Auth.iniciarSesion('jefePub', 'jefe1234');
+    await esperar(500);
+    const precargaEnAppwrite = (await DBAppwrite.listar('pedidos'))
+      .find(p => p.id === precargaCreada.id);
+    assert(!!precargaEnAppwrite, 'A.70 precarga persiste en Appwrite');
+  }
+  
+  // 6.16.9 — Restaurar sesión de jefePub
+  await limpiarSesion();
+  await Auth.iniciarSesion('jefePub', 'jefe1234');
 
-      const tokenStaff = 'tk_uni_' + Date.now();
-      const staffVinculado = await crearStaffYRegistrar({
-        nombre: 'Staff Vinculado ' + cliente.usuarioId,
-        usuarioId: cliente.usuarioId,
-        espacioId: 'lataberna',
-        roles: ['mesero', 'barraAyudante'],
-        rolPrincipal: 'mesero',
-        estado: 'activo',
-        tokenVinculacion: tokenStaff
-      });
-      assert(!!staffVinculado, 'Staff con token creado');
 
-      await limpiarSesion();
-      assert(await Auth.iniciarSesion(nombreCliente, passwordCliente), 'Cliente inicia sesión para canje');
-      const resultadoVinculacion = await Auth.vincularCuentaStaff(tokenStaff);
-      assert(resultadoVinculacion.exito === true, 'Token canjeado correctamente');
-      const rolesFinales = Auth.obtenerRolesEfectivos();
-      assert(rolesFinales.includes('mesero') && rolesFinales.includes('barraAyudante'), 'Roles múltiples tras vinculación');
-      assert(Auth.obtenerRolPrincipal() === 'mesero', 'Rol principal correcto tras vinculación');
+  // ═════════════════════════════════════════════════════════════════
+  // SUITE 6.17 — Sincronización de labels vía SDK (A.71)
+  // ═════════════════════════════════════════════════════════════════
+  suite('6.17 Sincronización de labels vía SDK (A.71)');
+  info('Validando que la invocación usa SDK oficial.');
+  
+  // 6.17.1 — El método público existe
+  assert(typeof DBAppwrite.invocarAsignarRol === 'function',
+    'A.71 DBAppwrite.invocarAsignarRol es función');
+  
+  // 6.17.2 — Invocación con payload vacío no lanza TypeError de CORS.
+  // Si el SDK está en uso, responde con error del servidor o éxito,
+  // pero nunca con TypeError: Failed to fetch.
+  let respuestaInvalida = null;
+  let excepcionInvalida = null;
+  try {
+    respuestaInvalida = await DBAppwrite.invocarAsignarRol({ foo: 'bar' });
+  } catch (e) {
+    excepcionInvalida = e;
+  }
+  assert(excepcionInvalida === null,
+    'A.71 invocación no lanza excepción CORS');
+  assert(respuestaInvalida !== null && typeof respuestaInvalida === 'object',
+    'A.71 respuesta de la función es un objeto');
 
-      // ── Suite 4: Mesas, pedidos y comandas ────────────
-      resultsEl.innerHTML += '<h2>4. Mesas, pedidos y comandas</h2>';
-      await limpiarSesion();
-      await Auth.iniciarSesion('master', 'master123');
+  // ═════════════════════════════════════════════════════════════════
+  // SUITE 6.18 — Movimientos de inventario (A.74)
+  // ═════════════════════════════════════════════════════════════════
+  suite('6.18 Movimientos de inventario (A.74)');
+  info('Validando log append-only de ajustes y consumos.');
+  
+  // 6.18.1 — Setup: crear insumo de test
+  const insumoMovId = 'test_mov_insumo_' + Date.now();
+  const insumoMovCreado = await DBAppwrite.crear('insumos', insumoMovId, {
+    nombre: 'Insumo Movimiento Test',
+    stock: 100,
+    stock_minimo: 10,
+    unidad: 'kg',
+    tipo: 'cocina',
+    categoria: 'test',
+    destino: 'cocina'
+  });
+  assert(!!insumoMovCreado, 'A.74 setup: insumo creado');
+  if (insumoMovCreado) {
+    idsCreados.insumos.push(insumoMovId);
+    DB.insumos.push(insumoMovCreado);
+  }
+  
+  // Esperar a que esté en el array interno
+  await esperar(300);
+  
+  // Limpiar movimientos del Store para empezar limpios
+  Store.despachar({ type: 'MOVIMIENTOS_LIMPIAR' });
+  const movimientosAntes = Store.obtenerEstado().movimientos.length;
+  assert(movimientosAntes === 0, 'A.74 slice movimientos arranca limpio');
+  
+  // 6.18.2 — Suscripción al evento movimientos:actualizados
+  let eventoMovimientoRecibido = null;
+  const limpiarEventoMovimiento = EventBus.on('movimientos:actualizados', (m) => {
+    eventoMovimientoRecibido = m;
+  });
+  
+  // 6.18.3 — Ajuste manual positivo (entrada)
+  const resultadoAjustePos = await DB.ajustarStock(insumoMovId, 20, 'Ajuste test positivo');
+  assert(resultadoAjustePos?.exito === true, 'A.74 ajuste positivo exitoso');
+  if (resultadoAjustePos?.exito) {
+    assert(resultadoAjustePos.datos.stock === 120,
+      'A.74 stock quedó en 120 (100 + 20)');
+  }
+  
+  await esperar(500);
+  
+  assert(eventoMovimientoRecibido !== null,
+    'A.74 evento movimientos:actualizados emitido');
+  if (eventoMovimientoRecibido) {
+    assert(eventoMovimientoRecibido.insumoId === insumoMovId,
+      'A.74 movimiento lleva el insumoId correcto');
+    assert(eventoMovimientoRecibido.insumoNombre === 'Insumo Movimiento Test',
+      'A.74 movimiento lleva insumoNombre denormalizado');
+    assert(eventoMovimientoRecibido.unidad === 'kg',
+      'A.74 movimiento lleva unidad denormalizada');
+    assert(eventoMovimientoRecibido.tipo === 'entrada',
+      'A.74 movimiento tipo=entrada');
+    assert(eventoMovimientoRecibido.cantidad === 20,
+      'A.74 movimiento cantidad=20');
+    assert(eventoMovimientoRecibido.espacioId === 'PubPrueba',
+      'A.74 movimiento lleva espacioId');
+  }
+  limpiarEventoMovimiento();
+  
+  // 6.18.4 — Verificar que el movimiento aparece en el Store
+  const movsEnStore = Store.obtenerEstado().movimientos;
+  assert(movsEnStore.length === 1, 'A.74 Store tiene 1 movimiento tras ajuste');
+  if (movsEnStore.length > 0) {
+    assert(movsEnStore[0].insumoId === insumoMovId,
+      'A.74 Store: movimiento con insumoId correcto');
+  }
+  
+  // 6.18.5 — Verificar persistencia en Appwrite
+  const movsAppwrite = await DBAppwrite.listar('movimientos');
+  const movimientoPersistido = movsAppwrite.find(m => m.insumoId === insumoMovId);
+  assert(!!movimientoPersistido, 'A.74 movimiento persiste en Appwrite');
+  if (movimientoPersistido) {
+    assert(movimientoPersistido.tipo === 'entrada',
+      'A.74 Appwrite: tipo=entrada');
+    assert(Number(movimientoPersistido.cantidad) === 20,
+      'A.74 Appwrite: cantidad=20');
+  }
+  
+  // 6.18.6 — Ajuste negativo (salida)
+  Store.despachar({ type: 'MOVIMIENTOS_LIMPIAR' });
+  
+  const resultadoAjusteNeg = await DB.ajustarStock(insumoMovId, -30, 'Ajuste test negativo');
+  assert(resultadoAjusteNeg?.exito === true, 'A.74 ajuste negativo exitoso');
+  if (resultadoAjusteNeg?.exito) {
+    assert(resultadoAjusteNeg.datos.stock === 90,
+      'A.74 stock quedó en 90 (120 - 30)');
+    assert(resultadoAjusteNeg.movimiento.tipo === 'salida',
+      'A.74 movimiento tipo=salida');
+    assert(resultadoAjusteNeg.movimiento.cantidad === -30,
+      'A.74 movimiento cantidad=-30');
+  }
+  
+  // 6.18.7 — Delta efectivo cuando el stock se recorta a 0
+  Store.despachar({ type: 'MOVIMIENTOS_LIMPIAR' });
+  
+  const resultadoRecorte = await DB.ajustarStock(insumoMovId, -500, 'Recorte a 0');
+  assert(resultadoRecorte?.exito === true, 'A.74 ajuste con recorte exitoso');
+  if (resultadoRecorte?.exito) {
+    assert(resultadoRecorte.datos.stock === 0,
+      'A.74 stock quedó en 0');
+    assert(resultadoRecorte.movimiento.cantidad === -90,
+      'A.74 movimiento registra delta efectivo (-90), no el solicitado (-500)');
+  }
+  
+  // 6.18.8 — Salida temprana si delta === 0
+  Store.despachar({ type: 'MOVIMIENTOS_LIMPIAR' });
+  const resultadoSinCambio = await DB.ajustarStock(insumoMovId, 0, 'Delta cero');
+  assert(resultadoSinCambio?.exito === true, 'A.74 ajuste con delta 0 devuelve exito');
+  assert(resultadoSinCambio?.sinCambio === true,
+    'A.74 ajuste con delta 0 marca sinCambio');
+  const movsTrasSinCambio = Store.obtenerEstado().movimientos.length;
+  assert(movsTrasSinCambio === 0,
+    'A.74 no se crea movimiento cuando delta=0');
+  
+  // 6.18.9 — obtenerMovimientos con filtros
+  Store.despachar({ type: 'MOVIMIENTOS_LIMPIAR' });
+  await DB.ajustarStock(insumoMovId, 10, 'Entrada 1');
+  await esperar(300);
+  await DB.ajustarStock(insumoMovId, 5, 'Entrada 2');
+  await esperar(300);
+  await DB.ajustarStock(insumoMovId, -3, 'Salida 1');
+  await esperar(300);
+  
+  const consulta = await DB.obtenerMovimientos({
+    insumoId: insumoMovId,
+    limite: 10
+  });
+  assert(Array.isArray(consulta.movimientos), 'A.74 obtenerMovimientos retorna array');
+  assert(consulta.movimientos.length >= 3, 'A.74 obtenerMovimientos retorna al menos 3');
+  
+  const soloEntradas = await DB.obtenerMovimientos({
+    insumoId: insumoMovId,
+    tipo: 'entrada',
+    limite: 10
+  });
+  assert(Array.isArray(soloEntradas.movimientos), 'A.74 filtro por tipo retorna array');
+  if (soloEntradas.movimientos.length > 0) {
+    assert(soloEntradas.movimientos.every(m => m.tipo === 'entrada'),
+      'A.74 filtro por tipo=entrada solo devuelve entradas');
+  }
+  
+  // 6.18.10 — Limpieza final de los movimientos de test
+  const todosLosMovs = await DBAppwrite.listar('movimientos');
+  const misMovs = todosLosMovs.filter(m => m.insumoId === insumoMovId);
+  for (const m of misMovs) {
+    try { await DBAppwrite.eliminar('movimientos', m.id); } catch {}
+  }
+  info(`A.74: eliminados ${misMovs.length} movimientos de test`);
 
-      const numMesa = 'test_mesa_' + Date.now();
-      const rAgregar = await CommandBus.ejecutar({ type: 'agregarMesa', datos: { numero: numMesa, zona: 'salon' } });
-      assert(rAgregar.exito === true, 'Mesa creada');
-      idsCreados.mesas.push(numMesa);
-      await esperar(500);
+    
+  // ═════════════════════════════════════════════════════════════════
+  // SUITE 6.14 — LIMPIEZA FINAL Y RESUMEN
+  // ═════════════════════════════════════════════════════════════════
+  suite('6.14 Limpieza final');
+  info('Limpiando huella...');
+  await limpiarSesion();
+  await Auth.iniciarSesion('jefePub', 'jefe1234');
+  await limpiarHuella();
 
-      const rPedido = await CommandBus.ejecutar({ type: 'crearPedidoMesa', datos: { numeroMesa: numMesa, mozo: 'Test', comensales: 2 } });
-      assert(rPedido.exito === true, 'Pedido creado en mesa');
-      const pedidoId = rPedido.data?.id;
-      if (pedidoId) idsCreados.pedidos.push(pedidoId);
-      await esperar(500);
+  resultsEl.innerHTML += `<div class="summary">${passed} pasaron, ${failed} fallaron</div>`;
+  if (failed === 0) resultsEl.innerHTML += `<div class="test pass">✔ Test unificado superado por completo.</div>`;
+}
 
-      const itemPrueba = { prodId: 'prod_test', nombre: 'Hamburguesa', precio: 1500, qty: 1, destino: 'cocina', obs: '', enviado: false };
-      await DB.actualizarPedido(pedidoId, { items: [itemPrueba] });
-      await esperar(300);
-      const mesaActual = (await DBAppwrite.listar('mesas')).find(m => m.numero === numMesa);
-      assert(!!mesaActual, 'Mesa existe en Appwrite');
-      assert(mesaActual?.estado === 'ocupada', 'Mesa ocupada');
-      assert(!!mesaActual?.pedidoId, 'Mesa con pedidoId');
+// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+// ▲ FIN SECCIÓN 6
+// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
-      const rEnviar = await CommandBus.ejecutar({ type: 'enviarComanda', datos: { mesa: mesaActual, mozo: 'Test', comensales: 2, observaciones: '', itemsPendientes: [itemPrueba] } });
-      assert(rEnviar.exito === true, 'Comanda enviada');
-      const comandasCreadas = rEnviar.data?.comandas || [];
-      comandasCreadas.forEach(c => idsCreados.comandas.push(c.id));
-      assert(comandasCreadas.length >= 1, 'Al menos una comanda creada');
-      await esperar(1500);
 
-      const comandaEnAppwrite = comandasCreadas.length ? (await DBAppwrite.listar('comandas')).find(c => c.id === comandasCreadas[0].id) : null;
-      assert(!!comandaEnAppwrite, 'Comanda en Appwrite');
-      assert(comandaEnAppwrite?.destino === 'cocina', 'Destino cocina correcto');
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║ SECCIÓN 7 — ARRANQUE                                            ║
+// ║ En cuanto la página termina de cargar, se ejecuta run() y se    ║
+// ║ captura cualquier error no controlado.                          ║
+// ╚══════════════════════════════════════════════════════════════════╝
+// ▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼▼
 
-      const rCompletar = await CommandBus.ejecutar({ type: 'completarSubcomanda', datos: { idOriginal: comandaEnAppwrite.id, destino: 'cocina' } });
-      assert(rCompletar.exito === true, 'Subcomanda completada');
-      assert(rCompletar.data?.ambasListas === true, 'Ambas listas');
-      await esperar(500);
+window.addEventListener('load', () => run().catch(e => {
+  resultsEl.innerHTML += `<div class="test fail">Error: ${e.message}</div>`;
+  console.error(e);
+}));
 
-      const comandaCompletada = (await DBAppwrite.listar('comandas')).find(c => c.id === comandaEnAppwrite.id);
-      assert(comandaCompletada?.estado === 'completada', 'Comanda principal completada');
+// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
+// ▲ FIN SECCIÓN 7
+// ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
-      const rLiberar = await CommandBus.ejecutar({ type: 'liberarMesa', datos: { numeroMesa: numMesa } });
-      assert(rLiberar.exito === true, 'Mesa liberada');
-      await esperar(500);
-      const mesaLiberada = (await DBAppwrite.listar('mesas')).find(m => m.numero === numMesa);
-      assert(mesaLiberada?.estado === 'libre', 'Mesa libre');
-
-      // ── Suite 5: Normalización y fábrica ───────────────
-      resultsEl.innerHTML += '<h2>5. Normalización y fábrica</h2>';
-      const prod1 = DBCore._normalizarProducto({ nombre: 'Test', precio: 100 });
-      assert(prod1.activo === true, 'Producto sin campo activo → por defecto true');
-      assert(prod1.estado === 'disponible', 'Producto sin estado → por defecto disponible');
-      assert(prod1.disponible === true, 'Producto disponible derivado true');
-
-      const mesaStr = DBCore._normalizarMesa({ numero: '1' });
-      assert(mesaStr.numero === '1', 'Mesa con numero string se conserva');
-      assert(mesaStr.estado === 'libre', 'Mesa sin estado → por defecto libre');
-      assert(mesaStr.items === undefined, 'Mesa NO tiene campo items (eliminado)');
-      assert(mesaStr.mozo === undefined, 'Mesa NO tiene campo mozo (eliminado)');
-
-      const nueva = mesaVacia(50, 'salon');
-      assert(nueva.numero === '50', 'mesaVacia: numero es string');
-      assert(nueva.estado === 'libre', 'mesaVacia: estado libre');
-      assert(nueva.esVirtual === false, 'mesaVacia: esVirtual = false');
-      assert(nueva.items === undefined, 'mesaVacia: sin campo items');
-      assert(nueva.mozo === undefined, 'mesaVacia: sin campo mozo');
-
-      // ── Suite 6: Factories ─────────────────────────────
-      resultsEl.innerHTML += '<h2>6. Factories</h2>';
-      const pedRec = reconstruirPedidoAgregado({
-        id: 'ped_recon_test', mesa: 1, mozo: 'Trini', comensales: 2,
-        items: [], descuento: 0, estado: 'abierto', observaciones: ''
-      });
-      assert(pedRec instanceof PedidoAgregado, 'reconstruirPedidoAgregado devuelve un PedidoAgregado');
-      assert(pedRec.estado === 'abierto', 'El estado del pedido reconstruido es correcto');
-
-      const delRec = reconstruirDelivery({
-        id: 'del_recon_test', direccion: { calle: 'Corrientes', numero: '1234' },
-        repartidor: 'Alex', items: [], estado: 'pendiente', observaciones: ''
-      });
-      assert(delRec instanceof Delivery, 'reconstruirDelivery devuelve un Delivery');
-      assert(delRec.estado === 'pendiente', 'El estado del delivery reconstruido es correcto');
-
-      // ── Suite 7: Dominio ───────────────────────────────
-      resultsEl.innerHTML += '<h2>7. Dominio</h2>';
-
-      // Cantidad
-      let c = crearCantidad(3);
-      assert(c !== null, 'crearCantidad(3) retorna instancia');
-      assert(c.valor === 3, 'Cantidad: valor es 3');
-      assert(crearCantidad(0) === null, 'crearCantidad(0) falla');
-      assert(crearCantidad(-1) === null, 'crearCantidad(-1) falla');
-      let c2 = c.sumar(new Cantidad(2));
-      assert(c2.valor === 5, 'Cantidad: 3 + 2 = 5');
-      assert(c.valor === 3, 'Cantidad: original sigue 3 (inmutable)');
-      assert(c.esMayorQue(new Cantidad(2)), 'Cantidad: 3 > 2');
-      assert(c.esMenorQue(new Cantidad(5)), 'Cantidad: 3 < 5');
-      assert(c.esIgual(new Cantidad(3)), 'Cantidad: 3 == 3');
-
-      // Dinero
-      let d = crearDinero(1500);
-      assert(d !== null, 'crearDinero(1500) retorna instancia');
-      assert(d.monto === 1500, 'Dinero: monto es 1500');
-      assert(crearDinero(-10) === null, 'crearDinero(-10) falla');
-      assert(crearDinero(NaN) === null, 'crearDinero(NaN) falla');
-      let d2 = d.sumar(new Dinero(300));
-      assert(d2.monto === 1800, 'Dinero: 1500 + 300 = 1800');
-      assert(d.monto === 1500, 'Dinero: original sigue 1500 (inmutable)');
-      let d3 = d.restar(new Dinero(2000));
-      assert(d3.monto === 0, 'Dinero: 1500 - 2000 = 0 (nunca negativo)');
-      let d4 = d.multiplicar(3);
-      assert(d4.monto === 4500, 'Dinero: 1500 * 3 = 4500');
-      assert(d.esMayorQue(new Dinero(1000)), 'Dinero: 1500 > 1000');
-      assert(d.esMenorQue(new Dinero(2000)), 'Dinero: 1500 < 2000');
-      assert(d.esIgual(new Dinero(1500)), 'Dinero: 1500 == 1500');
-      assert(!d.esCero(), 'Dinero: 1500 no es cero');
-      assert(d.toString().includes('1.500'), 'Dinero: formato incluye separador de miles');
-
-      // Resultado
-      let ok1 = Resultado.ok({ id: 5 });
-      assert(ok1.exito, 'Resultado: ok tiene exito=true');
-      assert(ok1.datos.id === 5, 'Resultado: ok conserva datos');
-      assert(ok1.error === null, 'Resultado: ok no tiene error');
-      let fail1 = Resultado.fallo('boom');
-      assert(!fail1.exito, 'Resultado: fallo tiene exito=false');
-      assert(fail1.error === 'boom', 'Resultado: fallo conserva error');
-      assert(fail1.datos === null, 'Resultado: fallo no tiene datos');
-      let chain = ok1.encadenar(data => Resultado.ok(data.id * 2));
-      assert(chain.exito, 'Resultado: encadenar ok retorna ok');
-      assert(chain.datos === 10, 'Resultado: encadenar transforma datos (5*2=10)');
-      let chainFail = fail1.encadenar(data => Resultado.ok(99));
-      assert(!chainFail.exito, 'Resultado: encadenar sobre fallo retorna fallo');
-      assert(chainFail.error === 'boom', 'Resultado: y mantiene el error original');
-      let chainEx = ok1.encadenar(() => { throw new Error('ups'); });
-      assert(!chainEx.exito, 'Resultado: encadenar captura excepción');
-      assert(chainEx.error === 'ups', 'Resultado: error es el mensaje de la excepción');
-
-      // ── Limpieza final ─────────────────────────────────
-      info('Limpiando huella...');
-      await limpiarSesion();
-      await Auth.iniciarSesion('master', 'master123');
-      await limpiarHuella();
-
-      resultsEl.innerHTML += `<div class="summary">${passed} pasaron, ${failed} fallaron</div>`;
-      if (failed === 0) resultsEl.innerHTML += `<div class="test pass">✔ Test unificado superado por completo.</div>`;
-    }
-
-    window.addEventListener('load', () => run().catch(e => {
-      resultsEl.innerHTML += `<div class="test fail">Error: ${e.message}</div>`;
-      console.error(e);
-    }));
   </script>
 </body>
 </html>

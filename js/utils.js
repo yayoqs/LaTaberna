@@ -1,18 +1,48 @@
 /* ================================================================
-   LaTaberna - PubPOS — UTILIDADES COMPARTIDAS (ES6)
+   LaTaberna - Ecosistema Elisekai — UTILIDADES COMPARTIDAS (ES6)
    Archivo: js/utils.js
-   Versión: 1.5.0
+   Versión: 1.6.1
    Propósito: Utilidades compartidas entre todas las células.
+              v1.6.1: ajuste en formatearDinero: CLP sin separador
+                      de miles y KYU con punto decimal y hasta 3
+                      decimales.
+              v1.6.0: se agrega soporte de monedas (CLP y KYU) en
+                      formatearDinero. Los montos se formatean según
+                      precisión y símbolo de cada moneda.
               v1.5.0: locale cambiado de 'es-AR' a 'es-CL'.
    ================================================================ */
 
-export function formatearDinero(n) {
-  return '$' + (n || 0).toLocaleString('es-CL', { minimumFractionDigits: 0 });
+// Registro de monedas y su precisión (factor para convertir a entero)
+export const MONEDAS = {
+  CLP: { precision: 1, simbolo: '$', decimales: 0 },
+  KYU: { precision: 1000, simbolo: '', decimales: 3 }
+};
+
+export function formatearDinero(monto, moneda = 'CLP') {
+  const infoMoneda = MONEDAS[moneda] || MONEDAS.CLP;
+  const valor = monto / infoMoneda.precision;
+
+  if (moneda === 'CLP') {
+    // CLP: sin separador de miles, sin decimales
+    const numeroFormateado = valor.toLocaleString('es-CL', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+      useGrouping: false
+    });
+    return infoMoneda.simbolo + numeroFormateado;
+  } else {
+    // KYU: punto decimal, hasta 3 decimales sin ceros innecesarios
+    const numeroFormateado = valor.toLocaleString('en-US', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: infoMoneda.decimales,
+      useGrouping: false
+    });
+    return numeroFormateado + ' KYU';
+  }
 }
 
-export function formatearDineroTicket(n) {
-  return '$' + (n || 0).toLocaleString('es-CL', { minimumFractionDigits: 0 });
-}
+// Alias directo para tickets (misma lógica)
+export const formatearDineroTicket = formatearDinero;
 
 export function formatearFechaLarga() {
   const now = new Date();

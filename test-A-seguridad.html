@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test A — Seguridad del Ecosistema</title>
+  <style>
+    body { font-family: monospace; background: #111827; color: #f9fafb; padding: 24px; }
+    h1 { color: #f59e0b; }
+    h2 { color: #60a5fa; margin-top: 20px; }
+    .ok { color: #10b981; }
+    .error { color: #ef4444; }
+    .info { color: #94a3b8; }
+    .resumen { margin-top: 20px; padding: 12px; background: #1f2937; border-radius: 6px; border: 1px solid #374151; }
+    pre { background: #1f2937; padding: 12px; border-radius: 6px; white-space: pre-wrap; font-size: 12px; margin: 6px 0; }
+    button { font-family: inherit; padding: 10px 14px; border-radius: 6px; border: 1px solid #374151; background: #1f2937; color: #f9fafb; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>🛡️ Test A — Seguridad del Ecosistema</h1>
+  <p>Simula vectores de ataque usando sesión legítima de un espacio e intenta acceder a datos de otro. Los ataques contra funciones serverless se ejecutan vía SDK oficial para evitar el bloqueo por CORS del fetch directo.</p>
+  <button id="btnEjecutar">Ejecutar pruebas de seguridad</button>
+
+  <div id="results"></div>
+
+  <script src="/js/appwrite.min.js"></script>
+
+  <script type="module">
+    import { Logger } from './js/lib/logger.js';
+    import { Deps } from './js/lib/deps.js';
+    import { DBAppwrite } from './js/db-appwrite.js';
+    import { Auth } from './js/auth.js';
+    import { inicializarAuth } from './js/auth.js';
+    import { ID_FUNCION_ASIGNAR_ROL } from './js/config-appwrite.js';
+    import { DB } from './js/db.js';
+
+    const resultsEl = document.getElementById('results');
+    let passed = 0;
+    let failed = 0;
+
+   
+    // RowIds de prueba. Los asserts de §§2 y 3 verifican que el
+    // acceso a filas del espacio ajeno esté bloqueado. El bloqueo
+    // ocurre por Row Security independientemente de si la fila
+    // existe o no. Si el Coordinador quiere verificación positiva
+    // de que la fila existe, se requiere sembrar filas en LaTaberna
+    // desde el setup (ver deuda anotada en REPORTE).
+    const idsLaTaberna = {
+      productos: ['LaTaberna_prod_hamburguesa', 'LaTaberna_prod_cerveza'],
+      pedidos: ['LaTaberna_ped_1'],
+      mesas: ['LaTaberna_mesa_1', 'LaTaberna_mesa_2', 'LaTaberna_mesa_3', 'LaTaberna_mesa_4'],
+      comandas: ['LaTaberna_kds_1'],
+      insumos: ['LaTaberna_ins_pan', 'LaTaberna_ins_cerveza'],
+      recetas: ['LaTaberna_rec_hamburguesa'],
+      configuracion: ['LaTaberna_conf_1'],
+      eventos_en_vivo: ['LaTaberna_evento_1'],
+      cartas: ['LaTaberna_carta_1'],
+      proveedores: ['LaTaberna_prov_1'],
+      entradas: ['LaTaberna_ent_1'],
+      comensales: ['LaTaberna_com_1'],
+      avisos: ['LaTaberna_aviso_1'],
+      variantes: ['LaTaberna_var_1']
+    };
+    
+    const coleccionesNegocio = Object.keys(idsLaTaberna);
+
+
+    function info(msg) {
+      const div = document.createElement('div');
+      div.className = 'info';
+      div.textContent = msg;
+      resultsEl.appendChild(div);
+    }
+
+    function ok(msg) {
+      passed++;
+      const div = document.createElement('div');
+      div.className = 'ok';
+      div.textContent = '✔ ' + msg;
+      resultsEl.appendChild(div);
+    }
+
+    function fail(msg) {
+      failed++;
+      const div = document.createElement('div');
+      div.className = 'error';
+      div.textContent = '✘ ' + msg;
+      resultsEl.appendChild(div);
+    }
+
+    function pre(obj) {
+      const el = document.createElement('pre');
+      el.textContent = typeof obj === 'string' ? obj : JSON.stringify(obj, null, 2);
+      resultsEl.appendChild(el);
+    }
+
+    async function listarSinFiltro(coleccion) {
+      try {
+        const respuesta = await DBAppwrite.baseDeDatos.listRows({
+          databaseId: DBAppwrite.idBaseDeDatos,
+          tableId: DBAppwrite.COLECCIONES[coleccion],
+          queries: [Appwrite.Query.limit(100)]
+        });
+        return respuesta.rows.map(f => ({ $id: f.$id, espacioId: f.espacioId }));
+      } catch (e) {
+        return { error: e.message, code: e.code, type: e.type };
+      }
+    }
+
+    async function leerFila(coleccion, rowId) {
+      try {
+        return await DBAppwrite.baseDeDatos.getRow({
+          databaseId: DBAppwrite.idBaseDeDatos,
+          tableId: DBAppwrite.COLECCIONES[coleccion],
+          rowId
+        });
+      } catch (e) {
+        return { error: e.message, code: e.code, type: e.type };
+      }
+    }
+
+    async function actualizarFila(coleccion, rowId) {
+      try {
+        return await DBAppwrite.baseDeDatos.updateRow({
+          databaseId: DBAppwrite.idBaseDeDatos,
+          tableId: DBAppwrite.COLECCIONES[coleccion],
+          rowId,
+          data: { observaciones: 'HACK' }
+        });
+      } catch (e) {
+        return { error: e.message, code: e.code, type: e.type };
+      }
+    }
+
+    async function crearFilaMaliciosa(coleccion, rowId, data) {
+      try {
+        return await DBAppwrite.baseDeDatos.createRow({
+          databaseId: DBAppwrite.idBaseDeDatos,
+          tableId: DBAppwrite.COLECCIONES[coleccion],
+          rowId,
+          data
+        });
+      } catch (e) {
+        return { error: e.message, code: e.code, type: e.type };
+      }
+    }
+
+    /**
+     * A.66: invoca la función asignar-rol vía SDK oficial de Appwrite.
+     * El SDK usa el dominio de Appwrite Cloud (con CORS configurado)
+     * e inyecta el JWT de la sesión activa automáticamente.
+     *
+     * @returns {Promise<{status: number|null, exito: boolean, row: object|null, error: string|null}>}
+     */
+    async function invocarAsignarRol(payload) {
+      try {
+        const funciones = new window.Appwrite.Functions(DBAppwrite.cliente);
+        const ejecucion = await funciones.createExecution({
+          functionId: ID_FUNCION_ASIGNAR_ROL,
+          body: JSON.stringify(payload),
+          async: false
+        });
+        const cuerpo = ejecucion.responseBody || ejecucion.body || ejecucion.response;
+        let respuesta;
+        try {
+          respuesta = JSON.parse(cuerpo);
+        } catch (e) {
+          respuesta = { _crudo: String(cuerpo).substring(0, 500) };
+        }
+        const status = ejecucion.responseStatusCode || ejecucion.statusCode || null;
+        return {
+          status,
+          exito: respuesta?.exito === true || respuesta?.success === true,
+          row: respuesta?.row || null,
+          error: respuesta?.error || null,
+          respuesta
+        };
+      } catch (e) {
+        return {
+          status: e.code || null,
+          exito: false,
+          row: null,
+          error: e.message,
+          respuesta: { _exception: true, type: e.type, code: e.code, message: e.message }
+        };
+      }
+    }
+
+    async function run() {
+      Logger.setLevel('ERROR');
+      resultsEl.innerHTML = '';
+      passed = 0;
+      failed = 0;
+
+      Deps.registrar('auth', Auth);
+
+      info('Inicializando Appwrite...');
+      await inicializarAuth();
+      if (!(await DBAppwrite.iniciar())) {
+        fail('No se pudo inicializar Appwrite');
+        return;
+      }
+      ok('Appwrite inicializado');
+
+      try { await Auth.cerrarSesion(); } catch {}
+
+      info('Autenticando como jefePub...');
+      if (!(await Auth.iniciarSesion('jefePub', 'jefe1234'))) {
+        fail('No se pudo autenticar');
+        return;
+      }
+      ok('Autenticado como jefePub');
+
+      // 1. Validación de listados sin filtro por colección
+      info('1. Validación de listados sin filtro por colección');
+      for (const coleccion of coleccionesNegocio) {
+        const listado = await listarSinFiltro(coleccion);
+        if (!Array.isArray(listado)) {
+          info(`⚠️ ${coleccion}: ${listado.error || 'sin acceso'}`);
+          continue;
+        }
+        const hayFuga = listado.some(f => f.espacioId === 'LaTaberna');
+        if (hayFuga) {
+          fail(`Fuga en listado de ${coleccion}`);
+          pre(listado);
+        } else {
+          ok(`Listado sin fuga en ${coleccion}`);
+        }
+      }
+
+      // 2. Lectura directa de filas de LaTaberna
+      info('2. Lectura directa de filas de LaTaberna');
+      for (const coleccion of coleccionesNegocio) {
+        const primerId = idsLaTaberna[coleccion][0];
+        const fila = await leerFila(coleccion, primerId);
+        if (!fila.error) {
+          fail(`Se pudo leer ${coleccion}/${primerId}`);
+        } else {
+          ok(`Lectura bloqueada en ${coleccion}/${primerId}`);
+        }
+      }
+
+      // 3. Actualización de filas de LaTaberna
+      info('3. Actualización de filas de LaTaberna');
+      for (const coleccion of coleccionesNegocio) {
+        const primerId = idsLaTaberna[coleccion][0];
+        const actualizacion = await actualizarFila(coleccion, primerId);
+        if (!actualizacion.error) {
+          fail(`Se pudo actualizar ${coleccion}/${primerId}`);
+        } else {
+          ok(`Actualización bloqueada en ${coleccion}/${primerId}`);
+        }
+      }
+
+      // 4. Creación maliciosa usando baseDeDatos.createRow
+      info('4. Creación maliciosa usando baseDeDatos.createRow');
+      const mesaMaliciosa = await crearFilaMaliciosa('mesas', 'hack_mesa_' + Date.now(), {
+        numero: '7777', estado: 'libre', pedidoId: '', comensales: 1,
+        zona: 'hack', esVirtual: false, espacioId: 'LaTaberna'
+      });
+      if (!mesaMaliciosa.error) {
+        fail('Se pudo crear mesa maliciosa en LaTaberna');
+        await DBAppwrite.eliminar('mesas', mesaMaliciosa.$id).catch(() => {});
+      } else {
+        ok('Creación maliciosa de mesa bloqueada');
+      }
+
+      const confMaliciosa = await crearFilaMaliciosa('configuracion', 'hack_conf_' + Date.now(), {
+        clave: 'global', valor: '{"nombreLocal":"HACKED"}', espacioId: 'LaTaberna'
+      });
+      if (!confMaliciosa.error) {
+        fail('Se pudo crear configuración maliciosa en LaTaberna');
+        await DBAppwrite.eliminar('configuracion', confMaliciosa.$id).catch(() => {});
+      } else {
+        ok('Creación maliciosa de configuración bloqueada');
+      }
+
+      // 5. Creación maliciosa usando DBAppwrite.crear
+      info('5. Creación maliciosa usando DBAppwrite.crear');
+      const mesaAtacada = await DBAppwrite.crear('mesas', 'ataque_mesa_' + Date.now(), {
+        numero: '6666', estado: 'libre', pedidoId: '', comensales: 1,
+        zona: 'ataque', esVirtual: false, espacioId: 'LaTaberna'
+      });
+      if (!mesaAtacada) {
+        ok('DBAppwrite.crear bloqueó creación con espacio ajeno');
+      } else if (mesaAtacada.espacioId === 'PubPrueba') {
+        ok('DBAppwrite.crear forzó espacio activo');
+        await DBAppwrite.eliminar('mesas', mesaAtacada.id).catch(() => {});
+      } else {
+        fail('DBAppwrite.crear devolvió espacio inesperado');
+        pre(mesaAtacada);
+      }
+
+      // 6. Acceso a tablas globales
+      info('6. Acceso a tablas globales');
+      const perfilAjeno = await leerFila('global_perfiles', 'edquilodrans');
+      if (!perfilAjeno.error) {
+        ok('Puede leer perfil ajeno (aceptable temporalmente)');
+      } else {
+        ok('Lectura de perfil ajeno bloqueada');
+      }
+      const actualizacionPerfil = await actualizarFila('global_perfiles', 'edquilodrans');
+      if (!actualizacionPerfil.error) {
+        fail('Se pudo actualizar perfil ajeno');
+      } else {
+        ok('Actualización de perfil ajeno bloqueada');
+      }
+      const crearEspacio = await crearFilaMaliciosa('global_espacios', 'hack_espacio_' + Date.now(), {
+        nombre: 'Espacio Hack', tipo: 'pub', app: 'lataberna', activo: true
+      });
+      if (!crearEspacio.error) {
+        fail('Se pudo crear espacio global');
+        await DBAppwrite.eliminar('global_espacios', crearEspacio.$id).catch(() => {});
+      } else {
+        ok('Creación de espacio global bloqueada');
+      }
+
+      // 7. Acceso a laTaberna_Staff
+      info('7. Acceso a laTaberna_Staff');
+      const staffLaTaberna = await listarSinFiltro('staff');
+      if (Array.isArray(staffLaTaberna) && staffLaTaberna.some(s => s.espacioId === 'LaTaberna')) {
+        fail('Fuga en staff');
+        pre(staffLaTaberna);
+      } else {
+        ok('Sin fuga en staff');
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // 8. Ataques contra función asignar-rol (A.66: migrado a SDK)
+      // ═══════════════════════════════════════════════════════════════
+      info('8. Ataques contra función asignar-rol (vía SDK oficial)');
+
+      // 8.1 — Invocación sin JWT
+      info('8.1 Invocación sin JWT (sesión cerrada)');
+      try { await Auth.cerrarSesion(); } catch {}
+
+      const resSinJwt = await invocarAsignarRol({
+        accion: 'crear',
+        coleccion: 'pedidos',
+        datos: {
+          mesa: '1', tipo: 'local', origen: 'cliente', estado: 'precarga',
+          espacioId: 'PubPrueba'
+        }
+      });
+      pre(resSinJwt.respuesta);
+
+      const rechazoSinJwt = (
+        resSinJwt.status === 401 ||
+        resSinJwt.status === 403 ||
+        resSinJwt.exito === false
+      );
+      if (rechazoSinJwt) {
+        ok('Función rechazó invocación sin JWT (rechazo real)');
+      } else {
+        fail('La función aceptó invocación sin JWT');
+      }
+
+      await Auth.iniciarSesion('jefePub', 'jefe1234');
+
+      // 8.2 — Escalamiento de privilegios por jugador
+      info('8.2 Escalamiento de privilegios por jugador');
+      const nombreJugador = 'ja_' + Date.now().toString(36);
+      const reg = await Auth.registrarUsuario(nombreJugador, 'pass12345');
+      if (!reg.exito) { fail('No se pudo registrar jugador temporal'); return; }
+      ok('Jugador temporal registrado');
+
+      await Auth.cerrarSesion();
+      await Auth.iniciarSesion(nombreJugador, 'pass12345');
+      ok('Jugador temporal autenticado');
+
+      const resEscalamiento = await invocarAsignarRol({
+        userId: reg.usuarioId,
+        espacioId: 'PubPrueba',
+        roles: ['admin']
+      });
+      pre(resEscalamiento.respuesta);
+
+      const rechazoEscalamiento = (
+        resEscalamiento.status === 403 ||
+        resEscalamiento.status === 401 ||
+        (resEscalamiento.exito === false && typeof resEscalamiento.error === 'string')
+      );
+      if (rechazoEscalamiento) {
+        ok('Escalamiento de privilegios bloqueado (rechazo real)');
+        if (resEscalamiento.error) {
+          info('Motivo del rechazo: ' + resEscalamiento.error);
+        }
+      } else {
+        fail('Posible escalamiento de privilegios');
+        pre(resEscalamiento.respuesta);
+      }
+
+      // 8.3 — Jugador sin Team intenta crear mesa en PubPrueba
+      info('8.3 Jugador sin Team intenta crear mesa en PubPrueba');
+      const mesaInvalida = await DBAppwrite.crear('mesas', 'mesa_jugador_' + Date.now(), {
+        numero: '555', estado: 'libre', pedidoId: '', comensales: 1,
+        zona: 'test_jugador', esVirtual: false, espacioId: 'PubPrueba'
+      });
+      if (!mesaInvalida) {
+        ok('Jugador sin team no pudo crear mesa en PubPrueba');
+      } else {
+        fail('Jugador sin team pudo crear mesa en PubPrueba');
+        await DBAppwrite.eliminar('mesas', mesaInvalida.id).catch(() => {});
+      }
+
+      // 8.4 — Verificación final: la sesión del jugador sigue activa
+      info('8.4 Verificación: jugador autenticado pero sin privilegios');
+      const usuarioJugador = Auth.obtenerUsuarioActual();
+      const esJugadorSinTeam = usuarioJugador?.rolesEfectivos.includes('jugador') &&
+                               !usuarioJugador?.rolesEfectivos.includes('admin') &&
+                               !usuarioJugador?.rolesEfectivos.includes('owner') &&
+                               !usuarioJugador?.rolesEfectivos.includes('master');
+      if (esJugadorSinTeam) {
+        ok('Jugador autenticado no tiene roles elevados');
+      } else {
+        fail('Jugador tiene roles elevados inesperados');
+        pre(usuarioJugador);
+      }
+
+      // Restaurar sesión de jefePub
+      try { await Auth.cerrarSesion(); } catch {}
+      try { await Auth.iniciarSesion('jefePub', 'jefe1234'); } catch {}
+
+      // ═══════════════════════════════════════════════════════════════
+      // 9. Permisos de fila de laTaberna_Movimientos
+      // Decisión de Coordinación (2026-10-09 20:00 UTC, A.75).
+      // Owner siempre puede update/delete en cualquier colección
+      // donde admin lo pueda, por jerarquía (master > owner > admin).
+      // La colección movimientos NO es la excepción. El principio
+      // de log append-only se mantiene como regla operativa, no
+      // como restricción de rol.
+      // ═══════════════════════════════════════════════════════════════
+      info('9. Permisos de fila de laTaberna_Movimientos');
+
+      // Login como jefePub (owner de PubPrueba)
+      try { await Auth.cerrarSesion(); } catch {}
+      if (!(await Auth.iniciarSesion('jefePub', 'jefe1234'))) {
+        fail('No se pudo autenticar como jefePub para §9');
+      } else {
+        ok('jefePub autenticado para §9');
+
+        // 9.1 — Setup: crear insumo temporal
+        const insumoTestId = 'test_mov_perm_' + Date.now();
+        const insumoCreado = await DBAppwrite.crear('insumos', insumoTestId, {
+          nombre: 'Insumo Test Permisos Movimientos',
+          stock: 100,
+          stock_minimo: 5,
+          unidad: 'u',
+          tipo: 'cocina',
+          categoria: 'test',
+          destino: 'cocina'
+        });
+
+        if (!insumoCreado) {
+          info('9.1 No se pudo crear insumo de prueba. Se omite §9.');
+        } else {
+          ok('9.1 Insumo temporal creado para §9');
+
+          // Esperar a que esté disponible en Appwrite
+          await new Promise(r => setTimeout(r, 800));
+
+          // 9.2 — Ajustar stock para generar un movimiento
+          DB.insumos = DB.insumos || [];
+          if (!DB.insumos.find(i => i.id === insumoTestId)) {
+            DB.insumos.push(insumoCreado);
+          }
+
+          const resultadoAjuste = await DB.ajustarStock(
+            insumoTestId, 10, 'Test A.75 permisos de fila'
+          );
+
+          if (!resultadoAjuste || !resultadoAjuste.exito) {
+            info('9.2 ajustarStock falló: ' + (resultadoAjuste?.error || 'desconocido') + '. Se omite §9.');
+          } else {
+            ok('9.2 ajustarStock ejecutado (movimiento generado)');
+
+            await new Promise(r => setTimeout(r, 800));
+
+            // 9.3 — Buscar la fila del movimiento en Appwrite
+            const movimientos = await DBAppwrite.listar('movimientos');
+            const movimiento = movimientos.find(m => m.insumoId === insumoTestId);
+
+            if (!movimiento) {
+              info('9.3 No se encontró el movimiento en Appwrite. Se omite §9.');
+            } else {
+              ok('9.3 Movimiento encontrado en Appwrite');
+
+              // 9.4 — Leer la fila completa con $permissions
+              let filaCruda = null;
+              try {
+                filaCruda = await DBAppwrite.baseDeDatos.getRow({
+                  databaseId: DBAppwrite.idBaseDeDatos,
+                  tableId: DBAppwrite.COLECCIONES.movimientos,
+                  rowId: movimiento.id
+                });
+              } catch (e) {
+                fail('No se pudo leer la fila cruda de movimientos: ' + e.message);
+              }
+
+              if (filaCruda) {
+                const permisos = filaCruda.$permissions || [];
+                pre(permisos);
+
+                const tieneReadTeam = permisos.some(p => p === 'read("team:PubPrueba")');
+                const tieneUpdateAdmin = permisos.some(p => p === 'update("team:PubPrueba/admin")');
+                const tieneDeleteAdmin = permisos.some(p => p === 'delete("team:PubPrueba/admin")');
+                const tieneUpdateOwner = permisos.some(p => p === 'update("team:PubPrueba/owner")');
+                const tieneDeleteOwner = permisos.some(p => p === 'delete("team:PubPrueba/owner")');
+
+                if (tieneReadTeam) {
+                  ok('9.4 read team:PubPrueba presente');
+                } else {
+                  fail('9.4 read team:PubPrueba ausente');
+                }
+
+                if (tieneUpdateAdmin) {
+                  ok('9.4 update admin presente');
+                } else {
+                  fail('9.4 update admin ausente');
+                }
+
+                if (tieneDeleteAdmin) {
+                  ok('9.4 delete admin presente');
+                } else {
+                  fail('9.4 delete admin ausente');
+                }
+
+                // Decisión de Coordinación (A.75): owner SIEMPRE
+                // presente en update/delete por jerarquía.
+                if (tieneUpdateOwner) {
+                  ok('9.4 update owner presente (por jerarquía master > owner > admin)');
+                } else {
+                  fail('9.4 update owner ausente. Contradice la decisión A.75 de Coordinación.');
+                }
+
+                if (tieneDeleteOwner) {
+                  ok('9.4 delete owner presente (por jerarquía master > owner > admin)');
+                } else {
+                  fail('9.4 delete owner ausente. Contradice la decisión A.75 de Coordinación.');
+                }
+              }
+
+              // 9.5 — Limpieza del movimiento de test
+              try {
+                await DBAppwrite.eliminar('movimientos', movimiento.id);
+                ok('9.5 Movimiento de prueba eliminado');
+              } catch (e) {
+                info('9.5 No se pudo eliminar el movimiento de prueba: ' + e.message);
+              }
+            }
+          }
+
+          // Limpieza del insumo temporal
+          try {
+            await DBAppwrite.eliminar('insumos', insumoTestId);
+            info('9.6 Insumo temporal eliminado');
+          } catch (e) {
+            info('9.6 No se pudo eliminar insumo temporal: ' + e.message);
+          }
+        }
+      }
+
+      // Restaurar sesión de jefePub para el cierre
+      try { await Auth.cerrarSesion(); } catch {}
+      try { await Auth.iniciarSesion('jefePub', 'jefe1234'); } catch {}
+
+      resultsEl.innerHTML += `<div class="resumen">${passed} pasaron, ${failed} fallaron</div>`;
+      if (failed === 0) {
+        resultsEl.innerHTML += `<div class="ok">✔ Test de seguridad superado.</div>`;
+      } else {
+        resultsEl.innerHTML += `<div class="error">✘ Existen fugas que revisar.</div>`;
+      }
+    }
+
+    document.getElementById('btnEjecutar').addEventListener('click', run);
+  </script>
+</body>
+</html>

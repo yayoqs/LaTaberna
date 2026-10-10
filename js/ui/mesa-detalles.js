@@ -1,10 +1,18 @@
 /* ================================================================
    LaTaberna - PubPOS — UI (ES6)
    Archivo: js/ui/mesa-detalles.js
-   Versión: 3.2.4
+   Versión: 3.2.5
    Propósito: Centro de operaciones de mesa.
-              v3.2.4: deshacerFusion espera la liberación local y
-                      elimina la llamada redundante a DBAppwrite.eliminar.
+
+   v3.2.5: Paquete post-6 (B1.7). Guard defensivo en
+           cargarPrecarga: si falta precargaId o mesa activa,
+           loguea warn y no emite. Aclara en encabezado que el
+           consumo de `precarga:cargar_en_comanda` se resuelve en
+           precarga-control.js (v2.3.0). Sin cambios funcionales
+           respecto a v3.2.4.
+
+   v3.2.4: deshacerFusion espera la liberación local y elimina la
+           llamada redundante a DBAppwrite.eliminar.
    ================================================================ */
 
 import { Store } from '../lib/store.js';
@@ -354,8 +362,24 @@ const MesaDetalles = (() => {
     if (_mesaActual) _renderizarEstado(_mesaActual);
   }
 
+  /**
+   * v3.2.5: guard defensivo. El consumo del evento se resuelve en
+   * precarga-control.js v2.3.0 con un listener de
+   * `precarga:cargar_en_comanda` que dispara `_revisarPrecarga`.
+   */
   function cargarPrecarga(precargaId) {
-    EventBus.emit('precarga:cargar_en_comanda', { precargaId, mesa: _mesaActual?.numero });
+    if (!precargaId) {
+      Logger.warn('[MesaDetalles] cargarPrecarga sin precargaId.');
+      return;
+    }
+    if (!_mesaActual) {
+      Logger.warn('[MesaDetalles] cargarPrecarga sin mesa activa.');
+      return;
+    }
+    EventBus.emit('precarga:cargar_en_comanda', {
+      precargaId,
+      mesa: _mesaActual.numero
+    });
     cerrar();
   }
 
@@ -372,10 +396,8 @@ const MesaDetalles = (() => {
     const originales = Array.isArray(_mesaActual.mesasFusionadas) ? _mesaActual.mesasFusionadas : [];
 
     try {
-      // Ahora liberarMesasFusionadas es async y elimina la virtual en Appwrite
       await DB.liberarMesasFusionadas(_mesaActual);
 
-      // Restaurar originales en Appwrite
       if (DBAppwrite && DBAppwrite.habilitado) {
         for (const num of originales) {
           await DBAppwrite.actualizar('mesas', String(num), { estado: 'libre', pedidoId: '' })
@@ -395,7 +417,7 @@ const MesaDetalles = (() => {
 
   EventBus.on('mesa:seleccionada', (numMesa) => { if (!_panelVisible) abrir(numMesa); });
 
-  Logger.info('[MesaDetalles] Módulo inicializado v3.2.4.');
+  Logger.info('[MesaDetalles] Módulo inicializado v3.2.5.');
 
   return { abrir, cerrar, pedirCuenta, cerrarMesa, aceptarVinculacion, cargarPrecarga, deshacerFusion, _mesaActual: null };
 })();

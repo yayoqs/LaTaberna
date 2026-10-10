@@ -1,10 +1,25 @@
 /* ================================================================
-   La Taberna — MÓDULO: eventos-en-vivo.js (v1.3.2 – obtenerRol)
-   Propósito: Panel del animador para eventos en vivo (bingo, karaoke, votaciones).
-              Soporta contenedor estático en index.html (estándar B1).
-              Sin asignaciones window. Eliminado updatedAt manual.
-              Migrado a nuevos nombres en español de utils.js.
-              Auth.getRol → Auth.obtenerRol.
+   LaTaberna - Ecosistema Elisekai — MÓDULO JS (ES6)
+   Archivo: js/modulos/admin/eventos-en-vivo.js
+   Versión: 1.3.3
+   Propósito: Panel del animador para eventos en vivo (bingo,
+              karaoke, votaciones). Persiste con DBAppwrite y
+              escucha eventos_en_vivo:actualizada para cambios
+              externos (votos de clientes).
+              v1.3.3: encabezado alineado al estándar oficial para
+                      que el script de búsqueda de versiones lo
+                      detecte correctamente.
+              v1.3.2: Auth.getRol → Auth.obtenerRol y
+                      Auth.getNombre → Auth.obtenerNombre.
+              v1.3.1: migración a nombres en español de utils.js
+                      (showToast → mostrarToast).
+              v1.3.0: refactor _asegurarVista con soporte de
+                      contenedores estáticos (estándar B1).
+              v1.2.1: eliminado updatedAt manual de llamadas a
+                      Appwrite (atributo no definido en esquema).
+              v1.2.0: panel de historial de bolas en bingo.
+              v1.1.1: migración a ES6 (imports con nombre, sin
+                      window, delegación de eventos con data-action).
    ================================================================ */
 
 import { EventBus } from '../../lib/eventBus.js';
@@ -318,7 +333,7 @@ const EventosEnVivo = (() => {
   }
 
   function _init() {
-    EventBus.on('vista:cambiada', (vista) => {
+    EventBus.on('eventos:cambiada', (vista) => {
       if (vista === 'eventos-en-vivo') { _vistaActiva = true; render(); } else { _vistaActiva = false; }
     });
     _suscribirTiempoReal();

@@ -1,0 +1,1608 @@
+<!DOCTYPE html>
+<html lang="es-CL">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Prueba C — Menú Digital con Variantes</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --color-bg: #0f0f14;
+    --color-card: #1a1a24;
+    --color-panel: #21212e;
+    --color-hover: #2a2a3a;
+    --color-border: #2e2e42;
+    --color-accent: #f59e0b;
+    --color-accent-dark: #d97706;
+    --color-primary: #6366f1;
+    --color-success: #22c55e;
+    --color-danger: #ef4444;
+    --color-warning: #f59e0b;
+    --color-info: #3b82f6;
+    --color-text: #f1f5f9;
+    --color-text-sec: #94a3b8;
+    --color-text-muted: #64748b;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --radius-lg: 16px;
+    --t: all .2s ease;
+  }
+
+  html, body { height: 100%; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--color-bg);
+    color: var(--color-text);
+    min-height: 100vh;
+    padding: 0;
+    padding-bottom: 120px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Banner del prototipo */
+  .proto-banner {
+    background: linear-gradient(135deg, rgba(99,102,241,.15), rgba(245,158,11,.1));
+    border-bottom: 1px solid var(--color-border);
+    padding: 10px 16px;
+    font-size: 11px;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+    font-weight: 800;
+    color: var(--color-accent);
+    text-align: center;
+  }
+
+  /* Header de menú */
+  .menu-estado {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 20px;
+    background: var(--color-card);
+    border-bottom: 1px solid var(--color-border);
+    font-size: 13px;
+    color: var(--color-text-sec);
+  }
+
+  .menu-banner {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    padding: 16px 24px;
+    text-align: center;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .menu-banner p {
+    font-size: 15px;
+    font-weight: 500;
+    color: rgba(255,255,255,.7);
+    font-style: italic;
+  }
+
+  .menu-categorias {
+    display: flex;
+    gap: 8px;
+    padding: 12px 20px;
+    overflow-x: auto;
+    background: var(--color-card);
+    border-bottom: 1px solid var(--color-border);
+    scrollbar-width: none;
+  }
+  .menu-categorias::-webkit-scrollbar { display: none; }
+  .menu-cat {
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: 24px;
+    color: var(--color-text-sec);
+    padding: 7px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: var(--t);
+  }
+  .menu-cat:hover { border-color: var(--color-accent); color: var(--color-accent); }
+  .menu-cat.active {
+    background: var(--color-accent);
+    color: #000;
+    border-color: var(--color-accent);
+    font-weight: 700;
+  }
+
+  .menu-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+    padding: 20px;
+  }
+  @media (max-width: 600px) {
+    .menu-grid {
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 12px;
+      padding: 12px;
+    }
+  }
+
+  .menu-card {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    cursor: pointer;
+    transition: var(--t);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+  }
+  .menu-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--color-accent);
+    box-shadow: 0 10px 28px rgba(0,0,0,.4);
+  }
+  .menu-card:active { transform: scale(.98); }
+  .menu-card.sin-variantes { cursor: default; }
+  .menu-card.sin-variantes:hover {
+    transform: none;
+    border-color: var(--color-border);
+    box-shadow: none;
+  }
+
+  .menu-card-img {
+    height: 140px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+  }
+  .menu-card-inicial {
+    font-size: 52px;
+    font-weight: 800;
+    color: rgba(255,255,255,.85);
+    text-shadow: 0 4px 12px rgba(0,0,0,.35);
+  }
+  .menu-card-precio {
+    position: absolute;
+    bottom: 10px;
+    right: 14px;
+    background: var(--color-accent);
+    color: #000;
+    font-weight: 800;
+    font-size: 14px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.3);
+  }
+  .menu-card-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(0,0,0,.55);
+    backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,.15);
+    color: #fff;
+    font-size: 10.5px;
+    font-weight: 800;
+    padding: 5px 10px;
+    border-radius: 99px;
+    letter-spacing: .3px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .menu-card-badge i { color: var(--color-accent); font-size: 10px; }
+
+  .menu-card-body {
+    padding: 12px 14px 14px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .menu-card-body h3 {
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.25;
+    color: var(--color-text);
+  }
+  .menu-card-body p {
+    font-size: 12px;
+    color: var(--color-text-muted);
+    line-height: 1.4;
+  }
+  .menu-card-accion {
+    margin-top: auto;
+    padding-top: 8px;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--color-accent);
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .menu-card.sin-variantes .menu-card-accion { color: var(--color-text-muted); }
+
+  /* Panel de orden flotante */
+  .orden-panel {
+    position: fixed;
+    right: 20px;
+    bottom: 20px;
+    width: 340px;
+    max-height: 60vh;
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 20px 50px rgba(0,0,0,.5);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 100;
+    transition: var(--t);
+  }
+  @media (max-width: 700px) {
+    .orden-panel {
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      width: auto;
+      max-height: 55vh;
+    }
+  }
+  .orden-panel.oculto {
+    transform: translateY(calc(100% - 56px));
+  }
+
+  .orden-cabecera {
+    padding: 14px 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--color-border);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .orden-cabecera h3 {
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .orden-cabecera h3 i { color: var(--color-accent); }
+  .orden-cabecera .contador {
+    background: var(--color-accent);
+    color: #000;
+    font-weight: 800;
+    font-size: 12px;
+    padding: 2px 9px;
+    border-radius: 99px;
+  }
+
+  .orden-items {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .orden-vacia {
+    padding: 32px 16px;
+    text-align: center;
+    color: var(--color-text-muted);
+    font-size: 13px;
+  }
+  .orden-vacia i {
+    font-size: 32px;
+    opacity: .3;
+    display: block;
+    margin-bottom: 10px;
+  }
+
+  .orden-item {
+    background: var(--color-panel);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+  }
+  .orden-item-info { flex: 1; min-width: 0; }
+  .orden-item-nombre {
+    font-size: 13px;
+    font-weight: 700;
+    margin-bottom: 3px;
+  }
+  .orden-item-opciones {
+    font-size: 11px;
+    color: var(--color-accent);
+    line-height: 1.4;
+    margin-bottom: 3px;
+    font-weight: 600;
+  }
+  .orden-item-alergias {
+    font-size: 10.5px;
+    color: var(--color-danger);
+    font-weight: 700;
+    margin-bottom: 3px;
+  }
+  .orden-item-obs {
+    font-size: 10.5px;
+    color: var(--color-text-muted);
+    font-style: italic;
+    margin-bottom: 4px;
+  }
+  .orden-item-precio {
+    font-size: 12px;
+    color: var(--color-text-sec);
+    font-weight: 600;
+  }
+  .orden-item-precio strong { color: var(--color-accent); }
+  .btn-quitar-item {
+    background: transparent;
+    border: none;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  .btn-quitar-item:hover { color: var(--color-danger); }
+
+  .orden-pie {
+    padding: 12px 18px;
+    border-top: 1px solid var(--color-border);
+    flex-shrink: 0;
+    background: var(--color-card);
+  }
+  .orden-total {
+    display: flex;
+    justify-content: space-between;
+    font-size: 15px;
+    font-weight: 700;
+    margin-bottom: 10px;
+  }
+  .orden-total span:last-child { color: var(--color-accent); font-size: 18px; }
+  .btn-primario {
+    width: 100%;
+    padding: 12px;
+    background: var(--color-accent);
+    color: #000;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-weight: 800;
+    font-size: 14px;
+    cursor: pointer;
+    transition: var(--t);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .btn-primario:hover { background: var(--color-accent-dark); }
+  .btn-primario:disabled {
+    background: var(--color-hover);
+    color: var(--color-text-muted);
+    cursor: not-allowed;
+  }
+
+  /* Modal */
+  .mo-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.72);
+    backdrop-filter: blur(4px);
+    z-index: 1100;
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 0;
+    animation: mo-fade .18s ease;
+  }
+  .mo-overlay.abierto { display: flex; }
+  @keyframes mo-fade { from { opacity: 0; } to { opacity: 1; } }
+
+  .mo-modal {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    width: 100%;
+    max-width: 520px;
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 -20px 50px rgba(0,0,0,.6);
+    animation: mo-up .28s cubic-bezier(.4,0,.2,1);
+  }
+  @keyframes mo-up { from { transform: translateY(100%); } to { transform: translateY(0); } }
+
+  @media (min-width: 768px) {
+    .mo-overlay {
+      align-items: center;
+      padding: 20px;
+    }
+    .mo-modal {
+      border-radius: var(--radius);
+      max-height: 88vh;
+    }
+  }
+
+  .mo-handle {
+    width: 40px; height: 4px;
+    background: var(--color-border);
+    border-radius: 4px;
+    margin: 8px auto 0;
+    flex-shrink: 0;
+  }
+  @media (min-width: 768px) { .mo-handle { display: none; } }
+
+  .mo-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid var(--color-border);
+    flex-shrink: 0;
+  }
+  .mo-header-info { flex: 1; min-width: 0; }
+  .mo-nombre {
+    font-size: 18px;
+    font-weight: 800;
+    line-height: 1.2;
+    margin-bottom: 3px;
+  }
+  .mo-precio-base {
+    font-size: 12px;
+    color: var(--color-text-muted);
+  }
+  .mo-cerrar {
+    background: var(--color-hover);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-sec);
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: var(--t);
+  }
+  .mo-cerrar:hover { color: var(--color-danger); border-color: var(--color-danger); }
+
+  .mo-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px 16px 12px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mo-variante {
+    padding: 14px 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+  .mo-variante:last-of-type { border-bottom: none; }
+
+  .mo-var-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .mo-var-titulo {
+    font-size: 13px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+  }
+  .mo-var-req {
+    color: var(--color-danger);
+    font-weight: 800;
+    font-size: 14px;
+  }
+  .mo-var-tipo {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--color-text-muted);
+    background: var(--color-panel);
+    padding: 2px 8px;
+    border-radius: 99px;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+  }
+  .mo-var-tipo.multiple { color: var(--color-info); }
+
+  .mo-opcion {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1.5px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    margin-bottom: 6px;
+    cursor: pointer;
+    transition: var(--t);
+    background: var(--color-panel);
+    position: relative;
+  }
+  .mo-opcion:last-child { margin-bottom: 0; }
+  .mo-opcion:hover { border-color: var(--color-accent); }
+  .mo-opcion.seleccionada {
+    border-color: var(--color-accent);
+    background: rgba(245,158,11,.08);
+  }
+  .mo-opcion.seleccionada .mo-check {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: #000;
+  }
+  .mo-opcion.deshabilitada {
+    opacity: .35;
+    pointer-events: none;
+    filter: grayscale(.4);
+  }
+
+  .mo-check {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    border: 2px solid var(--color-border);
+    background: var(--color-card);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: transparent;
+    font-size: 11px;
+    transition: var(--t);
+    margin-top: 1px;
+  }
+  .mo-check.checkbox { border-radius: 6px; }
+
+  .mo-opcion-info { flex: 1; min-width: 0; }
+  .mo-opcion-nombre {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.3;
+    margin-bottom: 2px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .mo-opcion-nombre .warn-icon { color: var(--color-warning); font-size: 11px; }
+  .mo-opcion-desc {
+    font-size: 11.5px;
+    color: var(--color-text-muted);
+    line-height: 1.35;
+  }
+  .mo-opcion-delta {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--color-accent);
+    flex-shrink: 0;
+    white-space: nowrap;
+    margin-top: 2px;
+  }
+  .mo-opcion-delta.negativo { color: var(--color-success); }
+  .mo-opcion-delta.cero {
+    color: var(--color-text-muted);
+    font-weight: 600;
+  }
+  .mo-exclusion-icon {
+    position: absolute;
+    top: 6px; right: 8px;
+    font-size: 10px;
+    color: var(--color-text-muted);
+    background: var(--color-card);
+    padding: 2px 6px;
+    border-radius: 99px;
+    border: 1px solid var(--color-border);
+  }
+
+  .mo-seccion {
+    padding: 14px 0;
+    border-top: 1px solid var(--color-border);
+  }
+  .mo-seccion:first-of-type { border-top: none; }
+  .mo-seccion-titulo {
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .mo-seccion-titulo i { color: var(--color-accent); font-size: 12px; }
+  .mo-seccion-sub {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    margin-bottom: 10px;
+    line-height: 1.4;
+  }
+
+  .mo-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .mo-chip {
+    background: var(--color-panel);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-sec);
+    padding: 7px 12px;
+    border-radius: 99px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--t);
+    white-space: nowrap;
+  }
+  .mo-chip:hover { border-color: var(--color-accent); color: var(--color-accent); }
+  .mo-chip.on {
+    background: var(--color-accent);
+    border-color: var(--color-accent);
+    color: #000;
+  }
+  .mo-chip.alergia.on {
+    background: var(--color-danger);
+    border-color: var(--color-danger);
+    color: #fff;
+  }
+
+  .mo-cantidad-fila {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .mo-cantidad-label { font-size: 13px; font-weight: 700; }
+  .mo-cantidad-control {
+    display: flex;
+    align-items: center;
+    background: var(--color-panel);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+  .mo-cantidad-btn {
+    background: transparent;
+    border: none;
+    color: var(--color-text);
+    width: 42px; height: 42px;
+    font-size: 18px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--t);
+  }
+  .mo-cantidad-btn:hover { background: var(--color-hover); color: var(--color-accent); }
+  .mo-cantidad-btn:disabled { opacity: .3; cursor: not-allowed; }
+  .mo-cantidad-valor {
+    font-size: 17px;
+    font-weight: 800;
+    min-width: 46px;
+    text-align: center;
+    border-left: 1px solid var(--color-border);
+    border-right: 1px solid var(--color-border);
+    line-height: 42px;
+  }
+
+  .mo-footer {
+    border-top: 1px solid var(--color-border);
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    background: var(--color-card);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .mo-total {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 13px;
+    color: var(--color-text-sec);
+  }
+  .mo-total-monto {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--color-accent);
+  }
+  .mo-botones {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 8px;
+  }
+  .mo-btn {
+    padding: 14px 12px;
+    border-radius: var(--radius-sm);
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    border: none;
+    transition: var(--t);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .mo-btn-cancelar {
+    background: var(--color-panel);
+    color: var(--color-text-sec);
+    border: 1px solid var(--color-border);
+  }
+  .mo-btn-cancelar:hover { color: var(--color-text); border-color: var(--color-text-sec); }
+  .mo-btn-agregar {
+    background: var(--color-accent);
+    color: #000;
+  }
+  .mo-btn-agregar:hover { background: var(--color-accent-dark); }
+  .mo-btn-agregar:active { transform: scale(.98); }
+
+  /* Modal de JSON */
+  .json-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.8);
+    z-index: 2000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  .json-overlay.abierto { display: flex; }
+  .json-box {
+    background: var(--color-card);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    width: 100%;
+    max-width: 640px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+  }
+  .json-box-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--color-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .json-box-header h3 { font-size: 14px; }
+  .json-box pre {
+    flex: 1;
+    overflow: auto;
+    padding: 16px 18px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11.5px;
+    line-height: 1.5;
+    color: #cbd5e1;
+    background: #0a0a10;
+    border-radius: 0;
+  }
+  .json-box-footer {
+    padding: 12px 18px;
+    border-top: 1px solid var(--color-border);
+  }
+</style>
+</head>
+<body>
+
+<div class="proto-banner">
+  <i class="fas fa-flask"></i> Prototipo aislado — Prueba C — Menú Digital con Variantes
+</div>
+
+<div class="menu-estado">
+  <span>👤 Comensal Demo</span>
+  <span>🪑 Mesa 7</span>
+</div>
+
+<div class="menu-banner">
+  <p>🗺️ "Donde cada trago es una aventura"</p>
+</div>
+
+<div class="menu-categorias" id="menuCats"></div>
+<div class="menu-grid" id="menuGrid"></div>
+
+<!-- Panel de orden -->
+<aside class="orden-panel oculto" id="ordenPanel">
+  <div class="orden-cabecera" id="ordenCabecera">
+    <h3><i class="fas fa-clipboard-list"></i> Mi Orden <span class="contador" id="ordenContador">0</span></h3>
+    <i class="fas fa-chevron-up" id="ordenChevron"></i>
+  </div>
+  <div class="orden-items" id="ordenItems"></div>
+  <div class="orden-pie">
+    <div class="orden-total">
+      <span>Total</span>
+      <span id="ordenTotal">$0</span>
+    </div>
+    <button class="btn-primario" id="btnSimularPrecarga" disabled>
+      <i class="fas fa-check"></i> Simular confirmar precarga
+    </button>
+  </div>
+</aside>
+
+<!-- Modal de opciones -->
+<div class="mo-overlay" id="moOverlay" role="dialog" aria-modal="true" aria-label="Opciones del producto">
+  <div class="mo-modal">
+    <div class="mo-handle"></div>
+    <div class="mo-header">
+      <div class="mo-header-info">
+        <div class="mo-nombre" id="moNombre">Producto</div>
+        <div class="mo-precio-base" id="moPrecioBase">Base $0</div>
+      </div>
+      <button class="mo-cerrar" id="moBtnCerrar" aria-label="Cerrar"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="mo-body" id="moBody"></div>
+    <div class="mo-footer">
+      <div class="mo-total">
+        <span>Total</span>
+        <span class="mo-total-monto" id="moTotal">$0</span>
+      </div>
+      <div class="mo-botones">
+        <button class="mo-btn mo-btn-cancelar" id="moBtnCancelar">Cancelar</button>
+        <button class="mo-btn mo-btn-agregar" id="moBtnAgregar"><i class="fas fa-check"></i> Agregar a mi orden</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal de JSON -->
+<div class="json-overlay" id="jsonOverlay">
+  <div class="json-box">
+    <div class="json-box-header">
+      <h3>Payload de precarga (simulado)</h3>
+      <button class="mo-cerrar" id="jsonBtnCerrar"><i class="fas fa-times"></i></button>
+    </div>
+    <pre id="jsonContenido"></pre>
+    <div class="json-box-footer">
+      <button class="btn-primario" id="jsonBtnCerrar2">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ════════════════════════════════════════════════════════════
+   PROTOTIPO AISLADO — Prueba C — Menú Digital con Variantes
+   Sin dependencias reales. Todo local.
+   ════════════════════════════════════════════════════════════ */
+
+// ── Datos stub ─────────────────────────────────────────────
+
+const ALERGENOS = [
+  'mani','gluten','lactosa','mariscos','huevo','soya',
+  'frutos_secos','pescado','otro'
+];
+
+const ETIQUETAS_ALERGENO = {
+  mani: 'Maní',
+  gluten: 'Gluten',
+  lactosa: 'Lactosa',
+  mariscos: 'Mariscos',
+  huevo: 'Huevo',
+  soya: 'Soya',
+  frutos_secos: 'Frutos secos',
+  pescado: 'Pescado',
+  otro: 'Otro'
+};
+
+// Chips de observación agrupados por par mutuamente excluyente.
+// Merken reemplaza a picante (contexto chileno).
+const GRUPOS_CHIPS = [
+  { id: 'hielo',   opciones: ['Sin hielo', 'Hielo extra'] },
+  { id: 'limon',   opciones: ['Sin limón', 'Doble limón'] },
+  { id: 'sal',     opciones: ['Sin sal', 'Escarchado'] },
+  { id: 'merken',  opciones: ['Sin merken', 'Merken extra'] },
+  { id: 'temp',    opciones: ['Bien fría'] }
+];
+const CHIPS_OBS = GRUPOS_CHIPS.flatMap(g => g.opciones);
+
+// Variantes reutilizables
+const varianteSaborMichelada = {
+  id: 'sabor_michelada',
+  nombre: 'Sabor',
+  tipo: 'unica',
+  requerido: true,
+  min_seleccion: 1,
+  max_seleccion: 1,
+  activo: true,
+  orden: 0,
+  opciones: [
+    { id: 'sabor_clasica', nombre: 'Clásica', descripcion: 'Receta original de la casa', precio_delta: 0, activo: true, alergenos: [], requiere: [], excluye: [], insumos_delta: [], pasos_delta: [] },
+    { id: 'sabor_cubana',  nombre: 'Cubana',  descripcion: 'Jugo de tomate y salsa inglesa', precio_delta: 500, activo: true, alergenos: [], requiere: [], excluye: [], insumos_delta: [], pasos_delta: [] },
+    { id: 'sabor_diabla',  nombre: 'Diabla',  descripcion: 'Salsa picante y un toque de merken', precio_delta: 700, activo: true, alergenos: [], requiere: [], excluye: ['escarchado_con'], insumos_delta: [], pasos_delta: [] }
+  ]
+};
+
+const varianteEscarchado = {
+  id: 'escarchado',
+  nombre: 'Escarchado',
+  tipo: 'unica',
+  requerido: false,
+  min_seleccion: 0,
+  max_seleccion: 1,
+  activo: true,
+  orden: 1,
+  opciones: [
+    { id: 'escarchado_sin', nombre: 'Sin escarchado', descripcion: 'Vaso sin sal', precio_delta: 0, activo: true, alergenos: [], requiere: [], excluye: [], insumos_delta: [], pasos_delta: [] },
+    { id: 'escarchado_con', nombre: 'Con escarchado', descripcion: 'Borde del vaso con sal y limón', precio_delta: 300, activo: true, alergenos: [], requiere: [], excluye: ['sabor_diabla'], insumos_delta: [], pasos_delta: [] }
+  ]
+};
+
+const varianteTermino = {
+  id: 'termino',
+  nombre: 'Término',
+  tipo: 'unica',
+  requerido: true,
+  min_seleccion: 1,
+  max_seleccion: 1,
+  activo: true,
+  orden: 0,
+  opciones: [
+    { id: 'term_jugoso',   nombre: 'Jugoso',     descripcion: 'Centro rosado', precio_delta: 0, activo: true, alergenos: [], requiere: [], excluye: [], insumos_delta: [], pasos_delta: [] },
+    { id: 'term_punto',    nombre: 'Al punto',   descripcion: 'Centro ligeramente rosa', precio_delta: 0, activo: true, alergenos: [], requiere: [], excluye: [], insumos_delta: [], pasos_delta: [] },
+    { id: 'term_cocido',   nombre: 'Bien cocido',descripcion: 'Sin rosa en el centro', precio_delta: 0, activo: true, alergenos: [], requiere: [], excluye: [], insumos_delta: [], pasos_delta: [] }
+  ]
+};
+
+const varianteSalsasBurger = {
+  id: 'salsas_burger',
+  nombre: 'Salsas',
+  tipo: 'multiple',
+  requerido: false,
+  min_seleccion: 0,
+  max_seleccion: 2,
+  activo: true,
+  orden: 1,
+  opciones: [
+    { id: 'sal_ajo',      nombre: 'Salsa de ajo',     precio_delta: 0, activo: true, alergenos: [], requiere: [], excluye: ['sal_sin_salsas'], insumos_delta: [], pasos_delta: [] },
+    { id: 'sal_tomate',   nombre: 'Salsa de tomate',  precio_delta: 0, activo: true, alergenos: [], requiere: [], excluye: ['sal_sin_salsas'], insumos_delta: [], pasos_delta: [] },
+    { id: 'sal_ketchup',  nombre: 'Ketchup',          precio_delta: 0, activo: true, alergenos: [], requiere: [], excluye: ['sal_sin_salsas'], insumos_delta: [], pasos_delta: [] },
+    { id: 'sal_mostaza',  nombre: 'Mostaza',          precio_delta: 0, activo: true, alergenos: [], requiere: [], excluye: ['sal_sin_salsas'], insumos_delta: [], pasos_delta: [] },
+    { id: 'sal_sin_salsas', nombre: 'Sin salsas',     descripcion: 'Sin ninguna salsa', precio_delta: 0, activo: true, alergenos: [], requiere: [], excluye: ['sal_ajo','sal_tomate','sal_ketchup','sal_mostaza'], insumos_delta: [], pasos_delta: [] }
+  ]
+};
+
+const varianteTamanoTabla = {
+  id: 'tamano_tabla',
+  nombre: 'Tamaño',
+  tipo: 'unica',
+  requerido: true,
+  min_seleccion: 1,
+  max_seleccion: 1,
+  activo: true,
+  orden: 0,
+  opciones: [
+    { id: 'tabla_2', nombre: 'Para 2', descripcion: 'Ideal para compartir en pareja', precio_delta: 0, activo: true, alergenos: [], requiere: [], excluye: [], insumos_delta: [], pasos_delta: [] },
+    { id: 'tabla_4', nombre: 'Para 4', descripcion: 'Porción familiar', precio_delta: 8000, activo: true, alergenos: [], requiere: [], excluye: [], insumos_delta: [], pasos_delta: [] }
+  ]
+};
+
+const varianteAgregadosTabla = {
+  id: 'agregados_tabla',
+  nombre: 'Agregados',
+  tipo: 'multiple',
+  requerido: false,
+  min_seleccion: 0,
+  max_seleccion: 3,
+  activo: true,
+  orden: 1,
+  opciones: [
+    { id: 'ag_aceitunas',  nombre: 'Aceitunas',         precio_delta: 800, activo: true, alergenos: [], requiere: [], excluye: [], insumos_delta: [], pasos_delta: [] },
+    { id: 'ag_queso',      nombre: 'Queso madurado',    precio_delta: 1500, activo: true, alergenos: ['lactosa'], requiere: [], excluye: [], insumos_delta: [], pasos_delta: [] },
+    { id: 'ag_jamon',      nombre: 'Jamón serrano',     precio_delta: 2200, activo: true, alergenos: [], requiere: [], excluye: [], insumos_delta: [], pasos_delta: [] },
+    { id: 'ag_frutos',     nombre: 'Frutos secos',      precio_delta: 1800, activo: true, alergenos: ['frutos_secos'], requiere: [], excluye: [], insumos_delta: [], pasos_delta: [] }
+  ]
+};
+
+// Productos
+const productos = [
+  {
+    id: 'prod_cerveza',
+    nombre: 'Cerveza Artesanal',
+    precio: 4500,
+    categoria: 'Cervezas',
+    destino: 'barra',
+    descripcion: 'IPA local con notas cítricas',
+    variantes_ids: []
+  },
+  {
+    id: 'prod_michelada',
+    nombre: 'Michelada Especial',
+    precio: 5500,
+    categoria: 'Cervezas',
+    destino: 'barra',
+    descripcion: 'Cerveza preparada con limón y sal',
+    variantes_ids: ['sabor_michelada', 'escarchado']
+  },
+  {
+    id: 'prod_burger',
+    nombre: 'Hamburguesa de la Casa',
+    precio: 8900,
+    categoria: 'Cocina',
+    destino: 'cocina',
+    descripcion: 'Carne angus 200g con papas rústicas',
+    variantes_ids: ['termino', 'salsas_burger']
+  },
+  {
+    id: 'prod_tabla',
+    nombre: 'Tabla Mixta',
+    precio: 15000,
+    categoria: 'Cocina',
+    destino: 'cocina',
+    descripcion: 'Selección de quesos, embutidos y encurtidos',
+    variantes_ids: ['tamano_tabla', 'agregados_tabla']
+  }
+];
+
+const variantesPorId = {
+  sabor_michelada: varianteSaborMichelada,
+  escarchado: varianteEscarchado,
+  termino: varianteTermino,
+  salsas_burger: varianteSalsasBurger,
+  tamano_tabla: varianteTamanoTabla,
+  agregados_tabla: varianteAgregadosTabla
+};
+
+// ── Estado local ───────────────────────────────────────────
+
+const orden = []; // items con opciones
+
+let modalState = null; // { producto, variantes, selecciones, alergias, chips, cantidad }
+
+// ── Utilidades ─────────────────────────────────────────────
+
+const formatearDinero = (n) => {
+  const v = Number(n) || 0;
+  return '$' + Math.abs(v).toLocaleString('es-CL', { useGrouping: false });
+};
+
+const esc = (s) => String(s == null ? '' : s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+  .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+
+const obtenerColorDesdeNombre = (nombre) => {
+  let hash = 0;
+  for (let i = 0; i < nombre.length; i++) {
+    hash = nombre.charCodeAt(i) + ((hash << 5) - hash);
+    hash = hash & hash;
+  }
+  const h = Math.abs(hash) % 360;
+  return `hsl(${h}, 55%, 45%)`;
+};
+
+// ── Render menú ────────────────────────────────────────────
+
+function renderCategorias() {
+  const cont = document.getElementById('menuCats');
+  const cats = ['Todas', ...new Set(productos.map(p => p.categoria))];
+  cont.innerHTML = cats.map((c, i) =>
+    `<button class="menu-cat ${i === 0 ? 'active' : ''}" data-cat="${esc(c)}">${esc(c)}</button>`
+  ).join('');
+
+  cont.querySelectorAll('.menu-cat').forEach(btn => {
+    btn.addEventListener('click', () => {
+      cont.querySelectorAll('.menu-cat').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderProductos(btn.dataset.cat);
+    });
+  });
+}
+
+function renderProductos(categoria = 'Todas') {
+  const grid = document.getElementById('menuGrid');
+  let lista = productos.slice();
+  if (categoria !== 'Todas') lista = lista.filter(p => p.categoria === categoria);
+
+  grid.innerHTML = lista.map(p => {
+    const tieneVariantes = (p.variantes_ids || []).length > 0;
+    const badge = tieneVariantes
+      ? `<span class="menu-card-badge"><i class="fas fa-wand-magic-sparkles"></i> Personalizable</span>`
+      : '';
+    const accion = tieneVariantes
+      ? `<span class="menu-card-accion"><i class="fas fa-sliders"></i> Elegir opciones</span>`
+      : `<span class="menu-card-accion"><i class="fas fa-plus"></i> Agregar directo</span>`;
+
+    return `
+      <div class="menu-card ${tieneVariantes ? '' : 'sin-variantes'}" data-prod-id="${esc(p.id)}">
+        <div class="menu-card-img" style="background-color: ${obtenerColorDesdeNombre(p.nombre)}">
+          ${badge}
+          <span class="menu-card-inicial">${esc(p.nombre.charAt(0))}</span>
+          <span class="menu-card-precio">${formatearDinero(p.precio)}</span>
+        </div>
+        <div class="menu-card-body">
+          <h3>${esc(p.nombre)}</h3>
+          <p>${esc(p.descripcion)}</p>
+          ${accion}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  grid.querySelectorAll('.menu-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const prod = productos.find(p => p.id === card.dataset.prodId);
+      if (!prod) return;
+      onProductoClick(prod);
+    });
+  });
+}
+
+function onProductoClick(producto) {
+  const variantesActivas = (producto.variantes_ids || [])
+    .map(id => variantesPorId[id])
+    .filter(v => v && v.activo !== false)
+    .map(v => ({
+      ...v,
+      opciones: (v.opciones || []).filter(o => o.activo !== false)
+    }))
+    .filter(v => v.opciones.length > 0);
+
+  if (variantesActivas.length === 0) {
+    agregarDirecto(producto);
+    return;
+  }
+
+  abrirModal(producto, variantesActivas);
+}
+
+// ── Agregar directo (sin variantes) ────────────────────────
+
+function agregarDirecto(producto) {
+  const destino = producto.destino || 'cocina';
+  const item = {
+    tipo: 'producto',
+    prodId: producto.id,
+    nombre: producto.nombre,
+    precio_base: producto.precio,
+    precio: producto.precio,
+    precio_unitario: producto.precio,
+    precio_total: producto.precio,
+    opciones: [],
+    alergias_manuales: [],
+    categoria: producto.categoria,
+    destino: destino,
+    qty: 1,
+    obs: '',
+    enviado: false,
+    persona: 'General'
+  };
+  orden.push(item);
+  renderOrden();
+  abrirPanelOrden();
+}
+
+// ── Modal ──────────────────────────────────────────────────
+
+const overlay = document.getElementById('moOverlay');
+
+function abrirModal(producto, variantes) {
+  modalState = {
+    producto,
+    variantes,
+    selecciones: {},   // varianteId -> Set de opcionId
+    alergias: new Set(),
+    chips: new Set(),
+    cantidad: 1
+  };
+  variantes.forEach(v => modalState.selecciones[v.id] = new Set());
+
+  document.getElementById('moNombre').textContent = producto.nombre;
+  document.getElementById('moPrecioBase').textContent = `Base ${formatearDinero(producto.precio)}`;
+
+  renderModalBody();
+  actualizarTotalModal();
+  actualizarCantidadUI();
+
+  overlay.classList.add('abierto');
+}
+
+function cerrarModal() {
+  overlay.classList.remove('abierto');
+  modalState = null;
+}
+
+function renderModalBody() {
+  const body = document.getElementById('moBody');
+  const { variantes, selecciones, alergias, chips } = modalState;
+
+  const seccionesVariantes = variantes.map(v => {
+    const reqHtml = v.requerido ? '<span class="mo-var-req">*</span>' : '';
+    const tipoLabel = v.tipo === 'unica' ? 'única' : 'múltiple';
+    const tipoClass = v.tipo === 'multiple' ? 'mo-var-tipo multiple' : 'mo-var-tipo';
+    const sel = selecciones[v.id];
+
+    const opcionesHtml = v.opciones.map(o => {
+      const seleccionada = sel.has(o.id);
+      const excluida = esExcluida(o, variantes, selecciones);
+      const delta = o.precio_delta || 0;
+      const deltaClass = delta > 0 ? '' : delta < 0 ? 'negativo' : 'cero';
+      const deltaTexto = delta === 0
+        ? 'Incluido'
+        : delta > 0
+          ? `+${formatearDinero(delta)}`
+          : `-${formatearDinero(Math.abs(delta))}`;
+      const checkClass = v.tipo === 'multiple' ? 'mo-check checkbox' : 'mo-check';
+      const exclIcon = excluida ? '<span class="mo-exclusion-icon">⊘ excluida</span>' : '';
+
+      const clases = [
+        'mo-opcion',
+        seleccionada ? 'seleccionada' : '',
+        excluida ? 'deshabilitada' : ''
+      ].filter(Boolean).join(' ');
+
+      return `
+        <div class="${clases}" data-var-id="${esc(v.id)}" data-op-id="${esc(o.id)}">
+          <div class="${checkClass}"><i class="fas fa-check"></i></div>
+          <div class="mo-opcion-info">
+            <div class="mo-opcion-nombre">${esc(o.nombre)}</div>
+            ${o.descripcion ? `<div class="mo-opcion-desc">${esc(o.descripcion)}</div>` : ''}
+          </div>
+          <div class="mo-opcion-delta ${deltaClass}">${deltaTexto}</div>
+          ${exclIcon}
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div class="mo-variante">
+        <div class="mo-var-header">
+          <span class="mo-var-titulo">${esc(v.nombre)}</span>
+          ${reqHtml}
+          <span class="${tipoClass}">${tipoLabel}</span>
+        </div>
+        <div class="mo-opciones">${opcionesHtml}</div>
+      </div>
+    `;
+  }).join('');
+
+  const alergiasHtml = ALERGENOS.map(a => `
+    <button class="mo-chip alergia ${alergias.has(a) ? 'on' : ''}" data-alergeno="${esc(a)}">
+      ${esc(ETIQUETAS_ALERGENO[a])}
+    </button>
+  `).join('');
+
+  const chipsHtml = CHIPS_OBS.map(c => `
+    <button class="mo-chip ${chips.has(c) ? 'on' : ''}" data-chip="${esc(c)}">
+      ${esc(c)}
+    </button>
+  `).join('');
+
+  body.innerHTML = `
+    ${seccionesVariantes}
+
+    <div class="mo-seccion">
+      <div class="mo-seccion-titulo"><i class="fas fa-exclamation-triangle"></i> Alergias del cliente</div>
+      <div class="mo-seccion-sub">Marca solo si tú tienes una alergia que el garzón deba conocer.</div>
+      <div class="mo-chips" id="moChipsAlergias">${alergiasHtml}</div>
+    </div>
+
+    <div class="mo-seccion">
+      <div class="mo-seccion-titulo"><i class="fas fa-comment-dots"></i> Preferencias</div>
+      <div class="mo-seccion-sub">Toca una opción rápida. Si necesitas algo más específico, avísale al garzón.</div>
+      <div class="mo-chips" id="moChipsObs">${chipsHtml}</div>
+    </div>
+
+    <div class="mo-seccion">
+      <div class="mo-cantidad-fila">
+        <div class="mo-cantidad-label">Cantidad</div>
+        <div class="mo-cantidad-control">
+          <button class="mo-cantidad-btn" id="moBtnMenos" aria-label="Restar">−</button>
+          <div class="mo-cantidad-valor" id="moCantidad">${modalState.cantidad}</div>
+          <button class="mo-cantidad-btn" id="moBtnMas" aria-label="Sumar">+</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Listeners
+  body.querySelectorAll('.mo-opcion').forEach(el => {
+    el.addEventListener('click', () => {
+      if (el.classList.contains('deshabilitada')) return;
+      toggleOpcion(el.dataset.varId, el.dataset.opId);
+    });
+  });
+
+  body.querySelectorAll('#moChipsAlergias .mo-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const a = btn.dataset.alergeno;
+      if (modalState.alergias.has(a)) modalState.alergias.delete(a);
+      else modalState.alergias.add(a);
+      renderModalBody();
+    });
+  });
+
+  body.querySelectorAll('#moChipsObs .mo-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const chip = btn.dataset.chip;
+      const grupo = GRUPOS_CHIPS.find(g => g.opciones.includes(chip));
+      if (!grupo) return;
+      if (modalState.chips.has(chip)) {
+        modalState.chips.delete(chip);
+      } else {
+        grupo.opciones.forEach(o => modalState.chips.delete(o));
+        modalState.chips.add(chip);
+      }
+      renderModalBody();
+    });
+  });
+
+  document.getElementById('moBtnMenos').addEventListener('click', () => cambiarCantidad(-1));
+  document.getElementById('moBtnMas').addEventListener('click', () => cambiarCantidad(1));
+}
+
+function toggleOpcion(varId, opId) {
+  const variante = modalState.variantes.find(v => v.id === varId);
+  if (!variante) return;
+  const sel = modalState.selecciones[varId];
+
+  if (variante.tipo === 'unica') {
+    if (sel.has(opId)) sel.delete(opId);
+    else { sel.clear(); sel.add(opId); }
+  } else {
+    if (sel.has(opId)) {
+      sel.delete(opId);
+    } else {
+      const maxSel = variante.max_seleccion || 1;
+      if (sel.size >= maxSel) {
+        alert(`Máximo ${maxSel} opciones en "${variante.nombre}".`);
+        return;
+      }
+      sel.add(opId);
+    }
+  }
+
+  limpiarExcluidas();
+  renderModalBody();
+  actualizarTotalModal();
+}
+
+function limpiarExcluidas() {
+  const { variantes, selecciones } = modalState;
+  variantes.forEach(v => {
+    const sel = selecciones[v.id];
+    [...sel].forEach(opId => {
+      const op = v.opciones.find(o => o.id === opId);
+      if (!op) return;
+      if (esExcluida(op, variantes, selecciones)) sel.delete(opId);
+    });
+  });
+}
+
+function esExcluida(opcion, variantes, selecciones) {
+  for (const v of variantes) {
+    const sel = selecciones[v.id];
+    if (!sel) continue;
+    for (const opId of sel) {
+      if (opId === opcion.id) continue;
+      const op = v.opciones.find(o => o.id === opId);
+      if (op && Array.isArray(op.excluye) && op.excluye.includes(opcion.id)) return true;
+    }
+  }
+  return false;
+}
+
+function cambiarCantidad(delta) {
+  modalState.cantidad = Math.max(1, Math.min(20, modalState.cantidad + delta));
+  document.getElementById('moCantidad').textContent = modalState.cantidad;
+  actualizarCantidadUI();
+  actualizarTotalModal();
+}
+
+function actualizarCantidadUI() {
+  const menos = document.getElementById('moBtnMenos');
+  const mas = document.getElementById('moBtnMas');
+  if (menos) menos.disabled = modalState.cantidad <= 1;
+  if (mas) mas.disabled = modalState.cantidad >= 20;
+}
+
+function calcularPrecioUnitario() {
+  let total = modalState.producto.precio || 0;
+  modalState.variantes.forEach(v => {
+    const sel = modalState.selecciones[v.id];
+    if (!sel) return;
+    sel.forEach(opId => {
+      const op = v.opciones.find(o => o.id === opId);
+      if (op) total += (op.precio_delta || 0);
+    });
+  });
+  return total;
+}
+
+function actualizarTotalModal() {
+  const unitario = calcularPrecioUnitario();
+  const total = unitario * modalState.cantidad;
+  document.getElementById('moTotal').textContent = formatearDinero(total);
+}
+
+// ── Agregar desde modal ────────────────────────────────────
+
+function validarModal() {
+  const errores = [];
+  modalState.variantes.forEach(v => {
+    if (!v.requerido) return;
+    const sel = modalState.selecciones[v.id];
+    const size = sel ? sel.size : 0;
+    if (size < (v.min_seleccion || 0)) {
+      errores.push(`Falta seleccionar ${v.nombre}`);
+    }
+  });
+  return errores;
+}
+
+function agregarDesdeModal() {
+  const errores = validarModal();
+  if (errores.length > 0) {
+    alert('⚠️ ' + errores[0]);
+    return;
+  }
+
+  const opcionesSnapshot = [];
+  modalState.variantes.forEach(v => {
+    const sel = modalState.selecciones[v.id];
+    if (!sel || sel.size === 0) return;
+    const ordenadas = [...sel]
+      .map(id => ({ id, idx: v.opciones.findIndex(o => o.id === id) }))
+      .filter(x => x.idx >= 0)
+      .sort((a, b) => a.idx - b.idx);
+    ordenadas.forEach(({ id }) => {
+      const op = v.opciones.find(o => o.id === id);
+      if (!op) return;
+      opcionesSnapshot.push({
+        varianteId: v.id,
+        varianteNombre: v.nombre,
+        opcionId: op.id,
+        opcionNombre: op.nombre,
+        precio_delta: op.precio_delta || 0,
+        alergenos: Array.isArray(op.alergenos) ? op.alergenos : [],
+        insumos_delta: Array.isArray(op.insumos_delta) ? op.insumos_delta : [],
+        pasos_delta: Array.isArray(op.pasos_delta) ? op.pasos_delta : []
+      });
+    });
+  });
+
+  const obsPartes = CHIPS_OBS.filter(c => modalState.chips.has(c));
+
+  const precioUnitario = calcularPrecioUnitario();
+  const precioTotal = precioUnitario * modalState.cantidad;
+
+  const item = {
+    tipo: 'producto',
+    prodId: modalState.producto.id,
+    nombre: modalState.producto.nombre,
+    precio_base: modalState.producto.precio,
+    precio: precioUnitario,
+    precio_unitario: precioUnitario,
+    precio_total: precioTotal,
+    opciones: opcionesSnapshot,
+    alergias_manuales: [...modalState.alergias].sort(),
+    categoria: modalState.producto.categoria,
+    destino: modalState.producto.destino,
+    qty: modalState.cantidad,
+    obs: obsPartes.join(' · '),
+    enviado: false,
+    persona: 'General'
+  };
+
+  orden.push(item);
+  cerrarModal();
+  renderOrden();
+  abrirPanelOrden();
+}
+
+// ── Panel de orden ─────────────────────────────────────────
+
+function renderOrden() {
+  const cont = document.getElementById('ordenItems');
+  const contador = document.getElementById('ordenContador');
+  const totalEl = document.getElementById('ordenTotal');
+  const btnSimular = document.getElementById('btnSimularPrecarga');
+
+  const totalQty = orden.reduce((s, it) => s + (it.qty || 1), 0);
+  contador.textContent = totalQty;
+  totalEl.textContent = formatearDinero(orden.reduce((s, it) => s + (it.precio_unitario * it.qty), 0));
+  btnSimular.disabled = orden.length === 0;
+
+  if (orden.length === 0) {
+    cont.innerHTML = `<div class="orden-vacia"><i class="fas fa-inbox"></i>Tu orden está vacía</div>`;
+    return;
+  }
+
+  cont.innerHTML = orden.map((it, i) => {
+    const opciones = (it.opciones || []).map(o => o.opcionNombre).join(' · ');
+    const alergias = (it.alergias_manuales || []).length > 0
+      ? `<div class="orden-item-alergias">⚠ ${it.alergias_manuales.join(', ')}</div>`
+      : '';
+    const obs = it.obs ? `<div class="orden-item-obs">"${esc(it.obs)}"</div>` : '';
+
+    return `
+      <div class="orden-item">
+        <div class="orden-item-info">
+          <div class="orden-item-nombre">${esc(it.nombre)} × ${it.qty}</div>
+          ${opciones ? `<div class="orden-item-opciones">${esc(opciones)}</div>` : ''}
+          ${alergias}
+          ${obs}
+          <div class="orden-item-precio">Subtotal: <strong>${formatearDinero(it.precio_unitario * it.qty)}</strong></div>
+        </div>
+        <button class="btn-quitar-item" data-idx="${i}" title="Quitar"><i class="fas fa-trash-alt"></i></button>
+      </div>
+    `;
+  }).join('');
+
+  cont.querySelectorAll('.btn-quitar-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      orden.splice(parseInt(btn.dataset.idx, 10), 1);
+      renderOrden();
+    });
+  });
+}
+
+function abrirPanelOrden() {
+  const panel = document.getElementById('ordenPanel');
+  panel.classList.remove('oculto');
+  const chevron = document.getElementById('ordenChevron');
+  if (chevron) chevron.className = 'fas fa-chevron-down';
+}
+
+function togglePanelOrden() {
+  const panel = document.getElementById('ordenPanel');
+  panel.classList.toggle('oculto');
+  const chevron = document.getElementById('ordenChevron');
+  if (chevron) {
+    chevron.className = panel.classList.contains('oculto')
+      ? 'fas fa-chevron-up'
+      : 'fas fa-chevron-down';
+  }
+}
+
+// ── Simular precarga ───────────────────────────────────────
+
+function simularPrecarga() {
+  const payload = {
+    mesa: '7',
+    tipo: 'local',
+    origen: 'cliente',
+    estado: 'precarga',
+    comensales: 1,
+    items: orden,
+    total: orden.reduce((s, it) => s + (it.precio_unitario * it.qty), 0),
+    observaciones: '',
+    id_usuario: 'demo_user_id',
+    nombre_comensal: 'Comensal Demo',
+    timestamp: Date.now()
+  };
+  document.getElementById('jsonContenido').textContent = JSON.stringify(payload, null, 2);
+  document.getElementById('jsonOverlay').classList.add('abierto');
+}
+
+// ── Wiring ─────────────────────────────────────────────────
+
+document.getElementById('moBtnCerrar').addEventListener('click', cerrarModal);
+document.getElementById('moBtnCancelar').addEventListener('click', cerrarModal);
+document.getElementById('moBtnAgregar').addEventListener('click', agregarDesdeModal);
+overlay.addEventListener('click', (e) => { if (e.target === overlay) cerrarModal(); });
+
+document.getElementById('ordenCabecera').addEventListener('click', togglePanelOrden);
+document.getElementById('btnSimularPrecarga').addEventListener('click', simularPrecarga);
+
+document.getElementById('jsonBtnCerrar').addEventListener('click', () => {
+  document.getElementById('jsonOverlay').classList.remove('abierto');
+});
+document.getElementById('jsonBtnCerrar2').addEventListener('click', () => {
+  document.getElementById('jsonOverlay').classList.remove('abierto');
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    if (overlay.classList.contains('abierto')) cerrarModal();
+    else if (document.getElementById('jsonOverlay').classList.contains('abierto')) {
+      document.getElementById('jsonOverlay').classList.remove('abierto');
+    }
+  }
+});
+
+// ── Arranque ───────────────────────────────────────────────
+
+renderCategorias();
+renderProductos();
+renderOrden();

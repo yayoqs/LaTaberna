@@ -1,9 +1,9 @@
 /* ==============================================
    LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/vars.css
-   Versión: 1.0.3
+   Versión: 1.0.4
    Propósito: Variables globales de diseño (colores, tipografía, layout).
-              --font-display cambiado a system-ui para vistas admin.
+              v1.0.4: Agregado --radius-lg para Célula B3.
    ============================================== */
 
 :root {
@@ -45,6 +45,7 @@
   --font-mono:    "Courier New", Courier, monospace;
 
   /* ── ESPACIADO / FORMA ─────────────────────────────────── */
+  --radius-lg: 16px;
   --radius:    12px;
   --radius-sm: 8px;
   --radius-xs: 6px;

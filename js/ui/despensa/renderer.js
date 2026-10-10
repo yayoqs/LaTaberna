@@ -1,10 +1,29 @@
 /* ================================================================
    LaTaberna - PubPOS — DESPENSA SUBMÓDULO (ES6)
    Archivo: js/ui/despensa/renderer.js
-   Versión: 4.2.1
+   Versión: 4.3.1
    Propósito: Renderizado de la vista de despensa con panel izquierdo
               tipo acordeón (Proveedores/Productos) como la maqueta.
-              v4.2.1: renderMovimientos solo lee del Store.
+   v4.3.1: Paquete movimientos — panel de Movimientos lee el slice
+           `movimientos` del Store como fuente primaria. Cambios:
+             · renderMovimientos ya no lee un slice inexistente con
+               fallback silencioso. Si el slice está vacío, muestra
+               el estado vacío legítimo.
+             · El array llega ordenado descendente por fecha desde
+               el reductor. El render NO ordena.
+             · Los movimientos nuevos vienen denormalizados con
+               insumoNombre y unidad. Fallback a Store.insumos solo
+               para movimientos viejos sin denormalizar.
+             · El signo del display se deriva del tipo (no de
+               cantidad). `cantidad` es deltaEfectivo y puede ser 0
+               cuando el stock se recortó a 0.
+             · Se separa el pintado de un item a un helper
+               _renderMovimientoItem para reducir complejidad.
+   v4.3.0: agrega chip "Vendibles" en la barra de tabs
+           centrales (D.7) y badge .badge-vendible en la
+           ficha de insumo vendible (D.8).
+   v4.2.2: renderMovimientos usa insumoId y resuelve
+           nombre desde Store.insumos.
    ================================================================ */
 
 import { formatearDinero, formatearHoraCorta } from '../../utils.js';
@@ -45,6 +64,7 @@ export function asegurarVista() {
         <div class="central-tabs">
           <button class="central-tab activo" data-tab="inventario">📦 Inventario</button>
           <button class="central-tab" data-tab="movimientos">📋 Movimientos</button>
+          <button class="chip-vendibles" id="chipVendibles" type="button">💰 Vendibles</button>
         </div>
         <div class="central-tab-content activo" id="central-inventario">
           <div class="resumen-bar" id="resumenBar"></div>
@@ -94,6 +114,12 @@ function _normalizarIngredientes(ingredientes) {
   }).filter(Boolean);
 }
 
+function _labelDestino(destino) {
+  if (destino === 'barra') return 'Barra';
+  if (destino === 'ambos') return 'Ambos';
+  return 'Cocina';
+}
+
 export function renderResumen(ingredientes) {
   const bar = document.getElementById('resumenBar');
   if (!bar) return;
@@ -131,50 +157,113 @@ export function renderEspacios(ingredientes) {
           <span class="contador">${items.length}</span>
         </div>
         <div class="espacio-body">
-          ${items.map(ing => `
-            <div class="producto-item">
-              <span class="nombre">${ing.nombre}</span>
-              <span>${ing.stock} ${ing.unidad}</span>
-              ${ing.stock <= ing.stock_minimo ? '<span class="stock-bajo">⚠ Bajo</span>' : ''}
-              <button class="btn-editar-insumo" data-id="${ing.id}">✎</button>
-            </div>
-          `).join('')}
+          ${items.map(ing => {
+            const badgeVendible = ing.vendible === true
+              ? `<span class="badge-vendible">💰 ${formatearDinero(ing.precio_venta || 0)} · ${_labelDestino(ing.destino)}</span>`
+              : '';
+            return `
+              <div class="producto-item">
+                <span class="nombre">${ing.nombre}</span>
+                <span>${ing.stock} ${ing.unidad}</span>
+                ${ing.stock <= ing.stock_minimo ? '<span class="stock-bajo">⚠ Bajo</span>' : ''}
+                ${badgeVendible}
+                <button class="btn-editar-insumo" data-id="${ing.id}">✎</button>
+              </div>
+            `;
+          }).join('')}
         </div>
       </div>`;
   }).join('');
   container.querySelectorAll('.espacio-header').forEach(h => h.addEventListener('click', () => h.parentElement.classList.toggle('abierto')));
 }
 
+/* ── Panel de Movimientos (v4.3.1) ─────────────────────── */
+
 export function renderMovimientos(filtro = 'todos') {
   const cont = document.getElementById('movimientosContainer');
   if (!cont) return;
-  const movs = Store.obtenerEstado().movimientos || [];
-  const filtrados = filtro === 'todos' ? movs : movs.filter(m => m.tipo === filtro);
+
+  // v4.3.1: fuente primaria es el slice del Store. El array llega
+  // ordenado descendente por fecha desde el reductor: no se ordena acá.
+  const movimientos = Store.obtenerEstado().movimientos || [];
+  const filtrados = filtro === 'todos'
+    ? movimientos
+    : movimientos.filter(m => m.tipo === filtro);
+
   if (!filtrados.length) {
     cont.innerHTML = '<p style="color:var(--color-text-muted); padding:20px; text-align:center;">Sin movimientos registrados.</p>';
     return;
   }
+
+  // Agrupación por fecha. Preserva el orden de aparición: como el
+  // array viene descendente, los grupos también quedan descendentes.
   const grupos = {};
+  const ordenFechas = [];
   filtrados.forEach(m => {
-    const fecha = new Date(m.fecha).toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'short' });
-    (grupos[fecha] ??= []).push(m);
+    const fecha = new Date(m.fecha).toLocaleDateString('es-CL', {
+      weekday: 'long', day: 'numeric', month: 'short'
+    });
+    if (!grupos[fecha]) {
+      grupos[fecha] = [];
+      ordenFechas.push(fecha);
+    }
+    grupos[fecha].push(m);
   });
-  cont.innerHTML = Object.entries(grupos).map(([fecha, movs]) => `
+
+  cont.innerHTML = ordenFechas.map(fecha => `
     <div class="mov-grupo">
       <div class="mov-grupo-titulo">${fecha}</div>
-      ${movs.map(m => {
-        const icono = m.tipo === 'entrada' ? '↑' : m.tipo === 'salida' ? '↓' : '↻';
-        const color = m.tipo === 'entrada' ? 'var(--color-success)' : m.tipo === 'salida' ? 'var(--color-danger)' : 'var(--color-info)';
-        const signo = m.tipo === 'salida' ? '-' : '+';
-        return `
-          <div class="movimiento-item">
-            <div class="icono-mov" style="color:${color}; background:rgba(${m.tipo === 'entrada' ? '34,197,94' : m.tipo === 'salida' ? '239,68,68' : '59,130,246'},.2)">${icono}</div>
-            <div class="detalle"><div class="ingrediente">${m.ingrediente || m.ingredienteId}</div><div class="meta">${formatearHoraCorta(m.fecha)} — ${m.motivo || ''} (${m.usuario || 'sistema'})</div></div>
-            <div class="cantidad cantidad-${m.tipo}">${signo}${Math.abs(m.cantidad)} ${m.unidad || ''}</div>
-          </div>`;
-      }).join('')}
+      ${grupos[fecha].map(m => _renderMovimientoItem(m)).join('')}
     </div>
   `).join('');
+}
+
+/**
+ * v4.3.1: pinta un movimiento individual.
+ *
+ * Denormalización: `insumoNombre` y `unidad` vienen en la propia fila
+ * del movimiento. Fallback a Store.insumos solo para movimientos
+ * viejos sin denormalizar (transición).
+ *
+ * Signo: se deriva del tipo. `entrada` → +, `salida` → -, `ajuste` →
+ * signo del delta. `cantidad` es el delta efectivo (puede ser 0
+ * cuando el stock se recortó a 0 por un ajuste negativo).
+ */
+function _renderMovimientoItem(m) {
+  const icono = m.tipo === 'entrada' ? '↑' : m.tipo === 'salida' ? '↓' : '↻';
+  const color = m.tipo === 'entrada'
+    ? 'var(--color-success)'
+    : m.tipo === 'salida'
+      ? 'var(--color-danger)'
+      : 'var(--color-info)';
+  const bg = m.tipo === 'entrada'
+    ? '34,197,94'
+    : m.tipo === 'salida'
+      ? '239,68,68'
+      : '59,130,246';
+
+  const delta = Number(m.cantidad) || 0;
+  const valorAbsoluto = Math.abs(delta);
+  const signo = m.tipo === 'salida' ? '-' : (delta < 0 ? '-' : '+');
+
+  let nombreInsumo = m.insumoNombre;
+  if (!nombreInsumo) {
+    const insumos = Store.obtenerEstado().insumos || [];
+    const insumoEncontrado = insumos.find(i => i.id === m.insumoId);
+    nombreInsumo = insumoEncontrado ? insumoEncontrado.nombre : (m.insumoId || '—');
+  }
+
+  const unidad = m.unidad || '';
+
+  return `
+    <div class="movimiento-item">
+      <div class="icono-mov" style="color:${color}; background:rgba(${bg},.2)">${icono}</div>
+      <div class="detalle">
+        <div class="ingrediente">${nombreInsumo}</div>
+        <div class="meta">${formatearHoraCorta(m.fecha)} — ${m.motivo || ''} (${m.usuario || 'sistema'})</div>
+      </div>
+      <div class="cantidad cantidad-${m.tipo}">${signo}${valorAbsoluto} ${unidad}</div>
+    </div>`;
 }
 
 export function renderListaCompras(items) {

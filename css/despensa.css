@@ -1,9 +1,12 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/despensa.css
-   Versión: 3.1.3
+   Versión: 3.2.0
    Propósito: Estilos para la nueva vista de Despensa con pestañas
               centrales, movimientos y gestos swipe.
+              v3.2.0: agrega .chip-vendibles (D.7), .badge-vendible
+                      (D.8) y estilos del toggle "Vender insumo" en
+                      #modalInsumo (D.6).
               v3.1.3: restaura estilos del panel izquierdo expansible.
    ================================================================ */
 
@@ -175,6 +178,7 @@
   display: flex; gap: 8px; margin-bottom: 12px;
   background: var(--color-card); padding: 4px; border-radius: 30px;
   border: 1px solid var(--color-border); width: fit-content;
+  align-items: center;
 }
 #view-despensa .central-tab {
   padding: 8px 16px; border-radius: 24px; border: none; background: transparent;
@@ -184,6 +188,31 @@
 #view-despensa .central-tab.activo { background: var(--color-accent); color: #000; font-weight: 600; }
 #view-despensa .central-tab-content { display: none; }
 #view-despensa .central-tab-content.activo { display: flex; flex-direction: column; }
+
+/* ── CHIP VENDIBLES (D.7) ─────────────────────────────────── */
+#view-despensa .chip-vendibles {
+  background: transparent;
+  border: 1px dashed var(--color-border);
+  color: var(--color-text-sec);
+  border-radius: 24px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all .2s;
+  font-family: inherit;
+}
+#view-despensa .chip-vendibles:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+#view-despensa .chip-vendibles.activo {
+  background: var(--color-success);
+  border-color: var(--color-success);
+  border-style: solid;
+  color: #000;
+  font-weight: 600;
+}
 
 #view-despensa .resumen-bar { display: flex; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 #view-despensa .resumen-card {
@@ -219,15 +248,31 @@
 #view-despensa .producto-item {
   display: flex; align-items: center; gap: 8px; padding: 8px 0;
   border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 13px; font-weight: 400;
+  flex-wrap: wrap;
 }
 #view-despensa .producto-item:last-child { border-bottom: none; }
 #view-despensa .producto-item .stock-bajo { color: var(--color-danger); font-weight: 600; font-size: 11px; }
-#view-despensa .producto-item .nombre { flex: 1; font-size: 13px; font-weight: 400; color: #f1f5f9; -webkit-text-fill-color: #f1f5f9; }
+#view-despensa .producto-item .nombre { flex: 1; min-width: 120px; font-size: 13px; font-weight: 400; color: #f1f5f9; -webkit-text-fill-color: #f1f5f9; }
 #view-despensa .btn-editar-insumo {
   background: transparent; border: 1px solid var(--color-border); color: var(--color-text-sec);
   border-radius: 4px; padding: 2px 6px; font-size: 10px; cursor: pointer; opacity: 0.6; transition: all .2s;
 }
 #view-despensa .btn-editar-insumo:hover { opacity: 1; border-color: var(--color-accent); color: var(--color-accent); }
+
+/* ── BADGE VENDIBLE (D.8) ─────────────────────────────────── */
+#view-despensa .badge-vendible {
+  background: rgba(34, 197, 94, .15);
+  border: 1px solid rgba(34, 197, 94, .4);
+  color: var(--color-success);
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 10px;
+  padding: 2px 8px;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
 
 /* Movimientos */
 #view-despensa .movimientos-filtros { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
@@ -298,6 +343,25 @@
   display: none; opacity: 0; transition: opacity 0.3s;
 }
 #view-despensa .overlay.activo { display: block; opacity: 1; }
+
+/* ── MODAL INSUMO (D.6): toggle vendible ──────────────────── */
+#modalInsumo .campo-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 12px 0;
+  font-size: 13px;
+  cursor: pointer;
+}
+#modalInsumo .campo-checkbox input[type="checkbox"] {
+  width: auto;
+  margin: 0;
+}
+#modalInsumo #bloqueVendible {
+  padding: 8px 0 4px;
+  border-top: 1px dashed rgba(255,255,255,0.1);
+  margin-top: 8px;
+}
 
 /* ── RESPONSIVE ───────────────────────────────────────────── */
 @media (max-width: 768px) {

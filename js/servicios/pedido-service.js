@@ -1,9 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — SERVICIO JS (ES6)
    Archivo: js/servicios/pedido-service.js
-   Versión: 1.0.5
+   Versión: 1.1.1
    Propósito: Servicio de casos de uso para pedidos de mesa.
-              Corrección: Logger en todos los catch.
+              v1.1.1: Se renombra idempotencyKey a claveIdempotencia
+                      (política de idioma) y se estandariza el paso
+                      dentro del objeto de datos.
    ================================================================ */
 
 import { PedidoAgregado } from '../dominio/pedido.js';
@@ -69,7 +71,7 @@ const PedidoService = (() => {
     return Resultado.ok(pedido);
   }
 
-  async function cerrarPedido(pedidoId, { formaPago, totalFinal, descuento = 0 }) {
+  async function cerrarPedido(pedidoId, { formaPago, totalFinal, descuento = 0, claveIdempotencia }) {
     if (!_pedidoRepo) return Resultado.fallo('Repositorio no configurado');
     const datos = await _pedidoRepo.obtenerPorId(pedidoId);
     if (!datos) return Resultado.fallo('Pedido no encontrado');
@@ -88,7 +90,13 @@ const PedidoService = (() => {
       return Resultado.fallo(`No se pudo cerrar el pedido: ${e.message}`);
     }
     try {
-      await _pedidoRepo.cerrarPedido(pedidoId, { formaPago, total: totalFinal, descuento, pedido: pedido.toJSON() });
+      await _pedidoRepo.cerrarPedido(pedidoId, {
+        formaPago,
+        total: totalFinal,
+        descuento,
+        pedido: pedido.toJSON(),
+        claveIdempotencia
+      });
     } catch (e) {
       Logger.error('[PedidoService] Error al guardar cierre en repositorio:', e);
       return Resultado.fallo(`Error al guardar cierre: ${e.message}`);
@@ -97,7 +105,7 @@ const PedidoService = (() => {
     return Resultado.ok(pedido);
   }
 
-  async function cerrarPedidoSinLiberar(pedidoId, { formaPago, totalFinal, descuento = 0 }) {
+  async function cerrarPedidoSinLiberar(pedidoId, { formaPago, totalFinal, descuento = 0, claveIdempotencia }) {
     if (!_pedidoRepo) return Resultado.fallo('Repositorio no configurado');
     const datos = await _pedidoRepo.obtenerPorId(pedidoId);
     if (!datos) return Resultado.fallo('Pedido no encontrado');
@@ -116,7 +124,13 @@ const PedidoService = (() => {
       return Resultado.fallo(`No se pudo cerrar el pedido: ${e.message}`);
     }
     try {
-      await _pedidoRepo.cerrarPedidoSinLiberar(pedidoId, { formaPago, total: totalFinal, descuento, pedido: pedido.toJSON() });
+      await _pedidoRepo.cerrarPedidoSinLiberar(pedidoId, {
+        formaPago,
+        total: totalFinal,
+        descuento,
+        pedido: pedido.toJSON(),
+        claveIdempotencia
+      });
     } catch (e) {
       Logger.error('[PedidoService] Error al guardar cierre sin liberar en repositorio:', e);
       return Resultado.fallo(`Error al guardar cierre: ${e.message}`);
@@ -125,7 +139,7 @@ const PedidoService = (() => {
     return Resultado.ok(pedido);
   }
 
-  async function agregarTransaccion(pedidoId, { persona, monto, formaPago }) {
+  async function agregarTransaccion(pedidoId, { persona, monto, formaPago, claveIdempotencia }) {
     if (!_pedidoRepo) return Resultado.fallo('Repositorio no configurado');
     if (!monto || monto <= 0) return Resultado.fallo('El monto debe ser mayor a cero');
 
@@ -144,7 +158,7 @@ const PedidoService = (() => {
         monto,
         formaPago: formaPago || 'efectivo',
         timestamp: Date.now()
-      });
+      }, claveIdempotencia);
 
       if (!resultado.exito) {
         return Resultado.fallo(resultado.error || 'Error al agregar transacción');

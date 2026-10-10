@@ -1,10 +1,17 @@
 /* ================================================================
    LaTaberna - PubPOS — REPOSITORIO JS (ES6)
    Archivo: js/repositorios/inventario-repository.js
-   Versión: 1.1.1
+   Versión: 1.3.0
    Propósito: Repositorio de inventario reutilizable (Appwrite + localStorage).
-              v1.1.1: restaura métodos de lectura (obtenerInsumos, obtenerRecetas)
-                      y añade guardarEntrada para la nueva colección.
+              v1.3.0: A.74: se elimina registrarMovimiento. La generación
+                      y persistencia de movimientos pasa a
+                      db-inventario.js como operación canónica. Se
+                      agrega guardarMovimiento(movimiento) como wrapper
+                      de DBAppwrite.crear para futuras refactorizaciones
+                      donde la persistencia se centralice en el repo.
+              v1.2.0: guardarInsumo propaga vendible, precio_venta y
+                      destino a Appwrite.
+              v1.1.1: restaura métodos de lectura.
    ================================================================ */
 
 import { Logger } from '../lib/logger.js';
@@ -29,7 +36,10 @@ export function crearInventarioRepo() {
             categoria: insumo.categoria || 'general',
             ubicacion: insumo.ubicacion || '',
             tipo: insumo.tipo || 'cocina',
-            costo_manual: insumo.costo_manual != null ? insumo.costo_manual : null
+            costo_manual: insumo.costo_manual != null ? insumo.costo_manual : null,
+            vendible: insumo.vendible === true,
+            precio_venta: insumo.vendible === true ? (Number(insumo.precio_venta) || 0) : 0,
+            destino: ['cocina', 'barra', 'ambos'].includes(insumo.destino) ? insumo.destino : 'cocina'
           };
 
           if (insumo.id) {
@@ -108,13 +118,57 @@ export function crearInventarioRepo() {
       return (DB.insumos || []).find(i => i.id == id) || null;
     },
 
-    async registrarMovimiento(movimiento) {
-      if (typeof DB.ajustarStock === 'function') {
-        DB.ajustarStock(movimiento.insumoId || movimiento.ingredienteId, movimiento.cantidad, movimiento.motivo);
+    /**
+     * A.74: persiste un movimiento en Appwrite.
+     * Wrapper de DBAppwrite.crear('movimientos', ...).
+     *
+     * Disponible para futuras refactorizaciones donde la persistencia
+     * de movimientos se centralice en el repo. No es llamado desde
+     * db-inventario.js hoy: la operación canónica persiste directo.
+     *
+     * @param {object} movimiento
+     * @returns {Promise<object|null>}
+     */
+    async guardarMovimiento(movimiento) {
+      if (!movimiento || !movimiento.id) {
+        Logger.warn('[InventarioRepo] guardarMovimiento: movimiento inválido.');
+        return null;
+      }
+
+      if (!DBAppwrite || !DBAppwrite.habilitado) {
+        Logger.warn('[InventarioRepo] guardarMovimiento: Appwrite no disponible.');
+        return null;
+      }
+
+      try {
+        const docRemoto = await DBAppwrite.crear('movimientos', movimiento.id, {
+          insumoId: movimiento.insumoId,
+          insumoNombre: movimiento.insumoNombre,
+          tipo: movimiento.tipo,
+          cantidad: movimiento.cantidad,
+          unidad: movimiento.unidad || '',
+          motivo: movimiento.motivo || '',
+          referencia: movimiento.referencia || '',
+          usuario: movimiento.usuario || '',
+          usuarioId: movimiento.usuarioId || '',
+          fecha: movimiento.fecha,
+          espacioId: movimiento.espacioId
+        });
+
+        if (docRemoto && docRemoto.id) {
+          Logger.debug('[InventarioRepo] Movimiento persistido en Appwrite:', docRemoto.id);
+          return docRemoto;
+        }
+
+        Logger.warn('[InventarioRepo] No se pudo persistir el movimiento en Appwrite.');
+        return null;
+      } catch (e) {
+        Logger.warn('[InventarioRepo] Error al persistir movimiento:', e);
+        return null;
       }
     },
 
-    // ── MÉTODOS DE LECTURA (restaurados) ─────────────────────
+    // ── MÉTODOS DE LECTURA ───────────────────────────────────
     async obtenerInsumos() {
       return DB.insumos || [];
     },
@@ -123,7 +177,7 @@ export function crearInventarioRepo() {
       return DB.recetas || [];
     },
 
-    // ── NUEVO: guardarEntrada ────────────────────────────────
+    // ── guardarEntrada ───────────────────────────────────────
     async guardarEntrada(datos) {
       const entrada = { ...datos };
       let guardadoRemoto = false;

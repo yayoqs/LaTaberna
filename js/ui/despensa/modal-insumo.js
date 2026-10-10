@@ -1,8 +1,12 @@
 /* ================================================================
    LaTaberna - PubPOS — DESPENSA SUBMÓDULO (ES6)
    Archivo: js/ui/despensa/modal-insumo.js
-   Versión: 3.0.1
+   Versión: 3.1.0
    Propósito: Modal para crear/editar/eliminar insumos del inventario.
+              v3.1.0: agrega toggle "Vender este insumo en la carta" con
+                      campos condicionales precio_venta y destino (D.6,
+                      Fase 2 Paso 4). El botón de guardar cambia de copy
+                      según el estado del toggle.
               v3.0.1: corrige acción del Store al eliminar.
    ================================================================ */
 
@@ -35,6 +39,19 @@ export async function mostrar(insumo = null, onGuardado = null) {
           <label>Stock mínimo</label><input type="number" id="insumoStockMin" step="0.01" value="5">
           <label>Ubicación</label><input type="text" id="insumoUbicacion" placeholder="Ej: Estante 3">
           <label>Costo manual ($)</label><input type="number" id="insumoCostoManual" step="0.01" value="" placeholder="Vacío = calcular desde entradas">
+          <label class="campo-checkbox">
+            <input type="checkbox" id="insumoVendible">
+            Vender este insumo en la carta
+          </label>
+          <div id="bloqueVendible" style="display:none;">
+            <label>Precio de venta ($)</label><input type="number" id="insumoPrecioVenta" step="1" min="0" value="0">
+            <label>Destino</label>
+            <select id="insumoDestino">
+              <option value="cocina">Cocina</option>
+              <option value="barra">Barra</option>
+              <option value="ambos">Ambos</option>
+            </select>
+          </div>
           <div class="modal-small-footer" style="justify-content: space-between;">
             <button class="btn-danger" id="btnEliminarModalInsumo" style="display:none;"><i class="fas fa-trash"></i> Eliminar</button>
             <div style="display:flex; gap:10px;">
@@ -50,6 +67,7 @@ export async function mostrar(insumo = null, onGuardado = null) {
     document.getElementById('btnCancelarModalInsumo').addEventListener('click', () => cerrar(onGuardado));
     document.getElementById('btnGuardarModalInsumo').addEventListener('click', () => guardar(onGuardado));
     document.getElementById('btnEliminarModalInsumo').addEventListener('click', () => eliminar(onGuardado));
+    document.getElementById('insumoVendible').addEventListener('change', _actualizarVistaVendible);
   }
 
   document.getElementById('insumoId').value = insumo?.id || '';
@@ -61,9 +79,25 @@ export async function mostrar(insumo = null, onGuardado = null) {
   document.getElementById('insumoStockMin').value = insumo?.stock_minimo || 5;
   document.getElementById('insumoUbicacion').value = insumo?.ubicacion || '';
   document.getElementById('insumoCostoManual').value = insumo?.costo_manual != null ? insumo.costo_manual : '';
+  document.getElementById('insumoVendible').checked = insumo?.vendible === true;
+  document.getElementById('insumoPrecioVenta').value = insumo?.precio_venta != null ? insumo.precio_venta : 0;
+  document.getElementById('insumoDestino').value = ['cocina','barra','ambos'].includes(insumo?.destino) ? insumo.destino : 'cocina';
   document.getElementById('ingTitulo').textContent = titulo;
   document.getElementById('btnEliminarModalInsumo').style.display = esEdicion ? 'inline-flex' : 'none';
+
+  _actualizarVistaVendible();
   modal.style.display = 'flex';
+}
+
+function _actualizarVistaVendible() {
+  const toggle = document.getElementById('insumoVendible');
+  const bloque = document.getElementById('bloqueVendible');
+  const btnGuardar = document.getElementById('btnGuardarModalInsumo');
+  if (!toggle || !bloque || !btnGuardar) return;
+
+  const activo = toggle.checked;
+  bloque.style.display = activo ? 'block' : 'none';
+  btnGuardar.textContent = activo ? 'Guardar y publicar en carta' : 'Guardar';
 }
 
 export function cerrar(onCerrar) {
@@ -85,7 +119,6 @@ async function eliminar(onEliminado) {
     }
     const state = Store.obtenerEstado();
     const insumosActualizados = (state.insumos || []).filter(i => i.id != id);
-    // ✅ Usar INSUMOS_INICIALIZAR que sí existe en el Store
     Store.despachar({ type: 'INSUMOS_INICIALIZAR', payload: insumosActualizados });
     mostrarToast('success', 'Insumo eliminado');
     cerrar(onEliminado);
@@ -101,6 +134,10 @@ async function guardar(onGuardado) {
   const nombre = document.getElementById('insumoNombre').value.trim();
   if (!nombre) { mostrarToast('error', 'Nombre obligatorio'); return; }
 
+  const vendible = document.getElementById('insumoVendible').checked;
+  const precioVentaRaw = document.getElementById('insumoPrecioVenta').value;
+  const destinoRaw = document.getElementById('insumoDestino').value;
+
   const datos = {
     id: id || undefined,
     nombre,
@@ -110,7 +147,10 @@ async function guardar(onGuardado) {
     categoria: document.getElementById('insumoCategoria').value,
     ubicacion: document.getElementById('insumoUbicacion').value.trim() || '',
     tipo: document.getElementById('insumoTipo').value,
-    costo_manual: document.getElementById('insumoCostoManual').value !== '' ? parseFloat(document.getElementById('insumoCostoManual').value) : null
+    costo_manual: document.getElementById('insumoCostoManual').value !== '' ? parseFloat(document.getElementById('insumoCostoManual').value) : null,
+    vendible,
+    precio_venta: vendible ? (parseFloat(precioVentaRaw) || 0) : 0,
+    destino: vendible && ['cocina','barra','ambos'].includes(destinoRaw) ? destinoRaw : 'cocina'
   };
 
   try {

@@ -15,16 +15,21 @@
   <link rel="stylesheet" href="css/mesas.css">
   <link rel="stylesheet" href="css/mesa-detalles.css">
   <link rel="stylesheet" href="css/pedido.css">
+  <link rel="stylesheet" href="css/modal-opciones.css">
+  <link rel="stylesheet" href="css/cliente-modal-opciones.css">
   <link rel="stylesheet" href="css/kds.css">
   <link rel="stylesheet" href="css/caja.css">
+  <link rel="stylesheet" href="css/caja-cobro.css">
+  <link rel="stylesheet" href="css/caja-arqueo.css">
+  <link rel="stylesheet" href="css/caja-movimientos.css">
+  <link rel="stylesheet" href="css/caja-historial.css">
   <link rel="stylesheet" href="css/config.css">
   <link rel="stylesheet" href="css/modals.css">
   <link rel="stylesheet" href="css/ticket.css">
   <link rel="stylesheet" href="css/despensa.css">
   <link rel="stylesheet" href="css/recetas.css">
   <link rel="stylesheet" href="css/reparto.css">
-  <link rel="stylesheet" href="css/menu.css">
-  <link rel="stylesheet" href="css/menu-editor.css">
+  <link rel="stylesheet" href="css/carta-editor.css">
   <link rel="stylesheet" href="css/perfil.css">
   <link rel="stylesheet" href="css/cliente-inicio.css">
   <link rel="stylesheet" href="css/cliente-bienvenida.css">
@@ -37,13 +42,10 @@
 </head>
 <body>
 
-  <!-- Toast y modal loader DEBEN estar antes que cualquier otro contenedor para quedar por encima en el contexto de apilamiento -->
   <div id="toastContainer" class="toast-container" aria-live="polite"></div>
 
-  <!-- PUNTO DE ENTRADA MODULAR ÚNICO -->
   <script type="module" src="js/app.js"></script>
 
-  <!-- HEADER FIJO -->
   <header class="app-header">
     <div class="header-left">
       <div class="logo">
@@ -53,40 +55,37 @@
     </div>
 
     <nav class="header-nav">
-      <button class="nav-btn" data-view="mesas" data-rol="mesero,admin,master,caja">
+      <button class="nav-btn" data-view="mesas" data-rol="master,owner,admin,mesero">
         <i class="fas fa-chair"></i><span> Mesas</span>
       </button>
-      <button class="nav-btn" data-view="cocina" data-rol="cocina,barra,admin,master">
+      <button class="nav-btn" data-view="cocina" data-rol="master,owner,admin,chef,cocinaAyudante,barman,barraAyudante">
         <i class="fas fa-fire-burner"></i><span> Cocina</span>
       </button>
-      <button class="nav-btn" data-view="caja" data-rol="caja,admin,master">
+      <button class="nav-btn" data-view="caja" data-rol="master,owner,admin,caja">
         <i class="fas fa-cash-register"></i><span> Caja</span>
       </button>
-      <button class="nav-btn" data-view="despensa" data-rol="admin,master,cocina,barra">
+      <button class="nav-btn" data-view="despensa" data-rol="master,owner,admin,chef">
         <i class="fas fa-boxes"></i><span> Despensa</span>
       </button>
-      <button class="nav-btn" data-view="recetas" data-rol="cocina,barra,admin,master">
+      <button class="nav-btn" data-view="recetas" data-rol="master,owner,admin,chef,cocinaAyudante,barman,barraAyudante">
         <i class="fas fa-book"></i><span> Recetas</span>
       </button>
-      <button class="nav-btn" data-view="reparto" data-rol="admin,master,reparto">
+      <button class="nav-btn" data-view="reparto" data-rol="master,owner,admin,repartidor">
         <i class="fas fa-motorcycle"></i><span> Reparto</span>
       </button>
-      <button class="nav-btn" data-view="menu" data-rol="cliente,mesero,admin,master,caja">
-        <i class="fas fa-utensils"></i><span> Menú</span>
-      </button>
-      <button class="nav-btn" data-view="eventos" data-rol="artista,eventos,admin,master">
+      <button class="nav-btn" data-view="eventos" data-rol="master,owner,admin,artista">
         <i class="fas fa-calendar-alt"></i><span> Eventos</span>
       </button>
-      <button class="nav-btn" data-view="eventos-en-vivo" data-rol="artista,eventos,admin,master">
+      <button class="nav-btn" data-view="eventos-en-vivo" data-rol="master,owner,admin,artista">
         <i class="fas fa-broadcast-tower"></i><span> En Vivo</span>
       </button>
-      <button class="nav-btn" data-view="perfil" data-rol="mesero,admin,master,caja,cocina,barra,despensa,eventos,reparto,cliente,artista">
+      <button class="nav-btn" data-view="perfil" data-rol="master,owner,admin,chef,cocinaAyudante,barman,barraAyudante,mesero,caja,repartidor,artista,jugador">
         <i class="fas fa-id-card"></i><span> Perfil</span>
       </button>
-      <button class="nav-btn" data-view="config" data-rol="admin,master">
+      <button class="nav-btn" data-view="config" data-rol="master,owner,admin">
         <i class="fas fa-sliders"></i><span> Config</span>
       </button>
-      <button class="nav-btn" data-view="carta-editor" data-rol="admin,master">
+      <button class="nav-btn" data-view="carta-editor" data-rol="master,owner,admin">
         <i class="fas fa-pen-ruler"></i><span> Diseñar Carta</span>
       </button>
     </nav>
@@ -99,10 +98,6 @@
     </div>
 
     <div class="header-right">
-      <span id="syncPendingBadge" style="display:none; margin-right:6px;">
-        <i class="fas fa-sync-alt"></i> <span id="syncPendingCount">0</span>
-      </span>
-      <span id="syncStatusIndicator" title="Sin sincronizar"><i class="fas fa-sync-alt"></i></span>
       <span id="espacioSelectorContainer"></span>
       <span id="usuarioActualDisplay"></span>
       <button class="btn-secondary" id="btnLogout" title="Cerrar sesión" style="padding:6px 10px;">
@@ -111,7 +106,6 @@
     </div>
   </header>
 
-  <!-- Contenedores de vista vacíos (los módulos los llenan al activarse) -->
   <main id="view-mesas" class="view"></main>
   <main id="view-cocina" class="view"></main>
   <main id="view-caja" class="view"></main>
@@ -119,7 +113,6 @@
   <main id="view-despensa" class="view"></main>
   <main id="view-recetas" class="view"></main>
   <main id="view-reparto" class="view"></main>
-  <main id="view-menu" class="view"></main>
   <main id="view-eventos" class="view"></main>
   <main id="view-eventos-en-vivo" class="view"></main>
   <main id="view-perfil" class="view"></main>
@@ -129,7 +122,6 @@
   <main id="view-eventos-cliente" class="view"></main>
   <main id="view-carta-editor" class="view"></main>
 
-  <!-- Popover global (usado por mesas) -->
   <div id="popoverContainer" style="display:none; position:fixed; z-index:9999;"></div>
 
 </body>

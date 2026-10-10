@@ -1,11 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — MESAS SUBMÓDULO (ES6)
    Archivo: js/ui/mesas/bandeja-atencion.js
-   Versión: 1.3.1
+   Versión: 1.3.2
    Propósito: Bandeja lateral de atención para mesero.
-              v1.3.1: Corrección de campo de aviso: usa mesaId en
-                      la colección laTaberna_Avisos. Las precargas
-                      siguen usando mesa en laTaberna_Pedidos.
+              v1.3.2: Muestra toast al fallar atención o revisión.
    ================================================================ */
 
 import { EventBus } from '../../lib/eventBus.js';
@@ -13,6 +11,7 @@ import { Logger } from '../../lib/logger.js';
 import { DBAppwrite } from '../../db-appwrite.js';
 import { Auth } from '../../auth.js';
 import { CommandBus } from '../../lib/command-bus.js';
+import { mostrarToast } from '../../utils.js';
 
 let _solicitudes = [];
 let _overlay = null;
@@ -25,9 +24,9 @@ let _touchStartY = 0;
 function _espacioIdActivo() {
   try {
     const local = Auth.obtenerLocalActivo?.();
-    return local?.id || 'lataberna';
+    return local?.id || null;
   } catch {
-    return 'lataberna';
+    return null;
   }
 }
 
@@ -115,15 +114,20 @@ async function _atenderAviso(id) {
 
   const usuario = Auth.obtenerNombre?.() || 'mesero';
   try {
-    await DBAppwrite.actualizar('avisos', id, {
+    const resultado = await DBAppwrite.actualizar('avisos', id, {
       estado: 'atendido',
       atendidoPor: usuario,
       atendidoEn: new Date().toISOString()
     });
+    if (!resultado) {
+      mostrarToast('error', 'No se pudo atender el aviso. Verifica permisos.');
+      return;
+    }
     Logger.info('[BandejaAtencion] Aviso ' + id + ' atendido.');
     await _cargarSolicitudes();
   } catch (e) {
     Logger.error('[BandejaAtencion] Error al atender aviso:', e);
+    mostrarToast('error', 'Error al atender aviso: ' + (e.message || 'sin detalle'));
   }
 }
 
@@ -132,7 +136,7 @@ async function _revisarPrecarga(id) {
   if (!precarga) return;
 
   try {
-    await CommandBus.ejecutar({
+    const resultado = await CommandBus.ejecutar({
       type: 'precarga:revisar',
       datos: {
         precargaId: id,
@@ -141,10 +145,15 @@ async function _revisarPrecarga(id) {
         revisadoPor: Auth.obtenerNombre?.() || 'mesero'
       }
     });
+    if (!resultado.exito) {
+      mostrarToast('error', resultado.error || 'No se pudo revisar la precarga');
+      return;
+    }
     Logger.info('[BandejaAtencion] Precarga ' + id + ' revisada.');
     await _cargarSolicitudes();
   } catch (e) {
     Logger.error('[BandejaAtencion] Error al revisar precarga:', e);
+    mostrarToast('error', 'Error al revisar precarga: ' + (e.message || 'sin detalle'));
   }
 }
 
@@ -152,6 +161,8 @@ async function _cargarSolicitudes() {
   if (!DBAppwrite || !DBAppwrite.habilitado) return;
 
   const espacioId = _espacioIdActivo();
+  if (!espacioId) return;
+
   const solicitudes = [];
 
   try {

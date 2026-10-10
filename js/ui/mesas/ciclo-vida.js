@@ -1,9 +1,10 @@
 /* ================================================================
    LaTaberna - PubPOS — MESAS SUBMÓDULO (ES6)
    Archivo: js/ui/mesas/ciclo-vida.js
-   Versión: 1.2.2
+   Versión: 1.2.4
    Propósito: Ciclo de vida (activar/limpiar) con AbortController.
-              v1.2.2: Integra AvisosMesero persistente.
+              v1.2.4: Filtro de Store incluye PEDIDO_ITEM_* para
+                      refrescar la grilla ante cambios de comanda.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -32,7 +33,12 @@ export function activar() {
   document.getElementById('btnConfirmarFusion')?.addEventListener('click', fusionarMesasSeleccionadas, { signal });
 
   const unsubscribeStore = Store.suscribir((state, action) => {
-    if (action.type.startsWith('MESA') || action.type.startsWith('MESAS') || action.type.startsWith('COMANDA')) {
+    if (
+      action.type.startsWith('MESA') ||
+      action.type.startsWith('MESAS') ||
+      action.type.startsWith('COMANDA') ||
+      action.type.startsWith('PEDIDO_ITEM')
+    ) {
       renderGrid();
     }
     if (action.type === 'CONFIG_INICIALIZAR') {

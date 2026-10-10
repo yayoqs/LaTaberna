@@ -1,14 +1,23 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/cliente-menu.css
-   Versión: 1.0.2
-   Propósito: Menú digital del cliente. Reglas encapsuladas en #view-menu-digital.
+   Versión: 1.0.3
+   Propósito: Menú digital del cliente. Reglas encapsuladas en
+              #view-menu-digital.
+   v1.0.3: Paquete 6.
+     · Badge "✦ Personalizable" en tarjetas con variantes activas.
+     · Aviso de alérgenos propios del producto base.
+     · Chip de alergias declaradas en la barra de estado.
+     · Tarjetas atenuadas para productos sin destino válido.
+   v1.0.2: barra de estado, banner de espera, botón flotante.
    ================================================================ */
-   
+
+/* ── Barra de estado (arriba de todo) ──────────────────────── */
 #view-menu-digital .menu-estado {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
   padding: 10px 20px;
   background: var(--color-card);
   border-bottom: 1px solid var(--color-border);
@@ -16,7 +25,39 @@
   color: var(--color-text-sec);
   flex-shrink: 0;
 }
+#view-menu-digital .menu-estado > span {
+  font-weight: 600;
+}
+#view-menu-digital .chip-alergias {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 99px;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-sec);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 11.5px;
+  cursor: pointer;
+  transition: var(--t);
+}
+#view-menu-digital .chip-alergias:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+#view-menu-digital .chip-alergias.activo {
+  background: rgba(239,68,68,.15);
+  border-color: var(--color-danger);
+  color: #fca5a5;
+}
+#view-menu-digital .chip-alergias.activo:hover {
+  background: rgba(239,68,68,.25);
+}
 
+/* ── Banner de espera ──────────────────────────────────────── */
 #view-menu-digital .menu-banner-espera {
   display: flex;
   align-items: center;
@@ -31,12 +72,30 @@
   transition: opacity .3s ease, max-height .3s ease;
 }
 #view-menu-digital .menu-banner-espera i { font-size: 20px; }
+#view-menu-digital .menu-banner-espera p { margin: 0; }
 
+/* ── Tarjeta atenuada ──────────────────────────────────────── */
 #view-menu-digital .menu-card-atenuado {
   opacity: 0.5;
   pointer-events: none;
+  position: relative;
+}
+#view-menu-digital .menu-card-atenuado::after {
+  content: '⚠ No disponible';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15,15,20,.7);
+  color: var(--color-danger);
+  font-weight: 800;
+  font-size: 12px;
+  text-align: center;
+  padding: 12px;
 }
 
+/* ── Botón agregar ─────────────────────────────────────────── */
 #view-menu-digital .btn-agregar-orden {
   display: inline-flex;
   align-items: center;
@@ -51,6 +110,7 @@
   font-weight: 700;
   cursor: pointer;
   transition: var(--t);
+  font-family: inherit;
 }
 #view-menu-digital .btn-agregar-orden:hover {
   background: var(--color-accent-dark);
@@ -63,7 +123,33 @@
   pointer-events: none;
 }
 
-/* Botón flotante para abrir la orden */
+/* ── Badge "Personalizable" ────────────────────────────────── */
+#view-menu-digital .menu-card-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: var(--color-accent);
+  color: #000;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 4px 10px;
+  border-radius: 99px;
+  letter-spacing: .3px;
+  text-transform: uppercase;
+  z-index: 3;
+  box-shadow: 0 2px 6px rgba(0,0,0,.35);
+}
+
+/* ── Aviso de alérgenos del producto ───────────────────────── */
+#view-menu-digital .menu-card-alergenos {
+  font-size: 10.5px;
+  color: var(--color-danger);
+  font-weight: 700;
+  line-height: 1.35;
+  margin-top: 2px;
+}
+
+/* ── Botón flotante de orden ───────────────────────────────── */
 #view-menu-digital .btn-toggle-orden {
   position: fixed;
   bottom: 24px;
@@ -104,6 +190,7 @@
   right: -4px;
 }
 
+/* ── Banner principal ──────────────────────────────────────── */
 #view-menu-digital .menu-banner {
   background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
   padding: 16px 24px;
@@ -152,8 +239,11 @@
   outline: none;
   color: #fff;
   font-size: 14px;
+  font-family: inherit;
 }
 #view-menu-digital .menu-banner-search input::placeholder { color: rgba(255,255,255,.4); }
+
+/* ── Categorías ────────────────────────────────────────────── */
 #view-menu-digital .menu-categorias {
   display: flex;
   gap: 8px;
@@ -166,6 +256,8 @@
   -webkit-overflow-scrolling: touch;
 }
 #view-menu-digital .menu-categorias::-webkit-scrollbar { display: none; }
+
+/* ── Grilla ────────────────────────────────────────────────── */
 #view-menu-digital .menu-grid {
   flex: 1;
   overflow-y: auto;
@@ -188,5 +280,13 @@
     width: 48px;
     height: 48px;
     font-size: 16px;
+  }
+  #view-menu-digital .menu-estado {
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+  #view-menu-digital .chip-alergias {
+    font-size: 10.5px;
+    padding: 4px 10px;
   }
 }

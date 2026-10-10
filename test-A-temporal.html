@@ -1,198 +1,182 @@
 <!DOCTYPE html>
-<html lang="es-CL">
+<html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-  <title>Test D — Temporal</title>
-  <link rel="stylesheet" href="css/vars.css">
-  <link rel="stylesheet" href="css/base.css">
-  <link rel="stylesheet" href="css/layout.css">
-  <link rel="stylesheet" href="css/modals.css">
-  <link rel="stylesheet" href="css/config.css">
-  <script src="js/appwrite.min.js"></script>
+  <title>Test A — Integración bootstrap</title>
+  <!-- v1.0.0 — Cubre el flujo real de bootstrap: state.cartas
+       poblado sin intervención del editor. Flujo en dos fases
+       (login → reload → verificación). Aprobado por Coordinación
+       A.76 (2026-10-10 06:00 UTC). -->
   <style>
-    /* Ajustes específicos para tests temporales:
-       permitir scroll en móvil y evitar bloqueo de altura fija */
-    html, body {
-      height: auto;
-      min-height: 100vh;
-      overflow-y: auto;
-      overflow-x: hidden;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      display: block;
-      background: #0f0f14;
-      color: #f1f5f9;
-      font-family: 'Nunito', system-ui, sans-serif;
-      padding: 20px;
-      box-sizing: border-box;
-    }
-
-    .panel-test {
-      background: #1a1a24;
-      border: 1px solid #2e2e42;
-      border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 20px;
-      box-sizing: border-box;
-    }
-
-    .panel-test h2 {
-      font-size: 18px;
-      margin: 0 0 12px;
-    }
-
-    .log-positivo { color: #22c55e; font-weight: 700; }
-    .log-error { color: #ef4444; font-weight: 700; }
-    .log-info { color: #60a5fa; font-weight: 700; }
-
-    code {
-      background: #252535;
-      padding: 2px 6px;
-      border-radius: 4px;
-    }
-
-    /* Asegurar que los contenedores internos no limiten scroll */
-    #view-config {
-      display: block;
-      height: auto;
-      min-height: 0;
-      overflow: visible;
-    }
-
-    @media (max-width: 768px) {
-      body {
-        padding: 12px;
-      }
-
-      .panel-test {
-        padding: 14px;
-      }
-    }
+    body { font-family: monospace; background: #111827; color: #f9fafb; padding: 24px; }
+    h1 { color: #f59e0b; }
+    .ok { color: #10b981; }
+    .error { color: #ef4444; }
+    .info { color: #94a3b8; }
+    pre { background: #1f2937; padding: 8px; border-radius: 6px; font-size: 12px; }
+    button { font-family: inherit; padding: 10px 14px; border-radius: 6px; border: 1px solid #374151; background: #1f2937; color: #f9fafb; cursor: pointer; }
   </style>
 </head>
 <body>
+  <h1>🧪 Test A — Integración bootstrap</h1>
+  <p>
+    Verifica que <code>state.cartas</code> se puebla desde bootstrap
+    sin intervención del editor de cartas. Flujo en dos fases con
+    reload intermedio. Acepta espacio vacío como válido.
+  </p>
+  <button id="btnRun">Ejecutar</button>
+  <div id="results"></div>
 
-  <div class="panel-test">
-    <h2>Test D — Temporal</h2>
-    <p style="font-size:13px; color:#94a3b8; margin:0 0 8px;">
-      Test temporal para verificar cambios. Al pasar en verde, su lógica se incorpora al test unificado.
-    </p>
-    <div id="logTest"></div>
-  </div>
-
-  <!-- Contenedor donde Config.activar() montará la vista -->
-  <div id="view-config"></div>
+  <script src="/js/appwrite.min.js"></script>
 
   <script type="module">
-    import { Auth } from './js/auth.js';
-    import { DB } from './js/db.js';
-    import { DBAppwrite } from './js/db-appwrite.js';
     import { Logger } from './js/lib/logger.js';
-    import { Config } from './js/ui/config.js';
+    import { Deps } from './js/lib/deps.js';
+    import { DBAppwrite } from './js/db-appwrite.js';
+    import { DB } from './js/db.js';
+    import { Store } from './js/lib/store.js';
+    import { Auth, inicializarAuth } from './js/auth.js';
+    import { EventBus } from './js/lib/eventBus.js';
 
-    Logger.setLevel('ERROR');
+    const resultsEl = document.getElementById('results');
+    const FLAG = 'test-bootstrap-run';
+    let passed = 0, failed = 0;
 
-    const log = document.getElementById('logTest');
-    const resultados = [];
+    function info(m) { resultsEl.innerHTML += `<div class="info">ℹ️ ${m}</div>`; }
+    function ok(m) { passed++; resultsEl.innerHTML += `<div class="ok">✔ ${m}</div>`; }
+    function fail(m) { failed++; resultsEl.innerHTML += `<div class="error">✘ ${m}</div>`; }
+    function pre(o) { resultsEl.innerHTML += `<pre>${JSON.stringify(o, null, 2)}</pre>`; }
 
-    function agregarResultado(nombre, ok, detalle = '') {
-      const fila = document.createElement('div');
-      fila.className = ok ? 'log-positivo' : 'log-error';
-      fila.innerHTML = `${ok ? '✅' : '❌'} ${nombre}${detalle ? ` — <code>${detalle}</code>` : ''}`;
-      log.appendChild(fila);
-      resultados.push({ nombre, ok });
-    }
-
-    function agregarInfo(mensaje) {
-      const fila = document.createElement('div');
-      fila.className = 'log-info';
-      fila.innerHTML = `ℹ️ ${mensaje}`;
-      log.appendChild(fila);
-    }
-
-    const esperar = ms => new Promise(r => setTimeout(r, ms));
-
-    async function run() {
+    async function fase1_prepararSesion() {
+      resultsEl.innerHTML = '';
       Logger.setLevel('ERROR');
-      log.innerHTML = '';
+      Deps.registrar('auth', Auth);
 
-      // Inicializar
-      await DB.init();
-      await Auth.cerrarSesion();
-
-      const login = await Auth.iniciarSesion('master', 'master123');
-      if (!login) {
-        agregarResultado('Login master', false);
+      info('Fase 1: preparando sesión...');
+      await inicializarAuth();
+      if (!(await DBAppwrite.iniciar())) {
+        fail('Appwrite no inicializó');
         return;
       }
-      agregarResultado('Login master', true);
+      try { await Auth.cerrarSesion(); } catch {}
+      if (!(await Auth.iniciarSesion('jefePub', 'jefe1234'))) {
+        fail('Login falló');
+        return;
+      }
+      ok('Sesión iniciada. Recargando para que bootstrap arranque naturalmente...');
+      sessionStorage.setItem(FLAG, 'true');
+      setTimeout(() => location.reload(), 800);
+    }
 
-      // Crear documento global con espacioId falso para probar filtro
-      const espacioFalso = 'espacio_falso_' + Date.now();
-      await DBAppwrite.crear('configuracion', 'unique()', {
-        clave: 'global',
-        valor: JSON.stringify({ nombreLocal: 'Falso' }),
-        espacioId: espacioFalso
+    async function fase2_verificarBootstrap() {
+      resultsEl.innerHTML = '';
+      info('Fase 2: bootstrap arrancando en página recargada...');
+
+      // Escuchar db:inicializada
+      let inicializada = false;
+      EventBus.on('db:inicializada', () => { inicializada = true; });
+
+      // Cargar bootstrap (arranca toda la app). Es la única forma
+      // limpia de cubrir el flujo real de bootstrap: el despacho
+      // CARTAS_INICIALIZAR vive ahí, no en un módulo testeable en
+      // aislamiento.
+      info('Importando bootstrap.js...');
+      try {
+        await import('./js/bootstrap.js');
+      } catch (e) {
+        fail('Error al importar bootstrap: ' + e.message);
+        sessionStorage.removeItem(FLAG);
+        return;
+      }
+
+      info('Esperando db:inicializada (timeout 15s)...');
+      const t0 = Date.now();
+      while (!inicializada && Date.now() - t0 < 15000) {
+        await new Promise(r => setTimeout(r, 200));
+      }
+      if (!inicializada) {
+        fail('No llegó db:inicializada en 15s');
+        sessionStorage.removeItem(FLAG);
+        return;
+      }
+      ok('db:inicializada recibido');
+
+      // Dar 2.5s a bootstrap para despachar CARTAS_INICIALIZAR
+      // (vive después de DB.init() en bootstrap.arrancar()).
+      info('Esperando 2.5s para que bootstrap complete sus despachos...');
+      await new Promise(r => setTimeout(r, 2500));
+
+      // Verificaciones
+      const stateCartas = Store.obtenerEstado().cartas;
+      const dbCartas = DB.cartas || [];
+
+      pre({
+        DB_cartas_len: dbCartas.length,
+        Store_cartas_len: Array.isArray(stateCartas) ? stateCartas.length : 'no array'
       });
 
-      // Activar Configuración real (monta en #view-config)
-      Config.activar();
-
-      const inputNombre = document.getElementById('cfgNombreLocal');
-      if (!inputNombre) {
-        agregarResultado('Campos de configuración disponibles', false);
-        return;
+      if (Array.isArray(stateCartas)) {
+        ok('state.cartas es array');
+      } else {
+        fail('state.cartas no es array');
       }
-      inputNombre.value = 'La Taberna Test';
-      document.getElementById('cfgDireccion').value = 'Dirección Test';
-      document.getElementById('cfgCuit').value = '12345678';
-      document.getElementById('cfgPie').value = 'Pie Test';
 
-      document.getElementById('btnGuardarConfig').click();
-      await esperar(2000); // esperar sincronización Appwrite
+      if (Array.isArray(stateCartas) && stateCartas.length === dbCartas.length) {
+        ok('state.cartas coincide con DB.cartas en longitud');
+      } else {
+        fail('state.cartas ≠ DB.cartas en longitud');
+      }
 
-      // Verificar que el documento correcto fue actualizado
-      const configs = await DBAppwrite.listar('configuracion');
-      const docCorrecto = configs.find(d => d.clave === 'global' && d.espacioId === 'lataberna');
-      const docFalso = configs.find(d => d.clave === 'global' && d.espacioId === espacioFalso);
+      // Verificación independiente: releer cartas desde Appwrite.
+      // Si PubPrueba tiene cartas, deben estar todas en state.cartas.
+      let cartasAppwrite = [];
+      try {
+        cartasAppwrite = await DBAppwrite.listar('cartas');
+      } catch (e) {
+        info('No se pudo releer cartas de Appwrite: ' + e.message);
+      }
 
-      agregarResultado(
-        'Documento con espacio correcto actualizado',
-        !!docCorrecto && docCorrecto.valor.includes('La Taberna Test')
-      );
-      agregarResultado(
-        'Documento con espacio falso no fue tocado',
-        !!docFalso && docFalso.valor.includes('Falso')
-      );
+      if (cartasAppwrite.length === 0) {
+        ok('PubPrueba no tiene cartas en Appwrite. Estado vacío válido.');
+      } else {
+        const idsAppwrite = cartasAppwrite.map(c => c.id).sort();
+        const idsStore = (stateCartas || []).map(c => c.id).sort();
+        const faltantes = idsAppwrite.filter(id => !idsStore.includes(id));
 
-      // Limpiar documento falso
-      if (docFalso) await DBAppwrite.eliminar('configuracion', docFalso.id);
-      const configsDespues = await DBAppwrite.listar('configuracion');
-      const falsoEliminado = !configsDespues.some(d => d.id === docFalso?.id);
-      agregarResultado('Documento falso eliminado', falsoEliminado);
+        pre({ idsAppwrite, idsStore, faltantes });
 
-      // Resumen final
-      const total = resultados.length;
-      const pasaron = resultados.filter(r => r.ok).length;
-      const fallaron = total - pasaron;
+        if (faltantes.length === 0) {
+          ok(`Las ${cartasAppwrite.length} cartas de Appwrite están en state.cartas`);
+        } else {
+          fail(`${faltantes.length} cartas de Appwrite faltan en state.cartas: ${faltantes.join(', ')}`);
+        }
+      }
 
-      const resumen = document.createElement('div');
-      resumen.style.marginTop = '12px';
-      resumen.className = fallaron === 0 ? 'log-positivo' : 'log-error';
-      resumen.innerHTML = `<strong>Resumen:</strong> ${pasaron} correctos, ${fallaron} fallidos.`;
-      log.appendChild(resumen);
+      // Limpieza
+      try { await Auth.cerrarSesion(); } catch {}
+      sessionStorage.removeItem(FLAG);
 
-      Logger.info(`[test-D-temporal] Finalizado. ${pasaron}/${total} correctos.`);
+      resultsEl.innerHTML += `<div class="info">${passed} pasaron, ${failed} fallaron</div>`;
+      if (failed === 0) {
+        resultsEl.innerHTML += `<div class="ok">✔ Test de integración superado.</div>`;
+      } else {
+        resultsEl.innerHTML += `<div class="error">✘ Existen fallos que revisar.</div>`;
+      }
     }
 
-    window.addEventListener('load', () => run().catch(e => {
-      log.innerHTML += `<div class="log-error">Error: ${e.message}</div>`;
-      console.error(e);
-    }));
+    document.getElementById('btnRun').addEventListener('click', () => {
+      if (sessionStorage.getItem(FLAG) === 'true') {
+        fase2_verificarBootstrap();
+      } else {
+        fase1_prepararSesion();
+      }
+    });
+
+    // Autoarranque de fase 2 si venimos de un reload
+    if (sessionStorage.getItem(FLAG) === 'true') {
+      info('Bandera detectada al cargar. Corriendo fase 2 automáticamente...');
+      fase2_verificarBootstrap();
+    }
   </script>
 </body>
 </html>

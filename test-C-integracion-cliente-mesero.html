@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test Integración v3 — Cliente ↔ Mesero (con fixes)</title>
+  <style>
+    body { font-family: monospace; background: #111827; color: #f9fafb; padding: 24px; line-height: 1.5; }
+    h1 { color: #f59e0b; }
+    h2 { color: #60a5fa; margin-top: 22px; font-size: 14px; border-bottom: 1px solid #374151; padding-bottom: 4px; }
+    .test { margin: 4px 0; padding: 6px 10px; border-radius: 6px; font-size: 12px; }
+    .pass { background: rgba(16,185,129,.15); border-left: 4px solid #10b981; }
+    .fail { background: rgba(239,68,68,.15); border-left: 4px solid #ef4444; }
+    .info { background: rgba(59,130,246,.15); border-left: 4px solid #3b82f6; }
+    .warn { background: rgba(245,158,11,.15); border-left: 4px solid #f59e0b; }
+    .accion { background: rgba(139,92,246,.15); border-left: 4px solid #8b5cf6; color: #c4b5fd; }
+    .summary { margin-top: 22px; padding: 14px; background: #1f2937; border: 1px solid #374151; border-radius: 6px; font-weight: bold; font-size: 14px; }
+    pre { background: #0d0d14; padding: 10px; border-radius: 6px; font-size: 11px; overflow: auto; max-height: 300px; }
+  </style>
+</head>
+<body>
+  <h1>Test Integración v3 — Cliente ↔ Mesero</h1>
+  <p>Cadena completa: precarga con variantes (jugador sin Team) → bandeja del mesero → revisión → comanda → descuento de stock.</p>
+  <div id="results"></div>
+  <div id="view-menu-digital" class="view"></div>
+
+  <script src="/js/appwrite.min.js"></script>
+  <script type="module">
+    import { Logger } from '/js/lib/logger.js';
+    import { EventBus } from '/js/lib/eventBus.js';
+    import { Store } from '/js/lib/store.js';
+    import { Deps } from '/js/lib/deps.js';
+    import { CommandBus } from '/js/lib/command-bus.js';
+    import { DBAppwrite } from '/js/db-appwrite.js';
+    import { DB } from '/js/db.js';
+    import { Auth, inicializarAuth } from '/js/auth.js';
+    import { Orden } from '/js/modulos/cliente/orden.js';
+    import { MenuDigital } from '/js/modulos/cliente/menu-digital.js';
+    import { ModalOpciones } from '/js/modulos/cliente/modal-opciones.js';
+    import { AlergiasCliente } from '/js/modulos/cliente/alergias-cliente.js';
+    import { obtenerEspacioRestaurante } from '/js/modulos/cliente/contexto-qr.js';
+    import { PrecargaControl } from '/js/modulos/interno/precarga-control.js';
+    import { BandejaAtencion } from '/js/ui/mesas/bandeja-atencion.js';
+    import { PedidoManager } from '/js/managers/pedido-manager.js';
+    import { PedidoRepositoryLocal } from '/js/repositorios/pedido-repository.js';
+    import { PedidoService } from '/js/servicios/pedido-service.js';
+    import { InventarioService } from '/js/servicios/inventario-service.js';
+    import { crearInventarioRepo } from '/js/repositorios/inventario-repository.js';
+    import '/js/comandos/enviar-comanda.js';
+
+    Logger.setLevel('ERROR');
+    const resultsEl = document.getElementById('results');
+    let passed = 0, failed = 0;
+
+    function assert(cond, msg) {
+      if (cond) { passed++; resultsEl.innerHTML += `<div class="test pass">✔ ${msg}</div>`; }
+      else { failed++; resultsEl.innerHTML += `<div class="test fail">✘ ${msg}</div>`; }
+    }
+    function info(m) { resultsEl.innerHTML += `<div class="test info">ℹ️ ${m}</div>`; }
+    function warn(m) { resultsEl.innerHTML += `<div class="test warn">⚠️ ${m}</div>`; }
+    function accion(m) { resultsEl.innerHTML += `<div class="test accion">${m}</div>`; }
+    const esperar = ms => new Promise(r => setTimeout(r, ms));
+
+    const _creados = {
+      variantes: [], productos: [], insumos: [], recetas: [],
+      mesas: [], pedidos: [], comandas: [], perfiles: [], espacios: []
+    };
+    const STAFF = { user: 'jefePub', pass: 'jefe1234' };
+    const CLAVE_ESPACIO_QR = 'cliente_espacioId_restaurante';
+
+    async function run() {
+      // ══════════════════════════════════════════════════════
+      // SUITE 0 — Sanidad
+      // ══════════════════════════════════════════════════════
+      resultsEl.innerHTML += '<h2>0. Sanidad</h2>';
+      assert(typeof window.Appwrite !== 'undefined', 'SDK cargado');
+      assert(typeof DBAppwrite !== 'undefined', 'DBAppwrite');
+      assert(typeof MenuDigital !== 'undefined', 'MenuDigital');
+      assert(typeof ModalOpciones !== 'undefined', 'ModalOpciones');
+      assert(typeof AlergiasCliente !== 'undefined', 'AlergiasCliente');
+      assert(typeof PrecargaControl !== 'undefined', 'PrecargaControl');
+      assert(typeof BandejaAtencion !== 'undefined', 'BandejaAtencion');
+      assert(typeof obtenerEspacioRestaurante === 'function', 'obtenerEspacioRestaurante exportado');
+      assert(typeof DBAppwrite.crearPrecargaCliente === 'function', 'DBAppwrite.crearPrecargaCliente disponible');
+
+      Deps.registrar('auth', Auth);
+      await inicializarAuth();
+      if (!(await DBAppwrite.iniciar())) { assert(false, 'DBAppwrite.init'); return finalizar(); }
+      assert(true, 'DBAppwrite inicializado');
+
+      // ══════════════════════════════════════════════════════
+      // SUITE 1 — Setup de datos con staff
+      // ══════════════════════════════════════════════════════
+      resultsEl.innerHTML += '<h2>1. Setup de datos con jefePub (owner PubPrueba)</h2>';
+      try { await Auth.cerrarSesion(); } catch {}
+      const loginStaff = await Auth.iniciarSesion(STAFF.user, STAFF.pass);
+      assert(loginStaff === true, 'Login jefePub');
+      const espacio = Auth.obtenerLocalActivo?.();
+      assert(espacio?.id === 'PubPrueba', `Espacio activo: ${espacio?.id}`);
+
+      const sufijo = `int${Date.now().toString().slice(-6)}`;
+
+      const insumo = await DBAppwrite.crear('insumos', null, {
+        nombre: `Insumo Integración ${sufijo}`,
+        stock: 100,
+        stock_minimo: 10,
+        unidad: 'u',
+        tipo: 'cocina',
+        categoria: 'test',
+        destino: 'cocina'
+      });
+      assert(insumo !== null, 'Insumo creado');
+      if (insumo) _creados.insumos.push(insumo.id);
+
+      const idVariante = `v_int_${sufijo}`;
+      const variante = await DBAppwrite.crear('variantes', idVariante, {
+        nombre: `Sabor Integración ${sufijo}`,
+        tipo: 'unica',
+        requerido: true,
+        min_seleccion: 1,
+        max_seleccion: 1,
+        opciones: JSON.stringify([
+          { id: `op_clasica_${sufijo}`, nombre: 'Clásica', precio_delta: 0, activo: true,
+            alergenos: [], requiere: [], excluye: [], insumos_delta: [], pasos_delta: [] },
+          { id: `op_especial_${sufijo}`, nombre: 'Especial', descripcion: 'Con ingrediente adicional',
+            precio_delta: 700, activo: true, alergenos: ['gluten'], requiere: [], excluye: [],
+            insumos_delta: [{ insumoId: insumo.id, cantidad: 2, accion: 'sumar' }],
+            pasos_delta: [{ accion: 'sumar', texto: 'Añadir ingrediente especial', posicion: 'fin' }] }
+        ]),
+        activo: true,
+        orden: 0
+      });
+      assert(variante !== null, 'Variante creada');
+      if (variante) _creados.variantes.push(idVariante);
+
+      const producto = await DBAppwrite.crear('productos', null, {
+        nombre: `Producto Integración ${sufijo}`,
+        precio: 2000,
+        categoria: 'test',
+        destino: 'cocina',
+        activo: true,
+        estado: 'disponible',
+        variantes_ids: JSON.stringify([idVariante]),
+        alergenos: JSON.stringify([])
+      });
+      assert(producto !== null, 'Producto creado');
+      if (producto) _creados.productos.push(producto.id);
+
+      const numMesa = `int_${sufijo}`;
+      const mesa = await DBAppwrite.crear('mesas', numMesa, {
+        numero: numMesa,
+        estado: 'libre',
+        pedidoId: '',
+        comensales: 1,
+        zona: 'test',
+        esVirtual: false
+      });
+      assert(mesa !== null, 'Mesa creada');
+      if (mesa) _creados.mesas.push(numMesa);
+
+      try { await Auth.cerrarSesion(); } catch {}
+
+      // ══════════════════════════════════════════════════════
+      // SUITE 1.5 — Diagnóstico: jugador sin Team puede crear precarga
+      // ══════════════════════════════════════════════════════
+      resultsEl.innerHTML += '<h2>1.5 Diagnóstico — jugador creando precarga</h2>';
+
+      const nombreJugador = 'jp_' + Date.now().toString(36);
+      const reg = await Auth.registrarUsuario(nombreJugador, 'pass12345');
+      assert(reg.exito, 'Jugador registrado');
+      if (reg.exito && reg.usuarioId) {
+        _creados.espacios.push(`mirefugio_${reg.usuarioId}`);
+      }
+
+      const loginJugador = await Auth.iniciarSesion(nombreJugador, 'pass12345');
+      assert(loginJugador, 'Jugador logueado');
+
+      const rolesDiag = Auth.obtenerRolesEfectivos?.() || [];
+      info(`Roles del jugador: ${rolesDiag.join(', ')}`);
+      info(`Espacio activo del jugador: ${Auth.obtenerLocalActivo?.()?.id}`);
+
+      let puedeCrearPrecarga = false;
+      if (typeof DBAppwrite.crearPrecargaCliente === 'function') {
+        try {
+          const testPrecarga = await DBAppwrite.crearPrecargaCliente(
+            {
+              mesa: 'diag_test',
+              tipo: 'local',
+              origen: 'cliente',
+              estado: 'precarga',
+              comensales: 1,
+              items: '[]',
+              total: 0,
+              observaciones: '',
+              nombre_comensal: 'Diagnóstico'
+            },
+            'PubPrueba'
+          );
+          if (testPrecarga && testPrecarga.id) {
+            puedeCrearPrecarga = true;
+            assert(true, 'Jugador SÍ puede crear precarga vía crearPrecargaCliente');
+            info(`Precarga de diagnóstico creada: ${testPrecarga.id}`);
+            _creados.pedidos.push(testPrecarga.id);
+          } else {
+            assert(false, 'crearPrecargaCliente devolvió null');
+          }
+        } catch (e) {
+          assert(false, `crearPrecargaCliente lanzó: ${e.message}`);
+          resultsEl.innerHTML += `<pre>${e.message}\n${e.stack || ''}</pre>`;
+        }
+      } else {
+        assert(false, 'crearPrecargaCliente no existe. ¿Célula A desplegó el cambio?');
+      }
+
+      // Limpiar el pedido de diagnóstico
+      if (_creados.pedidos.length > 0) {
+        const diagId = _creados.pedidos[_creados.pedidos.length - 1];
+        try { await DBAppwrite.eliminar('pedidos', diagId); } catch {}
+        _creados.pedidos.pop();
+      }
+
+      if (!puedeCrearPrecarga) {
+        warn('Flujo cliente saltado: verificar despliegue de crearPrecargaCliente en Célula A.');
+      }
+
+      // ══════════════════════════════════════════════════════
+      // SUITE 2 — Fase cliente completa
+      // ══════════════════════════════════════════════════════
+      resultsEl.innerHTML += '<h2>2. Fase cliente — menú, modal, precarga</h2>';
+
+      if (!puedeCrearPrecarga) {
+        warn('Suite 2 saltada por diagnóstico fallido.');
+      } else {
+        // Setear el espacioId del QR (simula ?espacio=PubPrueba)
+        try {
+          sessionStorage.setItem(CLAVE_ESPACIO_QR, 'PubPrueba');
+          assert(obtenerEspacioRestaurante() === 'PubPrueba', 'sessionStorage tiene espacioId=PubPrueba');
+        } catch (e) {
+          assert(false, 'No se pudo setear sessionStorage: ' + e.message);
+        }
+
+        // Hidratar Store
+        const varianteNormalizada = { ...variante, opciones: JSON.parse(variante.opciones || '[]') };
+        const productoNormalizado = { ...producto, variantes_ids: [idVariante], alergenos: [] };
+        Store.despachar({ type: 'VARIANTES_INICIALIZAR', payload: [varianteNormalizada] });
+        Store.despachar({ type: 'PRODUCTOS_INICIALIZAR', payload: [productoNormalizado] });
+        Store.despachar({ type: 'CLIENTE_MESA_ASIGNADA', payload: numMesa });
+        Store.despachar({ type: 'CLIENTE_PERMISO_PREPEDIDOS', payload: true });
+
+        MenuDigital.mostrar();
+        await esperar(200);
+        const vistaMenu = document.getElementById('view-menu-digital');
+        assert(vistaMenu?.classList.contains('active'), 'Menú digital activo');
+
+        const grid = document.getElementById('menuDigitalGrid');
+        const tarjeta = Array.from(grid.querySelectorAll('.menu-card')).find(c =>
+          c.textContent.includes(productoNormalizado.nombre)
+        );
+        assert(!!tarjeta, 'Tarjeta del producto en el menú');
+        assert(!!tarjeta?.querySelector('.menu-card-badge'), 'Badge "Personalizable" presente');
+
+        EventBus.emit('cliente:producto_con_variantes', {
+          producto: productoNormalizado,
+          variantes: [varianteNormalizada]
+        });
+        await esperar(150);
+
+        const overlayModal = document.getElementById('modalOpcionesCliente');
+        assert(overlayModal?.classList.contains('active'), 'Modal se abre al tocar producto con variantes');
+
+        const opciones = overlayModal.querySelectorAll('.moc-opcion');
+        assert(opciones.length === 2, '2 opciones renderizadas');
+
+        const opEspecial = Array.from(opciones).find(o => o.dataset.opcion === `op_especial_${sufijo}`);
+        if (opEspecial) { opEspecial.click(); await esperar(80); }
+
+        const mocTotal = document.getElementById('mocTotal');
+        assert(mocTotal?.textContent.includes('2700'), `Total actualizado = $2700 (actual: ${mocTotal?.textContent})`);
+
+        document.getElementById('mocBtnAgregar').click();
+        await esperar(150);
+        const itemsEnOrden = Orden.obtenerItems();
+        assert(itemsEnOrden.length === 1, 'Item agregado a la orden');
+        assert(itemsEnOrden[0].opciones?.length === 1, 'Item con 1 opción');
+
+        // Confirmar orden
+        let precargaPayload = null;
+        const limpiarEvento = EventBus.on('cliente:precarga_enviada', (p) => { precargaPayload = p; });
+
+        const btnConfirmar = document.getElementById('btnConfirmarOrden');
+        if (btnConfirmar) {
+          btnConfirmar.click();
+          await esperar(2500);
+        }
+        limpiarEvento();
+
+        assert(precargaPayload !== null, 'Evento cliente:precarga_enviada emitido');
+        const precargaId = precargaPayload?.id;
+        assert(!!precargaId, `Precarga ID: ${precargaId}`);
+        if (precargaId) _creados.pedidos.push(precargaId);
+
+        // Verificar en Appwrite
+        if (precargaId) {
+          // Volver a staff para leer (el jugador no ve PubPrueba)
+          try { await Auth.cerrarSesion(); } catch {}
+          await Auth.iniciarSesion(STAFF.user, STAFF.pass);
+          await esperar(500);
+
+          let precargaDoc = null;
+          try {
+            precargaDoc = await DBAppwrite.baseDeDatos.getRow({
+              databaseId: DBAppwrite.idBaseDeDatos,
+              tableId: DBAppwrite.COLECCIONES.pedidos,
+              rowId: precargaId
+            });
+          } catch (e) {
+            warn('Error al leer precarga: ' + e.message);
+          }
+
+          if (precargaDoc) {
+            assert(precargaDoc.estado === 'precarga', `Estado = precarga (actual: ${precargaDoc.estado})`);
+            assert(precargaDoc.origen === 'cliente', `Origen = cliente`);
+            assert(precargaDoc.mesa === numMesa, `Mesa = ${numMesa}`);
+            assert(precargaDoc.espacioId === 'PubPrueba', `EspacioId = PubPrueba (actual: ${precargaDoc.espacioId})`);
+            const itemsPersistidos = JSON.parse(precargaDoc.items || '[]');
+            assert(itemsPersistidos[0]?.opciones?.length === 1, 'Item con opciones persistido');
+          }
+
+          // Volver al jugador para el resto del test
+          try { await Auth.cerrarSesion(); } catch {}
+          await Auth.iniciarSesion(nombreJugador, 'pass12345');
+        }
+
+        MenuDigital.ocultar();
+      }
+
+      // ══════════════════════════════════════════════════════
+      // SUITE 3 — Fase mesero: bandeja
+      // ══════════════════════════════════════════════════════
+      resultsEl.innerHTML += '<h2>3. Fase mesero — bandeja de atención</h2>';
+
+      const hayPrecarga = _creados.pedidos.length > 0;
+
+      if (!hayPrecarga) {
+        warn('Suite 3 saltada: no hay precarga creada.');
+      } else {
+        try { await Auth.cerrarSesion(); } catch {}
+        const loginMesero = await Auth.iniciarSesion(STAFF.user, STAFF.pass);
+        assert(loginMesero, 'Mesero (jefePub) logueado');
+
+        if (!document.getElementById('bandejaAtencionOverlay')) {
+          const overlayMesas = document.createElement('div');
+          overlayMesas.id = 'bandejaAtencionOverlay';
+          overlayMesas.className = 'bandeja-overlay';
+          overlayMesas.style.display = 'none';
+          document.body.appendChild(overlayMesas);
+        }
+
+        Deps.registrar('pedidoRepo', PedidoRepositoryLocal);
+        PedidoService.configurar(PedidoRepositoryLocal);
+        Deps.registrar('pedidoService', PedidoService);
+        InventarioService.configurar(crearInventarioRepo());
+        Deps.registrar('inventarioService', InventarioService);
+        PedidoManager.init({ pedidoRepo: PedidoRepositoryLocal });
+
+        PrecargaControl.activar();
+        BandejaAtencion.activar();
+
+        BandejaAtencion.abrirBandeja();
+        await esperar(1500);
+
+        const listaBandeja = document.getElementById('bandejaLista');
+        const itemsBandeja = listaBandeja?.querySelectorAll('.bandeja-item') || [];
+        assert(itemsBandeja.length >= 1, `Bandeja muestra ${itemsBandeja.length} solicitud(es)`);
+
+        const itemPrecarga = Array.from(itemsBandeja).find(el =>
+          el.textContent.includes(`Mesa ${numMesa}`)
+        );
+        assert(!!itemPrecarga, 'Bandeja muestra la precarga del cliente');
+
+        const btnRevisar = itemPrecarga?.querySelector('.bandeja-revisar');
+        assert(!!btnRevisar, 'Botón Revisar presente');
+
+        if (btnRevisar) {
+          let itemsListosPayload = null;
+          const limpiarItems = EventBus.on('precarga:items_listos', (p) => { itemsListosPayload = p; });
+
+          btnRevisar.click();
+          await esperar(2000);
+          limpiarItems();
+
+          assert(itemsListosPayload !== null, 'Evento precarga:items_listos emitido');
+          if (itemsListosPayload) {
+            assert(itemsListosPayload.mesa === numMesa, 'precarga:items_listos con mesa correcta');
+            assert(Array.isArray(itemsListosPayload.items), 'Items enviados');
+            assert(itemsListosPayload.items[0]?.opciones?.length === 1, 'Item con opciones preservadas');
+          }
+        }
+
+        // Estado de la precarga tras revisión
+        const precargaId = _creados.pedidos[_creados.pedidos.length - 1];
+        if (precargaId) {
+          let doc = null;
+          try {
+            doc = await DBAppwrite.baseDeDatos.getRow({
+              databaseId: DBAppwrite.idBaseDeDatos,
+              tableId: DBAppwrite.COLECCIONES.pedidos,
+              rowId: precargaId
+            });
+          } catch (e) {
+            warn('No se pudo leer la precarga tras revisión: ' + e.message);
+          }
+          if (doc) {
+            info(`Estado de la precarga tras revisión: "${doc.estado}"`);
+            if (doc.estado === 'revisado') {
+              warn('Valor "revisado" no figura en el enum documentado en COLECCIONES.md §2. Reportar a Coordinación.');
+            }
+          }
+        }
+
+        BandejaAtencion.cerrarBandeja();
+      }
+
+      // ══════════════════════════════════════════════════════
+      // SUITE 4 — Descuento de stock
+      // ══════════════════════════════════════════════════════
+      resultsEl.innerHTML += '<h2>4. Descuento de stock con insumos_delta</h2>';
+
+      if (!hayPrecarga) {
+        warn('Suite 4 saltada: sin precarga no hay flujo completo.');
+      } else {
+        const pedidoAbierto = await DBAppwrite.crear('pedidos', null, {
+          mesa: numMesa, tipo: 'local', origen: 'staff', estado: 'abierta',
+          comensales: 1, items: '[]', total: 0, mozo: 'Test'
+        });
+        assert(!!pedidoAbierto, 'Pedido abierto creado');
+        if (pedidoAbierto) _creados.pedidos.push(pedidoAbierto.id);
+
+        await DBAppwrite.actualizar('mesas', numMesa, {
+          estado: 'ocupada',
+          pedidoId: pedidoAbierto.id
+        });
+
+        const insumosActuales = await DBAppwrite.listar('insumos');
+        Store.despachar({ type: 'INSUMOS_INICIALIZAR', payload: insumosActuales });
+
+        const stockInicial = insumosActuales.find(i => i.id === insumo.id)?.stock;
+        info(`Stock inicial del insumo: ${stockInicial}`);
+
+        const itemParaComanda = {
+          tipo: 'producto',
+          prodId: producto.id,
+          nombre: producto.nombre,
+          precio_base: 2000,
+          precio: 2700,
+          precio_unitario: 2700,
+          precio_total: 2700,
+          categoria: 'test',
+          destino: 'cocina',
+          qty: 1,
+          obs: '',
+          enviado: false,
+          opciones: [
+            {
+              varianteId: idVariante,
+              varianteNombre: `Sabor Integración ${sufijo}`,
+              opcionId: `op_especial_${sufijo}`,
+              opcionNombre: 'Especial',
+              precio_delta: 700,
+              alergenos: ['gluten'],
+              insumos_delta: [{ insumoId: insumo.id, cantidad: 2, accion: 'sumar' }],
+              pasos_delta: [{ accion: 'sumar', texto: 'Añadir ingrediente especial', posicion: 'fin' }]
+            }
+          ],
+          alergias_manuales: []
+        };
+
+        const resEnvio = await CommandBus.ejecutar({
+          type: 'enviarComanda',
+          datos: {
+            mesa: { numero: numMesa, pedidoId: pedidoAbierto.id, estado: 'ocupada' },
+            mozo: 'Test',
+            comensales: 1,
+            observaciones: '',
+            itemsPendientes: [itemParaComanda],
+            overrideStock: true
+          }
+        });
+
+        assert(resEnvio?.exito === true, `enviarComanda exitoso (error: ${resEnvio?.error || 'ninguno'})`);
+
+        await esperar(800);
+        const insumosDespues = await DBAppwrite.listar('insumos');
+        const insumoDespues = insumosDespues.find(i => i.id === insumo.id);
+
+        assert(insumoDespues?.stock === 98, `Stock bajó de 100 a 98 (actual: ${insumoDespues?.stock})`);
+
+        if (resEnvio?.data?.comandas) {
+          resEnvio.data.comandas.forEach(c => {
+            if (c.id) _creados.comandas.push(c.id);
+          });
+        }
+      }
+
+      // ══════════════════════════════════════════════════════
+      // SUITE 5 — Limpieza
+      // ══════════════════════════════════════════════════════
+      resultsEl.innerHTML += '<h2>5. Limpieza</h2>';
+      accion('Eliminando huella...');
+      
+      // Restaurar sesión de staff para poder eliminar los datos.
+      try { await Auth.cerrarSesion(); } catch {}
+      await Auth.iniciarSesion(STAFF.user, STAFF.pass);
+      await esperar(500);
+      
+      try { await DBAppwrite.actualizar('mesas', numMesa, { estado: 'libre', pedidoId: '' }); } catch {}
+      
+      for (const id of _creados.comandas) { try { await DBAppwrite.eliminar('comandas', id); } catch {} }
+      for (const id of _creados.pedidos) { try { await DBAppwrite.eliminar('pedidos', id); } catch {} }
+      for (const id of _creados.mesas) { try { await DBAppwrite.eliminar('mesas', id); } catch {} }
+      for (const id of _creados.productos) { try { await DBAppwrite.eliminar('productos', id); } catch {} }
+      for (const id of _creados.variantes) { try { await DBAppwrite.eliminar('variantes', id); } catch {} }
+      for (const id of _creados.insumos) { try { await DBAppwrite.eliminar('insumos', id); } catch {} }
+      for (const id of _creados.recetas) { try { await DBAppwrite.eliminar('recetas', id); } catch {} }
+      
+      try { sessionStorage.removeItem(CLAVE_ESPACIO_QR); } catch {}
+      try { await Auth.cerrarSesion(); } catch {}
+      try { MenuDigital.ocultar(); } catch {}
+      try { ModalOpciones.limpiar(); } catch {}
+      try { AlergiasCliente.limpiar(); } catch {}
+      try { BandejaAtencion.limpiar(); } catch {}
+      document.getElementById('view-menu-digital')?.remove();
+      document.getElementById('bandejaAtencionOverlay')?.remove();
+      
+      assert(true, 'Huella eliminada');
+      
+      finalizar();
+    }
+
+    function finalizar() {
+      resultsEl.innerHTML += `<div class="summary">${passed} pasaron, ${failed} fallaron</div>`;
+      if (failed === 0) {
+        resultsEl.innerHTML += '<div class="test pass">🎉 Flujo cliente ↔ mesero verificado de punta a punta.</div>';
+      } else {
+        resultsEl.innerHTML += `<div class="test fail">⚠️ ${failed} fallo(s). Revisar hallazgos.</div>`;
+      }
+    }
+
+    window.addEventListener('load', () => run().catch(e => {
+      resultsEl.innerHTML += `<div class="test fail">Error fatal: ${e.message}</div>
+        <pre>${e.stack || ''}</pre>`;
+      console.error(e);
+    }));
+  </script>
+</body>
+</html>

@@ -1,9 +1,14 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/pedido.css
-   Versión: 1.0.2
+   Versión: 1.0.3
    Propósito: Modal de pedido, carta de productos y comanda.
               Reglas expandidas sin anidamiento SCSS.
+
+   v1.0.3: Paquete 4 — reglas del badge "Personalizable" en tarjetas
+           de producto con variantes, y del subtexto/badges de items
+           con opciones en la comanda.
+   v1.0.2: base anterior.
    ================================================================ */
 
 #modalPedido {
@@ -174,6 +179,7 @@
   display: flex;
   flex-direction: column;
   gap: 5px;
+  position: relative;
 }
 #modalPedido .prod-card:hover {
   border-color: var(--color-accent);
@@ -181,6 +187,37 @@
   box-shadow: 0 4px 16px rgba(245,158,11,.2);
 }
 #modalPedido .prod-card:active { transform: scale(.97); }
+
+/* v1.0.3: tarjeta con variantes activas. */
+#modalPedido .prod-card.prod-card-variantes {
+  border-color: rgba(245,158,11,.3);
+}
+#modalPedido .prod-card.prod-card-variantes:hover {
+  border-color: var(--color-accent);
+}
+
+#modalPedido .prod-badge-variantes {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--color-accent);
+  background: rgba(245,158,11,.12);
+  border: 1px solid rgba(245,158,11,.3);
+  padding: 2px 8px;
+  border-radius: 99px;
+  align-self: flex-start;
+  margin-bottom: 2px;
+  line-height: 1.4;
+}
+#modalPedido .prod-badge-variantes .prod-badge-glyph {
+  font-size: 11px;
+  line-height: 1;
+  color: var(--color-accent);
+}
 
 #modalPedido .prod-nombre {
   font-size: 13px;
@@ -302,6 +339,11 @@
   font-weight: 700;
 }
 
+/* v1.0.3: item con variantes — borde izquierdo ámbar sutil. */
+#modalPedido .comanda-item.tiene-variantes {
+  border-left: 3px solid var(--color-accent);
+}
+
 #modalPedido .item-qty-controls {
   display: flex;
   align-items: center;
@@ -341,6 +383,54 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* v1.0.3: subtexto con opciones seleccionadas. */
+#modalPedido .item-opciones {
+  font-size: 11px;
+  color: var(--color-text-sec);
+  margin-top: 2px;
+  line-height: 1.35;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* v1.0.3: fila de badges (alergia, impacto). */
+#modalPedido .item-badges {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+#modalPedido .item-badge-alergia {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .3px;
+  background: rgba(239,68,68,.15);
+  color: #fca5a5;
+  border: 1px solid rgba(239,68,68,.3);
+  padding: 2px 7px;
+  border-radius: 99px;
+  line-height: 1.4;
+}
+#modalPedido .item-badge-impacto {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+  background: rgba(245,158,11,.15);
+  color: var(--color-accent);
+  border: 1px solid rgba(245,158,11,.3);
+  border-radius: 50%;
+  line-height: 1;
+}
+
 #modalPedido .item-obs-input {
   width: 100%;
   background: transparent;

@@ -1,12 +1,14 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/config.css
-   Versión: 3.0.2
+   Versión: 3.1.0
    Propósito: Estilos para la nueva vista de Configuración rediseñada
               con panel izquierdo, gestión de zonas, personal por roles,
-              impresoras y contraseñas. Swipe y overlay en móvil.
-              v3.0.2: agrega estilos para .panel-admin y .nota-privacidad
-                      para que la pestaña Personal se vea correctamente.
+              catálogo, impresoras y contraseñas. Swipe y overlay
+              en móvil.
+   v3.1.0: agrega .campo-help para textos de ayuda bajo los campos.
+   v3.0.2: agrega estilos para .panel-admin y .nota-privacidad
+           para que la pestaña Personal se vea correctamente.
    ================================================================ */
 
 /* ── Contenedor principal ─────────────────────────────────── */
@@ -190,6 +192,16 @@
   border-radius: 8px;
   font-size: 13px;
   outline: none;
+}
+
+#view-config .campo-help {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 6px;
+  line-height: 1.5;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
 }
 
 /* ── BOTONES ───────────────────────────────────────────────── */

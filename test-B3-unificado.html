@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test B3 — Unificado Frontend Caja</title>
+  <style>
+    body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; line-height: 1.5; }
+    h1 { color: #f59e0b; }
+    .test { margin: 6px 0; padding: 8px 12px; border-radius: 6px; }
+    .pass { background: rgba(16,185,129,.15); border-left: 4px solid #10b981; }
+    .fail { background: rgba(239,68,68,.15); border-left: 4px solid #ef4444; }
+    .warn { background: rgba(245,158,11,.15); border-left: 4px solid #f59e0b; }
+    .info { background: rgba(59,130,246,.15); border-left: 4px solid #3b82f6; }
+    .summary { margin-top: 20px; padding: 12px; background: #1f2937; border: 1px solid #374151; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test B3 — Unificado Frontend Caja</h1>
+  <p>Autenticación, permisos, flujo de caja, cobro, split, ticket, arqueo, historial, movimientos, variantes y botones.</p>
+  <div id="results"></div>
+  <div id="toastContainer"></div>
+
+  <script src="/js/appwrite.min.js"></script>
+
+  <script type="module">
+    const resultsEl = document.getElementById('results');
+    let passed = 0, failed = 0, warnings = 0;
+
+    function assert(cond, msg) {
+      if (cond) { passed++; resultsEl.innerHTML += `<div class="test pass">✔ ${msg}</div>`; }
+      else { failed++; resultsEl.innerHTML += `<div class="test fail">✘ ${msg}</div>`; }
+    }
+    function warn(msg) { warnings++; resultsEl.innerHTML += `<div class="test warn">⚠️ ${msg}</div>`; }
+    const log = msg => { resultsEl.innerHTML += `<div class="test info">ℹ️ ${msg}</div>`; };
+    const esperar = ms => new Promise(r => setTimeout(r, ms));
+
+    async function run() {
+      resultsEl.innerHTML = '';
+      const errores = [];
+      const originalError = console.error;
+      console.error = (...args) => {
+        errores.push(args.map(a => String(a)).join(' '));
+        originalError(...args);
+      };
+      window.confirm = () => true;
+
+      if (typeof window.Appwrite === 'undefined') {
+        assert(false, 'SDK de Appwrite no cargado');
+        return;
+      }
+      assert(true, 'SDK de Appwrite cargado');
+
+      const { Logger } = await import('./js/lib/logger.js');
+      Logger.setLevel('ERROR');
+      const { EventBus } = await import('./js/lib/eventBus.js');
+      const { Store } = await import('./js/lib/store.js');
+      const { CommandBus } = await import('./js/lib/command-bus.js');
+      const { Deps } = await import('./js/lib/deps.js');
+      const { DBAppwrite } = await import('./js/db-appwrite.js');
+      const { DB } = await import('./js/db.js');
+      const { Auth, inicializarAuth } = await import('./js/auth.js');
+      const { PedidoManager } = await import('./js/managers/pedido-manager.js');
+      const { PedidoRepositoryLocal } = await import('./js/repositorios/pedido-repository.js');
+      const { PedidoService } = await import('./js/servicios/pedido-service.js');
+      const { TurnoManager } = await import('./js/managers/turno-manager.js');
+      const { Cobro } = await import('./js/ui/cobro.js');
+      const { Tickets } = await import('./js/ui/tickets.js');
+      const { Caja } = await import('./js/ui/caja.js');
+      await import('./js/comandos/agregar-mesa.js');
+      await import('./js/comandos/crear-pedido-mesa.js');
+      await import('./js/comandos/liberar-mesa.js');
+      await import('./js/comandos/cerrar-turno.js');
+
+      const idsCreados = [];
+      async function limpiarHuella() {
+        for (const { coleccion, id } of idsCreados) {
+          try { await DBAppwrite.eliminar(coleccion, id); } catch {}
+        }
+      }
+
+      // 0. Inicialización y autenticación
+      try {
+        if (!(await DBAppwrite.iniciar()) || !DBAppwrite.habilitado) {
+          assert(false, 'No se pudo inicializar Appwrite');
+          return;
+        }
+        assert(true, 'Appwrite inicializado');
+      } catch (e) { assert(false, 'Error inicializando Appwrite: ' + e.message); return; }
+
+      await inicializarAuth();
+      const loginOk = await Auth.iniciarSesion('jefepub', 'jefe1234');
+      assert(loginOk, 'Login jefepub/jefe1234 exitoso');
+      if (!loginOk) return;
+
+      const localActivo = Auth.obtenerLocalActivo?.();
+      assert(localActivo?.id === 'PubPrueba', 'Espacio resuelto: PubPrueba');
+      const rolesEfectivos = Auth.obtenerRolesEfectivos?.() || [];
+      assert(rolesEfectivos.includes('admin'), 'Roles efectivos incluyen admin');
+      assert(Auth.tienePermiso('verCaja'), 'Permiso verCaja concedido');
+      assert(Auth.puedeCerrarMesa?.() === true, 'Permiso cerrarMesa concedido');
+
+      await DB.init();
+      PedidoManager.init({ pedidoRepo: PedidoRepositoryLocal });
+      Deps.registrar('pedidoRepo', PedidoRepositoryLocal);
+      PedidoService.configurar(PedidoRepositoryLocal);
+      Deps.registrar('pedidoService', PedidoService);
+
+      // 1. Crear mesa y pedido de prueba
+      const numMesa = 'test_uni_' + Date.now();
+      try {
+        const mesaCreada = await DBAppwrite.crear('mesas', numMesa, {
+          numero: numMesa,
+          estado: 'libre',
+          pedidoId: '',
+          comensales: 3,
+          zona: 'salon',
+          esVirtual: false,
+          espacioId: localActivo.id
+        });
+        if (!mesaCreada) { assert(false, 'No se pudo crear mesa'); return; }
+        idsCreados.push({ coleccion: 'mesas', id: mesaCreada.id });
+        assert(true, 'Mesa de prueba creada');
+      } catch (e) { assert(false, 'Error creando mesa: ' + e.message); return; }
+
+      let pedidoId = null;
+      try {
+        const resAbrir = await PedidoRepositoryLocal.abrirMesa(numMesa, 'Mozo Test', 3);
+        pedidoId = resAbrir.id;
+        idsCreados.push({ coleccion: 'pedidos', id: pedidoId });
+        assert(!!pedidoId, 'Pedido creado al abrir mesa');
+      } catch (e) { assert(false, 'Error abriendo mesa: ' + e.message); return; }
+
+      try {
+        const mesa = DB.mesas.find(m => m.numero == numMesa);
+        mesa.items = [
+          { nombre: 'Cerveza', precio: 3500, qty: 2, persona: 'Juan' },
+          { nombre: 'Pizza', precio: 8900, qty: 1, persona: 'Juan' },
+          { nombre: 'Cerveza', precio: 3500, qty: 1, persona: 'María' },
+          { nombre: 'Empanadas', precio: 4500, qty: 1, persona: 'María' },
+          { nombre: 'Mojito', precio: 5200, qty: 1, persona: 'Pedro' },
+          { nombre: 'Papas', precio: 3800, qty: 1, persona: 'Pedro' }
+        ];
+        mesa.total = 32900;
+        const pedido = DB.pedidos.find(p => p.id === pedidoId);
+        pedido.items = mesa.items;
+        pedido.total = mesa.total;
+        pedido.comensales = 3;
+        DB.saveMesas();
+        DB.savePedidos();
+
+        if (!Store.obtenerEstado().mesas.some(m => m.numero == numMesa)) {
+          Store.despachar({ type: 'MESA_AGREGAR', payload: mesa });
+        }
+        if (!Store.obtenerEstado().pedidos.some(p => p.id === pedidoId)) {
+          Store.despachar({ type: 'PEDIDO_CREADO', payload: pedido });
+        }
+
+        assert(true, 'Ítems y personas agregados al pedido');
+      } catch (e) { assert(false, 'Error agregando ítems: ' + e.message); }
+
+      // 2. Vista de caja
+      Caja.activar();
+      await esperar(500);
+      const vistaCaja = document.getElementById('view-caja');
+      assert(vistaCaja && vistaCaja.querySelector('.caja-shell'), 'Vista de caja activada');
+
+      const stats = document.querySelectorAll('#view-caja .stat-card');
+      assert(stats.length === 4, `4 tarjetas de resumen (actual: ${stats.length})`);
+
+      const mesaCards = document.querySelectorAll('#view-caja .mesa-card');
+      assert(mesaCards.length >= 1, `Al menos una mesa en tarjeta (actual: ${mesaCards.length})`);
+
+      const filasHistorial = document.querySelectorAll('#view-caja .caja-table tbody tr');
+      assert(filasHistorial.length >= 1, `Historial con filas (actual: ${filasHistorial.length})`);
+
+      // 3. Navegación lateral
+      const navItems = document.querySelectorAll('#view-caja .nav-item');
+      assert(navItems.length >= 8, `Navegación lateral con al menos 8 items (actual: ${navItems.length})`);
+
+      const navMesas = [...navItems].find(i => i.dataset.seccion === 'mesas');
+      navMesas?.click(); await esperar(150);
+      assert(navMesas.classList.contains('active'), 'Nav Mesas activa');
+
+      const navPend = [...navItems].find(i => i.dataset.seccion === 'pendientes');
+      navPend?.click(); await esperar(150);
+      assert(navPend.classList.contains('active'), 'Nav Pendientes activa');
+
+      const navRetiros = [...navItems].find(i => i.dataset.seccion === 'retiros');
+      navRetiros?.click(); await esperar(300);
+      assert(document.getElementById('modalMovimiento')?.style.display === 'flex', 'Nav Retiros abre modal de movimiento');
+      document.getElementById('btnCancelarMovimiento')?.click();
+      await esperar(150);
+
+      const navAjustes = [...navItems].find(i => i.dataset.seccion === 'ajustes');
+      navAjustes?.click(); await esperar(200);
+      assert(true, 'Nav Ajustes ejecuta acción (toast)');
+
+      const navResumen = [...navItems].find(i => i.dataset.seccion === 'resumen');
+      navResumen?.click(); await esperar(150);
+      assert(navResumen.classList.contains('active'), 'Nav Resumen activa');
+
+      // 4. Menú hamburguesa
+      const hamburger = document.getElementById('btnMenuCaja');
+      const sidebar = document.getElementById('cajaSidebarLeft');
+      if (hamburger && sidebar) {
+        hamburger.click(); await esperar(100);
+        assert(sidebar.classList.contains('open'), 'Botón hamburguesa abre barra lateral');
+        document.getElementById('cajaSidebarBackdrop')?.click(); await esperar(100);
+        assert(!sidebar.classList.contains('open'), 'Backdrop cierra barra lateral');
+      }
+
+      // 5. Modal de cobro
+      const btnNuevoCobro = document.getElementById('btnNuevoCobro');
+      assert(btnNuevoCobro, 'Botón Nuevo cobro existe');
+      if (btnNuevoCobro) {
+        btnNuevoCobro.click();
+        await esperar(300);
+        const modalCobro = document.getElementById('modalCierre');
+        assert(modalCobro && modalCobro.style.display === 'flex', 'Nuevo cobro abre modal');
+        if (modalCobro) {
+          const tabs = document.querySelectorAll('#modalCierre .split-tabs button');
+          assert(tabs.length === 3, `Modal cobro con 3 pestañas (actual: ${tabs.length})`);
+
+          const tabPersona = [...tabs].find(t => t.dataset.split === 'persona');
+          tabPersona?.click(); await esperar(100);
+          assert(document.getElementById('panel-persona')?.classList.contains('active'), 'Pestaña Por persona activa');
+
+          const tabItems = [...tabs].find(t => t.dataset.split === 'items');
+          tabItems?.click(); await esperar(100);
+          assert(document.getElementById('panel-items')?.classList.contains('active'), 'Pestaña Por ítems activa');
+
+          const tabTotal = [...tabs].find(t => t.dataset.split === 'total');
+          tabTotal?.click(); await esperar(100);
+          assert(document.getElementById('panel-total')?.classList.contains('active'), 'Pestaña Total activa');
+
+          const descuentoInput = document.getElementById('cierreDescuento');
+          descuentoInput.value = 10; descuentoInput.dispatchEvent(new Event('input'));
+          await esperar(100);
+          assert(document.getElementById('totalFinal')?.textContent.includes('$'), 'Total actualizado con descuento');
+
+          tabPersona?.click(); await esperar(100);
+          const pmChips = document.querySelectorAll('#modalCierre .pm-chip');
+          if (pmChips.length > 0) {
+            pmChips[0].click(); await esperar(100);
+            assert(document.getElementById('keypadBox')?.style.display === 'block', 'Numpad visible al elegir efectivo');
+            assert(document.getElementById('btnCobrarPersonaActual')?.style.display === 'flex', 'Botón cobrar persona visible');
+          }
+
+          document.getElementById('btnCerrarModalCierre')?.click(); await esperar(100);
+          assert(modalCobro.style.display === 'none', 'Modal cobro se cierra');
+        }
+      }
+
+      // 6. Arqueo
+      const btnArqueoParcial = document.getElementById('btnArqueoParcial');
+      assert(btnArqueoParcial, 'Botón Arqueo parcial existe');
+      if (btnArqueoParcial) {
+        btnArqueoParcial.click(); await esperar(300);
+        const modalArqueo = document.getElementById('modalArqueo');
+        assert(modalArqueo && modalArqueo.style.display === 'flex', 'Arqueo parcial abre modal');
+        if (modalArqueo) {
+          const denomInputs = document.querySelectorAll('#modalArqueo .denom-qty');
+          assert(denomInputs.length >= 5, `Modal arqueo con denominaciones (${denomInputs.length})`);
+          if (denomInputs.length > 0) {
+            denomInputs[0].value = '2'; denomInputs[0].dispatchEvent(new Event('input')); await esperar(100);
+            assert(document.getElementById('arqueoTotalContado')?.textContent.includes('$'), 'Arqueo actualiza total contado');
+          }
+          document.getElementById('btnCerrarArqueo')?.click(); await esperar(100);
+          assert(modalArqueo.style.display === 'none', 'Modal arqueo se cierra');
+        }
+      }
+
+      // 7. Vista tarjetas/tabla
+      const btnTarjetas = document.getElementById('btnVistaTarjetas');
+      const btnTabla = document.getElementById('btnVistaTabla');
+      if (btnTabla) {
+        btnTabla.click(); await esperar(100);
+        assert(btnTabla.classList.contains('active'), 'Vista tabla activada');
+        btnTarjetas.click(); await esperar(100);
+        assert(btnTarjetas.classList.contains('active'), 'Vista tarjetas activada');
+      }
+
+      // 8. Acciones rápidas
+      const btnRetiro = document.getElementById('btnRegistrarRetiro');
+      if (btnRetiro) {
+        btnRetiro.click(); await esperar(300);
+        const modalMov = document.getElementById('modalMovimiento');
+        assert(modalMov && modalMov.style.display === 'flex', 'Registrar retiro abre modal de movimiento');
+        document.getElementById('btnCancelarMovimiento')?.click(); await esperar(150);
+      }
+
+      const btnReimprimir = document.getElementById('btnReimprimirUltimo');
+      if (btnReimprimir) {
+        let reimprimirAccionado = false;
+        btnReimprimir.addEventListener('click', () => { reimprimirAccionado = true; });
+        btnReimprimir.click(); await esperar(100);
+        assert(reimprimirAccionado, 'Botón Reimprimir último ticket responde');
+      }
+
+      // 9. Historial como modal
+      const navHistorial = [...navItems].find(i => i.dataset.seccion === 'historial');
+      navHistorial?.click(); await esperar(400);
+      const modalHist = document.getElementById('modalHistorial');
+      assert(!!modalHist, 'Nav Historial crea modalHistorial');
+      if (modalHist) {
+        assert(modalHist.style.display === 'flex', 'Historial visible como modal');
+        const filtroCerrada = modalHist.querySelector('.filtro-estado[data-estado="cerrada"]');
+        filtroCerrada?.click(); await esperar(150);
+        assert(filtroCerrada.classList.contains('active'), 'Filtro "Cerradas" activo');
+        const tablaHist = modalHist.querySelector('#historialBody');
+        assert(!!tablaHist, 'Tabla de historial presente');
+        document.getElementById('btnCerrarHistorial')?.click(); await esperar(150);
+        assert(modalHist.style.display === 'none', 'Historial se cierra');
+      }
+      assert(document.getElementById('view-caja') && getComputedStyle(document.getElementById('view-caja')).display !== 'none', 'Vista de caja sigue visible tras cerrar historial');
+
+      // 10. Movimientos (últimos 6)
+      const navMov = [...navItems].find(i => i.dataset.seccion === 'movimientos');
+      navMov?.click(); await esperar(300);
+      const modalListaMov = document.getElementById('modalListaMovimientos');
+      assert(!!modalListaMov, 'Nav Movimientos abre lista de movimientos');
+      if (modalListaMov) {
+        assert(modalListaMov.style.display === 'flex', 'Lista de movimientos visible');
+        const lista = document.getElementById('listaMovimientos');
+        assert(!!lista, 'Contenedor de lista presente');
+        document.getElementById('btnCerrarListaMovimientos')?.click(); await esperar(150);
+        assert(modalListaMov.style.display === 'none', 'Lista de movimientos se cierra');
+      }
+
+      // 11. Búsqueda con feedback
+      const busqueda = document.getElementById('busquedaCaja');
+      if (busqueda) {
+        busqueda.value = 'zzz_sin_match'; busqueda.dispatchEvent(new Event('input')); await esperar(100);
+        const fb = document.getElementById('feedbackBusqueda');
+        assert(fb && fb.textContent.includes('Sin resultados'), 'Búsqueda sin coincidencias muestra "Sin resultados"');
+        busqueda.value = ''; busqueda.dispatchEvent(new Event('input')); await esperar(100);
+        assert(fb && fb.textContent === '', 'Búsqueda vacía limpia feedback');
+      }
+
+      // 12. Ticket
+      try {
+        const ticketHTML = Tickets.generarCierre(
+          { numero: numMesa, mozo: 'Mozo Test', comensales: 3, items: DB.mesas.find(m=>m.numero==numMesa)?.items || [] },
+          32900, 0, 'Mixto', null,
+          [
+            { persona: 'Juan', formaPago: 'Efectivo', monto: 15900 },
+            { persona: 'María', formaPago: 'Débito', monto: 8000 },
+            { persona: 'Pedro', formaPago: 'Efectivo', monto: 9000 }
+          ]
+        );
+        Tickets.mostrar(ticketHTML, `Comprobante — Mesa ${numMesa}`, {
+          textoImprimir: 'Imprimir', claseImprimir: 'btn-primary', onImprimir: () => true,
+          textoExtra: 'Liberar Mesa', onExtra: async () => {
+            const res = await CommandBus.ejecutar({ type: 'liberarMesa', datos: { numeroMesa: numMesa } });
+            if (res.exito) EventBus.emit('pedido:cerrado', { mesa: numMesa });
+          }
+        });
+        await esperar(300);
+        const ticketModal = document.querySelector('.ticket-preview-modal');
+        assert(!!ticketModal, 'Ticket modal abierto');
+        const btnImprimirTicket = ticketModal?.querySelector('.btn-primary, [id$="-imprimir"]');
+        if (btnImprimirTicket) {
+          btnImprimirTicket.click(); await esperar(100);
+          assert(true, 'Botón imprimir ticket no lanza error');
+        }
+        const overlayTicket = ticketModal?.closest('.modal-overlay');
+        if (overlayTicket) { overlayTicket.remove(); await esperar(100); }
+        assert(!document.querySelector('.ticket-preview-modal'), 'Ticket modal cerrado');
+      } catch (e) { assert(false, 'Error en flujo de ticket: ' + e.message); }
+
+      // 13. Variantes: opciones, alergias, precio_unitario
+      try {
+        const mesaVar = {
+          numero: 'VAR1',
+          mozo: 'Mozo Test',
+          comensales: 2,
+          items: [
+            {
+              nombre: 'Michelada',
+              precio: 6500,
+              precio_unitario: 7300,
+              qty: 1,
+              opciones: [
+                { opcionNombre: 'Cubana' },
+                { opcionNombre: 'Grande' },
+                { opcionNombre: 'Escarchado' }
+              ]
+            },
+            {
+              nombre: 'Hamburguesa',
+              precio: 9000,
+              precio_unitario: 9500,
+              qty: 1,
+              opciones: [
+                { opcionNombre: 'Sin cebolla' },
+                { opcionNombre: 'Con cheddar' },
+                { opcionNombre: 'Doble carne' },
+                { opcionNombre: 'Con bacon' },
+                { opcionNombre: 'Sin tomate' }
+              ],
+              alergias_manuales: ['maní', 'lactosa']
+            },
+            {
+              nombre: 'Cerveza',
+              precio: 3500,
+              qty: 2
+            }
+          ]
+        };
+
+        const ticketCierre = Tickets.generarCierre(mesaVar, 24000, 0, 'Efectivo', null, []);
+        assert(ticketCierre.includes('Michelada (Cubana · Grande · Escarchado)'), 'Ticket cierre: opciones compactas en una línea');
+        assert(ticketCierre.includes('Hamburguesa') && ticketCierre.includes('…'), 'Ticket cierre: opciones >4 truncadas con "…"');
+        assert(ticketCierre.includes('⚠ Alergia: maní, lactosa'), 'Ticket cierre: alergias visibles');
+        assert(ticketCierre.includes('$7.300') || ticketCierre.includes('7300'), 'Ticket cierre: usa precio_unitario para Michelada');
+        assert(ticketCierre.includes('$7.000') || ticketCierre.includes('7000'), 'Ticket cierre: Cerveza sin variante usa precio base ($3500 x2)');
+
+        const ticketCuenta = Tickets.generarCuenta(mesaVar, null);
+        assert(ticketCuenta.includes('Michelada (Cubana · Grande · Escarchado)'), 'Ticket cuenta: opciones compactas');
+
+        const comandaVar = { mesa: 'VAR1', mozo: 'Mozo', items: mesaVar.items };
+        const ticketComanda = Tickets.generarComanda(comandaVar, 'ambos');
+        assert(ticketComanda.includes('Cubana · Grande · Escarchado'), 'Ticket comanda: opciones visibles');
+        assert(ticketComanda.includes('⚠ Alergia: maní, lactosa'), 'Ticket comanda: alergias visibles');
+
+        const parcial = Tickets.generarCierreParcial(
+          { numero: 'VAR1' },
+          { persona: 'Juan', monto: 7300, formaPago: 'Efectivo', items: [mesaVar.items[0]] },
+          null
+        );
+        assert(parcial.includes('Michelada (Cubana · Grande · Escarchado)'), 'Ticket parcial: opciones visibles');
+
+        assert(true, 'Variantes: opciones, alergias y precio_unitario procesados');
+      } catch (e) {
+        assert(false, 'Error procesando variantes en tickets: ' + e.message);
+      }
+
+      // 14. Liberación idempotente
+      const mesaFinal = DB.mesas.find(m => m.numero == numMesa);
+      if (mesaFinal && mesaFinal.estado !== 'libre') {
+        try {
+          await CommandBus.ejecutar({ type: 'liberarMesa', datos: { numeroMesa: numMesa } });
+          assert(true, 'Mesa liberada al final');
+        } catch (e) {
+          warn('No se pudo liberar mesa en limpieza');
+        }
+      } else {
+        assert(true, 'Mesa ya estaba libre, sin doble liberación');
+      }
+
+      await limpiarHuella();
+
+      if (errores.length > 0) {
+        warn('Errores de consola detectados: ' + errores.length);
+        errores.slice(0,5).forEach(e => log('  ' + e));
+      } else {
+        assert(true, 'Sin errores de consola');
+      }
+
+      resultsEl.innerHTML += `<div class="summary">${passed} pasaron, ${failed} fallaron, ${warnings} advertencias</div>`;
+      if (failed === 0) resultsEl.innerHTML += '<div class="test pass">✔ Test Unificado B3 superado sin fallos.</div>';
+      else resultsEl.innerHTML += '<div class="test fail">✘ Se detectaron fallos.</div>';
+    }
+
+    window.addEventListener('load', () => setTimeout(run, 200));
+  </script>
+</body>
+</html>

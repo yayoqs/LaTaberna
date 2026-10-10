@@ -1,9 +1,12 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/lib/command-bus.js
-   Versión: 1.1.2
+   Versión: 1.1.3
    Propósito: Bus de comandos centralizado (CQRS).
-              Con import explícito.
+              v1.1.3: El wrapper respeta el campo `exito` del
+              handler. Si el handler devuelve { exito: false },
+              el wrapper propaga ese fallo en lugar de
+              enmascararlo como exito: true.
    ================================================================ */
 
 import { Logger } from './logger.js';
@@ -32,6 +35,18 @@ export const CommandBus = (() => {
     Logger.info(`[CommandBus] Ejecutando comando "${command.type}"...`);
     try {
       const resultado = await handler(command);
+
+      // Si el handler devuelve explícitamente exito: false,
+      // propagamos el fallo en lugar de enmascararlo.
+      if (resultado && typeof resultado === 'object' && resultado.exito === false) {
+        Logger.warn(`[CommandBus] Comando "${command.type}" reportó fallo interno:`, resultado.error);
+        return {
+          exito: false,
+          data: resultado,
+          error: resultado.error || 'El handler reportó fallo sin detalle.'
+        };
+      }
+
       Logger.info(`[CommandBus] Comando "${command.type}" ejecutado con éxito.`, resultado);
       return { exito: true, data: resultado };
     } catch (error) {

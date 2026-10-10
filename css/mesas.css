@@ -1,9 +1,17 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/mesas.css
-   Versión: 1.1.1
+   Versión: 1.2.1
    Propósito: Estilos para el mapa de mesas.
-              v1.1.1: Bandeja de atención sin contador. Encapsulada.
+              v1.2.1: B1.8 — reemplazo de `var(--shadow-md)` (variable
+                      inexistente en vars.css v1.0.4) por
+                      `var(--shadow-md, var(--shadow))` con fallback.
+                      Cuando Célula E agregue `--shadow-md` a
+                      vars.css, el hover usará ese valor automáticamente.
+                      Mientras tanto, cae a `--shadow`.
+              v1.2.0: Fondo por zona, borde por estado, condición
+                      fusionada con borde punteado, badges apilados
+                      sin solaparse.
    ================================================================ */
 
 /* ── GRID DE MESAS ──────────────────────────────────── */
@@ -31,36 +39,49 @@
   box-shadow: var(--shadow-sm);
   min-height: 140px;
   justify-content: center;
+  border-left: 6px solid transparent;
 }
 
+/* B1.8: fallback para --shadow-md. Si Célula E agrega la variable
+   a vars.css, se usará automáticamente. Mientras tanto, aplica
+   --shadow. */
 #view-mesas .mesa-card:hover {
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-md, var(--shadow));
   transform: translateY(-2px);
 }
 
-/* ── COLORACIÓN POR ESTADO ─────────────────────────── */
-#view-mesas .mesa-card.libre       { border-left: 5px solid #22c55e; }
-#view-mesas .mesa-card.ocupada     { border-left: 5px solid #3b82f6; }
-#view-mesas .mesa-card.esperando   { border-left: 5px solid #f59e0b; }
-#view-mesas .mesa-card.cuenta      { border-left: 5px solid #ef4444; }
-#view-mesas .mesa-card.pagada      { border-left: 5px solid #10b981; }
-#view-mesas .mesa-card.fusionada   { border-left: 5px solid #8b5cf6; }
+/* ── COLOR DE BORDE POR ESTADO ──────────────────────── */
+#view-mesas .mesa-card.libre       { border-left-color: #22c55e; }
+#view-mesas .mesa-card.ocupada     { border-left-color: #3b82f6; }
+#view-mesas .mesa-card.esperando   { border-left-color: #f59e0b; }
+#view-mesas .mesa-card.cuenta      { border-left-color: #ef4444; }
+#view-mesas .mesa-card.pagada      { border-left-color: #10b981; }
 
-/* ── VIRTUAL (FUSIÓN) ─────────────────────────────── */
-#view-mesas .mesa-virtual {
-  border-style: dashed;
-  opacity: .85;
+/* ── CONDICIÓN FUSIONADA (solo borde punteado) ─────── */
+#view-mesas .mesa-card.mesa-virtual {
+  border-left-style: dashed;
+  opacity: .9;
 }
 
-#view-mesas .mesa-virtual-badge {
-  font-size: 10px;
-  background: #8b5cf6;
-  color: #fff;
-  padding: 2px 8px;
-  border-radius: 99px;
-  display: inline-flex;
-  align-items: center;
+/* ── FONDO POR ZONA ──────────────────────────────────── */
+#view-mesas .mesa-card.zona-0 { background: linear-gradient(135deg, rgba(59,130,246,.12) 0%, var(--color-card) 100%); }
+#view-mesas .mesa-card.zona-1 { background: linear-gradient(135deg, rgba(34,197,94,.12) 0%, var(--color-card) 100%); }
+#view-mesas .mesa-card.zona-2 { background: linear-gradient(135deg, rgba(245,158,11,.12) 0%, var(--color-card) 100%); }
+#view-mesas .mesa-card.zona-3 { background: linear-gradient(135deg, rgba(139,92,246,.12) 0%, var(--color-card) 100%); }
+#view-mesas .mesa-card.zona-4 { background: linear-gradient(135deg, rgba(6,182,212,.12) 0%, var(--color-card) 100%); }
+#view-mesas .mesa-card.zona-5 { background: linear-gradient(135deg, rgba(249,115,22,.12) 0%, var(--color-card) 100%); }
+#view-mesas .mesa-card.zona-6 { background: linear-gradient(135deg, rgba(236,72,153,.12) 0%, var(--color-card) 100%); }
+#view-mesas .mesa-card.zona-7 { background: linear-gradient(135deg, rgba(168,85,247,.12) 0%, var(--color-card) 100%); }
+
+/* ── BADGES SUPERIORES (apilados sin solaparse) ────── */
+#view-mesas .badges-container {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  display: flex;
+  flex-direction: column;
   gap: 4px;
+  z-index: 5;
 }
 
 /* ── ELEMENTOS INTERNOS ───────────────────────────── */
@@ -85,13 +106,15 @@
   color: var(--color-text-muted);
 }
 
-#view-mesas .mesa-zona-badge {
+#view-mesas .mesa-virtual-badge {
   font-size: 10px;
+  background: #8b5cf6;
+  color: #fff;
   padding: 2px 8px;
   border-radius: 99px;
-  position: absolute;
-  bottom: 8px;
-  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 /* ── MODO SELECCIÓN (FUSIÓN) ─────────────────────── */
@@ -126,25 +149,19 @@
 
 /* ── INSIGNIA DE PRECARGA ─────────────────────────── */
 #view-mesas .precarga-badge {
-  position: absolute;
-  top: -8px;
-  right: -8px;
-  background: #f59e0b;
-  color: #1a1a24;
-  font-size: 12px;
-  font-weight: bold;
   min-width: 22px;
   height: 22px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  cursor: pointer;
+  font-size: 11px;
+  font-weight: 800;
   box-shadow: 0 2px 6px rgba(0,0,0,.3);
-  z-index: 5;
-  transition: transform .15s ease;
   padding: 0 4px;
   gap: 3px;
+  background: var(--color-accent);
+  color: #1a1a24;
 }
 
 #view-mesas .precarga-badge:hover {
@@ -152,28 +169,22 @@
   background: #fbbf24;
 }
 
-#view-mesas .precarga-badge i {
-  font-size: 10px;
-}
+#view-mesas .precarga-badge i { font-size: 10px; }
 
 /* ── INSIGNIA CLIENTE ESPERANDO ─────────────────────── */
 #view-mesas .esperando-cliente-badge {
-  position: absolute;
-  top: 20px;
-  right: -8px;
-  background: #3b82f6;
-  color: #fff;
-  font-size: 10px;
   min-width: 22px;
   height: 22px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
-  cursor: default;
+  font-size: 11px;
+  font-weight: 800;
   box-shadow: 0 2px 6px rgba(0,0,0,.3);
-  z-index: 5;
   padding: 0 4px;
+  background: #3b82f6;
+  color: #fff;
   animation: esperando-pulse 2s infinite;
 }
 
@@ -182,7 +193,35 @@
   50%      { box-shadow: 0 0 0 6px rgba(59,130,246,0); }
 }
 
-/* ── BANDEJA DE ATENCIÓN (encapsulada en #view-mesas) ── */
+/* ── INSIGNIA LLAMADO ──────────────────────────────── */
+#view-mesas .llamado-badge {
+  min-width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  box-shadow: 0 2px 6px rgba(0,0,0,.3);
+  padding: 0 4px;
+  background: #ef4444;
+  color: #fff;
+}
+
+/* ── BADGE DE ZONA ─────────────────────────────────── */
+#view-mesas .mesa-zona-badge {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  color: #fff;
+  font-weight: 700;
+}
+
+/* ── BANDEJA DE ATENCIÓN ───────────────────────────── */
 #view-mesas .bandeja-overlay {
   position: fixed;
   top: 0;
@@ -194,10 +233,6 @@
   display: none;
   align-items: stretch;
   justify-content: flex-end;
-}
-
-#view-mesas .bandeja-overlay[style*="display: flex"] {
-  display: flex;
 }
 
 #view-mesas .bandeja-panel {

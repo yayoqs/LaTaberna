@@ -1,18 +1,22 @@
 /* ================================================================
-   LaTaberna - PubPOS — MÓDULO JS (ES6)
+   LaTaberna - Ecosistema Elisekai — MÓDULO JS (ES6)
    Archivo: js/roles.js
-   Versión: 2.0.3
+   Versión: 3.0.1
    Propósito: Definición de roles, jerarquía y matriz de permisos.
-              v2.0.3: documentada la decisión de mantener verMesas
-                      false para cliente. El READ en Appwrite sobre
-                      laTaberna_Mesas no habilita la vista de mesas.
+              v3.0.1: A.14: admin.verConfig pasa a true. La UI de
+                      Configuración (Célula D) valida qué secciones
+                      puede ver/guardar.
+              v3.0.0: incorpora "jugador" como rol global base.
+                      Elimina "cliente".
+                      LaTaberna trata al jugador sin Team como cliente.
    ================================================================ */
 
 export const Roles = {
   lista: [
     'master',
+    'jugador',
+    'owner',
     'admin',
-    'gerente',
     'chef',
     'cocinaAyudante',
     'barman',
@@ -20,14 +24,13 @@ export const Roles = {
     'mesero',
     'caja',
     'repartidor',
-    'artista',
-    'cliente'
+    'artista'
   ],
 
   jerarquia: {
-    master: ['admin'],
-    admin: [
-      'gerente',
+    master: ['owner'],
+    owner: [
+      'admin',
       'chef',
       'cocinaAyudante',
       'barman',
@@ -37,7 +40,7 @@ export const Roles = {
       'repartidor',
       'artista'
     ],
-    gerente: [
+    admin: [
       'chef',
       'cocinaAyudante',
       'barman',
@@ -75,7 +78,32 @@ export const Roles = {
       gestionarDelivery: true,
       gestionarEventos: true
     },
-    admin: {
+    jugador: {
+      verMesas: false,
+      verCocina: false,
+      verCaja: false,
+      verConfig: false,
+      verMenu: true,
+      verEventos: true,
+      verDelivery: false,
+      gestionarPedido: false,
+      tomarPedido: false,
+      enviarComanda: false,
+      cambiarEstadoComanda: false,
+      cerrarMesa: false,
+      editarProductos: false,
+      editarPrecios: false,
+      editarRecetas: false,
+      editarInventario: false,
+      verCostos: false,
+      gestionarPersonal: false,
+      asignarAdmin: false,
+      asignarGerente: false,
+      asignarStaff: false,
+      gestionarDelivery: false,
+      gestionarEventos: false
+    },
+    owner: {
       verMesas: true,
       verCocina: true,
       verCaja: true,
@@ -94,17 +122,17 @@ export const Roles = {
       editarInventario: true,
       verCostos: true,
       gestionarPersonal: true,
-      asignarAdmin: false,
+      asignarAdmin: true,
       asignarGerente: true,
       asignarStaff: true,
       gestionarDelivery: true,
       gestionarEventos: true
     },
-    gerente: {
+    admin: {
       verMesas: true,
       verCocina: true,
       verCaja: true,
-      verConfig: false,
+      verConfig: true,
       verMenu: true,
       verEventos: true,
       verDelivery: true,
@@ -324,45 +352,16 @@ export const Roles = {
       asignarStaff: false,
       gestionarDelivery: false,
       gestionarEventos: true
-    },
-    cliente: {
-      // verMesas se mantiene false para evitar acceso a la vista de
-      // mapa de mesas. El permiso READ en Appwrite sobre laTaberna_Mesas
-      // solo permite consultas puntuales de estado de mesa, no habilita
-      // esta vista.
-      verMesas: false,
-      verCocina: false,
-      verCaja: false,
-      verConfig: false,
-      verMenu: true,
-      verEventos: true,
-      verDelivery: false,
-      gestionarPedido: false,
-      tomarPedido: false,
-      enviarComanda: false,
-      cambiarEstadoComanda: false,
-      cerrarMesa: false,
-      editarProductos: false,
-      editarPrecios: false,
-      editarRecetas: false,
-      editarInventario: false,
-      verCostos: false,
-      gestionarPersonal: false,
-      asignarAdmin: false,
-      asignarGerente: false,
-      asignarStaff: false,
-      gestionarDelivery: false,
-      gestionarEventos: false
     }
   },
 
   getPermisos(rol) {
-    return this.permisos[rol] || this.permisos.cliente;
+    return this.permisos[rol] || this.permisos.jugador;
   },
 
   puedeAsignar(rolActual, rolObjetivo) {
     if (!this.lista.includes(rolObjetivo)) return false;
-    if (rolActual === 'master') return rolObjetivo === 'admin';
+    if (rolActual === 'master') return rolObjetivo === 'owner';
     const permitidos = this.jerarquia[rolActual] || [];
     return permitidos.includes(rolObjetivo);
   }

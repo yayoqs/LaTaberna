@@ -1,0 +1,1388 @@
+<!DOCTYPE html>
+<html lang="es-CL">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Prueba C v3 — Modal de opciones + Mis alergias</title>
+<style>
+:root {
+  --color-bg: #0f0f14;
+  --color-card: #1a1a24;
+  --color-panel: #21212e;
+  --color-hover: #2a2a3a;
+  --color-border: #2e2e42;
+  --color-border-strong: #3f3f57;
+  --color-accent: #f59e0b;
+  --color-accent-dark: #d97706;
+  --color-primary: #6366f1;
+  --color-success: #22c55e;
+  --color-danger: #ef4444;
+  --color-warning: #f59e0b;
+  --color-info: #3b82f6;
+  --color-text: #f1f5f9;
+  --color-text-sec: #94a3b8;
+  --color-text-muted: #64748b;
+  --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "Courier New", Courier, monospace;
+  --radius-lg: 16px;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --radius-xs: 6px;
+  --t: all .2s ease;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Cabecera ──────────────────────────────────────────────── */
+.prueba-header {
+  background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+  padding: 16px 24px;
+  border-bottom: 2px solid var(--color-accent);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+.prueba-header-top {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap;
+  max-width: 1400px; margin: 0 auto;
+}
+.prueba-header h1 {
+  margin: 0; font-size: 18px; font-weight: 800;
+  background: linear-gradient(to right, var(--color-accent), var(--color-primary));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.prueba-header p { margin: 4px 0 0 0; font-size: 12px; color: var(--color-text-sec); }
+.prueba-acciones { display: flex; gap: 8px; flex-wrap: wrap; }
+.prueba-acciones button {
+  background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.15);
+  color: #fff; padding: 8px 14px; border-radius: var(--radius-sm);
+  font-size: 12px; font-weight: 600; cursor: pointer; transition: var(--t);
+  font-family: inherit;
+}
+.prueba-acciones button:hover {
+  background: rgba(245,158,11,.2); border-color: var(--color-accent); color: var(--color-accent);
+}
+
+/* ── Layout dos columnas ───────────────────────────────────── */
+.prueba-layout {
+  display: grid; grid-template-columns: 1fr 360px; gap: 0;
+  max-width: 1400px; margin: 0 auto; min-height: calc(100vh - 90px);
+}
+@media (max-width: 960px) { .prueba-layout { grid-template-columns: 1fr; } }
+
+.col-menu { padding: 24px; border-right: 1px solid var(--color-border); }
+@media (max-width: 960px) {
+  .col-menu { border-right: none; padding: 16px; padding-bottom: 100px; }
+}
+
+/* ── Barra de estado del menú ──────────────────────────────── */
+.barra-estado {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 12px 16px; margin-bottom: 20px;
+  background: var(--color-card); border: 1px solid var(--color-border);
+  border-radius: var(--radius); font-size: 12px;
+}
+.barra-estado .info-item {
+  display: flex; align-items: center; gap: 6px;
+  color: var(--color-text-sec); font-weight: 600;
+}
+.barra-estado .separador { color: var(--color-border-strong); }
+.barra-estado .chip-alergia {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border-radius: 99px;
+  border: 1px solid var(--color-border-strong);
+  background: var(--color-panel); color: var(--color-text-sec);
+  font-weight: 700; font-size: 11.5px;
+  cursor: pointer; transition: var(--t); font-family: inherit;
+}
+.barra-estado .chip-alergia:hover {
+  border-color: var(--color-accent); color: var(--color-accent);
+}
+.barra-estado .chip-alergia.activo {
+  background: rgba(239,68,68,.15); border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+.barra-estado .chip-alergia.activo:hover {
+  background: rgba(239,68,68,.25);
+}
+
+/* ── Grid menú ─────────────────────────────────────────────── */
+.menu-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px;
+}
+@media (max-width: 600px) {
+  .menu-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+}
+.menu-card {
+  background: var(--color-card); border: 1px solid var(--color-border);
+  border-radius: var(--radius); overflow: hidden;
+  display: flex; flex-direction: column; cursor: pointer;
+  transition: var(--t); position: relative;
+}
+.menu-card:hover {
+  border-color: var(--color-accent); transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,.35);
+}
+.menu-card.atenuada { cursor: not-allowed; }
+.menu-card.atenuada:hover { transform: none; border-color: var(--color-border); }
+.menu-card.atenuada .menu-card-img,
+.menu-card.atenuada .menu-card-body { opacity: .3; filter: grayscale(.6); }
+.menu-card.atenuada::after {
+  content: '⚠ Sin destino configurado'; position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--color-danger); font-weight: 800; font-size: 12px;
+  text-align: center; padding: 16px;
+  background: rgba(15,15,20,.6); backdrop-filter: blur(2px); pointer-events: none;
+}
+.menu-card-img {
+  height: 100px; display: flex; align-items: center; justify-content: center;
+  font-size: 44px; position: relative;
+  background: linear-gradient(135deg, rgba(245,158,11,.12), rgba(99,102,241,.12));
+}
+.menu-card-badge {
+  position: absolute; top: 8px; left: 8px;
+  background: var(--color-accent); color: #000;
+  font-size: 10px; font-weight: 800; padding: 4px 10px;
+  border-radius: 99px; letter-spacing: .3px; text-transform: uppercase;
+}
+.menu-card-body {
+  padding: 12px 14px; flex: 1;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.menu-card-body h3 { margin: 0; font-size: 14px; font-weight: 700; line-height: 1.25; }
+.menu-card-body .desc {
+  font-size: 11.5px; color: var(--color-text-muted); line-height: 1.4; min-height: 32px;
+}
+.menu-card-body .precio {
+  font-size: 15px; font-weight: 800; color: var(--color-accent);
+  margin-top: auto; padding-top: 6px;
+}
+.menu-card-body .alergenos-producto {
+  font-size: 10px; color: var(--color-danger); font-weight: 700;
+  display: flex; align-items: center; gap: 4px;
+}
+
+/* ── FAB ───────────────────────────────────────────────────── */
+.fab-orden {
+  position: fixed; bottom: 24px; right: 24px;
+  background: var(--color-accent); border: none; border-radius: 50%;
+  width: 56px; height: 56px; color: #000; font-size: 22px; cursor: pointer;
+  box-shadow: 0 6px 20px rgba(245,158,11,.45);
+  z-index: 100; display: none; align-items: center; justify-content: center;
+  transition: var(--t); font-weight: 800;
+}
+.fab-orden:hover { background: var(--color-accent-dark); transform: scale(1.05); }
+.fab-orden .contador {
+  position: absolute; top: -4px; right: -4px;
+  background: #000; color: var(--color-accent);
+  border-radius: 50%; width: 22px; height: 22px;
+  font-size: 11px; font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+}
+@media (max-width: 960px) { .fab-orden { display: flex; } }
+
+/* ── Columna orden ─────────────────────────────────────────── */
+.col-orden {
+  background: var(--color-card); border-left: 1px solid var(--color-border);
+  display: flex; flex-direction: column;
+  position: sticky; top: 90px; height: calc(100vh - 90px); overflow: hidden;
+}
+@media (max-width: 960px) {
+  .col-orden {
+    position: fixed; inset: auto 0 0 0; height: 70vh;
+    border-left: none; border-top: 2px solid var(--color-accent);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    transform: translateY(100%); transition: transform .3s ease;
+    z-index: 90; box-shadow: 0 -10px 40px rgba(0,0,0,.6);
+  }
+  .col-orden.abierto { transform: translateY(0); }
+}
+.col-orden .orden-cabecera {
+  padding: 16px 20px; border-bottom: 1px solid var(--color-border);
+  display: flex; justify-content: space-between; align-items: center;
+  flex-shrink: 0; background: rgba(0,0,0,.15);
+}
+.col-orden .orden-cabecera h3 {
+  margin: 0; font-size: 15px; font-weight: 800;
+  display: flex; align-items: center; gap: 8px;
+  text-transform: uppercase; letter-spacing: .5px;
+}
+.col-orden .orden-cabecera h3 .em { color: var(--color-accent); font-size: 18px; }
+.col-orden .orden-contador {
+  font-size: 11px; color: var(--color-text-muted);
+  background: var(--color-panel); padding: 3px 10px;
+  border-radius: 99px; font-weight: 700;
+}
+.col-orden .btn-cerrar-orden {
+  background: transparent; border: none; color: var(--color-text-muted);
+  cursor: pointer; font-size: 18px; transition: var(--t); display: none;
+}
+.col-orden .btn-cerrar-orden:hover { color: var(--color-danger); }
+@media (max-width: 960px) { .col-orden .btn-cerrar-orden { display: block; } }
+.col-orden .orden-items {
+  flex: 1; overflow-y: auto; padding: 12px 16px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.col-orden .orden-item {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px; background: var(--color-panel);
+  border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+  transition: var(--t);
+}
+.col-orden .orden-item:hover { border-color: var(--color-border-strong); }
+.col-orden .orden-item-info { flex: 1; min-width: 0; }
+.col-orden .orden-item-nombre {
+  font-weight: 700; font-size: 13px; margin-bottom: 4px; color: var(--color-text);
+}
+.col-orden .orden-item-subopciones {
+  font-size: 11px; color: var(--color-text-muted); line-height: 1.5;
+  margin-bottom: 6px; padding-left: 8px;
+  border-left: 2px solid rgba(245,158,11,.4);
+}
+.col-orden .orden-item-precio {
+  font-size: 12px; color: var(--color-accent); font-weight: 700; margin-bottom: 8px;
+}
+.col-orden .orden-item-cantidad { display: flex; align-items: center; gap: 8px; }
+.col-orden .orden-item-cantidad button {
+  background: var(--color-hover); border: 1px solid var(--color-border);
+  color: var(--color-text); border-radius: var(--radius-xs);
+  width: 26px; height: 26px; cursor: pointer; font-size: 15px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  transition: var(--t); font-family: inherit;
+}
+.col-orden .orden-item-cantidad button:hover {
+  border-color: var(--color-accent); color: var(--color-accent);
+}
+.col-orden .orden-item-cantidad span {
+  min-width: 22px; text-align: center; font-weight: 800; font-size: 14px;
+}
+.col-orden .btn-quitar-item {
+  background: transparent; border: none; color: var(--color-text-muted);
+  cursor: pointer; font-size: 16px; flex-shrink: 0;
+  margin-top: 2px; transition: var(--t); padding: 4px;
+}
+.col-orden .btn-quitar-item:hover { color: var(--color-danger); }
+.col-orden .orden-vacia {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; color: var(--color-text-muted);
+  padding: 20px; text-align: center;
+}
+.col-orden .orden-vacia .icono { font-size: 44px; opacity: .4; margin-bottom: 12px; }
+.col-orden .orden-vacia p { font-size: 13px; margin: 0; }
+.col-orden .orden-pie {
+  padding: 16px 20px; border-top: 1px solid var(--color-border);
+  flex-shrink: 0; background: rgba(0,0,0,.15);
+}
+.col-orden .orden-total {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 13px; color: var(--color-text-sec); margin-bottom: 12px;
+  text-transform: uppercase; letter-spacing: .5px; font-weight: 700;
+}
+.col-orden .orden-total span:last-child {
+  color: var(--color-accent); font-size: 22px; font-weight: 800;
+  letter-spacing: 0; text-transform: none;
+}
+.col-orden .btn-confirmar-orden {
+  width: 100%; background: var(--color-accent); color: #000;
+  border: none; border-radius: var(--radius-sm); padding: 14px;
+  font-size: 14px; font-weight: 800; cursor: pointer;
+  transition: var(--t); font-family: inherit;
+  text-transform: uppercase; letter-spacing: .5px;
+}
+.col-orden .btn-confirmar-orden:hover:not(:disabled) { background: var(--color-accent-dark); }
+.col-orden .btn-confirmar-orden:disabled {
+  background: var(--color-hover); color: var(--color-text-muted); cursor: not-allowed;
+}
+.col-orden .aviso-alergias-orden {
+  padding: 10px 16px; background: rgba(239,68,68,.1);
+  border-top: 1px solid rgba(239,68,68,.3);
+  border-bottom: 1px solid rgba(239,68,68,.3);
+  font-size: 11.5px; color: #fca5a5; font-weight: 700;
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
+
+/* ── Modal ─────────────────────────────────────────────────── */
+#modalOpcionesCliente {
+  position: fixed; inset: 0; background: rgba(0,0,0,.82);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  z-index: 1000; display: none; align-items: flex-end; justify-content: center;
+}
+#modalOpcionesCliente.abierto { display: flex; }
+.moc-modal {
+  background: var(--color-card); border: 1px solid var(--color-border-strong);
+  border-bottom: none; border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  width: 100%; max-width: 540px; max-height: 92vh;
+  display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: 0 -20px 60px rgba(0,0,0,.7);
+  animation: moc-slide-up .28s cubic-bezier(.4,0,.2,1);
+}
+@keyframes moc-slide-up {
+  from { transform: translateY(100%); } to { transform: translateY(0); }
+}
+.moc-handle {
+  width: 44px; height: 4px; background: var(--color-border-strong);
+  border-radius: 4px; margin: 10px auto 0; flex-shrink: 0;
+}
+.moc-header {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 14px 18px; border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0; background: rgba(0,0,0,.15);
+}
+.moc-header-info { flex: 1; min-width: 0; }
+.moc-nombre {
+  font-size: 18px; font-weight: 800; line-height: 1.2;
+  margin-bottom: 3px; color: var(--color-text);
+}
+.moc-precio-base { font-size: 12px; color: var(--color-text-muted); }
+.moc-cerrar {
+  background: var(--color-hover); border: 1px solid var(--color-border);
+  color: var(--color-text-sec); width: 34px; height: 34px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; flex-shrink: 0; transition: var(--t);
+  font-size: 16px; font-family: inherit;
+}
+.moc-cerrar:hover { color: var(--color-danger); border-color: var(--color-danger); }
+.moc-body {
+  flex: 1; overflow-y: auto; padding: 4px 18px 12px;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Mini banner de alergias en el modal */
+.moc-aviso-alergias {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px; margin: 12px 0 4px;
+  background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.35);
+  border-radius: var(--radius-sm); font-size: 12px;
+  color: #fca5a5; font-weight: 700;
+}
+.moc-aviso-alergias .texto { flex: 1; }
+.moc-aviso-alergias button {
+  background: transparent; border: 1px solid rgba(239,68,68,.5);
+  color: #fca5a5; padding: 4px 10px; border-radius: 99px;
+  font-size: 11px; font-weight: 700; cursor: pointer;
+  transition: var(--t); font-family: inherit;
+}
+.moc-aviso-alergias button:hover {
+  background: rgba(239,68,68,.2); color: #fff;
+}
+
+.moc-variante { padding: 16px 0; border-bottom: 1px solid var(--color-border); }
+.moc-variante:last-of-type { border-bottom: none; }
+.moc-var-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.moc-var-titulo {
+  font-size: 13px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--color-accent);
+}
+.moc-var-req { color: var(--color-danger); font-weight: 800; font-size: 16px; line-height: 1; }
+.moc-var-tipo {
+  font-size: 10px; font-weight: 700; color: var(--color-text-muted);
+  background: var(--color-panel); padding: 2px 8px;
+  border-radius: 99px; text-transform: uppercase; letter-spacing: .5px;
+}
+.moc-var-tipo.multiple { color: var(--color-info); }
+
+.moc-opcion {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px; border: 2px solid var(--color-border);
+  border-radius: var(--radius-sm); margin-bottom: 8px;
+  cursor: pointer; transition: var(--t);
+  background: var(--color-panel); position: relative;
+}
+.moc-opcion:last-child { margin-bottom: 0; }
+.moc-opcion:hover:not(.deshabilitada) { border-color: var(--color-border-strong); }
+.moc-opcion.seleccionada {
+  border-color: var(--color-accent); background: rgba(245,158,11,.12);
+}
+.moc-opcion.seleccionada .moc-check {
+  background: var(--color-accent); border-color: var(--color-accent); color: #000;
+}
+.moc-opcion.deshabilitada { opacity: .35; pointer-events: none; filter: grayscale(.5); }
+.moc-opcion.requerida-falta {
+  border-color: var(--color-warning); background: rgba(245,158,11,.06);
+}
+.moc-check {
+  width: 24px; height: 24px; border-radius: 50%;
+  border: 2px solid var(--color-border-strong);
+  background: var(--color-card);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; color: transparent; font-size: 13px; font-weight: 800;
+  transition: var(--t); margin-top: 1px;
+}
+.moc-check.checkbox { border-radius: 6px; }
+.moc-opcion-info { flex: 1; min-width: 0; }
+.moc-opcion-nombre {
+  font-size: 14px; font-weight: 700; line-height: 1.3;
+  margin-bottom: 3px; color: var(--color-text);
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+}
+.moc-opcion-nombre .warn-icon { color: var(--color-warning); font-size: 13px; }
+.moc-opcion-desc { font-size: 12px; color: var(--color-text-muted); line-height: 1.4; }
+.moc-opcion-delta {
+  font-size: 14px; font-weight: 800; color: var(--color-accent);
+  flex-shrink: 0; white-space: nowrap; margin-top: 2px;
+}
+.moc-opcion-delta.negativo { color: var(--color-success); }
+.moc-opcion-delta.cero {
+  color: var(--color-text-muted); font-weight: 600; font-size: 12px;
+}
+.moc-exclusion-icon {
+  position: absolute; top: 6px; right: 8px;
+  font-size: 10px; color: var(--color-text-muted);
+  background: var(--color-card); padding: 3px 8px;
+  border-radius: 99px; border: 1px solid var(--color-border);
+  font-weight: 700; text-transform: uppercase; letter-spacing: .3px;
+}
+.moc-req-aviso {
+  position: absolute; top: 6px; right: 8px;
+  font-size: 10px; color: var(--color-warning);
+  background: rgba(245,158,11,.2); padding: 3px 8px;
+  border-radius: 99px; border: 1px solid rgba(245,158,11,.5);
+  font-weight: 700; text-transform: uppercase; letter-spacing: .3px;
+}
+
+.moc-seccion { padding: 16px 0; border-top: 1px solid var(--color-border); }
+.moc-seccion:first-child { border-top: none; }
+.moc-seccion-titulo {
+  font-size: 12px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--color-text); margin-bottom: 6px;
+  display: flex; align-items: center; gap: 8px;
+}
+.moc-seccion-titulo .em { color: var(--color-accent); font-size: 15px; }
+.moc-seccion-sub {
+  font-size: 11.5px; color: var(--color-text-muted);
+  margin-bottom: 12px; line-height: 1.4;
+}
+.moc-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.moc-chip {
+  background: var(--color-panel); border: 1px solid var(--color-border-strong);
+  color: var(--color-text-sec); padding: 8px 14px;
+  border-radius: 99px; font-size: 12px; font-weight: 700;
+  cursor: pointer; transition: var(--t); white-space: nowrap;
+  font-family: inherit;
+}
+.moc-chip:hover { border-color: var(--color-accent); color: var(--color-accent); }
+.moc-chip.on { background: var(--color-accent); border-color: var(--color-accent); color: #000; }
+.moc-chip.alergia.on {
+  background: var(--color-danger); border-color: var(--color-danger); color: #fff;
+}
+
+.moc-cantidad-fila {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+}
+.moc-cantidad-label {
+  font-size: 13px; font-weight: 800; text-transform: uppercase;
+  letter-spacing: 1px; color: var(--color-text-sec);
+}
+.moc-cantidad-control {
+  display: flex; align-items: center;
+  background: var(--color-panel); border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm); overflow: hidden;
+}
+.moc-cantidad-btn {
+  background: transparent; border: none; color: var(--color-text);
+  width: 44px; height: 44px; font-size: 22px; font-weight: 700;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: var(--t); font-family: inherit;
+}
+.moc-cantidad-btn:hover:not(:disabled) { background: var(--color-hover); color: var(--color-accent); }
+.moc-cantidad-btn:disabled { opacity: .3; cursor: not-allowed; }
+.moc-cantidad-valor {
+  font-size: 18px; font-weight: 800; min-width: 50px; text-align: center;
+  border-left: 1px solid var(--color-border);
+  border-right: 1px solid var(--color-border);
+  line-height: 44px; color: var(--color-text);
+}
+.moc-footer {
+  border-top: 2px solid var(--color-border-strong);
+  padding: 14px 18px calc(14px + env(safe-area-inset-bottom, 0px));
+  background: var(--color-panel);
+  display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;
+}
+.moc-total {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 13px; color: var(--color-text-sec);
+  text-transform: uppercase; letter-spacing: 1px; font-weight: 700;
+}
+.moc-total-monto {
+  font-size: 26px; font-weight: 800; color: var(--color-accent);
+  letter-spacing: 0; text-transform: none;
+}
+.moc-botones { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; }
+.moc-btn {
+  padding: 14px 12px; border-radius: var(--radius-sm);
+  font-weight: 800; font-size: 14px; cursor: pointer;
+  border: none; transition: var(--t);
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  font-family: inherit;
+}
+.moc-btn-cancelar {
+  background: var(--color-hover); color: var(--color-text-sec);
+  border: 1px solid var(--color-border);
+}
+.moc-btn-cancelar:hover { color: var(--color-text); border-color: var(--color-text-sec); }
+.moc-btn-agregar { background: var(--color-accent); color: #000; }
+.moc-btn-agregar:hover { background: var(--color-accent-dark); }
+.moc-btn-agregar:disabled {
+  background: var(--color-hover); color: var(--color-text-muted); cursor: not-allowed;
+}
+
+@media (min-width: 768px) {
+  #modalOpcionesCliente { align-items: center; padding: 20px; }
+  .moc-modal {
+    border-radius: var(--radius-lg); border-bottom: 1px solid var(--color-border-strong);
+    max-height: 88vh; box-shadow: 0 24px 60px rgba(0,0,0,.7);
+    animation: moc-fade-scale .22s ease;
+  }
+  @keyframes moc-fade-scale {
+    from { opacity: 0; transform: translateY(20px) scale(.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .moc-handle { display: none; }
+}
+
+/* ── Modal alergias ────────────────────────────────────────── */
+#modalAlergias {
+  position: fixed; inset: 0; background: rgba(0,0,0,.88);
+  backdrop-filter: blur(8px); z-index: 1100;
+  display: none; align-items: center; justify-content: center; padding: 20px;
+}
+#modalAlergias.abierto { display: flex; }
+.ma-card {
+  background: var(--color-card); border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius); width: 100%; max-width: 480px;
+  max-height: 88vh; display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0,0,0,.7);
+}
+.ma-header {
+  padding: 18px 20px 14px; border-bottom: 1px solid var(--color-border);
+  background: var(--color-panel);
+}
+.ma-header h3 {
+  margin: 0 0 4px 0; font-size: 16px; color: var(--color-text);
+  font-weight: 800;
+}
+.ma-header p { margin: 0; font-size: 12px; color: var(--color-text-muted); }
+.ma-body { padding: 16px 20px; overflow-y: auto; flex: 1; }
+.ma-footer {
+  padding: 14px 20px; border-top: 1px solid var(--color-border);
+  display: grid; grid-template-columns: 1fr 2fr; gap: 10px;
+}
+.ma-btn {
+  padding: 12px; border-radius: var(--radius-sm); font-weight: 800;
+  font-size: 13px; cursor: pointer; border: none; transition: var(--t);
+  font-family: inherit;
+}
+.ma-btn-cancelar {
+  background: var(--color-hover); color: var(--color-text-sec);
+  border: 1px solid var(--color-border);
+}
+.ma-btn-cancelar:hover { color: var(--color-text); }
+.ma-btn-guardar { background: var(--color-accent); color: #000; }
+.ma-btn-guardar:hover { background: var(--color-accent-dark); }
+.ma-resumen {
+  padding: 12px 20px; border-top: 1px solid var(--color-border);
+  font-size: 12px; color: var(--color-text-muted); background: rgba(0,0,0,.15);
+}
+.ma-resumen strong { color: var(--color-text); }
+
+/* ── Modal JSON ────────────────────────────────────────────── */
+#modalJson {
+  position: fixed; inset: 0; background: rgba(0,0,0,.88);
+  backdrop-filter: blur(8px); z-index: 1200;
+  display: none; align-items: center; justify-content: center; padding: 20px;
+}
+#modalJson.abierto { display: flex; }
+.json-card {
+  background: var(--color-card); border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius); width: 100%; max-width: 760px;
+  max-height: 88vh; display: flex; flex-direction: column; overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0,0,0,.7);
+}
+.json-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px; border-bottom: 1px solid var(--color-border);
+  background: var(--color-panel);
+}
+.json-header h3 {
+  margin: 0; font-size: 15px; color: var(--color-accent);
+  font-weight: 800; text-transform: uppercase; letter-spacing: .5px;
+}
+.json-cerrar {
+  background: transparent; border: none; color: var(--color-text-muted);
+  cursor: pointer; font-size: 20px; font-family: inherit;
+}
+.json-cerrar:hover { color: var(--color-danger); }
+.json-card pre {
+  margin: 0; padding: 18px 20px; overflow: auto;
+  font-family: var(--font-mono); font-size: 12px; line-height: 1.55;
+  color: var(--color-text); background: #0d0d14;
+}
+
+/* ── Toasts ────────────────────────────────────────────────── */
+#toastContainer {
+  position: fixed; top: 100px; right: 20px; z-index: 2000;
+  display: flex; flex-direction: column; gap: 10px;
+  pointer-events: none; max-width: 340px;
+}
+.toast {
+  background: var(--color-card); border: 1px solid var(--color-border-strong);
+  border-left: 4px solid var(--color-accent);
+  padding: 12px 16px; border-radius: var(--radius-sm);
+  color: var(--color-text); font-size: 13px; font-weight: 600;
+  box-shadow: 0 8px 24px rgba(0,0,0,.5);
+  animation: toast-in .25s ease; pointer-events: auto;
+}
+.toast.success { border-left-color: var(--color-success); }
+.toast.error { border-left-color: var(--color-danger); }
+.toast.warning { border-left-color: var(--color-warning); }
+.toast.info { border-left-color: var(--color-info); }
+@keyframes toast-in {
+  from { transform: translateX(40px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+</style>
+</head>
+<body>
+
+<div id="toastContainer"></div>
+
+<header class="prueba-header">
+  <div class="prueba-header-top">
+    <div>
+      <h1>Prueba C v3 — Modal de opciones + Mis alergias</h1>
+      <p>Prototipo aislado · Autocontenido · Datos stub</p>
+    </div>
+    <div class="prueba-acciones">
+      <button id="btnReset">Reiniciar estado</button>
+      <button id="btnVerJson">Ver JSON de precarga</button>
+    </div>
+  </div>
+</header>
+
+<div class="prueba-layout">
+
+  <section class="col-menu">
+    <div class="barra-estado" id="barraEstado"></div>
+    <div class="menu-grid" id="gridProductos"></div>
+  </section>
+
+  <aside class="col-orden" id="colOrden">
+    <div class="orden-cabecera">
+      <h3><span class="em">📋</span> Mi Orden <span class="orden-contador" id="contadorOrden">0</span></h3>
+      <button class="btn-cerrar-orden" id="btnCerrarOrden">✕</button>
+    </div>
+    <div class="orden-items" id="ordenItems"></div>
+    <div id="avisoAlergiasOrden"></div>
+    <div class="orden-pie">
+      <div class="orden-total">
+        <span>Total</span>
+        <span id="ordenTotal">$0</span>
+      </div>
+      <button class="btn-confirmar-orden" id="btnConfirmarOrden" disabled>Confirmar Orden</button>
+    </div>
+  </aside>
+
+</div>
+
+<button class="fab-orden" id="btnToggleOrden">
+  🛒<span class="contador" id="contadorFab">0</span>
+</button>
+
+<!-- Modal de opciones -->
+<div id="modalOpcionesCliente">
+  <div class="moc-modal">
+    <div class="moc-handle"></div>
+    <div class="moc-header">
+      <div class="moc-header-info">
+        <div class="moc-nombre" id="mocNombre">Producto</div>
+        <div class="moc-precio-base" id="mocPrecioBase">Base $0</div>
+      </div>
+      <button class="moc-cerrar" id="mocBtnCerrar">✕</button>
+    </div>
+    <div class="moc-body" id="mocBody"></div>
+    <div class="moc-footer">
+      <div class="moc-total">
+        <span>Total</span>
+        <span class="moc-total-monto" id="mocTotal">$0</span>
+      </div>
+      <div class="moc-botones">
+        <button class="moc-btn moc-btn-cancelar" id="mocBtnCancelar">Cancelar</button>
+        <button class="moc-btn moc-btn-agregar" id="mocBtnAgregar">✓ Agregar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal alergias -->
+<div id="modalAlergias">
+  <div class="ma-card">
+    <div class="ma-header">
+      <h3>⚠ Mis alergias e intolerancias</h3>
+      <p>Declara una vez. Se aplicará a todos los productos que pidas en esta visita.</p>
+    </div>
+    <div class="ma-body">
+      <div class="moc-chips" id="maChips"></div>
+    </div>
+    <div class="ma-resumen" id="maResumen"></div>
+    <div class="ma-footer">
+      <button class="ma-btn ma-btn-cancelar" id="maCancelar">Cancelar</button>
+      <button class="ma-btn ma-btn-guardar" id="maGuardar">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal JSON -->
+<div id="modalJson">
+  <div class="json-card">
+    <div class="json-header">
+      <h3>📦 Payload de precarga</h3>
+      <button class="json-cerrar" id="jsonCerrar">✕</button>
+    </div>
+    <pre id="jsonContenido"></pre>
+  </div>
+</div>
+
+<script>
+/* ================================================================
+   Prueba C v3 — lógica
+   ================================================================ */
+const ALERGENOS = ['mani','gluten','lactosa','mariscos','huevo','soya','frutos_secos','pescado','otro'];
+const ETIQUETAS_ALERGENO = {
+  mani:'Maní', gluten:'Gluten', lactosa:'Lactosa', mariscos:'Mariscos',
+  huevo:'Huevo', soya:'Soya', frutos_secos:'Frutos secos',
+  pescado:'Pescado', otro:'Otro'
+};
+const DESTINOS_VALIDOS = ['cocina','barra','ambos'];
+
+const PRODUCTOS = [
+  { id:'p1', nombre:'Cerveza Artesanal', precio:4500, categoria:'bebidas', destino:'barra',
+    variantes_ids:[], emoji:'🍺', descripcion:'Rubia, suave, servida a 4°C.',
+    alergenos:['gluten'] },
+  { id:'p2', nombre:'Michelada Clásica', precio:5000, categoria:'bebidas', destino:'barra',
+    variantes_ids:['sabor_michelada','escarchado'], emoji:'🍹',
+    descripcion:'Cerveza preparada con limón y sal.',
+    alergenos:['gluten'] },
+  { id:'p3', nombre:'Tabla de Picoteo', precio:8900, categoria:'platos', destino:'cocina',
+    variantes_ids:['extras_tabla'], emoji:'🧀',
+    descripcion:'Selección de quesos, aceitunas y frutos secos.',
+    alergenos:['lactosa','frutos_secos'] },
+  { id:'p4', nombre:'Producto Sin Destino', precio:1000, categoria:'', destino:'',
+    variantes_ids:[], emoji:'❓', descripcion:'Mal configurado.', alergenos:[] }
+];
+
+const VARIANTES = [
+  { id:'sabor_michelada', nombre:'Sabor', tipo:'unica', requerido:true,
+    min_seleccion:1, max_seleccion:1, activo:true, orden:0,
+    opciones:[
+      { id:'sabor_clasica', nombre:'Clásica', descripcion:'La versión tradicional',
+        precio_delta:0, activo:true, alergenos:[], requiere:[], excluye:[],
+        insumos_delta:[], pasos_delta:[] },
+      { id:'sabor_cubana', nombre:'Cubana', descripcion:'Jugo de tomate y salsa inglesa',
+        precio_delta:500, activo:true, alergenos:[], requiere:[], excluye:[],
+        insumos_delta:[], pasos_delta:[] },
+      { id:'sabor_diabla', nombre:'Diabla', descripcion:'Salsa picante y especias',
+        precio_delta:700, activo:true, alergenos:[], requiere:[], excluye:['escarchado_con'],
+        insumos_delta:[], pasos_delta:[] }
+    ]
+  },
+  { id:'escarchado', nombre:'Escarchado', tipo:'unica', requerido:false,
+    min_seleccion:0, max_seleccion:1, activo:true, orden:1,
+    opciones:[
+      { id:'escarchado_sin', nombre:'Sin escarchado', descripcion:'Vaso limpio',
+        precio_delta:0, activo:true, alergenos:[], requiere:[], excluye:[],
+        insumos_delta:[], pasos_delta:[] },
+      { id:'escarchado_con', nombre:'Con escarchado', descripcion:'Borde de sal y chile',
+        precio_delta:200, activo:true, alergenos:[], requiere:[], excluye:[],
+        insumos_delta:[], pasos_delta:[] }
+    ]
+  },
+  { id:'extras_tabla', nombre:'Extras', tipo:'multiple', requerido:false,
+    min_seleccion:0, max_seleccion:3, activo:true, orden:0,
+    opciones:[
+      { id:'queso_extra', nombre:'Queso extra', descripcion:'Porción adicional',
+        precio_delta:1500, activo:true, alergenos:['lactosa'], requiere:[], excluye:[],
+        insumos_delta:[], pasos_delta:[] },
+      { id:'aceitunas', nombre:'Aceitunas', descripcion:'',
+        precio_delta:800, activo:true, alergenos:[], requiere:[], excluye:[],
+        insumos_delta:[], pasos_delta:[] },
+      { id:'frutos_secos', nombre:'Frutos secos', descripcion:'Nueces y almendras',
+        precio_delta:1200, activo:true, alergenos:['frutos_secos'],
+        requiere:['queso_extra'], excluye:[], insumos_delta:[], pasos_delta:[] },
+      { id:'pan_extra', nombre:'Pan extra', descripcion:'',
+        precio_delta:500, activo:true, alergenos:['gluten'], requiere:[], excluye:[],
+        insumos_delta:[], pasos_delta:[] }
+    ]
+  }
+];
+
+// Estado global
+const estado = {
+  orden: [],
+  modal: null,
+  alergiasCliente: new Set(),          // declaradas por el cliente
+  alergiasTemporal: null               // buffer mientras edita el modal
+};
+
+/* ── Utils ───────────────────────────────────────────────────── */
+function formatearDinero(n) {
+  const v = Number(n) || 0;
+  return '$' + v.toLocaleString('es-CL', { minimumFractionDigits:0, maximumFractionDigits:0, useGrouping:false });
+}
+function esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+function mostrarToast(tipo, msg, ms) {
+  ms = ms || 3000;
+  const cont = document.getElementById('toastContainer');
+  const t = document.createElement('div');
+  t.className = 'toast ' + tipo;
+  t.textContent = msg;
+  cont.appendChild(t);
+  setTimeout(() => {
+    t.style.transition = 'opacity .3s, transform .3s';
+    t.style.opacity = '0'; t.style.transform = 'translateX(40px)';
+    setTimeout(() => t.remove(), 320);
+  }, ms);
+}
+function normalizarVariantesIds(v) {
+  if (!v) return [];
+  if (Array.isArray(v)) return v;
+  if (typeof v === 'string') {
+    try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch { return []; }
+  }
+  return [];
+}
+function resolverVariantesActivas(producto) {
+  const ids = normalizarVariantesIds(producto.variantes_ids);
+  if (!ids.length) return [];
+  return ids
+    .map(id => VARIANTES.find(v => v.id === id))
+    .filter(v => v && v.activo !== false)
+    .map(v => ({ ...v, opciones: (v.opciones || []).filter(o => o.activo !== false) }))
+    .filter(v => v.opciones.length > 0);
+}
+
+/* ── Barra de estado ────────────────────────────────────────── */
+function renderBarraEstado() {
+  const b = document.getElementById('barraEstado');
+  const nAlergias = estado.alergiasCliente.size;
+  const chipHTML = nAlergias === 0
+    ? `<button class="chip-alergia" id="chipAlergias">⚠ Declarar alergias</button>`
+    : `<button class="chip-alergia activo" id="chipAlergias">⚠ ${[...estado.alergiasCliente].map(a => ETIQUETAS_ALERGENO[a] || a).join(', ')} · Editar</button>`;
+  b.innerHTML = `
+    <span class="info-item">👤 Cliente</span>
+    <span class="separador">·</span>
+    <span class="info-item">🪑 Mesa 5</span>
+    <span class="separador">·</span>
+    ${chipHTML}
+  `;
+  document.getElementById('chipAlergias').addEventListener('click', abrirModalAlergias);
+}
+
+/* ── Menú ───────────────────────────────────────────────────── */
+function renderMenu() {
+  const grid = document.getElementById('gridProductos');
+  grid.innerHTML = PRODUCTOS.map(p => {
+    const variantesActivas = resolverVariantesActivas(p);
+    const tieneVariantes = variantesActivas.length > 0;
+    const destinoValido = DESTINOS_VALIDOS.includes(p.destino);
+    const alergenosProd = Array.isArray(p.alergenos) && p.alergenos.length
+      ? `<div class="alergenos-producto">⚠ Contiene: ${p.alergenos.map(a => ETIQUETAS_ALERGENO[a] || a).join(', ')}</div>`
+      : '';
+    return `
+      <div class="menu-card${!destinoValido ? ' atenuada' : ''}" data-producto-id="${esc(p.id)}">
+        <div class="menu-card-img">
+          <span>${p.emoji || '🍽️'}</span>
+          ${tieneVariantes ? '<span class="menu-card-badge">✦ Personalizable</span>' : ''}
+        </div>
+        <div class="menu-card-body">
+          <h3>${esc(p.nombre)}</h3>
+          <div class="desc">${esc(p.descripcion || '')}</div>
+          ${alergenosProd}
+          <div class="precio">${formatearDinero(p.precio)}</div>
+        </div>
+      </div>
+    `;
+  }).join('');
+  grid.querySelectorAll('.menu-card:not(.atenuada)').forEach(card => {
+    card.addEventListener('click', () => {
+      const prod = PRODUCTOS.find(p => p.id === card.dataset.productoId);
+      if (prod) tocarProducto(prod);
+    });
+  });
+}
+
+/* ── Tocar producto → SIEMPRE abre modal ───────────────────── */
+function tocarProducto(producto) {
+  if (!DESTINOS_VALIDOS.includes(producto.destino)) {
+    mostrarToast('error', 'Este producto no está disponible.');
+    return;
+  }
+  const variantes = resolverVariantesActivas(producto);
+  abrirModal(producto, variantes);
+}
+
+/* ── Armar item ────────────────────────────────────────────── */
+function armarItem(producto, opcionesSnapshot, cantidad) {
+  let precioUnitario = producto.precio || 0;
+  opcionesSnapshot.forEach(o => { precioUnitario += (o.precio_delta || 0); });
+  return {
+    tipo:'producto', prodId:producto.id, nombre:producto.nombre,
+    precio_base:producto.precio || 0,
+    opciones:opcionesSnapshot,
+    alergias_manuales:[...estado.alergiasCliente].sort(),
+    precio:precioUnitario,
+    precio_unitario:precioUnitario,
+    precio_total:precioUnitario * cantidad,
+    categoria:producto.categoria, destino:producto.destino,
+    qty:cantidad, obs:'',
+    enviado:false, enviadoA:null, enviadoTs:null, persona:'General'
+  };
+}
+
+/* ── Modal ─────────────────────────────────────────────────── */
+function abrirModal(producto, variantes) {
+  estado.modal = {
+    producto, variantes,
+    selecciones:{}, cantidad:1
+  };
+  variantes.forEach(v => { estado.modal.selecciones[v.id] = new Set(); });
+  renderModal();
+  document.getElementById('modalOpcionesCliente').classList.add('abierto');
+}
+function cerrarModal() {
+  estado.modal = null;
+  document.getElementById('modalOpcionesCliente').classList.remove('abierto');
+}
+
+function renderModal() {
+  const m = estado.modal;
+  if (!m) return;
+  document.getElementById('mocNombre').textContent = m.producto.nombre;
+  document.getElementById('mocPrecioBase').textContent = 'Base ' + formatearDinero(m.producto.precio);
+  const body = document.getElementById('mocBody');
+  body.innerHTML = '';
+
+  // Sección de variantes (solo si hay)
+  if (m.variantes.length > 0) {
+    m.variantes.forEach(v => {
+      const sec = document.createElement('div');
+      sec.className = 'moc-variante';
+      sec.innerHTML = `
+        <div class="moc-var-header">
+          <span class="moc-var-titulo">${esc(v.nombre)}</span>
+          ${v.requerido ? '<span class="moc-var-req">*</span>' : ''}
+          <span class="moc-var-tipo${v.tipo === 'multiple' ? ' multiple' : ''}">${v.tipo === 'unica' ? 'única' : 'múltiple'}</span>
+        </div>
+        <div class="moc-opciones"></div>
+      `;
+      const cont = sec.querySelector('.moc-opciones');
+      cont.innerHTML = htmlOpciones(v);
+      cont.addEventListener('click', (e) => {
+        const card = e.target.closest('.moc-opcion');
+        if (!card || card.classList.contains('deshabilitada')) return;
+        toggleOpcion(v.id, card.dataset.opcion);
+      });
+      body.appendChild(sec);
+    });
+  }
+
+  // Aviso de alergias declaradas (común a ambos casos)
+  if (estado.alergiasCliente.size > 0) {
+    const aviso = document.createElement('div');
+    aviso.className = 'moc-aviso-alergias';
+    aviso.innerHTML = `
+      <span>⚠</span>
+      <span class="texto">Tienes declarada: ${[...estado.alergiasCliente].map(a => ETIQUETAS_ALERGENO[a] || a).join(', ')}</span>
+      <button id="mocBtnEditarAlergias">Editar</button>
+    `;
+    body.appendChild(aviso);
+    aviso.querySelector('#mocBtnEditarAlergias').addEventListener('click', () => {
+      abrirModalAlergias();
+    });
+  }
+
+  // Cantidad
+  const secC = document.createElement('div');
+  secC.className = 'moc-seccion';
+  secC.innerHTML = `
+    <div class="moc-cantidad-fila">
+      <div class="moc-cantidad-label">Cantidad</div>
+      <div class="moc-cantidad-control">
+        <button class="moc-cantidad-btn" id="mocBtnMenos">−</button>
+        <div class="moc-cantidad-valor" id="mocCantidad">1</div>
+        <button class="moc-cantidad-btn" id="mocBtnMas">+</button>
+      </div>
+    </div>
+  `;
+  body.appendChild(secC);
+  document.getElementById('mocBtnMenos').addEventListener('click', () => cambiarCantidad(-1));
+  document.getElementById('mocBtnMas').addEventListener('click', () => cambiarCantidad(1));
+  actualizarCantidadUI();
+  actualizarTotal();
+}
+
+function htmlOpciones(v) {
+  const sel = estado.modal.selecciones[v.id] || new Set();
+  return v.opciones.map(o => {
+    const isSel = sel.has(o.id);
+    const delta = o.precio_delta || 0;
+    const dc = delta > 0 ? '' : delta < 0 ? 'negativo' : 'cero';
+    const dt = delta === 0 ? 'Incluido' : delta > 0 ? '+' + formatearDinero(delta) : '-' + formatearDinero(Math.abs(delta));
+    const excl = esExcluida(o);
+    const reqFalta = tieneRequisitoFaltante(o);
+    const clases = ['moc-opcion', isSel?'seleccionada':'', excl?'deshabilitada':'', reqFalta?'requerida-falta':''].filter(Boolean).join(' ');
+    const checkClass = v.tipo === 'multiple' ? 'moc-check checkbox' : 'moc-check';
+    const warn = reqFalta ? '<span class="warn-icon">⚠</span>' : '';
+    const exclIco = excl ? '<span class="moc-exclusion-icon">⊘ excluida</span>' : '';
+    const reqIco = reqFalta ? '<span class="moc-req-aviso">requiere otra</span>' : '';
+    return `
+      <div class="${clases}" data-opcion="${esc(o.id)}">
+        <div class="${checkClass}">✓</div>
+        <div class="moc-opcion-info">
+          <div class="moc-opcion-nombre">${esc(o.nombre)} ${warn}</div>
+          ${o.descripcion ? `<div class="moc-opcion-desc">${esc(o.descripcion)}</div>` : ''}
+        </div>
+        <div class="moc-opcion-delta ${dc}">${dt}</div>
+        ${exclIco}${reqIco}
+      </div>
+    `;
+  }).join('');
+}
+function esExcluida(op) {
+  if (!estado.modal) return false;
+  for (const v of estado.modal.variantes) {
+    const s = estado.modal.selecciones[v.id];
+    if (!s) continue;
+    for (const id of s) {
+      if (id === op.id) continue;
+      const o = v.opciones.find(x => x.id === id);
+      if (o && Array.isArray(o.excluye) && o.excluye.includes(op.id)) return true;
+    }
+  }
+  return false;
+}
+function tieneRequisitoFaltante(op) {
+  if (!Array.isArray(op.requiere) || !op.requiere.length) return false;
+  return op.requiere.some(id => !estaSeleccionada(id));
+}
+function estaSeleccionada(id) {
+  if (!estado.modal) return false;
+  for (const v of estado.modal.variantes) {
+    const s = estado.modal.selecciones[v.id];
+    if (s && s.has(id)) return true;
+  }
+  return false;
+}
+function toggleOpcion(vid, oid) {
+  const v = estado.modal.variantes.find(x => x.id === vid);
+  if (!v) return;
+  const s = estado.modal.selecciones[vid];
+  if (v.tipo === 'unica') {
+    if (s.has(oid)) s.delete(oid);
+    else { s.clear(); s.add(oid); }
+  } else {
+    if (s.has(oid)) s.delete(oid);
+    else {
+      const max = v.max_seleccion || 1;
+      if (s.size >= max) { mostrarToast('warning', 'Máximo ' + max + ' opciones en ' + v.nombre + '.'); return; }
+      s.add(oid);
+    }
+  }
+  limpiarExcluidas();
+  renderModal();
+}
+function limpiarExcluidas() {
+  for (const v of estado.modal.variantes) {
+    const s = estado.modal.selecciones[v.id];
+    if (!s) continue;
+    [...s].forEach(id => {
+      const op = v.opciones.find(x => x.id === id);
+      if (op && esExcluida(op)) s.delete(id);
+    });
+  }
+}
+function cambiarCantidad(d) {
+  estado.modal.cantidad = Math.max(1, Math.min(20, estado.modal.cantidad + d));
+  actualizarCantidadUI();
+  actualizarTotal();
+}
+function actualizarCantidadUI() {
+  const el = document.getElementById('mocCantidad');
+  if (el) el.textContent = estado.modal.cantidad;
+  document.getElementById('mocBtnMenos').disabled = estado.modal.cantidad <= 1;
+  document.getElementById('mocBtnMas').disabled = estado.modal.cantidad >= 20;
+}
+function calcularPrecioUnitario() {
+  let t = estado.modal.producto.precio || 0;
+  for (const v of estado.modal.variantes) {
+    const s = estado.modal.selecciones[v.id];
+    if (!s) continue;
+    for (const id of s) {
+      const o = v.opciones.find(x => x.id === id);
+      if (o) t += (o.precio_delta || 0);
+    }
+  }
+  return t;
+}
+function actualizarTotal() {
+  const u = calcularPrecioUnitario();
+  const t = u * estado.modal.cantidad;
+  document.getElementById('mocTotal').textContent = formatearDinero(t);
+}
+function validarModal() {
+  const errs = [];
+  for (const v of estado.modal.variantes) {
+    if (!v.requerido) continue;
+    const s = estado.modal.selecciones[v.id];
+    const c = s ? s.size : 0;
+    const min = v.min_seleccion || 0;
+    if (c < min) errs.push('Falta seleccionar ' + v.nombre);
+  }
+  for (const v of estado.modal.variantes) {
+    const s = estado.modal.selecciones[v.id];
+    if (!s) continue;
+    for (const id of s) {
+      const o = v.opciones.find(x => x.id === id);
+      if (!o || !Array.isArray(o.requiere) || !o.requiere.length) continue;
+      for (const rid of o.requiere) {
+        if (!estaSeleccionada(rid)) errs.push('"' + o.nombre + '" requiere "' + nombreOpcion(rid) + '"');
+      }
+    }
+  }
+  return { ok: !errs.length, errores: errs };
+}
+function nombreOpcion(id) {
+  for (const v of estado.modal.variantes) {
+    const o = v.opciones.find(x => x.id === id);
+    if (o) return o.nombre;
+  }
+  return id;
+}
+function agregarDesdeModal() {
+  const v = validarModal();
+  if (!v.ok) { mostrarToast('warning', v.errores[0]); return; }
+  const m = estado.modal;
+  const snap = [];
+  for (const va of m.variantes) {
+    const s = m.selecciones[va.id];
+    if (!s || !s.size) continue;
+    const ord = [...s].map(id => ({ id, idx: va.opciones.findIndex(o => o.id === id) }))
+      .filter(x => x.idx >= 0).sort((a, b) => a.idx - b.idx);
+    for (const { id } of ord) {
+      const o = va.opciones.find(x => x.id === id);
+      if (!o) continue;
+      snap.push({
+        varianteId: va.id, varianteNombre: va.nombre,
+        opcionId: o.id, opcionNombre: o.nombre,
+        precio_delta: o.precio_delta || 0,
+        alergenos: Array.isArray(o.alergenos) ? o.alergenos : [],
+        insumos_delta: Array.isArray(o.insumos_delta) ? o.insumos_delta : [],
+        pasos_delta: Array.isArray(o.pasos_delta) ? o.pasos_delta : []
+      });
+    }
+  }
+  const item = armarItem(m.producto, snap, m.cantidad);
+  const ex = estado.orden.find(it =>
+    it.prodId === item.prodId &&
+    JSON.stringify(it.opciones) === JSON.stringify(item.opciones)
+  );
+  if (ex) ex.qty += item.qty;
+  else estado.orden.push(item);
+  const partN = snap.map(o => o.opcionNombre).join(' ');
+  const lbl = partN ? m.producto.nombre + ' ' + partN : m.producto.nombre;
+  mostrarToast('success', m.cantidad + '× ' + lbl + ' agregada');
+  cerrarModal();
+  renderOrden();
+}
+
+/* ── Modal de alergias ─────────────────────────────────────── */
+function abrirModalAlergias() {
+  estado.alergiasTemporal = new Set(estado.alergiasCliente);
+  renderModalAlergias();
+  document.getElementById('modalAlergias').classList.add('abierto');
+}
+function cerrarModalAlergias() {
+  estado.alergiasTemporal = null;
+  document.getElementById('modalAlergias').classList.remove('abierto');
+}
+function renderModalAlergias() {
+  const cont = document.getElementById('maChips');
+  cont.innerHTML = ALERGENOS.map(a => `
+    <button class="moc-chip alergia${estado.alergiasTemporal.has(a) ? ' on' : ''}" data-alergeno="${esc(a)}">
+      ${esc(ETIQUETAS_ALERGENO[a] || a)}
+    </button>
+  `).join('');
+  cont.querySelectorAll('.moc-chip').forEach(b => b.addEventListener('click', () => {
+    const a = b.dataset.alergeno;
+    if (estado.alergiasTemporal.has(a)) estado.alergiasTemporal.delete(a);
+    else estado.alergiasTemporal.add(a);
+    renderModalAlergias();
+  }));
+  const n = estado.alergiasTemporal.size;
+  const resumen = document.getElementById('maResumen');
+  resumen.innerHTML = n === 0
+    ? '<em>Sin alergias declaradas.</em>'
+    : `<strong>${n} alergia${n > 1 ? 's' : ''} declarada${n > 1 ? 's' : ''}:</strong> ${[...estado.alergiasTemporal].map(a => ETIQUETAS_ALERGENO[a] || a).join(', ')}`;
+}
+function guardarAlergias() {
+  estado.alergiasCliente = new Set(estado.alergiasTemporal);
+  cerrarModalAlergias();
+  renderBarraEstado();
+  renderMenu();
+  renderOrden();
+  const n = estado.alergiasCliente.size;
+  if (n > 0) mostrarToast('success', `${n} alergia${n > 1 ? 's' : ''} registrada${n > 1 ? 's' : ''}.`);
+  else mostrarToast('info', 'Sin alergias declaradas.');
+}
+
+/* ── Panel de orden ────────────────────────────────────────── */
+function renderOrden() {
+  const cont = document.getElementById('ordenItems');
+  const totEl = document.getElementById('ordenTotal');
+  const btn = document.getElementById('btnConfirmarOrden');
+  const cnt = document.getElementById('contadorOrden');
+  const cntFab = document.getElementById('contadorFab');
+  const aviso = document.getElementById('avisoAlergiasOrden');
+  const items = estado.orden;
+  const totalQty = items.reduce((s, it) => s + it.qty, 0);
+  const totalMoney = items.reduce((s, it) => s + it.precio * it.qty, 0);
+  if (cnt) cnt.textContent = totalQty;
+  if (cntFab) cntFab.textContent = totalQty;
+  if (totEl) totEl.textContent = formatearDinero(totalMoney);
+  if (btn) btn.disabled = !items.length;
+  if (aviso) {
+    if (estado.alergiasCliente.size > 0) {
+      aviso.innerHTML = `
+        <div class="aviso-alergias-orden">
+          <span>⚠</span>
+          <span>Alergias declaradas: ${[...estado.alergiasCliente].map(a => ETIQUETAS_ALERGENO[a] || a).join(', ')}</span>
+        </div>
+      `;
+    } else aviso.innerHTML = '';
+  }
+  if (!cont) return;
+  if (!items.length) {
+    cont.innerHTML = `<div class="orden-vacia"><div class="icono">🛒</div><p>Tu orden está vacía</p></div>`;
+    return;
+  }
+  cont.innerHTML = items.map((it, i) => {
+    const sub = (it.opciones || []).map(o => o.opcionNombre).join(' · ');
+    const lineas = [sub].filter(Boolean);
+    return `
+      <div class="orden-item">
+        <div class="orden-item-info">
+          <div class="orden-item-nombre">${esc(it.nombre)}</div>
+          ${lineas.length ? `<div class="orden-item-subopciones">${esc(lineas.join(' · '))}</div>` : ''}
+          <div class="orden-item-precio">${formatearDinero(it.precio)} c/u</div>
+          <div class="orden-item-cantidad">
+            <button data-idx="${i}" data-accion="restar">−</button>
+            <span>${it.qty}</span>
+            <button data-idx="${i}" data-accion="sumar">+</button>
+          </div>
+        </div>
+        <button class="btn-quitar-item" data-idx="${i}" title="Quitar">🗑</button>
+      </div>
+    `;
+  }).join('');
+  cont.querySelectorAll('[data-accion]').forEach(b => b.addEventListener('click', () => {
+    const i = parseInt(b.dataset.idx, 10);
+    const a = b.dataset.accion;
+    const it = estado.orden[i];
+    if (!it) return;
+    if (a === 'sumar') it.qty += 1;
+    else { it.qty -= 1; if (it.qty <= 0) estado.orden.splice(i, 1); }
+    renderOrden();
+  }));
+  cont.querySelectorAll('.btn-quitar-item').forEach(b => b.addEventListener('click', () => {
+    estado.orden.splice(parseInt(b.dataset.idx, 10), 1);
+    renderOrden();
+  }));
+}
+
+/* ── JSON precarga ─────────────────────────────────────────── */
+function verJsonPrecarga() {
+  if (!estado.orden.length) { mostrarToast('warning', 'La orden está vacía.'); return; }
+  const total = estado.orden.reduce((s, it) => s + it.precio * it.qty, 0);
+  const payload = {
+    mesa:5, tipo:'local', origen:'cliente', estado:'precarga', comensales:1,
+    items:estado.orden, total,
+    observaciones:'', id_usuario:'usr_stub_12345', nombre_comensal:'Cliente Prueba',
+    timestamp:Date.now()
+  };
+  document.getElementById('jsonContenido').textContent = JSON.stringify(payload, null, 2);
+  document.getElementById('modalJson').classList.add('abierto');
+}
+
+/* ── Bindings ──────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+  renderBarraEstado();
+  renderMenu();
+  renderOrden();
+
+  document.getElementById('btnToggleOrden').addEventListener('click', () => {
+    document.getElementById('colOrden').classList.toggle('abierto');
+  });
+  document.getElementById('btnCerrarOrden').addEventListener('click', () => {
+    document.getElementById('colOrden').classList.remove('abierto');
+  });
+  document.getElementById('btnConfirmarOrden').addEventListener('click', verJsonPrecarga);
+  document.getElementById('btnVerJson').addEventListener('click', verJsonPrecarga);
+  document.getElementById('mocBtnCerrar').addEventListener('click', cerrarModal);
+  document.getElementById('mocBtnCancelar').addEventListener('click', cerrarModal);
+  document.getElementById('mocBtnAgregar').addEventListener('click', agregarDesdeModal);
+  document.getElementById('modalOpcionesCliente').addEventListener('click', (e) => {
+    if (e.target.id === 'modalOpcionesCliente') cerrarModal();
+  });
+
+  document.getElementById('maCancelar').addEventListener('click', cerrarModalAlergias);
+  document.getElementById('maGuardar').addEventListener('click', guardarAlergias);
+  document.getElementById('modalAlergias').addEventListener('click', (e) => {
+    if (e.target.id === 'modalAlergias') cerrarModalAlergias();
+  });
+
+  document.getElementById('jsonCerrar').addEventListener('click', () => {
+    document.getElementById('modalJson').classList.remove('abierto');
+  });
+  document.getElementById('modalJson').addEventListener('click', (e) => {
+    if (e.target.id === 'modalJson') e.target.classList.remove('abierto');
+  });
+  document.getElementById('btnReset').addEventListener('click', () => {
+    estado.orden = [];
+    estado.modal = null;
+    estado.alergiasCliente = new Set();
+    document.getElementById('modalOpcionesCliente').classList.remove('abierto');
+    document.getElementById('modalAlergias').classList.remove('abierto');
+    document.getElementById('colOrden').classList.remove('abierto');
+    renderBarraEstado();
+    renderMenu();
+    renderOrden();
+    mostrarToast('info', 'Estado reiniciado.');
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (document.getElementById('modalJson').classList.contains('abierto')) {
+      document.getElementById('modalJson').classList.remove('abierto');
+    } else if (document.getElementById('modalAlergias').classList.contains('abierto')) {
+      cerrarModalAlergias();
+    } else if (estado.modal) {
+      cerrarModal();
+    }
+  });
+});
+</script>
+</body>
+</html>

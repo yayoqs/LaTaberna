@@ -1,0 +1,510 @@
+/* ================================================================
+   LaTaberna - PubPOS — CSS MODAL OPCIONES
+   Archivo: css/modal-opciones.css
+   Versión: 1.0.0
+   Propósito: Estilos del modal de selección de opciones de
+              productos con variantes (js/ui/pedido/modal-opciones.js).
+              Bottom sheet en móvil, diálogo centrado en desktop.
+              Usa selectores con ID (#modalOpciones) para ganar
+              especificidad frente a .modal-overlay de modals.css.
+
+   Requiere:
+     · css/vars.css (variables --color-*, --radius-*, --t)
+     · Ser cargado después de css/pedido.css en index.html
+       (Célula E agrega el <link>).
+
+   z-index 1100: por encima del modal de pedido (#modalPedido z=999).
+   ================================================================ */
+
+/* ── Overlay ─────────────────────────────────────────── */
+
+#modalOpciones {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.72);
+  backdrop-filter: blur(4px);
+  z-index: 1100;
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0;
+  animation: mo-fade-in .18s ease;
+}
+
+@keyframes mo-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ── Modal base (bottom sheet móvil) ─────────────────── */
+
+#modalOpciones .mo-modal {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  width: 100%;
+  max-width: 520px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 -20px 50px rgba(0,0,0,.6);
+  animation: mo-slide-up .28s cubic-bezier(.4,0,.2,1);
+}
+
+@keyframes mo-slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
+#modalOpciones .mo-handle {
+  width: 40px;
+  height: 4px;
+  background: var(--color-border);
+  border-radius: 4px;
+  margin: 8px auto 0;
+  flex-shrink: 0;
+}
+
+/* ── Header ──────────────────────────────────────────── */
+
+#modalOpciones .mo-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+#modalOpciones .mo-header-info { flex: 1; min-width: 0; }
+
+#modalOpciones .mo-nombre {
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.2;
+  margin-bottom: 2px;
+  color: var(--color-text);
+}
+
+#modalOpciones .mo-precio-base {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+#modalOpciones .mo-cerrar {
+  background: var(--color-hover);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-sec);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: var(--t);
+}
+#modalOpciones .mo-cerrar:hover {
+  color: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+/* ── Body scrollable ─────────────────────────────────── */
+
+#modalOpciones .mo-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 16px 12px;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── Variante ────────────────────────────────────────── */
+
+#modalOpciones .mo-variante {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+#modalOpciones .mo-variante:last-of-type { border-bottom: none; }
+
+#modalOpciones .mo-var-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+#modalOpciones .mo-var-titulo {
+  font-size: 13px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--color-text);
+}
+
+#modalOpciones .mo-var-req {
+  color: var(--color-danger);
+  font-weight: 800;
+  font-size: 13px;
+}
+
+#modalOpciones .mo-var-tipo {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: var(--color-panel);
+  padding: 2px 8px;
+  border-radius: 99px;
+  text-transform: uppercase;
+  letter-spacing: .3px;
+}
+#modalOpciones .mo-var-tipo.multiple { color: var(--color-info); }
+
+/* ── Opción card ─────────────────────────────────────── */
+
+#modalOpciones .mo-opcion {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: var(--t);
+  background: var(--color-panel);
+  position: relative;
+}
+#modalOpciones .mo-opcion:last-child { margin-bottom: 0; }
+#modalOpciones .mo-opcion:hover { border-color: var(--color-accent); }
+
+#modalOpciones .mo-opcion.seleccionada {
+  border-color: var(--color-accent);
+  background: rgba(245,158,11,.08);
+}
+#modalOpciones .mo-opcion.seleccionada .mo-check {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #000;
+}
+
+#modalOpciones .mo-opcion.deshabilitada {
+  opacity: .35;
+  pointer-events: none;
+  filter: grayscale(.4);
+}
+
+#modalOpciones .mo-opcion.requerida-falta {
+  border-color: var(--color-warning);
+  background: rgba(245,158,11,.04);
+}
+
+#modalOpciones .mo-check {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--color-border);
+  background: var(--color-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: transparent;
+  font-size: 11px;
+  transition: var(--t);
+  margin-top: 1px;
+}
+#modalOpciones .mo-check.checkbox { border-radius: 6px; }
+
+#modalOpciones .mo-opcion-info { flex: 1; min-width: 0; }
+
+#modalOpciones .mo-opcion-nombre {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text);
+}
+#modalOpciones .mo-opcion-nombre .warn-icon {
+  color: var(--color-warning);
+  font-size: 11px;
+}
+
+#modalOpciones .mo-opcion-desc {
+  font-size: 11.5px;
+  color: var(--color-text-muted);
+  line-height: 1.35;
+}
+
+#modalOpciones .mo-opcion-delta {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--color-accent);
+  flex-shrink: 0;
+  white-space: nowrap;
+  margin-top: 2px;
+}
+#modalOpciones .mo-opcion-delta.negativo { color: var(--color-success); }
+#modalOpciones .mo-opcion-delta.cero {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+#modalOpciones .mo-exclusion-icon {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  font-size: 10px;
+  color: var(--color-text-muted);
+  background: var(--color-card);
+  padding: 2px 6px;
+  border-radius: 99px;
+  border: 1px solid var(--color-border);
+}
+
+/* ── Sección (alergias, obs, cantidad) ───────────────── */
+
+#modalOpciones .mo-seccion {
+  padding: 14px 0;
+  border-top: 1px solid var(--color-border);
+}
+#modalOpciones .mo-seccion:first-of-type { border-top: none; }
+
+#modalOpciones .mo-seccion-titulo {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  color: var(--color-text);
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+#modalOpciones .mo-seccion-titulo i {
+  color: var(--color-accent);
+  font-size: 12px;
+}
+
+#modalOpciones .mo-seccion-sub {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-bottom: 10px;
+  line-height: 1.4;
+}
+
+/* ── Chips ───────────────────────────────────────────── */
+
+#modalOpciones .mo-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+#modalOpciones .mo-chip {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-sec);
+  padding: 6px 10px;
+  border-radius: 99px;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--t);
+  white-space: nowrap;
+}
+#modalOpciones .mo-chip:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+#modalOpciones .mo-chip.on {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #000;
+}
+#modalOpciones .mo-chip.alergia.on {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+  color: #fff;
+}
+
+/* ── Input libre ─────────────────────────────────────── */
+
+#modalOpciones .mo-input {
+  width: 100%;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  padding: 10px 12px;
+  font-size: 13px;
+  outline: none;
+  transition: var(--t);
+  font-family: inherit;
+  margin-top: 8px;
+}
+#modalOpciones .mo-input:focus { border-color: var(--color-accent); }
+#modalOpciones .mo-input::placeholder { color: var(--color-text-muted); }
+
+/* ── Cantidad ────────────────────────────────────────── */
+
+#modalOpciones .mo-cantidad-fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+#modalOpciones .mo-cantidad-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+#modalOpciones .mo-cantidad-control {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+#modalOpciones .mo-cantidad-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-text);
+  width: 42px;
+  height: 42px;
+  font-size: 18px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--t);
+}
+#modalOpciones .mo-cantidad-btn:hover {
+  background: var(--color-hover);
+  color: var(--color-accent);
+}
+#modalOpciones .mo-cantidad-btn:active { transform: scale(.95); }
+#modalOpciones .mo-cantidad-btn:disabled {
+  opacity: .3;
+  cursor: not-allowed;
+}
+
+#modalOpciones .mo-cantidad-valor {
+  font-size: 17px;
+  font-weight: 800;
+  min-width: 46px;
+  text-align: center;
+  border-left: 1px solid var(--color-border);
+  border-right: 1px solid var(--color-border);
+  line-height: 42px;
+  color: var(--color-text);
+}
+
+/* ── Footer ──────────────────────────────────────────── */
+
+#modalOpciones .mo-footer {
+  border-top: 1px solid var(--color-border);
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  background: var(--color-card);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+#modalOpciones .mo-total {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 13px;
+  color: var(--color-text-sec);
+}
+#modalOpciones .mo-total-monto {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--color-accent);
+}
+
+#modalOpciones .mo-botones {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 8px;
+}
+
+#modalOpciones .mo-btn {
+  padding: 14px 12px;
+  border-radius: var(--radius-sm);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  border: none;
+  transition: var(--t);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+#modalOpciones .mo-btn-cancelar {
+  background: var(--color-panel);
+  color: var(--color-text-sec);
+  border: 1px solid var(--color-border);
+}
+#modalOpciones .mo-btn-cancelar:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-sec);
+}
+
+#modalOpciones .mo-btn-agregar {
+  background: var(--color-accent);
+  color: #000;
+}
+#modalOpciones .mo-btn-agregar:hover { background: var(--color-accent-dark); }
+#modalOpciones .mo-btn-agregar:active { transform: scale(.98); }
+#modalOpciones .mo-btn-agregar:disabled {
+  background: var(--color-hover);
+  color: var(--color-text-muted);
+  cursor: not-allowed;
+}
+
+/* ── Desktop: diálogo centrado ───────────────────────── */
+
+@media (min-width: 768px) {
+  #modalOpciones {
+    align-items: center;
+    padding: 20px;
+  }
+
+  #modalOpciones .mo-modal {
+    border-radius: var(--radius);
+    max-height: 88vh;
+    box-shadow: 0 20px 50px rgba(0,0,0,.6);
+    animation: mo-fade-scale .22s ease;
+  }
+
+  @keyframes mo-fade-scale {
+    from { opacity: 0; transform: translateY(20px) scale(.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  #modalOpciones .mo-handle { display: none; }
+}
+
+/* ── Accesibilidad ───────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  #modalOpciones,
+  #modalOpciones .mo-modal {
+    animation: none !important;
+  }
+}

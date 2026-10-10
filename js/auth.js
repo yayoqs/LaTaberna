@@ -1,15 +1,19 @@
 /* ================================================================
-   LaTaberna - PubPOS — MÓDULO JS (ES6)
+   LaTaberna - Ecosistema Elisekai — MÓDULO JS (ES6)
    Archivo: js/auth.js
-   Versión: 2.1.3
+   Versión: 2.6.1
    Propósito: Autenticación con Appwrite Account nativo.
-              v2.1.3: corregido C2, C3 y permisos de barra.
-                      Sin backdoor de master por nombre de usuario.
-                      Vista por defecto de barra pasa a cocina.
+              v2.6.1: A.74: cambiarLocal despacha MOVIMIENTOS_LIMPIAR
+                      al Store antes de la recarga. Tras el cambio,
+                      dispara DB.recargarMovimientos() para repoblar
+                      el slice con los movimientos del nuevo espacio.
+              v2.6.0: Se agrega obtenerJWT() con cache a 80% del TTL.
+                      Se limpia el cache al cerrar sesión.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
 import { EventBus } from './lib/eventBus.js';
+import { Store } from './lib/store.js';
 import { mostrarToast } from './utils.js';
 import { Roles } from './roles.js';
 import { DBAppwrite } from './db-appwrite.js';
@@ -22,12 +26,42 @@ export const Auth = (() => {
   let _appwriteUserId = null;
   let _listenersAsignados = false;
 
+  // Cache de JWT
+  let _jwtCache = null;
+  let _jwtExpira = 0;
+
+  const PRIORIDAD_ROLES = [
+    'master',
+    'owner',
+    'admin',
+    'mesero',
+    'caja',
+    'chef',
+    'barman',
+    'repartidor',
+    'artista',
+    'cocinaAyudante',
+    'barraAyudante',
+    'jugador'
+  ];
+
   function _emailDesdeNombre(nombreUsuario) {
     return `${nombreUsuario.toLowerCase().replace(/\s+/g, '_')}@elisekai.com`;
   }
 
   function _obtenerDB() {
     try { return Deps.obtener('db'); } catch { return null; }
+  }
+
+  function _obtenerAppActual() {
+    if (_usuarioActual?.espacioActivoId) {
+      const espacio = (_usuarioActual.espacios || []).find(e => e.id === _usuarioActual.espacioActivoId);
+      if (espacio?.app) return espacio.app;
+    }
+    const host = window.location.hostname || '';
+    const partes = host.split('.');
+    if (partes.length >= 3) return partes[0];
+    return 'lataberna';
   }
 
   async function _cargarPerfilGlobal(usuarioId) {
@@ -49,14 +83,43 @@ export const Auth = (() => {
   function obtenerVistaPorDefecto() {
     const rol = obtenerRolPrincipal();
 
+    if (rol === 'master') return 'mesas';
+    if (rol === 'owner' || rol === 'admin') return 'mesas';
     if (rol === 'chef' || rol === 'cocinaAyudante') return 'cocina';
     if (rol === 'barman' || rol === 'barraAyudante') return 'cocina';
     if (rol === 'caja') return 'caja';
-    if (rol === 'gerente' || rol === 'admin' || rol === 'master') return 'mesas';
     if (rol === 'repartidor') return 'reparto';
     if (rol === 'artista') return 'eventos';
-    if (rol === 'cliente') return 'bienvenida';
+    if (rol === 'jugador') return 'bienvenida';
     return 'mesas';
+  }
+
+  /**
+   * Obtiene un JWT del usuario actual, cacheado al 80% del TTL.
+   * Appwrite emite JWT con 15 minutos por defecto. Cacheamos 12 min.
+   * @returns {Promise<string|null>}
+   */
+  async function obtenerJWT() {
+    if (_jwtCache && Date.now() < _jwtExpira) {
+      return _jwtCache;
+    }
+    try {
+      if (typeof DBAppwrite !== 'undefined' && DBAppwrite.cuenta) {
+        const respuesta = await DBAppwrite.cuenta.createJWT();
+        _jwtCache = respuesta.jwt;
+        _jwtExpira = Date.now() + (12 * 60 * 1000);
+        Logger.debug('[Auth] JWT generado y cacheado.');
+        return _jwtCache;
+      }
+    } catch (e) {
+      Logger.warn('[Auth] No se pudo obtener JWT:', e.message);
+    }
+    return null;
+  }
+
+  function limpiarJWTCache() {
+    _jwtCache = null;
+    _jwtExpira = 0;
   }
 
   async function iniciarSesion(nombreUsuario, password) {
@@ -68,37 +131,90 @@ export const Auth = (() => {
 
       try { await DBAppwrite.cuenta.deleteSession('current'); } catch(e) {}
       _appwriteUserId = null;
+      limpiarJWTCache();
 
       const email = _emailDesdeNombre(nombreUsuario);
       await DBAppwrite.cuenta.createEmailPasswordSession(email, password);
       Logger.info(`[Auth] Sesión Appwrite creada para: ${email}`);
 
       const appwriteUserId = await obtenerIdUsuarioAppwrite();
-      const espacioId = 'lataberna';
+      let espaciosUsuario = [];
+      let roles = ['jugador'];
+      let rolPrincipal = 'jugador';
+      let espacioActivoId = null;
 
-      let roles = ['cliente'];
-      let rolPrincipal = 'cliente';
+      if (appwriteUserId) {
+        const esMaster = await _esMasterPorLabel(appwriteUserId);
 
-      const db = _obtenerDB();
-      if (db && db.obtenerStaffPorUsuario) {
-        const staff = await db.obtenerStaffPorUsuario(appwriteUserId, espacioId);
-        if (staff) {
-          roles = Array.isArray(staff.roles) ? staff.roles : (() => {
-            try { return JSON.parse(staff.roles || '[]'); } catch { return []; }
-          })();
-          rolPrincipal = staff.rolPrincipal || roles[0] || 'cliente';
+        if (esMaster) {
+          const todos = await DBAppwrite.listarTodosLosEspacios();
+          espaciosUsuario = todos.map(espacio => ({
+            id: espacio.id,
+            nombre: espacio.nombre || espacio.id,
+            app: espacio.app || 'lataberna',
+            tipo: espacio.tipo || 'espacio',
+            roles: ['master'],
+            rolPrincipal: 'master'
+          }));
+        } else {
+          const equipos = await DBAppwrite.obtenerEquiposDelUsuario();
+
+          for (const equipo of equipos) {
+            const teamId = equipo.$id;
+            const membresia = await DBAppwrite.obtenerMembresiaDeEquipo(teamId, appwriteUserId);
+            const rolesEquipo = membresia && Array.isArray(membresia.roles) ? membresia.roles : [];
+            const espacio = await DBAppwrite.obtenerEspacioPorId(teamId);
+
+            if (espacio) {
+              espaciosUsuario.push({
+                id: teamId,
+                nombre: espacio.nombre || teamId,
+                app: espacio.app || 'lataberna',
+                tipo: espacio.tipo || 'espacio',
+                roles: rolesEquipo,
+                rolPrincipal: PRIORIDAD_ROLES.find(rol => rolesEquipo.includes(rol)) || rolesEquipo[0] || 'jugador'
+              });
+            }
+          }
+
+          const espaciosPersonales = await DBAppwrite.listarEspaciosPorAdmin(appwriteUserId);
+          for (const espacio of espaciosPersonales) {
+            const yaExiste = espaciosUsuario.some(e => e.id === espacio.id);
+            if (!yaExiste) {
+              espaciosUsuario.push({
+                id: espacio.id,
+                nombre: espacio.nombre || espacio.id,
+                app: espacio.app || 'mirefugio',
+                tipo: espacio.tipo || 'hogar',
+                roles: ['jugador'],
+                rolPrincipal: 'jugador'
+              });
+            }
+          }
         }
       }
 
-      const localTaberna = {
-        id: espacioId,
-        nombre: 'La Taberna',
-        tipo: 'bar',
-        roles,
-        rolPrincipal,
-        databaseId: '6a0275cb0022ebf7d30d'
+      if (espaciosUsuario.length === 0) {
+        roles = ['jugador'];
+        rolPrincipal = 'jugador';
+      } else {
+        const appActual = _obtenerAppActual();
+        const espaciosDeApp = espaciosUsuario.filter(e => e.app === appActual);
+        const espacioElegido = espaciosDeApp.length > 0
+          ? espaciosDeApp[0]
+          : espaciosUsuario[0];
+
+        espacioActivoId = espacioElegido.id;
+        roles = espacioElegido.roles || ['jugador'];
+        rolPrincipal = espacioElegido.rolPrincipal || 'jugador';
+      }
+
+      _usuarioActual = {
+        nombre: nombreUsuario,
+        espacios: espaciosUsuario,
+        espacioActivoId,
+        perfil: null
       };
-      _usuarioActual = { nombre: nombreUsuario, local: [localTaberna], localActivoId: espacioId, perfil: null };
       _rolSimulado = null;
 
       const perfil = await _cargarPerfilGlobal(appwriteUserId);
@@ -110,18 +226,37 @@ export const Auth = (() => {
       mostrarToast('success', 'Bienvenido/a ' + nombreUsuario);
       const vistaInicial = obtenerVistaPorDefecto();
       EventBus.emit('app:cambiarVista', vistaInicial);
+
+      if (typeof DBAppwrite !== 'undefined' && DBAppwrite.reconfigurarRealtime) {
+        await DBAppwrite.reconfigurarRealtime();
+      }
+
       return true;
     } catch (e) {
-      const esErrorCredenciales = e.code === 401 ||
-                                 (e.type && e.type.includes('user_invalid_credentials')) ||
-                                 (e.message && e.message.toLowerCase().includes('invalid credentials'));
-      if (esErrorCredenciales) {
+      const tipo = e.type || '';
+      if (tipo === 'user_invalid_credentials' || e.code === 401) {
         Logger.warn('[Auth] Credenciales rechazadas por Appwrite:', e.message);
         mostrarToast('error', 'Usuario o contraseña incorrectos');
+      } else if (tipo === 'user_blocked') {
+        Logger.warn('[Auth] Usuario bloqueado:', e.message);
+        mostrarToast('error', 'Tu cuenta ha sido suspendida temporalmente. Contacta a soporte.');
+      } else if (tipo === 'general_rate_limit_exceeded' || e.code === 429) {
+        Logger.warn('[Auth] Rate limit alcanzado:', e.message);
+        mostrarToast('error', 'Demasiados intentos. Espera un momento y vuelve a intentarlo.');
       } else {
         Logger.error('[Auth] Error en iniciarSesion:', e);
         mostrarToast('error', 'Error al iniciar sesión');
       }
+      return false;
+    }
+  }
+
+  async function _esMasterPorLabel(usuarioId) {
+    try {
+      const account = await DBAppwrite.cuenta.get();
+      const labels = account.labels || [];
+      return labels.includes('master');
+    } catch (e) {
       return false;
     }
   }
@@ -143,7 +278,7 @@ export const Auth = (() => {
       }
 
       Logger.info('[Auth] Usuario registrado:', nombreUsuario);
-      EventBus.emit('cliente:cuenta_creada', { nombre: nombreUsuario, timestamp: Date.now() });
+      EventBus.emit('jugador:cuenta_creada', { nombre: nombreUsuario, timestamp: Date.now() });
       return { exito: true, nombre: nombreUsuario, usuarioId: data.usuarioId };
     } catch (e) {
       Logger.error('[Auth] Error al llamar a registrar-usuario:', e);
@@ -163,9 +298,14 @@ export const Auth = (() => {
     _usuarioActual = null;
     _rolSimulado = null;
     _appwriteUserId = null;
+    limpiarJWTCache();
     sessionStorage.removeItem('usuarioActual');
     document.querySelectorAll('[data-rol]').forEach(el => el.style.display = 'none');
     mostrarLogin();
+
+    if (typeof DBAppwrite !== 'undefined' && DBAppwrite.desconectarRealtime) {
+      await DBAppwrite.desconectarRealtime();
+    }
   }
 
   async function obtenerIdUsuarioAppwrite() {
@@ -193,12 +333,12 @@ export const Auth = (() => {
       loginModal.innerHTML = `
         <div class="modal-small" style="max-width:360px;">
           <div class="modal-header">
-            <h3><i class="fas fa-beer"></i> La Taberna</h3>
+            <h3><i class="fas fa-beer"></i> Elisekai</h3>
             <button class="modal-close" id="btnCerrarModalLogin"><i class="fas fa-times"></i></button>
           </div>
           <div class="modal-small-body" id="loginPanel">
             <label>Usuario</label>
-            <input type="text" id="loginUsuario" placeholder="Ej: admin, gerente, chef...">
+            <input type="text" id="loginUsuario" placeholder="Nombre de usuario">
             <label>Contraseña</label>
             <input type="password" id="loginPassword" placeholder="Contraseña">
             <div class="modal-small-footer" style="display:flex; flex-direction:column; gap:8px;">
@@ -206,7 +346,7 @@ export const Auth = (() => {
                 <i class="fas fa-sign-in-alt"></i> Ingresar
               </button>
               <button class="btn-secondary" id="btnModalRegistrarse" style="width:100%;">
-                <i class="fas fa-user-plus"></i> ¿Aun sin cuenta? Registrate
+                <i class="fas fa-user-plus"></i> ¿Sin cuenta? Regístrate
               </button>
             </div>
           </div>
@@ -241,9 +381,7 @@ export const Auth = (() => {
       document.getElementById('btnModalCrearCuenta').addEventListener('click', _registrarDesdeModal);
 
       loginModal.addEventListener('click', function(e) {
-        if (e.target === loginModal) {
-          cerrarModalLogin();
-        }
+        if (e.target === loginModal) cerrarModalLogin();
       });
 
       _listenersAsignados = true;
@@ -303,8 +441,8 @@ export const Auth = (() => {
   }
 
   function _obtenerLocalActivo() {
-    if (!_usuarioActual || !_usuarioActual.localActivoId) return null;
-    return _usuarioActual.local?.find(l => l.id === _usuarioActual.localActivoId) || null;
+    if (!_usuarioActual || !_usuarioActual.espacioActivoId) return null;
+    return _usuarioActual.espacios?.find(e => e.id === _usuarioActual.espacioActivoId) || null;
   }
 
   function obtenerRolesEfectivos() {
@@ -312,7 +450,7 @@ export const Auth = (() => {
     if (local && Array.isArray(local.roles)) return [...local.roles];
     if (local && local.rol) return [local.rol];
     if (_usuarioActual?.rol) return [_usuarioActual.rol];
-    return ['cliente'];
+    return ['jugador'];
   }
 
   function obtenerRolPrincipal() {
@@ -320,7 +458,7 @@ export const Auth = (() => {
     if (local && local.rolPrincipal) return local.rolPrincipal;
     if (local && local.rol) return local.rol;
     if (_usuarioActual?.rol) return _usuarioActual.rol;
-    return 'cliente';
+    return 'jugador';
   }
 
   function obtenerRolEfectivo() {
@@ -343,13 +481,14 @@ export const Auth = (() => {
       rolesEfectivos: obtenerRolesEfectivos(),
       rolPrincipal: obtenerRolPrincipal(),
       simulando: _rolSimulado || null,
-      local: _usuarioActual.local || [],
-      localActivoId: _usuarioActual.localActivoId,
+      espacios: _usuarioActual.espacios || [],
+      espacioActivoId: _usuarioActual.espacioActivoId,
+      appActual: _obtenerAppActual(),
       perfil: _usuarioActual.perfil || null
     };
   }
 
-  function obtenerLocales() { return _usuarioActual?.local || []; }
+  function obtenerLocales() { return _usuarioActual?.espacios || []; }
   function obtenerLocalActivo() { return _obtenerLocalActivo(); }
 
   async function vincularCuentaStaff(token) {
@@ -358,18 +497,21 @@ export const Auth = (() => {
     const resultado = await db.vincularCuentaStaff(token);
     if (resultado.exito) {
       const appwriteUserId = await obtenerIdUsuarioAppwrite();
-      const espacioId = resultado.staff?.espacioId || 'lataberna';
-      if (appwriteUserId && db.obtenerStaffPorUsuario) {
-        const staff = await db.obtenerStaffPorUsuario(appwriteUserId, espacioId);
-        if (staff) {
-          const local = _obtenerLocalActivo();
-          if (local) {
-            local.roles = staff.roles;
-            local.rolPrincipal = staff.rolPrincipal;
+      if (appwriteUserId) {
+        const equipos = await DBAppwrite.obtenerEquiposDelUsuario();
+        if (equipos.length > 0) {
+          const teamId = equipos[0].$id;
+          const membresia = await DBAppwrite.obtenerMembresiaDeEquipo(teamId, appwriteUserId);
+          if (membresia && Array.isArray(membresia.roles)) {
+            const local = _obtenerLocalActivo();
+            if (local) {
+              local.roles = membresia.roles;
+              local.rolPrincipal = PRIORIDAD_ROLES.find(rol => membresia.roles.includes(rol)) || membresia.roles[0] || 'jugador';
+            }
+            sessionStorage.setItem('usuarioActual', JSON.stringify(_usuarioActual));
+            aplicarRestriccionesUI();
+            EventBus.emit('auth:staff_vinculado', membresia);
           }
-          sessionStorage.setItem('usuarioActual', JSON.stringify(_usuarioActual));
-          aplicarRestriccionesUI();
-          EventBus.emit('auth:staff_vinculado', staff);
         }
       }
     }
@@ -377,13 +519,35 @@ export const Auth = (() => {
   }
 
   function cambiarLocal(localId) {
-    const local = _usuarioActual?.local?.find(l => l.id === localId);
+    const local = _usuarioActual?.espacios?.find(e => e.id === localId);
     if (!local) return;
-    _usuarioActual.localActivoId = localId;
+    _usuarioActual.espacioActivoId = localId;
     sessionStorage.setItem('usuarioActual', JSON.stringify(_usuarioActual));
     aplicarRestriccionesUI();
     EventBus.emit('app:cambiarVista', obtenerVistaPorDefecto());
     mostrarToast('info', 'Cambiaste a "' + local.nombre + '"');
+
+    // A.74: limpiar el slice de movimientos y recargarlos del nuevo
+    // espacio. Los movimientos del espacio anterior no deben quedar
+    // visibles tras el cambio.
+    try {
+      Store.despachar({ type: 'MOVIMIENTOS_LIMPIAR' });
+    } catch (e) {
+      Logger.warn('[Auth] No se pudo limpiar movimientos al cambiar de espacio:', e);
+    }
+
+    try {
+      const db = _obtenerDB();
+      if (db && typeof db.recargarMovimientos === 'function') {
+        db.recargarMovimientos();
+      }
+    } catch (e) {
+      Logger.warn('[Auth] No se pudo recargar movimientos:', e);
+    }
+
+    if (typeof DBAppwrite !== 'undefined' && DBAppwrite.reconfigurarRealtime) {
+      DBAppwrite.reconfigurarRealtime();
+    }
   }
 
   function actualizarNombre(nuevoNombre) {
@@ -396,17 +560,17 @@ export const Auth = (() => {
 
   function esMasterReal() { return obtenerRolesEfectivos().includes('master'); }
   function esMaster() { return esMasterReal() && !_rolSimulado; }
-  function esAdmin() { return obtenerRolesEfectivos().some(r => r === 'admin' || r === 'master'); }
-  function esGerente() { return obtenerRolesEfectivos().some(r => r === 'gerente' || r === 'admin' || r === 'master'); }
-  function esChef() { return obtenerRolesEfectivos().some(r => r === 'chef' || r === 'admin' || r === 'master'); }
-  function esCocinaAyudante() { return obtenerRolesEfectivos().some(r => r === 'cocinaAyudante' || r === 'chef' || r === 'admin' || r === 'master'); }
-  function esBarman() { return obtenerRolesEfectivos().some(r => r === 'barman' || r === 'admin' || r === 'master'); }
-  function esBarraAyudante() { return obtenerRolesEfectivos().some(r => r === 'barraAyudante' || r === 'barman' || r === 'admin' || r === 'master'); }
-  function esMesero() { return obtenerRolesEfectivos().some(r => r === 'mesero' || r === 'admin' || r === 'master'); }
-  function esCaja() { return obtenerRolesEfectivos().some(r => r === 'caja' || r === 'admin' || r === 'master'); }
-  function esRepartidor() { return obtenerRolesEfectivos().some(r => r === 'repartidor' || r === 'admin' || r === 'master'); }
-  function esArtista() { return obtenerRolesEfectivos().some(r => r === 'artista' || r === 'admin' || r === 'master'); }
-  function esCliente() { return obtenerRolesEfectivos().some(r => r === 'cliente' || r === 'admin' || r === 'master'); }
+  function esOwner() { return obtenerRolesEfectivos().some(r => r === 'owner' || r === 'master'); }
+  function esAdmin() { return obtenerRolesEfectivos().some(r => r === 'admin' || r === 'owner' || r === 'master'); }
+  function esJugador() { return obtenerRolesEfectivos().some(r => r === 'jugador' || r === 'admin' || r === 'owner' || r === 'master'); }
+  function esChef() { return obtenerRolesEfectivos().some(r => r === 'chef' || r === 'admin' || r === 'owner' || r === 'master'); }
+  function esCocinaAyudante() { return obtenerRolesEfectivos().some(r => r === 'cocinaAyudante' || r === 'chef' || r === 'admin' || r === 'owner' || r === 'master'); }
+  function esBarman() { return obtenerRolesEfectivos().some(r => r === 'barman' || r === 'admin' || r === 'owner' || r === 'master'); }
+  function esBarraAyudante() { return obtenerRolesEfectivos().some(r => r === 'barraAyudante' || r === 'barman' || r === 'admin' || r === 'owner' || r === 'master'); }
+  function esMesero() { return obtenerRolesEfectivos().some(r => r === 'mesero' || r === 'admin' || r === 'owner' || r === 'master'); }
+  function esCaja() { return obtenerRolesEfectivos().some(r => r === 'caja' || r === 'admin' || r === 'owner' || r === 'master'); }
+  function esRepartidor() { return obtenerRolesEfectivos().some(r => r === 'repartidor' || r === 'admin' || r === 'owner' || r === 'master'); }
+  function esArtista() { return obtenerRolesEfectivos().some(r => r === 'artista' || r === 'admin' || r === 'owner' || r === 'master'); }
 
   function puede(permiso) { return tienePermiso(permiso); }
   function puedeEliminarItemEnviado() { return tienePermiso('gestionarPedido') || tienePermiso('cambiarEstadoComanda'); }
@@ -440,29 +604,27 @@ export const Auth = (() => {
       el.style.display = mostrar ? '' : 'none';
     });
     _renderSelectorLocal();
-    const mozoContainer = document.querySelector('.mozo-selector');
-    if (!mozoContainer || !_usuarioActual) return;
-    if (esMasterReal()) {
-      const rolesDisponibles = (typeof Roles !== 'undefined') ? Roles.lista.filter(r => r !== 'master') : [];
-      const seleccionado = _rolSimulado || '';
-      const opciones = rolesDisponibles.map(r => `<option value="${r}" ${r === seleccionado ? 'selected' : ''}>${r.charAt(0).toUpperCase() + r.slice(1)}</option>`).join('');
-      mozoContainer.innerHTML = `<i class="fas fa-eye"></i><select id="rolSimulado"><option value="">— Ver como —</option>${opciones}</select>`;
-      const selectEl = mozoContainer.querySelector('#rolSimulado');
-      if (selectEl) {
-        selectEl.addEventListener('change', function() {
-          _cambiarRolSimulado(this.value);
-        });
-      }
-    } else { mozoContainer.innerHTML = ''; }
   }
 
   function _renderSelectorLocal() {
     const container = document.getElementById('espacioSelectorContainer');
     if (!container || !_usuarioActual) return;
-    const locales = _usuarioActual.local || [];
-    if (locales.length <= 1) { container.innerHTML = ''; return; }
-    const activo = _usuarioActual.localActivoId;
-    container.innerHTML = `<i class="fas fa-home"></i><select id="localSelect">${locales.map(l => `<option value="${l.id}" ${l.id === activo ? 'selected' : ''}>${l.nombre}</option>`).join('')}</select>`;
+    const espacios = _usuarioActual.espacios || [];
+    if (espacios.length === 0) {
+      container.innerHTML = '';
+      return;
+    }
+
+    if (espacios.length === 1) {
+      const espacioActivo = _obtenerLocalActivo();
+      if (espacioActivo) {
+        container.innerHTML = `<i class="fas fa-home"></i> ${espacioActivo.nombre}`;
+      }
+      return;
+    }
+
+    const activo = _usuarioActual.espacioActivoId;
+    container.innerHTML = `<i class="fas fa-home"></i><select id="localSelect">${espacios.map(e => `<option value="${e.id}" ${e.id === activo ? 'selected' : ''}>${e.nombre}</option>`).join('')}</select>`;
     const selectEl = container.querySelector('#localSelect');
     if (selectEl) {
       selectEl.addEventListener('change', function() {
@@ -483,15 +645,16 @@ export const Auth = (() => {
     registrarUsuario,
     obtenerRol, obtenerNombre, obtenerUsuarioActual, obtenerLocales, obtenerLocalActivo, cambiarLocal,
     obtenerRolesEfectivos, obtenerRolPrincipal, obtenerRolEfectivo,
-    actualizarNombre, tienePermiso, puede, esMaster, esAdmin, esGerente, esChef, esCocinaAyudante, esBarman,
-    esBarraAyudante, esMesero, esCaja, esRepartidor, esArtista, esCliente,
+    actualizarNombre, tienePermiso, puede, esMaster, esOwner, esAdmin, esJugador, esChef, esCocinaAyudante, esBarman,
+    esBarraAyudante, esMesero, esCaja, esRepartidor, esArtista,
     puedeEliminarItemEnviado, puedeCerrarMesa,
     puedeAccederCaja, puedeAccederCocina, puedeCambiarEstadoComanda,
     puedeEditarProductos, puedeEditarPrecios,
     obtenerVistaPorDefecto, mostrarLogin, cerrarModalLogin, _iniciarSesionDesdeModal, _cambiarRolSimulado,
     esMasterReal, aplicarRestriccionesUI, puedeAccederRecetas, puedeAccederReparto, puedeAccederMenu,
     puedeAccederEventos, puedeAccederPerfil, puedeGestionarPersonal, puedeAsignarAdmin,
-    puedeAsignarGerente, puedeAsignarStaff, obtenerIdUsuarioAppwrite, _mostrarRegistro, vincularCuentaStaff
+    puedeAsignarGerente, puedeAsignarStaff, obtenerIdUsuarioAppwrite, _mostrarRegistro, vincularCuentaStaff,
+    obtenerJWT, limpiarJWTCache
   };
 })();
 

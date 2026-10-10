@@ -1,8 +1,0 @@
-{
-  "name": "vincular-staff",
-  "version": "1.0.0",
-  "type": "module",
-  "dependencies": {
-    "node-appwrite": "^22.1.3"
-  }
-}

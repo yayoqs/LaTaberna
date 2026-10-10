@@ -1,10 +1,12 @@
 /* ================================================================
    LaTaberna - PubPOS — DOMINIO JS (ES6)
    Archivo: js/dominio/pedido.js
-   Versión: 1.1.5
+   Versión: 1.1.6
    Propósito: Agregado PedidoAgregado: pedido de mesa, ítems, totales.
               Sin asignaciones window. Todos los imports explícitos.
-              Fallback cantidad || qty en reconstruirPedidoAgregado.
+              v1.1.6: A.20: items aceptan campo opcional tipo
+                      ('producto' | 'insumo'). No se valida, se respeta.
+              v1.1.5: Fallback cantidad || qty en reconstruirPedidoAgregado.
    ================================================================ */
 
 import { Cantidad, crearCantidad } from './cantidad.js';
@@ -36,13 +38,29 @@ export class PedidoAgregado {
   get creadoEn()     { return this._creadoEn; }
   get observaciones(){ return this._observaciones; }
 
-  agregarItem(nombre, precio, cantidad) {
+  /**
+   * Agrega un item al pedido.
+   * A.20: acepta objeto opcional con campo `tipo`.
+   * La firma clásica (nombre, precio, cantidad) sigue soportada.
+   */
+  agregarItem(nombre, precio, cantidad, extras = {}) {
     if (this._estado === 'cerrado') throw new Error('No se puede modificar un pedido cerrado');
     if (!(precio instanceof Dinero)) throw new Error('Precio inválido');
     if (!(cantidad instanceof Cantidad)) throw new Error('Cantidad inválida');
     const existente = this._items.find(it => it.nombre === nombre);
-    if (existente) { existente.cantidad = existente.cantidad.sumar(cantidad); }
-    else { this._items.push({ nombre, precio, cantidad }); }
+    if (existente) {
+      existente.cantidad = existente.cantidad.sumar(cantidad);
+    } else {
+      const item = { nombre, precio, cantidad };
+      // A.20: preservar tipo y otros extras si vienen
+      if (extras && typeof extras === 'object') {
+        if (extras.tipo) item.tipo = extras.tipo;
+        if (extras.prodId) item.prodId = extras.prodId;
+        if (extras.destino) item.destino = extras.destino;
+        if (extras.obs) item.obs = extras.obs;
+      }
+      this._items.push(item);
+    }
   }
 
   eliminarItem(indice) {
@@ -78,7 +96,19 @@ export class PedidoAgregado {
   toJSON() {
     return {
       id: this._id, mesa: this._mesa, mozo: this._mozo, comensales: this._comensales.toJSON(),
-      items: this._items.map(it => ({ nombre: it.nombre, precio: it.precio.toJSON(), cantidad: it.cantidad.toJSON() })),
+      items: this._items.map(it => {
+        const item = {
+          nombre: it.nombre,
+          precio: it.precio.toJSON(),
+          cantidad: it.cantidad.toJSON()
+        };
+        // A.20: preservar extras si vienen
+        if (it.tipo) item.tipo = it.tipo;
+        if (it.prodId) item.prodId = it.prodId;
+        if (it.destino) item.destino = it.destino;
+        if (it.obs) item.obs = it.obs;
+        return item;
+      }),
       descuento: this._descuento, estado: this._estado, creadoEn: this._creadoEn, observaciones: this._observaciones
     };
   }
@@ -86,11 +116,19 @@ export class PedidoAgregado {
 
 export function reconstruirPedidoAgregado(datos) {
   const pedido = new PedidoAgregado(datos.id, datos.mesa, datos.mozo, crearCantidad(datos.comensales));
-  (datos.items || []).forEach(it => pedido.agregarItem(
-    it.nombre,
-    crearDinero(it.precio),
-    crearCantidad(it.cantidad || it.qty)
-  ));
+  (datos.items || []).forEach(it => {
+    const extras = {};
+    if (it.tipo) extras.tipo = it.tipo;
+    if (it.prodId) extras.prodId = it.prodId;
+    if (it.destino) extras.destino = it.destino;
+    if (it.obs) extras.obs = it.obs;
+    pedido.agregarItem(
+      it.nombre,
+      crearDinero(it.precio),
+      crearCantidad(it.cantidad || it.qty),
+      extras
+    );
+  });
   if (datos.descuento) pedido.aplicarDescuento(datos.descuento);
   if (datos.estado === 'cerrado') pedido.cerrar();
   pedido.setObservaciones(datos.observaciones);

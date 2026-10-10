@@ -1,8 +1,11 @@
 /* ================================================================
    LaTaberna - PubPOS — DESPENSA SUBMÓDULO (ES6)
    Archivo: js/ui/despensa/estado.js
-   Versión: 2.1.0
+   Versión: 2.2.0
    Propósito: Estado centralizado de la nueva vista de despensa.
+              v2.2.0: agrega filtro "vendibles" para D.7 (Fase 2
+                      Paso 4). Expuesto vía getFiltroVendibles /
+                      setFiltroVendibles.
               v2.1.0: persiste lista de compras en localStorage.
    ================================================================ */
 
@@ -11,6 +14,7 @@ const STORAGE_KEY = 'pubpos_lista_compras';
 let _listaCompras = [];
 let _terminoBusqueda = '';
 let _espacioAbierto = null;
+let _filtroVendibles = false;
 
 // ── Inicialización desde localStorage ──
 try {
@@ -60,6 +64,16 @@ export function getTerminoBusqueda() {
 
 export function setTerminoBusqueda(termino) {
   _terminoBusqueda = termino;
+}
+
+// ── Filtro vendibles (D.7) ──
+
+export function getFiltroVendibles() {
+  return _filtroVendibles;
+}
+
+export function setFiltroVendibles(activo) {
+  _filtroVendibles = activo === true;
 }
 
 // ── Espacio abierto ──

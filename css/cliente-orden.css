@@ -1,9 +1,13 @@
 /* ================================================================
    LaTaberna - PubPOS — CSS MODULAR
    Archivo: css/cliente-orden.css
-   Versión: 1.0.3
+   Versión: 1.0.4
    Propósito: Panel de la orden del cliente. Estilos encapsulados
-             bajo #panelOrden, independientes de la vista contenedora.
+              bajo #panelOrden, independientes de la vista contenedora.
+   v1.0.4: Paquete 6.
+     · Subtexto de opciones y observaciones bajo el nombre del item.
+     · Aviso de alergias declaradas del cliente en el pie del panel.
+   v1.0.3: estructura base del panel de orden.
    ================================================================ */
 
 #panelOrden {
@@ -33,7 +37,13 @@
   align-items: center;
   flex-shrink: 0;
 }
-#panelOrden .orden-cabecera h3 { font-size: 16px; display: flex; align-items: center; gap: 8px; }
+#panelOrden .orden-cabecera h3 {
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
 #panelOrden .orden-cabecera h3 i { color: var(--color-accent); }
 
 #panelOrden .btn-cerrar-orden {
@@ -68,6 +78,16 @@
 #panelOrden .orden-item-nombre { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
 #panelOrden .orden-item-precio { font-size: 12px; color: var(--color-accent); margin-bottom: 6px; }
 
+/* Subtexto de opciones y observaciones */
+#panelOrden .orden-item-subopciones {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+  margin-bottom: 6px;
+  padding-left: 8px;
+  border-left: 2px solid rgba(245,158,11,.4);
+}
+
 #panelOrden .orden-item-cantidad { display: flex; align-items: center; gap: 6px; }
 #panelOrden .orden-item-cantidad button {
   background: var(--color-hover);
@@ -81,6 +101,7 @@
   align-items: center;
   justify-content: center;
   transition: var(--t);
+  font-family: inherit;
 }
 #panelOrden .orden-item-cantidad button:hover { border-color: var(--color-accent); }
 #panelOrden .orden-item-cantidad span { min-width: 20px; text-align: center; font-weight: 600; }
@@ -95,6 +116,7 @@
   padding: 4px 8px;
   font-size: 11px;
   outline: none;
+  font-family: inherit;
 }
 #panelOrden .orden-item-obs input:focus { border-color: var(--color-accent); }
 
@@ -121,7 +143,27 @@
   text-align: center;
 }
 #panelOrden .orden-vacia i { font-size: 40px; opacity: .3; margin-bottom: 12px; }
-#panelOrden .orden-vacia p { font-size: 14px; }
+#panelOrden .orden-vacia p { font-size: 14px; margin: 0; }
+
+/* Aviso de alergias declaradas */
+#panelOrden .aviso-alergias-orden {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: rgba(239,68,68,.1);
+  border-top: 1px solid rgba(239,68,68,.3);
+  border-bottom: 1px solid rgba(239,68,68,.3);
+  font-size: 11.5px;
+  color: #fca5a5;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+#panelOrden .aviso-alergias-orden i {
+  color: var(--color-danger);
+  font-size: 13px;
+  flex-shrink: 0;
+}
 
 #panelOrden .orden-pie {
   padding: 16px 20px;
@@ -136,7 +178,12 @@
   margin-bottom: 12px;
 }
 #panelOrden .orden-total span:last-child { color: var(--color-accent); }
-#panelOrden .orden-pie .btn-primary { width: 100%; justify-content: center; padding: 12px; font-size: 14px; }
+#panelOrden .orden-pie .btn-primary {
+  width: 100%;
+  justify-content: center;
+  padding: 12px;
+  font-size: 14px;
+}
 
 @media (max-width: 600px) {
   #panelOrden {

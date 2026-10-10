@@ -1,9 +1,20 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-core.js
-   Versión: 1.1.5
+   Versión: 1.1.9
    Propósito: Núcleo de datos: mesas, pedidos, productos, proveedores,
               persistencia local.
+              v1.1.9: A.43: _normalizarProducto lee `alergenos`
+                      (parsea si viene como string JSON, default []).
+                      Permite que un producto declare sus propios
+                      alérgenos sin depender de variantes.
+              v1.1.8: A.35: _normalizarProducto respeta variantes_ids
+                      (parsea si viene como string JSON, default []).
+              v1.1.7: A.18: _normalizarProducto deja de leer insumoId
+                      (deprecado por modelo insumo vendible).
+              v1.1.6: A.15: _normalizarProducto respeta el campo
+                      insumoId (opcional) para descontar stock sin
+                      receta. (deprecado)
               v1.1.5: _normalizarProducto alineado a campo estado.
                       Métodos legacy de delivery marcados como deprecados.
    ================================================================ */
@@ -62,7 +73,24 @@ export const DBCore = (function() {
     return estados.includes(val) ? val : 'disponible';
   }
 
+  // A.35 / A.43: parser de arrays que acepta string JSON o array.
+  function _parsearArray(val) {
+    if (Array.isArray(val)) return val;
+    if (typeof val === 'string') {
+      try {
+        const parsed = JSON.parse(val);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  }
+
   /* ── NORMALIZACIONES ─────────────────────────────────────── */
+
+  // A.35: variantes_ids se parsea y se preserva como array.
+  // A.43: alergenos se parsea y se preserva como array.
   module._normalizarProducto = function(p) {
     const estado = _validarEstadoProducto(p.estado);
     return {
@@ -75,8 +103,9 @@ export const DBCore = (function() {
       activo: _validarBooleano(p.activo, true),
       imagen: _validarString(p.imagen, ''),
       estado: estado,
-      // Derivado para compatibilidad con consumidores que aún usan disponible
-      disponible: estado !== 'agotado'
+      disponible: estado !== 'agotado',
+      variantes_ids: _parsearArray(p.variantes_ids),
+      alergenos: _parsearArray(p.alergenos)
     };
   };
 
@@ -372,7 +401,6 @@ export const DBCore = (function() {
 
   /* ── GESTIÓN DE DELIVERY (DEPRECADO) ─────────────────────── */
 
-  // DEPRECADO: usar colección unificada `pedidos` con tipo 'reparto'.
   module.crearPedidoDelivery = function(datos) {
     const nuevo = this._normalizarPedidoDelivery({
       ...datos,

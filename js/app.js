@@ -1,11 +1,12 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/app.js
-   Versión: 1.3.6
+   Versión: 1.3.9
    Propósito: Punto de entrada modular. Control de vistas con ciclo
               de vida (limpiar/activar).
-              v1.3.6: Validaciones de acceso migradas a
-              Auth.tienePermiso() / métodos de conveniencia actuales.
+              v1.3.9: Eliminadas suscripciones a eventos sin emisor
+              (sincronizacion:completada, sync:colaActualizada,
+              sync:completada).
    ================================================================ */
 
 // ── Utilidades y librerías ────────────────────────────────
@@ -60,6 +61,7 @@ import './managers/turno-manager.js';
 
 // ── Vistas (importadas para que se ejecuten sus registros) ─
 import { Carta } from './ui/carta.js';
+import { CartaEditor } from './ui/carta-editor.js';
 import { Comanda } from './ui/comanda.js';
 import { Caja } from './ui/caja.js';
 import { Cobro } from './ui/cobro.js';
@@ -68,7 +70,6 @@ import { Cuenta } from './ui/cuenta.js';
 import { Despensa } from './ui/despensa.js';
 import { Eventos } from './ui/eventos.js';
 import { KDS } from './ui/kds.js';
-import { Menu } from './ui/menu.js';
 import { MesaDetalles } from './ui/mesa-detalles.js';
 import { Mesas } from './ui/mesas.js';
 import { Pedido } from './ui/pedido-ui.js';
@@ -95,11 +96,10 @@ const modulosVista = {
   despensa: Despensa,
   recetas: Recetas,
   reparto: Reparto,
-  menu: Menu,
   eventos: Eventos,
   'eventos-en-vivo': EventosEnVivo,
   perfil: Perfil,
-  'carta-editor': Menu
+  'carta-editor': CartaEditor
   // Las vistas 'inicio' y 'bienvenida' se gestionan internamente
 };
 
@@ -219,7 +219,7 @@ export const App = {
       return;
     }
 
-    // Validaciones de permisos con el sistema de Auth v2.1.3
+    // Validaciones de permisos
     if (nombre === 'caja' && !Auth.puedeAccederCaja()) {
       mostrarToast('error', 'No tienes permiso para acceder a Caja');
       return;
@@ -242,10 +242,6 @@ export const App = {
     }
     if (nombre === 'reparto' && !Auth.puedeAccederReparto()) {
       mostrarToast('error', 'No tienes permiso para acceder a Reparto');
-      return;
-    }
-    if (nombre === 'menu' && !Auth.puedeAccederMenu()) {
-      mostrarToast('error', 'No tienes permiso para acceder al Menú');
       return;
     }
     if (nombre === 'eventos' && !Auth.puedeAccederEventos()) {
@@ -305,15 +301,6 @@ export const App = {
   },
 
   _suscribirEventos() {
-    EventBus.on('sincronizacion:completada', () => {
-      if (typeof Mesas !== 'undefined') Mesas.render();
-      if (typeof Carta !== 'undefined') Carta.render();
-      if (typeof Recetas !== 'undefined') Recetas.render();
-      if (typeof Reparto !== 'undefined') Reparto.render();
-      if (typeof Menu !== 'undefined') Menu.render();
-      if (typeof Eventos !== 'undefined') Eventos.render();
-      if (typeof Perfil !== 'undefined') Perfil.render();
-    });
     EventBus.on('mesas:guardadas', () => { if (typeof Mesas !== 'undefined') Mesas.render(); });
     EventBus.on('comandas:guardadas', () => { if (typeof KDS !== 'undefined') KDS.refresh(); });
     EventBus.on('pedido:cerrado', () => { if (typeof Caja !== 'undefined') Caja.render(); });
@@ -323,31 +310,10 @@ export const App = {
     });
     EventBus.on('productos:cargados', () => {
       if (typeof Recetas !== 'undefined') Recetas.render();
-      if (typeof Menu !== 'undefined') Menu.render();
+      if (typeof CartaEditor !== 'undefined') CartaEditor.render();
     });
     EventBus.on('recetas:actualizadas', () => { if (typeof Recetas !== 'undefined') Recetas.render(); });
     EventBus.on('pedidosDelivery:guardados', () => { if (typeof Reparto !== 'undefined') Reparto.render(); });
-
-    EventBus.on('sync:colaActualizada', (pendientes) => {
-      const badge = document.getElementById('syncPendingBadge');
-      const countSpan = document.getElementById('syncPendingCount');
-      if (badge && countSpan) {
-        countSpan.textContent = pendientes;
-        badge.style.display = pendientes > 0 ? 'inline-flex' : 'none';
-        if (pendientes > 0) {
-          Logger.debug(`[App] Badge de sincronización: ${pendientes} pendientes.`);
-        }
-      }
-    });
-
-    EventBus.on('sync:completada', (timestamp) => {
-      const indicator = document.getElementById('syncStatusIndicator');
-      if (indicator) {
-        indicator.title = `Última sincronización: ${new Date(timestamp).toLocaleTimeString()}`;
-        indicator.style.color = 'var(--color-success)';
-        indicator.innerHTML = '<i class="fas fa-check-circle"></i>';
-      }
-    });
 
     EventBus.on('turno:iniciado', (turno) => {
       Logger.info(`[App] Turno iniciado: ${turno?.id}`);
@@ -376,14 +342,14 @@ EventBus.on('app:cambiarVista', function(vista) {
 function _vincularHeader() {
   document.querySelectorAll('.nav-btn[data-view]').forEach(function(btn) {
     btn.addEventListener('click', function() {
-      var view = this.getAttribute('data-view');
+      const view = this.getAttribute('data-view');
       if (view) {
         App.showView(view);
       }
     });
   });
 
-  var logoutBtn = document.getElementById('btnLogout');
+  const logoutBtn = document.getElementById('btnLogout');
   if (logoutBtn) {
     logoutBtn.addEventListener('click', function() {
       Auth.cerrarSesion();

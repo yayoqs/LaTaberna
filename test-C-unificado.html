@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test C — Unificado Frontend Cliente (v1.1.2)</title>
+  <style>
+    body { font-family: monospace; background: #111827; color: #f9fafb; padding: 30px; line-height: 1.5; }
+    h1 { color: #f59e0b; }
+    h2 { color: #60a5fa; margin-top: 24px; }
+    .test { margin: 6px 0; padding: 8px 12px; border-radius: 6px; }
+    .pass { background: rgba(16,185,129,.15); border-left: 4px solid #10b981; }
+    .fail { background: rgba(239,68,68,.15); border-left: 4px solid #ef4444; }
+    .info { background: rgba(59,130,246,.15); border-left: 4px solid #3b82f6; }
+    .warn { background: rgba(245,158,11,.15); border-left: 4px solid #f59e0b; }
+    .accion { background: rgba(245,158,11,.15); border-left: 4px solid #f59e0b; }
+    .summary { margin-top: 24px; padding: 14px; background: #1f2937; border: 1px solid #374151; border-radius: 6px; font-weight: bold; }
+    #panelTest { margin-top: 20px; padding: 16px; background: #1a1a24; border-radius: 12px; border: 1px solid #2e2e42; max-height: 300px; overflow-y: auto; }
+  </style>
+</head>
+<body>
+  <h1>Test C — Unificado Frontend Cliente v1.1.2</h1>
+  <p>Batería completa: sanidad, autenticación, vistas del cliente, orden, menú digital y variantes (Paquete 6).</p>
+  <div id="results"></div>
+  <div id="panelTest"></div>
+
+  <script src="/js/appwrite.min.js"></script>
+
+  <script type="module">
+    import { Logger } from './js/lib/logger.js';
+    import { EventBus } from './js/lib/eventBus.js';
+    import { Store } from './js/lib/store.js';
+    import { Deps } from './js/lib/deps.js';
+    import { DBAppwrite } from './js/db-appwrite.js';
+    import { Auth, inicializarAuth } from './js/auth.js';
+
+    import { PantallaInicio } from './js/modulos/cliente/pantalla-inicio.js';
+    import { PantallaBienvenida } from './js/modulos/cliente/pantalla-bienvenida.js';
+    import { MenuDigital } from './js/modulos/cliente/menu-digital.js';
+    import { Orden } from './js/modulos/cliente/orden.js';
+    import { PantallaEventos } from './js/modulos/cliente/pantalla-eventos.js';
+    import { ModalOpciones } from './js/modulos/cliente/modal-opciones.js';
+    import { AlergiasCliente } from './js/modulos/cliente/alergias-cliente.js';
+
+    const resultsEl = document.getElementById('results');
+    const panelTest = document.getElementById('panelTest');
+    let passed = 0, failed = 0;
+
+    function assert(cond, msg) {
+      if (cond) { passed++; resultsEl.innerHTML += `<div class="test pass">✔ ${msg}</div>`; }
+      else { failed++; resultsEl.innerHTML += `<div class="test fail">✘ ${msg}</div>`; }
+    }
+    function info(msg) { resultsEl.innerHTML += `<div class="test info">ℹ️ ${msg}</div>`; }
+    function warn(msg) { resultsEl.innerHTML += `<div class="test warn">⚠️ ${msg}</div>`; }
+    function accion(msg) { resultsEl.innerHTML += `<div class="test accion">${msg}</div>`; }
+
+    const esperar = ms => new Promise(r => setTimeout(r, ms));
+
+    const _creados = { variantes: [], productos: [] };
+
+    async function run() {
+      Logger.setLevel('ERROR');
+
+      // ══════════════════════════════════════════════════════
+      // SUITE 0 — Sanidad
+      // ══════════════════════════════════════════════════════
+      resultsEl.innerHTML += '<h2>0. Sanidad de módulos</h2>';
+      assert(typeof window.Appwrite !== 'undefined', 'SDK Appwrite cargado');
+      assert(typeof Logger !== 'undefined', 'Logger existe');
+      assert(typeof EventBus !== 'undefined', 'EventBus existe');
+      assert(typeof Store !== 'undefined', 'Store existe');
+      assert(typeof Deps !== 'undefined', 'Deps existe');
+      assert(typeof DBAppwrite !== 'undefined', 'DBAppwrite existe');
+      assert(typeof Auth !== 'undefined', 'Auth existe');
+      assert(typeof PantallaInicio !== 'undefined', 'PantallaInicio existe');
+      assert(typeof PantallaBienvenida !== 'undefined', 'PantallaBienvenida existe');
+      assert(typeof MenuDigital !== 'undefined', 'MenuDigital existe');
+      assert(typeof Orden !== 'undefined', 'Orden existe');
+      assert(typeof PantallaEventos !== 'undefined', 'PantallaEventos existe');
+      assert(typeof ModalOpciones !== 'undefined', 'ModalOpciones existe');
+      assert(typeof AlergiasCliente !== 'undefined', 'AlergiasCliente existe');
+
+      // ══════════════════════════════════════════════════════
+      // SUITE 1 — Autenticación
+      // ══════════════════════════════════════════════════════
+      resultsEl.innerHTML += '<h2>1. Autenticación</h2>';
+      info('Inicializando Auth y Appwrite...');
+      Deps.registrar('auth', Auth);
+      await inicializarAuth();
+
+      const okInit = await DBAppwrite.iniciar();
+      if (!okInit) { assert(false, 'DBAppwrite inicializado'); return finalizar(); }
+      assert(true, 'DBAppwrite inicializado');
+
+      const sufijo = Date.now();
+      const nombreJugador = `test_jugador_${sufijo}`;
+      const passwordJugador = 'pass12345';
+
+      info(`Registrando jugador temporal: ${nombreJugador}`);
+      const registro = await Auth.registrarUsuario(nombreJugador, passwordJugador);
+      if (!registro.exito) { assert(false, `Registro de jugador: ${registro.error}`); return finalizar(); }
+      assert(true, 'Jugador registrado mediante registrarUsuario');
+
+      const login = await Auth.iniciarSesion(nombreJugador, passwordJugador);
+      if (!login) { assert(false, 'Login de jugador'); return finalizar(); }
+      assert(true, 'Jugador inicia sesión');
+
+      const nombreReal = Auth.obtenerNombre() || '';
+      const inicialEsperada = nombreReal.split(' ').map(n => n.charAt(0).toUpperCase()).slice(0, 2).join('');
+      assert(!!nombreReal, 'Auth.obtenerNombre() devuelve un nombre');
+      assert(Auth.esJugador?.() === true, 'Auth.esJugador() es true para rol jugador');
+
+      // ══════════════════════════════════════════════════════
+      // SUITE 2 — PantallaInicio
+      // ══════════════════════════════════════════════════════
+      resultsEl.innerHTML += '<h2>2. PantallaInicio</h2>';
+      PantallaInicio.mostrar();
+      const vistaInicio = document.getElementById('view-inicio');
+      assert(vistaInicio !== null, 'mostrar() crea la vista en el DOM');
+      assert(vistaInicio.id === 'view-inicio', 'La vista tiene id view-inicio');
+      assert(vistaInicio.classList.contains('view'), 'La vista tiene clase view');
+      assert(vistaInicio.classList.contains('active'), 'La vista está activa');
+
+      const loginCorner = vistaInicio.querySelector('.login-corner');
+      const btnRegistro = vistaInicio.querySelector('#btnRegistroCorner');
+      assert(loginCorner !== null, 'Triángulo de acceso existe');
+      assert(btnRegistro !== null, 'Enlace de registro existe');
+
+      const vitrinas = vistaInicio.querySelectorAll('.vitrina-card');
+      assert(vitrinas.length >= 6, 'Al menos 6 tarjetas de vitrina');
+
+      PantallaInicio.ocultar();
+      assert(!vistaInicio.classList.contains('active'), 'ocultar() quita clase active');
+
+      // ══════════════════════════════════════════════════════
+      // SUITE 3 — PantallaBienvenida
+      // ══════════════════════════════════════════════════════
+      resultsEl.innerHTML += '<h2>3. PantallaBienvenida</h2>';
+      PantallaBienvenida.mostrar();
+      const vistaBienvenida = document.getElementById('view-bienvenida');
+      assert(vistaBienvenida !== null, 'mostrar() crea la vista en el DOM');
+      assert(vistaBienvenida.id === 'view-bienvenida', 'La vista tiene id view-bienvenida');
+
+      const avatar = vistaBienvenida.querySelector('#bienvenidaAvatar');
+      const nombreEl = vistaBienvenida.querySelector('#bienvenidaNombre');
+      assert(avatar !== null, 'Avatar existe');
+      assert(avatar.textContent === inicialEsperada, `Avatar muestra iniciales correctas (${inicialEsperada})`);
+      assert(nombreEl !== null && nombreEl.textContent === nombreReal, 'Nombre del cliente coincide con Auth.obtenerNombre()');
+
+      assert(PantallaBienvenida.obtenerMesa() === null, 'obtenerMesa() devuelve null sin mesa guardada');
+      assert(PantallaBienvenida.permitePrepedidos() === false, 'permitePrepedidos() es false por defecto');
+
+      PantallaBienvenida.ocultar();
+      assert(!vistaBienvenida.classList.contains('active'), 'ocultar() quita clase active');
+
+      // ══════════════════════════════════════════════════════
+      // SUITE 4 — Orden
+      // ══════════════════════════════════════════════════════
+      resultsEl.innerHTML += '<h2>4. Orden (extendida con opciones)</h2>';
+      Orden.vaciar();
+      assert(Orden.obtenerItems().length === 0, 'vaciar() deja la orden vacía');
+      assert(Orden.obtenerTotal() === 0, 'obtenerTotal() es 0 con orden vacía');
+
+      const prodA = {
+        tipo: 'producto', prodId: 'prod_1', nombre: 'Hamburguesa',
+        precio_base: 1500, precio: 1500, precio_unitario: 1500, precio_total: 1500,
+        opciones: [], alergias_manuales: [],
+        categoria: 'platos', destino: 'cocina',
+        qty: 1, obs: '', enviado: false, enviadoA: null, enviadoTs: null, persona: 'General'
+      };
+      const prodB = {
+        tipo: 'producto', prodId: 'prod_2', nombre: 'Cerveza',
+        precio_base: 800, precio: 800, precio_unitario: 800, precio_total: 800,
+        opciones: [], alergias_manuales: [],
+        categoria: 'bebidas', destino: 'barra',
+        qty: 1, obs: '', enviado: false, enviadoA: null, enviadoTs: null, persona: 'General'
+      };
+
+      Orden.agregarItem(prodA);
+      assert(Orden.obtenerItems().length === 1, 'agregarItem() agrega un ítem');
+      assert(Orden.obtenerItems()[0].qty === 1, 'Cantidad inicial es 1');
+      assert(typeof Orden.obtenerItems()[0]._key === 'string', 'Ítem tiene _key interna');
+
+      Orden.agregarItem(prodA);
+      assert(Orden.obtenerItems().length === 1, 'agregarItem() duplicado no crea nuevo ítem');
+      assert(Orden.obtenerItems()[0].qty === 2, 'agregarItem() duplicado incrementa cantidad');
+      assert(Orden.obtenerItems()[0].precio_total === 3000, 'precio_total se recalcula (1500*2)');
+
+      const prodAConOpciones = {
+        ...prodA,
+        opciones: [
+          { varianteId: 'sabor', varianteNombre: 'Sabor', opcionId: 'cubana',
+            opcionNombre: 'Cubana', precio_delta: 500, alergenos: [],
+            insumos_delta: [], pasos_delta: [] }
+        ],
+        precio: 2000, precio_unitario: 2000, precio_total: 2000
+      };
+      Orden.agregarItem(prodAConOpciones);
+      assert(Orden.obtenerItems().length === 2, 'Mismo prodId con opciones distintas → renglón separado');
+      assert(Orden.obtenerItems()[1].opciones.length === 1, 'Segundo renglón tiene 1 opción');
+      assert(Orden.obtenerItems()[1].precio_unitario === 2000, 'precio_unitario refleja delta');
+
+      const prodAConAlergias = { ...prodA, alergias_manuales: ['gluten'] };
+      Orden.agregarItem(prodAConAlergias);
+      assert(Orden.obtenerItems().length === 3, 'Alergias distintas → renglón separado');
+      assert(JSON.stringify(Orden.obtenerItems()[2].alergias_manuales) === '["gluten"]', 'Alergias persisten en el ítem');
+
+      Orden.agregarItem(prodB);
+      assert(Orden.obtenerItems().length === 4, 'Producto distinto agrega renglón');
+
+      const totalEsperado = 1500 * 2 + 2000 + 1500 + 800;
+      assert(Orden.obtenerTotal() === totalEsperado, `obtenerTotal() = ${totalEsperado}`);
+
+      const primerKey = Orden.obtenerItems()[0]._key;
+      Orden.modificarCantidad(primerKey, 5);
+      assert(Orden.obtenerItems()[0].qty === 5, 'modificarCantidad por _key funciona');
+
+      Orden.modificarCantidad(primerKey, 0);
+      assert(Orden.obtenerItems().length === 3, 'modificarCantidad a 0 elimina el ítem');
+
+      Orden.modificarObservacion(Orden.obtenerItems()[0]._key, 'sin sal');
+      assert(Orden.obtenerItems()[0].obs === 'sin sal', 'modificarObservacion actualiza obs');
+
+      Orden.quitarItem(Orden.obtenerItems()[0]._key);
+      assert(Orden.obtenerItems().length === 2, 'quitarItem por _key elimina el ítem');
+
+      Orden.vaciar();
+      assert(Orden.obtenerItems().length === 0, 'vaciar() limpia todo');
+
+      // ══════════════════════════════════════════════════════
+      // SUITE 5 — MenuDigital
+      // ══════════════════════════════════════════════════════
+      resultsEl.innerHTML += '<h2>5. MenuDigital</h2>';
+      MenuDigital.mostrar();
+      const vistaMenu = document.getElementById('view-menu-digital');
+      assert(vistaMenu !== null, 'mostrar() crea la vista en el DOM');
+      assert(vistaMenu.id === 'view-menu-digital', 'La vista tiene id view-menu-digital');
+
+      const buscador = vistaMenu.querySelector('#menuDigitalSearch');
+      assert(buscador !== null, 'Buscador existe');
+
+      const panelOrden = document.getElementById('panelOrden');
+      assert(panelOrden !== null, 'Panel de orden se crea en el DOM');
+      assert(panelOrden.classList.contains('orden-panel'), 'Panel de orden tiene clase orden-panel');
+      assert(panelOrden.classList.contains('oculto'), 'Panel de orden empieza oculto');
+
+      const grid = vistaMenu.querySelector('#menuDigitalGrid');
+      assert(grid !== null, 'Grilla de productos existe');
+
+      const chipAlergias = vistaMenu.querySelector('#chipAlergiasMenu');
+      assert(chipAlergias !== null, 'Chip de alergias en barra de estado existe');
+
+      MenuDigital.ocultar();
+      assert(!vistaMenu.classList.contains('active'), 'ocultar() quita clase active');
+
+      // ══════════════════════════════════════════════════════
+      // SUITE 6 — PantallaEventos
+      // ══════════════════════════════════════════════════════
+      resultsEl.innerHTML += '<h2>6. PantallaEventos</h2>';
+      PantallaEventos.mostrar();
+      const vistaEventos = document.getElementById('view-eventos-cliente');
+      assert(vistaEventos !== null, 'mostrar() crea la vista en el DOM');
+      assert(vistaEventos.id === 'view-eventos-cliente', 'La vista tiene id view-eventos-cliente');
+
+      const eventosContenido = vistaEventos.querySelector('#eventosContenido');
+      assert(eventosContenido !== null, 'Contenedor de eventos existe');
+
+      await esperar(400);
+      assert(eventosContenido.innerHTML.includes('No hay eventos activos'), 'Muestra mensaje sin eventos activos');
+      PantallaEventos.ocultar();
+      assert(!vistaEventos.classList.contains('active'), 'ocultar() quita clase active');
+
+      // ══════════════════════════════════════════════════════
+      // SUITE 7 — Flujo de validación de mesa
+      // ══════════════════════════════════════════════════════
+      resultsEl.innerHTML += '<h2>7. Flujo de validación de mesa</h2>';
+      PantallaBienvenida.mostrar();
+      panelTest.innerHTML = '';
+      panelTest.appendChild(document.getElementById('view-bienvenida'));
+
+      const inputMesaFlujo = document.getElementById('inputMesa');
+      const btnVincularFlujo = document.getElementById('btnGuardarMesa');
+      assert(inputMesaFlujo !== null && btnVincularFlujo !== null, 'Controles de vinculación disponibles');
+
+      inputMesaFlujo.value = '5';
+      btnVincularFlujo.click();
+
+      const estadoMesa = document.getElementById('estadoMesa');
+      assert(estadoMesa?.textContent?.includes('Mesa 5'), 'Mensaje de mesa guardada visible');
+
+      const cardEspera = document.getElementById('cardEspera');
+      assert(cardEspera?.style?.display === 'block', 'Tarjeta de espera visible');
+
+      assert(PantallaBienvenida.permitePrepedidos() === false, 'permitePrepedidos() es false');
+      assert(PantallaBienvenida.obtenerMesa() === 5, 'obtenerMesa() devuelve 5');
+
+      Store.despachar({
+        type: 'PEDIDO_CREADO',
+        payload: {
+          id: 'ped_test', mesa: '5', estado: 'abierta', tipo: 'local',
+          origen: 'staff', mozo: 'Carlos', comensales: 2,
+          items: [], total: 0, observaciones: ''
+        }
+      });
+      EventBus.emit('mesas:actualizada', { numero: 5, estado: 'ocupada' });
+      await esperar(100);
+
+      const heroTitulo = document.querySelector('.hero-estado h1');
+      assert(heroTitulo !== null, 'Panel de control visible');
+      assert(heroTitulo.textContent.includes('Mesa 5'), 'Panel muestra Mesa 5');
+      assert(PantallaBienvenida.permitePrepedidos() === true, 'permitePrepedidos() es true');
+
+      let navego = false;
+      const cbNav = (vista) => { if (vista === 'menu') navego = true; };
+      EventBus.on('app:cambiarVista', cbNav);
+
+      const cardGastro = document.getElementById('cardGastronomica');
+      assert(cardGastro !== null, 'Tarjeta gastronómica existe en el panel');
+      cardGastro.click();
+      assert(navego, 'Emitió app:cambiarVista a menu');
+
+      // ══════════════════════════════════════════════════════
+      // SUITE 8 — Variantes en menú digital (Paquete 6)
+      // ══════════════════════════════════════════════════════
+      resultsEl.innerHTML += '<h2>8. Variantes en menú digital (Paquete 6)</h2>';
+
+      // 8.1 — Sanidad
+      accion('8.1 Ciclo de vida de los módulos nuevos');
+      assert(typeof ModalOpciones.activar === 'function', 'ModalOpciones.activar existe');
+      assert(typeof ModalOpciones.limpiar === 'function', 'ModalOpciones.limpiar existe');
+      assert(typeof ModalOpciones.mostrar === 'function', 'ModalOpciones.mostrar existe');
+      assert(typeof ModalOpciones.ocultar === 'function', 'ModalOpciones.ocultar existe');
+      assert(typeof AlergiasCliente.activar === 'function', 'AlergiasCliente.activar existe');
+      assert(typeof AlergiasCliente.limpiar === 'function', 'AlergiasCliente.limpiar existe');
+      assert(typeof AlergiasCliente.obtener === 'function', 'AlergiasCliente.obtener existe');
+      assert(typeof AlergiasCliente.cantidad === 'function', 'AlergiasCliente.cantidad existe');
+
+      // 8.2 — AlergiasCliente: estado y persistencia
+      accion('8.2 AlergiasCliente: estado y persistencia');
+      try { sessionStorage.removeItem('cliente_alergias_sesion'); } catch {}
+      AlergiasCliente.activar();
+      assert(AlergiasCliente.cantidad() === 0, 'AlergiasCliente arranca sin alergias');
+      assert(AlergiasCliente.obtener().length === 0, 'obtener() devuelve array vacío');
+
+      const overlayAlergias = document.getElementById('modalAlergiasCliente');
+      assert(overlayAlergias !== null, 'Overlay #modalAlergiasCliente existe tras activar');
+
+      AlergiasCliente.mostrar();
+      assert(overlayAlergias.classList.contains('active'), 'mostrar() abre el modal');
+
+      const chipsAlergias = overlayAlergias.querySelectorAll('.moc-chip');
+      assert(chipsAlergias.length >= 9, 'Chips del enum renderizados');
+
+      const chipGluten = Array.from(chipsAlergias).find(c => c.dataset.alergeno === 'gluten');
+      const chipLactosa = Array.from(chipsAlergias).find(c => c.dataset.alergeno === 'lactosa');
+      if (chipGluten) chipGluten.click();
+      if (chipLactosa) chipLactosa.click();
+      await esperar(50);
+
+      const btnGuardarAlergias = document.getElementById('macBtnGuardar');
+      assert(btnGuardarAlergias !== null, 'Botón guardar existe');
+      btnGuardarAlergias.click();
+      await esperar(50);
+
+      assert(AlergiasCliente.cantidad() === 2, 'cantidad() = 2 tras declarar gluten y lactosa');
+      assert(AlergiasCliente.tiene('gluten'), 'tiene("gluten") es true');
+      assert(AlergiasCliente.tiene('lactosa'), 'tiene("lactosa") es true');
+      assert(!AlergiasCliente.tiene('mani'), 'tiene("mani") es false');
+      assert(JSON.stringify(AlergiasCliente.obtener()) === JSON.stringify(['gluten', 'lactosa']), 'obtener() devuelve array ordenado');
+      assert(!overlayAlergias.classList.contains('active'), 'Modal se cierra tras guardar');
+
+      const rawStorage = sessionStorage.getItem('cliente_alergias_sesion');
+      assert(rawStorage !== null, 'sessionStorage tiene la clave cliente_alergias_sesion');
+      const parsedStorage = JSON.parse(rawStorage || '[]');
+      assert(parsedStorage.includes('gluten') && parsedStorage.includes('lactosa'), 'sessionStorage refleja las alergias');
+
+      // 8.3 — Emisión del evento
+      accion('8.3 Emisión de cliente:alergias_actualizadas');
+      let payloadAlergias = null;
+      const limpiarAlergias = EventBus.on('cliente:alergias_actualizadas', (p) => { payloadAlergias = p; });
+
+      AlergiasCliente.mostrar();
+      const overlayA2 = document.getElementById('modalAlergiasCliente');
+      const chipMani = Array.from(overlayA2.querySelectorAll('.moc-chip')).find(c => c.dataset.alergeno === 'mani');
+      if (chipMani) chipMani.click();
+      await esperar(50);
+      document.getElementById('macBtnGuardar').click();
+      await esperar(50);
+
+      assert(payloadAlergias !== null, 'cliente:alergias_actualizadas fue emitido');
+      assert(Array.isArray(payloadAlergias?.alergias), 'Payload tiene array alergias');
+      assert(payloadAlergias.alergias.includes('mani'), 'Payload incluye "mani"');
+      assert(AlergiasCliente.cantidad() === 3, 'cantidad() = 3 tras agregar mani');
+      limpiarAlergias();
+
+      AlergiasCliente.mostrar();
+      const overlayA3 = document.getElementById('modalAlergiasCliente');
+      ['gluten','lactosa','mani'].forEach(a => {
+        const chip = Array.from(overlayA3.querySelectorAll('.moc-chip')).find(c => c.dataset.alergeno === a);
+        if (chip && chip.classList.contains('on')) chip.click();
+      });
+      await esperar(50);
+      document.getElementById('macBtnGuardar').click();
+      await esperar(50);
+      assert(AlergiasCliente.cantidad() === 0, 'Alergias reseteadas para tests siguientes');
+
+      // 8.4 — Setup con jefePub
+      accion('8.4 Setup de datos con jefePub (owner PubPrueba)');
+
+      try { await Auth.cerrarSesion(); } catch {}
+      const loginStaff = await Auth.iniciarSesion('jefePub', 'jefe1234');
+      assert(loginStaff === true, 'Login de jefePub para setup');
+
+      const localStaff = Auth.obtenerLocalActivo?.();
+      assert(localStaff?.id === 'PubPrueba', `Espacio activo de staff: ${localStaff?.id}`);
+
+      const sufijoP6 = `t${Date.now().toString().slice(-6)}`;
+      const idVariante = `v_p6_${sufijoP6}`;
+
+      const varianteCreada = await DBAppwrite.crear('variantes', idVariante, {
+        nombre: `Variante Test ${sufijoP6}`,
+        descripcion: 'Creada por test-C-unificado',
+        tipo: 'unica',
+        requerido: true,
+        min_seleccion: 1,
+        max_seleccion: 1,
+        opciones: JSON.stringify([
+          { id: `op_${sufijoP6}_a`, nombre: 'Opción A', precio_delta: 0, activo: true, alergenos: [], requiere: [], excluye: [], insumos_delta: [], pasos_delta: [] },
+          { id: `op_${sufijoP6}_b`, nombre: 'Opción B', precio_delta: 500, activo: true, alergenos: [], requiere: [], excluye: [], insumos_delta: [], pasos_delta: [] }
+        ]),
+        activo: true,
+        orden: 0
+      });
+
+      assert(varianteCreada !== null, 'Variante creada en Appwrite');
+      if (varianteCreada) _creados.variantes.push(idVariante);
+
+      let prodP6 = null;
+      if (varianteCreada) {
+        prodP6 = await DBAppwrite.crear('productos', null, {
+          nombre: `Producto P6 ${sufijoP6}`,
+          precio: 1000,
+          categoria: 'test',
+          destino: 'cocina',
+          activo: true,
+          estado: 'disponible',
+          variantes_ids: JSON.stringify([idVariante]),
+          alergenos: JSON.stringify(['gluten'])
+        });
+        assert(prodP6 !== null, 'Producto con variantes_ids creado');
+        if (prodP6) _creados.productos.push(prodP6.id);
+      }
+
+      try { await Auth.cerrarSesion(); } catch {}
+      const loginJugador2 = await Auth.iniciarSesion(nombreJugador, passwordJugador);
+      assert(loginJugador2 === true, 'Jugador retoma sesión para flujo cliente');
+
+      if (varianteCreada) {
+        const varianteNormalizada = {
+          ...varianteCreada,
+          opciones: JSON.parse(varianteCreada.opciones || '[]')
+        };
+        const variantesActuales = Store.obtenerEstado().variantes || [];
+        Store.despachar({
+          type: 'VARIANTES_INICIALIZAR',
+          payload: [...variantesActuales.filter(v => v.id !== idVariante), varianteNormalizada]
+        });
+        const enStore = (Store.obtenerEstado().variantes || []).find(v => v.id === idVariante);
+        assert(!!enStore, 'Variante en Store');
+        assert(Array.isArray(enStore?.opciones) && enStore.opciones.length === 2, 'Variante en Store con 2 opciones');
+      }
+
+      // 8.5 a 8.8 — Solo si setup pasó
+      if (!varianteCreada || !prodP6) {
+        accion('8.5–8.8 Omitidas por fallo en setup');
+        warn('Setup de datos incompleto.');
+      } else {
+        // 8.5
+        accion('8.5 ModalOpciones: overlay y lifecycle');
+        ModalOpciones.activar();
+        const overlayModal = document.getElementById('modalOpcionesCliente');
+        assert(overlayModal !== null, 'Overlay #modalOpcionesCliente existe tras activar');
+        assert(!overlayModal.classList.contains('active'), 'Overlay arranca cerrado');
+
+        // 8.6
+        accion('8.6 Flujo integrado evento → modal → orden');
+        Orden.vaciar();
+
+        const productoStub = {
+          id: prodP6.id,
+          nombre: prodP6.nombre,
+          precio: prodP6.precio,
+          categoria: prodP6.categoria,
+          destino: prodP6.destino,
+          variantes_ids: [idVariante],
+          alergenos: ['gluten']
+        };
+
+        let ordenRecibida = null;
+        const limpiarOrden = EventBus.on('cliente:producto_agregado_a_orden', (p) => { ordenRecibida = p; });
+
+        EventBus.emit('cliente:producto_con_variantes', {
+          producto: productoStub,
+          variantes: [(Store.obtenerEstado().variantes || []).find(v => v.id === idVariante)]
+        });
+        await esperar(100);
+
+        const overlayActivo = document.getElementById('modalOpcionesCliente');
+        const modalAbierto = overlayActivo?.classList.contains('active');
+        assert(modalAbierto, 'Modal de opciones se abre tras el evento');
+
+        if (modalAbierto) {
+          const mocNombre = document.getElementById('mocNombre');
+          assert(mocNombre?.textContent === prodP6.nombre, 'Header muestra nombre del producto');
+
+          const opcionesDOM = overlayActivo.querySelectorAll('.moc-opcion');
+          assert(opcionesDOM.length === 2, 'Se renderizaron 2 opciones');
+          const opcionB = Array.from(opcionesDOM).find(o => o.dataset.opcion === `op_${sufijoP6}_b`);
+          if (opcionB) opcionB.click();
+          await esperar(50);
+
+          const totalEl = document.getElementById('mocTotal');
+          assert(totalEl?.textContent === '$1500', `Total = $1500 — actual: ${totalEl?.textContent}`);
+
+          const btnAgregar = document.getElementById('mocBtnAgregar');
+          btnAgregar?.click();
+          await esperar(100);
+        }
+
+        assert(ordenRecibida !== null, 'cliente:producto_agregado_a_orden emitido');
+        assert(Array.isArray(ordenRecibida?.item?.opciones) && ordenRecibida.item.opciones.length === 1, 'Item tiene 1 opción en snapshot');
+        assert(ordenRecibida?.item?.opciones[0]?.opcionId === `op_${sufijoP6}_b`, 'Snapshot captura Opción B');
+        assert(ordenRecibida?.item?.precio_unitario === 1500, 'precio_unitario = 1500');
+
+        const itemsEnOrden = Orden.obtenerItems();
+        assert(itemsEnOrden.length === 1, 'Ítem agregado a Orden');
+        assert(itemsEnOrden[0].opciones.length === 1, 'Ítem en Orden tiene opciones');
+        assert(itemsEnOrden[0].categoria === 'test', 'Ítem tiene categoria');
+        assert(itemsEnOrden[0].destino === 'cocina', 'Ítem tiene destino');
+        assert(itemsEnOrden[0].persona === 'General', 'Ítem tiene persona: General');
+        assert(JSON.stringify(itemsEnOrden[0].alergias_manuales) === '[]', 'Ítem sin alergias (cliente reset)');
+        limpiarOrden();
+
+        // 8.7
+        accion('8.7 Modal sin variantes (mini-modal)');
+        Orden.vaciar();
+        const productoSinVar = {
+          id: 'prod_stub_sin_var',
+          nombre: 'Producto Sin Variantes',
+          precio: 800,
+          categoria: 'bebidas',
+          destino: 'barra',
+          variantes_ids: [],
+          alergenos: []
+        };
+        EventBus.emit('cliente:producto_con_variantes', { producto: productoSinVar, variantes: [] });
+        await esperar(100);
+
+        const overlaySinVar = document.getElementById('modalOpcionesCliente');
+        const modalSinVarAbierto = overlaySinVar?.classList.contains('active');
+        assert(modalSinVarAbierto, 'Modal se abre incluso sin variantes');
+        if (modalSinVarAbierto) {
+          const variantesRenderizadas = overlaySinVar.querySelectorAll('.moc-variante');
+          assert(variantesRenderizadas.length === 0, 'Sin sección de variantes cuando no hay');
+          const cantidadEl = document.getElementById('mocCantidad');
+          assert(cantidadEl !== null, 'Bloque de cantidad visible en mini-modal');
+          document.getElementById('mocBtnCancelar')?.click();
+          await esperar(50);
+        }
+
+        // 8.8
+        accion('8.8 Producto con destino inválido');
+        const productoInvalido = {
+          id: 'prod_stub_invalido',
+          nombre: 'Producto Inválido',
+          precio: 500,
+          categoria: 'test',
+          destino: '',
+          variantes_ids: [],
+          alergenos: []
+        };
+        EventBus.emit('cliente:producto_con_variantes', { producto: productoInvalido, variantes: [] });
+        await esperar(100);
+        const overlayInvalido = document.getElementById('modalOpcionesCliente');
+        assert(!overlayInvalido?.classList.contains('active'), 'Modal no se abre con destino inválido');
+      }
+
+      // 8.9 — Limpieza
+      accion('8.9 Limpieza Paquete 6');
+      try { ModalOpciones.limpiar(); } catch {}
+      try { AlergiasCliente.limpiar(); } catch {}
+      try { sessionStorage.removeItem('cliente_alergias_sesion'); } catch {}
+
+      try { await Auth.cerrarSesion(); } catch {}
+      await Auth.iniciarSesion('jefePub', 'jefe1234');
+
+      for (const id of _creados.productos) {
+        try { await DBAppwrite.eliminar('productos', id); } catch {}
+      }
+      for (const id of _creados.variantes) {
+        try { await DBAppwrite.eliminar('variantes', id); } catch {}
+      }
+      _creados.productos = [];
+      _creados.variantes = [];
+      assert(true, 'Huella de Paquete 6 limpia');
+
+      document.getElementById('view-inicio')?.remove();
+      document.getElementById('view-bienvenida')?.remove();
+      document.getElementById('view-menu-digital')?.remove();
+      document.getElementById('view-eventos-cliente')?.remove();
+      document.getElementById('modalOpcionesCliente')?.remove();
+      document.getElementById('modalAlergiasCliente')?.remove();
+      panelTest.innerHTML = '';
+
+      finalizar();
+    }
+
+    function finalizar() {
+      resultsEl.innerHTML += `<div class="summary">${passed} pasaron, ${failed} fallaron</div>`;
+      if (failed === 0) {
+        resultsEl.innerHTML += `<div class="test pass">🎉 Test unificado de Célula C v1.1.2 superado por completo.</div>`;
+      } else {
+        resultsEl.innerHTML += `<div class="test fail">⚠️ ${failed} test(s) fallaron. Revisar antes del PR.</div>`;
+      }
+    }
+
+    window.addEventListener('load', () => run().catch(e => {
+      resultsEl.innerHTML += `<div class="test fail">Error fatal: ${e.message}</div>`;
+      console.error(e);
+    }));
+  </script>
+</body>
+</html>

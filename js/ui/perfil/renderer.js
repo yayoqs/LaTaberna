@@ -1,13 +1,15 @@
 /* ================================================================
    LaTaberna - PubPOS — PERFIL SUBMÓDULO (ES6)
    Archivo: js/ui/perfil/renderer.js
-   Versión: 1.0.1
+   Versión: 1.0.5
    Propósito: Construcción del DOM base del perfil y renderizado de
               paneles. Delega vitrina y edición a submódulos reales.
+              v1.0.5: elimina restauración automática de guía.
    ================================================================ */
 
 import { renderModoVitrina } from './vitrina.js';
 import { renderModoEdicion } from './edicion.js';
+import { renderSeccionGuias, inicializarListenersGuias } from './guia-master-admin.js';
 
 export function asegurarVista() {
   let main = document.getElementById('view-perfil');
@@ -55,7 +57,10 @@ export function asegurarVista() {
           <div class="central-tab-content" id="tab-admin"></div>
         </div>
       </div>
-      <div class="panel-derecho" id="panelDerechoPerfil"></div>
+      <div class="panel-derecho" id="panelDerechoPerfil">
+        <div id="panelDerechoContenido"></div>
+        <div id="perfilGuias"></div>
+      </div>
     </div>
     <div class="overlay" id="perfilOverlay"></div>
   `;
@@ -112,15 +117,22 @@ export function renderPanelIzquierdo(usuario, extras) {
 }
 
 export function renderPanelDerecho(usuario, extras) {
-  const panelDer = document.getElementById('panelDerechoPerfil');
-  if (!panelDer) return;
-  panelDer.innerHTML = `
+  const contenedor = document.getElementById('panelDerechoContenido');
+  if (!contenedor) return;
+  contenedor.innerHTML = `
     <h3>📊 Resumen</h3>
     <div class="resumen-mini"><div class="titulo">Puntos de fidelización</div><div class="valor">${(extras.puntos || 0).toLocaleString()}</div></div>
     <div class="resumen-mini"><div class="titulo">Próxima insignia en</div><div class="valor">3 visitas</div></div>
     <h3 style="margin-top:20px;">🕓 Actividad reciente</h3>
     ${(extras.actividad || []).length ? extras.actividad.map(a => `<div class="actividad-item"><div class="punto"></div><div>${a.texto}<span class="txt-sec">${a.fecha || ''}</span></div></div>`).join('') : '<p class="desc">Sin actividad.</p>'}
   `;
+
+  const guiasContainer = document.getElementById('perfilGuias');
+  if (guiasContainer) {
+    const guiasHTML = renderSeccionGuias(usuario);
+    guiasContainer.innerHTML = guiasHTML;
+    if (guiasHTML) inicializarListenersGuias(usuario);
+  }
 }
 
 export function aplicarVisibilidadRoles(esStaff, esAdmin) {
@@ -135,5 +147,4 @@ export function aplicarVisibilidadRoles(esStaff, esAdmin) {
   }
 }
 
-// Reexportamos las funciones reales para que ciclo-vida las encuentre
 export { renderModoVitrina, renderModoEdicion };

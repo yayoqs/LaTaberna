@@ -1,9 +1,19 @@
 /* ================================================================
    LaTaberna - PubPOS — DESPENSA SUBMÓDULO (ES6)
    Archivo: js/ui/despensa/ciclo-vida.js
-   Versión: 3.4.2
+   Versión: 3.5.1
    Propósito: Ciclo de vida de la despensa con panel izquierdo acordeón,
               proveedores reales y conexión Insumo ↔ Proveedor.
+              v3.5.1: Paquete movimientos — se suscribe a
+                      `movimientos:actualizados` del EventBus para
+                      refrescar el panel cuando el evento llegue antes
+                      de que el slice del Store esté sincronizado. El
+                      listener del Store (vía `MOVIMIENTO_REGISTRADO`)
+                      cubre el camino nominal; este listener cubre el
+                      camino externo (movimientos generados por Célula A
+                      antes de la reconfiguración del Store).
+              v3.5.0: agrega filtro "Vendibles" (D.7, Fase 2 Paso 4).
+                      El filtro aplica antes de la búsqueda por texto.
               v3.4.2: corrige quitarDeListaCompras para pasar objeto
                       { nombre } en lugar de string.
    ================================================================ */
@@ -28,7 +38,9 @@ import {
   agregarAListaCompras,
   quitarDeListaCompras,
   getTerminoBusqueda,
-  setTerminoBusqueda
+  setTerminoBusqueda,
+  getFiltroVendibles,
+  setFiltroVendibles
 } from './estado.js';
 import { mostrar as mostrarModalProveedor } from './modal-proveedor.js';
 import { crearProveedorRepo } from '../../repositorios/proveedor-repository.js';
@@ -39,10 +51,18 @@ let _filtroMovimientos = 'todos';
 
 async function _refresh() {
   const state = Store.obtenerEstado();
-  const insumos = (state.insumos || state.ingredientes || []).filter(i => {
-    const t = getTerminoBusqueda();
-    return !t || i.nombre.toLowerCase().includes(t.toLowerCase());
-  });
+  let insumos = state.insumos || state.ingredientes || [];
+
+  // D.7: el filtro de vendibles aplica antes de la búsqueda por texto.
+  if (getFiltroVendibles()) {
+    insumos = insumos.filter(i => i.vendible === true);
+  }
+
+  const t = getTerminoBusqueda();
+  if (t) {
+    const tLower = t.toLowerCase();
+    insumos = insumos.filter(i => (i.nombre || '').toLowerCase().includes(tLower));
+  }
 
   renderResumen(insumos);
   renderEspacios(insumos);
@@ -111,6 +131,18 @@ export function activar() {
       }
     }, { signal });
   });
+
+  // D.7: chip "Vendibles". Sincroniza estado visual y alterna el filtro.
+  const chipVendibles = document.getElementById('chipVendibles');
+  if (chipVendibles) {
+    chipVendibles.classList.toggle('activo', getFiltroVendibles());
+    chipVendibles.addEventListener('click', () => {
+      const nuevo = !getFiltroVendibles();
+      setFiltroVendibles(nuevo);
+      chipVendibles.classList.toggle('activo', nuevo);
+      _refresh();
+    }, { signal });
+  }
 
   // Filtros de movimientos
   document.querySelectorAll('#view-despensa .mov-filtro-btn').forEach(btn => {
@@ -237,6 +269,18 @@ export function activar() {
       _refresh();
     }
   }));
+
+  // v3.5.1: refresco puntual del panel de movimientos cuando el
+  // EventBus emite `movimientos:actualizados`. El listener del Store
+  // ya cubre el camino nominal (MOVIMIENTO_REGISTRADO). Este listener
+  // cubre el camino externo: movimientos generados por Célula A que
+  // llegan antes de que el slice del Store se haya sincronizado.
+  _desuscripciones.push(EventBus.on('movimientos:actualizados', () => {
+    if (document.getElementById('movimientosContainer')) {
+      renderMovimientos(_filtroMovimientos);
+    }
+  }));
+
   _desuscripciones.push(EventBus.on('db:inicializada', _refresh));
   _desuscripciones.push(EventBus.on('vista:cambiada', (vista) => {
     if (vista === 'despensa') _refresh();

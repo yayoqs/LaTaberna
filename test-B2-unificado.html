@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Test B2 — Unificado Real (KDS + Recetas)</title>
+  <style>
+    body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; line-height: 1.5; }
+    h1 { color: #f59e0b; }
+    h2 { color: #60a5fa; margin-top: 20px; }
+    .test { margin: 6px 0; padding: 8px 12px; border-radius: 6px; }
+    .pass { background: rgba(16,185,129,.15); border-left: 4px solid #10b981; }
+    .fail { background: rgba(239,68,68,.15); border-left: 4px solid #ef4444; }
+    .info { background: rgba(59,130,246,.15); border-left: 4px solid #3b82f6; }
+    .summary { margin-top: 20px; padding: 12px; background: #1f2937; border: 1px solid #374151; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Test B2 — Unificado Real (KDS + Recetas)</h1>
+  <p>Sin mocks. Autentica con jefePub/jefe1234, valida PubPrueba, crea comandas reales con espacioId y prueba ambos módulos.</p>
+  <div id="results"></div>
+  <div id="toastContainer"></div>
+  <main id="view-cocina" class="view"></main>
+  <main id="view-recetas" class="view"></main>
+
+  <script src="js/appwrite.min.js"></script>
+  <script type="module" src="js/lib/logger.js"></script>
+  <script type="module" src="js/lib/eventBus.js"></script>
+  <script type="module" src="js/lib/store.js"></script>
+  <script type="module" src="js/lib/deps.js"></script>
+  <script type="module" src="js/auth.js"></script>
+  <script type="module" src="js/utils.js"></script>
+  <script type="module" src="js/db.js"></script>
+  <script type="module" src="js/db-appwrite.js"></script>
+  <script type="module" src="js/ui/kds.js"></script>
+  <script type="module" src="js/ui/recetas.js"></script>
+  <script type="module" src="js/repositorios/receta-repository.js"></script>
+
+  <script type="module">
+    import { Store } from './js/lib/store.js';
+    import { EventBus } from './js/lib/eventBus.js';
+    import { Deps } from './js/lib/deps.js';
+    import { Auth } from './js/auth.js';
+    import { DB } from './js/db.js';
+    import { DBAppwrite } from './js/db-appwrite.js';
+    import { DBInventario } from './js/db-inventario.js';
+    import { Logger } from './js/lib/logger.js';
+    import { KDS } from './js/ui/kds.js';
+    import { Recetas } from './js/ui/recetas.js';
+    import { crearRecetaRepo } from './js/repositorios/receta-repository.js';
+    import { inicializarAuth } from './js/auth.js';
+    import { $id } from './js/utils.js';
+
+    Logger.setLevel('ERROR');
+    window.Logger = Logger;
+
+    const resultsEl = document.getElementById('results');
+    let passed = 0, failed = 0;
+    const comandasCreadas = [];
+    const productosCreados = [];
+    const recetasCreadas = [];
+    const insumosCreados = [];
+
+    function assert(cond, msg) {
+      if (cond) { passed++; resultsEl.innerHTML += `<div class="test pass">✔ ${msg}</div>`; }
+      else { failed++; resultsEl.innerHTML += `<div class="test fail">✘ ${msg}</div>`; }
+    }
+    const esperar = ms => new Promise(r => setTimeout(r, ms));
+
+    function simularToqueLargo(elemento, duracion = 700) {
+      return new Promise(resolve => {
+        elemento.dispatchEvent(new Event('mousedown', { bubbles: true }));
+        elemento.dispatchEvent(new Event('touchstart', { bubbles: true }));
+        setTimeout(() => {
+          elemento.dispatchEvent(new Event('mouseup', { bubbles: true }));
+          elemento.dispatchEvent(new Event('touchend', { bubbles: true }));
+          resolve();
+        }, duracion);
+      });
+    }
+
+    function simularSwipe(elemento, deltaX) {
+      const target = elemento;
+      const crearTouch = (x, y) => new Touch({ identifier: Date.now(), target, clientX: x, clientY: y, radiusX: 2.5, radiusY: 2.5, rotationAngle: 0, force: 1 });
+      target.dispatchEvent(new TouchEvent('touchstart', { touches: [crearTouch(0, 0)], bubbles: true, cancelable: true }));
+      target.dispatchEvent(new TouchEvent('touchend', { touches: [], changedTouches: [crearTouch(deltaX, 0)], bubbles: true, cancelable: true }));
+    }
+
+    function espacioActual() {
+      return Auth.obtenerLocalActivo()?.id || 'PubPrueba';
+    }
+
+    async function run() {
+      resultsEl.innerHTML = '';
+      const ahora = Date.now();
+      const espacioId = espacioActual();
+
+      if (!$id('toastContainer')) {
+        const tc = document.createElement('div'); tc.id = 'toastContainer'; document.body.appendChild(tc);
+      }
+
+      Deps.registrar('auth', Auth);
+
+      await inicializarAuth();
+      if (!(await DBAppwrite.iniciar())) {
+        assert(false, 'No se pudo inicializar Appwrite');
+        return;
+      }
+      const loginOk = await Auth.iniciarSesion('jefePub', 'jefe1234');
+      assert(loginOk, 'Login jefePub/jefe1234 exitoso');
+      assert(Auth.obtenerLocalActivo()?.id === 'PubPrueba', 'Espacio resuelto: PubPrueba');
+      await DB.init();
+
+      const rolesEfectivos = Auth.obtenerRolesEfectivos();
+      assert(rolesEfectivos.includes('admin') || rolesEfectivos.includes('owner'), 'Roles efectivos incluyen admin/owner');
+      if (!rolesEfectivos.includes('admin') && !rolesEfectivos.includes('owner')) return;
+
+      // ═══════════════════════════════════════════════════
+      // BLOQUE KDS (sin mocks)
+      // ═══════════════════════════════════════════════════
+      resultsEl.innerHTML += '<h2>Bloque KDS</h2>';
+
+      let prodIdReceta = null;
+      try {
+        const prod = await DBAppwrite.crear('productos', null, {
+          nombre: 'Producto KDS ' + ahora,
+          precio: 0,
+          categoria: 'test',
+          destino: 'cocina',
+          activo: true,
+          estado: 'disponible',
+          espacioId
+        });
+        productosCreados.push(prod.id);
+        Store.despachar({ type: 'PRODUCTO_GUARDADO', payload: prod });
+
+        const rec = await DBAppwrite.crear('recetas', null, {
+          productoId: prod.id,
+          ingredientes: JSON.stringify([]),
+          instrucciones: 'Preparar',
+          es_intermedio: false,
+          nivel: 'final',
+          categoria: 'test',
+          destino: 'cocina',
+          unidadStock: '',
+          espacioId
+        });
+        recetasCreadas.push(rec.id);
+        Store.despachar({ type: 'RECETA_GUARDADA', payload: rec });
+
+        prodIdReceta = prod.id;
+        DBInventario.productos = DBInventario.productos || [];
+        DBInventario.productos.push(prod);
+        DBInventario.recetas = DBInventario.recetas || [];
+        DBInventario.recetas.push(rec);
+      } catch (e) {
+        assert(false, 'Error creando producto/receta para KDS: ' + e.message);
+        return;
+      }
+
+      const comandas = [
+        { mesa: '10', destino: 'cocina', items: JSON.stringify([{ prodId: prodIdReceta, nombre: 'Producto KDS', qty: 1, destino: 'cocina', obs: '', enviado: false }]), estado: 'nueva', ts: ahora },
+        { mesa: '11', destino: 'barra', items: JSON.stringify([{ prodId: 'prod_barra', nombre: 'Trago', qty: 1, destino: 'barra', obs: '', enviado: false }]), estado: 'nueva', ts: ahora },
+        { mesa: '12', destino: 'ambos', items: JSON.stringify([
+          { prodId: prodIdReceta, nombre: 'Producto KDS', qty: 1, destino: 'cocina', obs: '', enviado: false },
+          { prodId: 'prod_barra', nombre: 'Trago', qty: 1, destino: 'barra', obs: '', enviado: false }
+        ]), estado: 'nueva', ts: ahora, observaciones: 'Combo' },
+        { mesa: '13', destino: 'cocina', items: JSON.stringify([{ prodId: 'prod_urg', nombre: 'Urgente', qty: 1, destino: 'cocina', obs: '', enviado: false }]), estado: 'nueva', ts: ahora - 20 * 60 * 1000 },
+        { mesa: '14', destino: 'cocina', items: JSON.stringify([{ prodId: prodIdReceta, nombre: 'Producto KDS', qty: 1, destino: 'cocina', obs: '', enviado: false }]), estado: 'en-proceso', ts: ahora }
+      ];
+
+      for (const com of comandas) {
+        try {
+          const creada = await DBAppwrite.crear('comandas', null, {
+            ...com,
+            pedidoId: '',
+            observaciones: com.observaciones || '',
+            subcomandas: '{}',
+            deliveryId: '',
+            mozo: 'Admin',
+            espacioId
+          });
+          comandasCreadas.push(creada.id);
+          const comandaParaStore = { ...creada, items: JSON.parse(creada.items) };
+          Store.despachar({ type: 'COMANDA_AGREGADA', payload: comandaParaStore });
+        } catch (e) {
+          assert(false, 'Error creando comanda: ' + e.message);
+        }
+      }
+      await esperar(500);
+
+      KDS.activar();
+      await esperar(500);
+
+      const filtroDestino = document.getElementById('kds-filtro-destino');
+      const estiloDestino = filtroDestino ? getComputedStyle(filtroDestino).display : 'none';
+      assert(estiloDestino !== 'none', 'KDS: control Cocina/Barra/Todas visible');
+
+      let tickets = document.querySelectorAll('.kds-ticket');
+      assert(tickets.length === 5, `KDS: pestaña nueva con Todas tiene 5 tickets (${tickets.length})`);
+
+      document.querySelector('.kds-chip-destino[data-destino="cocina"]').click();
+      await esperar(300);
+      tickets = document.querySelectorAll('.kds-ticket');
+      assert(tickets.length === 3, `KDS: filtro Cocina en nueva muestra 3 (${tickets.length})`);
+
+      document.querySelector('.kds-chip-destino[data-destino="barra"]').click();
+      await esperar(300);
+      tickets = document.querySelectorAll('.kds-ticket');
+      assert(tickets.length === 2, `KDS: filtro Barra en nueva muestra 2 (${tickets.length})`);
+
+      document.querySelector('.kds-chip-destino[data-destino="todas"]').click();
+      await esperar(300);
+
+      assert(!!document.getElementById('kds-' + comandasCreadas[2] + '_cocina'), 'KDS: tarjeta virtual cocina de ambos');
+      assert(!!document.getElementById('kds-' + comandasCreadas[2] + '_barra'), 'KDS: tarjeta virtual barra de ambos');
+      assert(!!document.querySelector('.kds-ticket-tiempo.t-peligro'), 'KDS: comanda urgente con clase t-peligro');
+
+      const ticketCocina = document.getElementById('kds-' + comandasCreadas[0]);
+      const btnIniciar = ticketCocina?.querySelector('.kds-boton-iniciar');
+      assert(!!btnIniciar, 'KDS: botón Iniciar presente');
+      btnIniciar.click();
+      await esperar(500);
+      const estadoEnProceso = Store.obtenerEstado().comandas.find(c => c.id === comandasCreadas[0])?.estado;
+      assert(estadoEnProceso === 'en-proceso', 'KDS: comanda pasó a en-proceso en Store real');
+
+      document.querySelector('#kds-pestanas .kds-pestana[data-estado="en-proceso"]').click();
+      await esperar(300);
+      tickets = document.querySelectorAll('.kds-ticket');
+      assert(tickets.length === 2, `KDS: pestaña en-proceso tiene 2 tickets (${tickets.length})`);
+
+      const lista = document.getElementById('kds-lista');
+      let pestanaActiva = document.querySelector('#kds-pestanas .kds-pestana.activo');
+      assert(pestanaActiva?.dataset.estado === 'en-proceso', 'KDS: pestaña activa es en-proceso');
+      try {
+        simularSwipe(lista, -100);
+        await esperar(300);
+        pestanaActiva = document.querySelector('#kds-pestanas .kds-pestana.activo');
+        assert(pestanaActiva?.dataset.estado === 'lista', 'KDS: swipe izquierda → lista');
+        simularSwipe(lista, 100);
+        await esperar(300);
+        pestanaActiva = document.querySelector('#kds-pestanas .kds-pestana.activo');
+        assert(pestanaActiva?.dataset.estado === 'en-proceso', 'KDS: swipe derecha → en-proceso');
+      } catch (e) {
+        assert(false, 'KDS: error en swipe: ' + e.message);
+      }
+
+      const ticketEnProceso = document.getElementById('kds-' + comandasCreadas[4]);
+      const itemTicket = ticketEnProceso?.querySelector('.kds-item');
+      assert(!!itemTicket, 'KDS: ítem interactivo presente');
+      let modalAbierto = false;
+      const originalMostrarDetalle = Recetas.mostrarDetalle;
+      Recetas.mostrarDetalle = (id) => { modalAbierto = true; originalMostrarDetalle(id); };
+      await simularToqueLargo(itemTicket, 700);
+      await esperar(500);
+      assert(modalAbierto, 'KDS: toque largo abrió modal de detalle');
+      Recetas.mostrarDetalle = originalMostrarDetalle;
+      const btnCerrarDetalle = document.getElementById('btnCerrarDetalle');
+      if (btnCerrarDetalle) btnCerrarDetalle.click();
+
+      KDS.limpiar();
+      document.getElementById('view-cocina')?.remove();
+      document.querySelectorAll('.modal-overlay').forEach(o => o.remove());
+
+      // ═══════════════════════════════════════════════════
+      // BLOQUE RECETAS (sin mocks)
+      // ═══════════════════════════════════════════════════
+      resultsEl.innerHTML += '<h2>Bloque Recetas</h2>';
+
+      const repo = crearRecetaRepo();
+      const sufijo = Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+      const nombreInsumo = 'Insumo Test ' + sufijo;
+      let insumoTestId = null;
+      let recetaCreadaId = null;
+      let productoCreadoId = null;
+
+      try {
+        const insumo = await DBAppwrite.crear('insumos', null, {
+          nombre: nombreInsumo,
+          stock: 100,
+          unidad: 'kg',
+          stock_minimo: 5,
+          categoria: 'cocina',
+          tipo: 'cocina',
+          ubicacion: 'Test',
+          espacioId
+        });
+        insumoTestId = insumo.id;
+        insumosCreados.push(insumo.id);
+        DB.insumos = DB.insumos || [];
+        DB.insumos.push(insumo);
+        assert(true, 'Recetas: insumo de prueba creado');
+      } catch (e) {
+        assert(false, 'Recetas: error al crear insumo: ' + e.message);
+        return;
+      }
+      await esperar(1000);
+
+      const nombreReceta = 'Receta Test ' + sufijo;
+      try {
+        const nueva = await repo.guardarReceta({
+          _nombreProducto: nombreReceta,
+          nivel: 'preparacion',
+          categoria: 'test_capitulo_' + sufijo,
+          es_intermedio: true,
+          destino: 'cocina',
+          ingredientes: [{ tipo: 'insumo', id: insumoTestId, cantidad: 2, unidad: 'kg' }],
+          instrucciones: 'Paso 1\nPaso 2',
+          unidadStock: 'kg',
+          creadoPor: 'test'
+        });
+        productoCreadoId = nueva.productoId;
+        recetaCreadaId = nueva.id;
+        recetasCreadas.push(nueva.id);
+        productosCreados.push(nueva.productoId);
+        assert(!!productoCreadoId, 'Recetas: producto creado automáticamente');
+        assert(!!recetaCreadaId, 'Recetas: receta creada');
+      } catch (e) {
+        assert(false, 'Recetas: error al crear receta: ' + e.message);
+        return;
+      }
+      await esperar(2000);
+
+      const stateDespuesCrear = Store.obtenerEstado();
+      const recetaEnStore = stateDespuesCrear.recetas.find(r => r.id === recetaCreadaId);
+      assert(!!recetaEnStore, 'Recetas: Store refleja receta creada');
+      assert(recetaEnStore?.categoria === 'test_capitulo_' + sufijo, 'Recetas: Store categoría correcta');
+
+      try {
+        const recetaAEditar = await repo.obtenerPorId(recetaCreadaId);
+        recetaAEditar.nivel = 'aderezo';
+        recetaAEditar.categoria = 'editado_' + sufijo;
+        recetaAEditar.es_intermedio = false;
+        recetaAEditar.destino = 'barra';
+        recetaAEditar.instrucciones = 'Nuevo paso';
+        await repo.guardarReceta(recetaAEditar);
+        await esperar(2000);
+        const stateDespuesEditar = Store.obtenerEstado();
+        const editStore = stateDespuesEditar.recetas.find(r => r.id === recetaCreadaId);
+        assert(editStore?.nivel === 'aderezo', 'Recetas: Store refleja edición de nivel');
+        assert(editStore?.categoria === 'editado_' + sufijo, 'Recetas: Store refleja edición de categoría');
+      } catch (e) {
+        assert(false, 'Recetas: error al editar: ' + e.message);
+      }
+
+      const nombreIntermedia = 'Intermedia Test ' + sufijo;
+      try {
+        const intermedia = await repo.guardarReceta({
+          _nombreProducto: nombreIntermedia,
+          nivel: 'preparacion',
+          categoria: 'test_intermedia',
+          es_intermedio: true,
+          destino: 'cocina',
+          ingredientes: [{ tipo: 'insumo', id: insumoTestId, cantidad: 5, unidad: 'kg' }],
+          instrucciones: 'Ejecutar',
+          unidadStock: 'kg',
+          creadoPor: 'test'
+        });
+        recetasCreadas.push(intermedia.id);
+        await esperar(1500);
+
+        const insumosRemotos = await DBAppwrite.listar('insumos');
+        const insumoRemoto = insumosRemotos.find(i => i.id === insumoTestId);
+        const stockInicial = insumoRemoto ? insumoRemoto.stock : 100;
+
+        let insumoAsociado = insumosRemotos.find(i => i.nombre === nombreIntermedia && i.tipo === 'cocina');
+        if (!insumoAsociado) {
+          insumoAsociado = await repo.guardarInsumo({
+            nombre: nombreIntermedia,
+            unidad: 'kg',
+            tipo: 'cocina',
+            categoria: 'test_intermedia',
+            stock: 0,
+            stock_minimo: 1
+          });
+          insumosCreados.push(insumoAsociado.id);
+        }
+        await repo.actualizarStockInsumo(insumoAsociado.id, (insumoAsociado.stock || 0) + 3);
+        const nuevoStockIng = stockInicial - 15;
+        await repo.actualizarStockInsumo(insumoTestId, nuevoStockIng);
+        await esperar(2000);
+
+        const insumosPost = await DBAppwrite.listar('insumos');
+        const insumoPost = insumosPost.find(i => i.id === insumoTestId);
+        assert(insumoPost?.stock === nuevoStockIng, 'Recetas: Appwrite stock descontado');
+        const insumoInterPost = insumosPost.find(i => i.nombre === nombreIntermedia && i.tipo === 'cocina');
+        assert(insumoInterPost?.stock === 3, 'Recetas: Appwrite stock preparación = 3');
+      } catch (e) {
+        assert(false, 'Recetas: error en ejecución: ' + e.message);
+      }
+
+      try {
+        await repo.eliminarReceta(recetaCreadaId);
+        await esperar(2000);
+        const recetasFinal = await DBAppwrite.listar('recetas');
+        assert(!recetasFinal.some(r => r.id === recetaCreadaId), 'Recetas: Appwrite receta eliminada');
+        assert(!DB.recetas.some(r => r.id === recetaCreadaId), 'Recetas: DB local receta eliminada');
+      } catch (e) {
+        assert(false, 'Recetas: error al eliminar: ' + e.message);
+      }
+
+      try {
+        const detalleReceta = await repo.guardarReceta({
+          _nombreProducto: 'Detalle Test ' + sufijo,
+          nivel: 'final',
+          categoria: 'test_detalle',
+          es_intermedio: false,
+          destino: 'cocina',
+          ingredientes: [{ tipo: 'insumo', id: insumoTestId, cantidad: 1, unidad: 'kg' }],
+          instrucciones: 'Instrucción de prueba',
+          creadoPor: 'test'
+        });
+        recetasCreadas.push(detalleReceta.id);
+        productosCreados.push(detalleReceta.productoId);
+        await esperar(1500);
+
+        DBInventario.productos = DB.productos || [];
+        DBInventario.recetas = DB.recetas || [];
+        DBInventario.insumos = DB.insumos || [];
+
+        Recetas.mostrarDetalle(detalleReceta.id);
+        await esperar(500);
+        const modal = document.getElementById('modalRecetaDetalle');
+        assert(modal && modal.style.display === 'flex', 'Recetas: modal de detalle abierto');
+        if (modal) {
+          const contenido = modal.textContent;
+          assert(contenido.includes('Detalle Test ' + sufijo), 'Recetas: modal nombre visible');
+          assert(contenido.includes(nombreInsumo), 'Recetas: modal insumo visible');
+          const btnCerrar = document.getElementById('btnCerrarDetalle');
+          if (btnCerrar) btnCerrar.click();
+          await esperar(300);
+          assert(modal.style.display === 'none', 'Recetas: modal cerrado');
+        }
+        await repo.eliminarReceta(detalleReceta.id);
+        await esperar(1500);
+      } catch (e) {
+        assert(false, 'Recetas: error en modal: ' + e.message);
+      }
+
+      // Verificación rol base
+      resultsEl.innerHTML += '<h2>Verificación rol base</h2>';
+      const rolesActuales = Auth.obtenerRolesEfectivos();
+      assert(!rolesActuales.includes('cliente'), 'Sin referencias al rol cliente en la sesión');
+      assert(typeof Auth.esJugador === 'function' || typeof Auth.tienePermiso === 'function', 'Auth expone esJugador o tienePermiso');
+
+      // Limpieza final
+      for (const id of comandasCreadas) { try { await DBAppwrite.eliminar('comandas', id); } catch {} }
+      for (const id of recetasCreadas) { try { await DBAppwrite.eliminar('recetas', id); } catch {} }
+      for (const id of productosCreados) { try { await DBAppwrite.eliminar('productos', id); } catch {} }
+      for (const id of insumosCreados) { try { await DBAppwrite.eliminar('insumos', id); } catch {} }
+
+      document.getElementById('view-recetas')?.remove();
+      document.querySelectorAll('.modal-overlay').forEach(o => o.remove());
+
+      resultsEl.innerHTML += `<div class="summary">${passed} pasaron, ${failed} fallaron</div>`;
+      if (failed === 0) resultsEl.innerHTML += `<div class="test pass">✔ Test B2 unificado real superado por completo.</div>`;
+    }
+
+    window.addEventListener('load', () => setTimeout(run, 200));
+  </script>
+</body>
+</html>

@@ -1,0 +1,527 @@
+/* ================================================================
+   LaTaberna - PubPOS — CSS MODULAR
+   Archivo: css/caja-cobro.css
+   Versión: 1.0.0
+   Propósito: Modal de cobro y split bill. Todos los estilos están
+              encapsulados bajo #modalCierre.
+   ================================================================ */
+
+/* ═══════════════════════════════════════════════════════════════
+   SECCIÓN 1 — CONTENEDOR DEL MODAL
+   ═══════════════════════════════════════════════════════════════ */
+
+#modalCierre .cobro-modal {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 980px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  overflow: hidden;
+}
+
+#modalCierre .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+#modalCierre .modal-header h3 {
+  font-size: 16.5px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+#modalCierre .modal-header .icon-accent { color: var(--color-accent); }
+#modalCierre .modal-header .mh-sub {
+  font-size: 11.5px;
+  color: var(--color-text-muted);
+  font-weight: 500;
+  margin-top: 2px;
+}
+#modalCierre .modal-close {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 15px;
+  cursor: pointer;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#modalCierre .modal-close:hover {
+  color: var(--color-text);
+  background: var(--color-hover);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SECCIÓN 2 — CUERPO EN DOS COLUMNAS
+   ═══════════════════════════════════════════════════════════════ */
+
+#modalCierre .cobro-body {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  flex: 1;
+  min-height: 0;
+}
+
+#modalCierre .cobro-left {
+  padding: 20px 22px;
+  overflow-y: auto;
+  border-right: 1px solid var(--color-border);
+}
+
+#modalCierre .cobro-right {
+  padding: 20px;
+  overflow-y: auto;
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SECCIÓN 3 — PESTAÑAS DE SPLIT
+   ═══════════════════════════════════════════════════════════════ */
+
+#modalCierre .split-tabs {
+  display: flex;
+  gap: 6px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 99px;
+  padding: 4px;
+  margin-bottom: 18px;
+}
+#modalCierre .split-tabs button {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--color-text-sec);
+  padding: 9px 10px;
+  border-radius: 99px;
+  cursor: pointer;
+  font-size: 12.5px;
+  font-weight: 700;
+  transition: var(--t);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+#modalCierre .split-tabs button.active {
+  background: var(--color-info);
+  color: #04211d;
+  box-shadow: 0 0 0 1px rgba(23,184,166,.25);
+}
+
+#modalCierre .split-panel { display: none; }
+#modalCierre .split-panel.active { display: block; }
+
+/* ═══════════════════════════════════════════════════════════════
+   SECCIÓN 4 — ÍTEMS
+   ═══════════════════════════════════════════════════════════════ */
+
+#modalCierre .item-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 4px;
+  border-bottom: 1px solid var(--color-border);
+}
+#modalCierre .item-row:last-child { border-bottom: none; }
+#modalCierre .item-qty {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--color-text-sec);
+  flex-shrink: 0;
+}
+#modalCierre .item-name {
+  flex: 1;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+#modalCierre .item-price {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--color-text-sec);
+  min-width: 68px;
+  text-align: right;
+}
+#modalCierre .item-chips {
+  display: flex;
+  gap: 4px;
+}
+#modalCierre .chip-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  font-size: 9.5px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #04211d;
+  border: 2px solid var(--color-card);
+  cursor: pointer;
+  transition: var(--t);
+}
+#modalCierre .chip-avatar:hover { transform: translateY(-2px); }
+#modalCierre .chip-avatar.p1 { background: var(--color-info); }
+#modalCierre .chip-avatar.p2 { background: var(--color-accent); }
+#modalCierre .chip-avatar.p3 { background: var(--color-primary); color: #fff; }
+#modalCierre .chip-avatar.off {
+  background: var(--color-panel);
+  color: var(--color-text-muted);
+  border-style: dashed;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SECCIÓN 5 — AÑADIR PERSONAS Y DIVIDIR
+   ═══════════════════════════════════════════════════════════════ */
+
+#modalCierre .person-add-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+#modalCierre .person-add-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--color-panel);
+  border: 1px dashed var(--color-border);
+  color: var(--color-text-sec);
+  padding: 8px 14px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: var(--t);
+}
+#modalCierre .person-add-btn:hover {
+  border-color: var(--color-info);
+  color: var(--color-info);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SECCIÓN 6 — TARJETA POR PERSONA
+   ═══════════════════════════════════════════════════════════════ */
+
+#modalCierre .split-person-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+#modalCierre .split-person-card .avatar-lg {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #04211d;
+  flex-shrink: 0;
+}
+#modalCierre .spc-info { flex: 1; }
+#modalCierre .spc-name { font-weight: 700; font-size: 13.5px; }
+#modalCierre .spc-detail { font-size: 11px; color: var(--color-text-muted); }
+#modalCierre .spc-amount-input {
+  width: 96px;
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  padding: 9px 10px;
+  font-weight: 700;
+  font-size: 13.5px;
+  text-align: right;
+  min-height: 40px;
+  outline: none;
+}
+#modalCierre .spc-amount-input:focus { border-color: var(--color-info); }
+
+/* ═══════════════════════════════════════════════════════════════
+   SECCIÓN 7 — DESCUENTO Y FORMULARIOS
+   ═══════════════════════════════════════════════════════════════ */
+
+#modalCierre .discount-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+#modalCierre .form-group label {
+  display: block;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--color-text-muted);
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+#modalCierre .form-group input,
+#modalCierre .form-group select {
+  width: 100%;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  padding: 11px 13px;
+  font-size: 14px;
+  outline: none;
+  transition: var(--t);
+  min-height: 42px;
+}
+#modalCierre .form-group input:focus,
+#modalCierre .form-group select:focus { border-color: var(--color-accent); }
+
+/* ═══════════════════════════════════════════════════════════════
+   SECCIÓN 8 — TOTALES Y RESTANTE
+   ═══════════════════════════════════════════════════════════════ */
+
+#modalCierre .totals-box {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+#modalCierre .tot-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12.5px;
+  color: var(--color-text-sec);
+  padding: 4px 0;
+}
+#modalCierre .tot-line.grand {
+  border-top: 1px solid var(--color-border);
+  margin-top: 8px;
+  padding-top: 10px;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--color-text);
+}
+#modalCierre .tot-line.grand span:last-child { color: var(--color-success); }
+#modalCierre .tot-line b { color: var(--color-text); }
+
+#modalCierre .restante-box {
+  text-align: center;
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 14px;
+  font-weight: 700;
+  font-size: 13px;
+  background: rgba(240,69,90,.1);
+  color: var(--color-danger);
+  border: 1px solid rgba(240,69,90,.25);
+}
+#modalCierre .restante-box.ok {
+  background: rgba(46,204,113,.1);
+  color: var(--color-success);
+  border-color: rgba(46,204,113,.25);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SECCIÓN 9 — PAGOS POR PERSONA
+   ═══════════════════════════════════════════════════════════════ */
+
+#modalCierre .pay-people {
+  flex: 1;
+  overflow-y: auto;
+  margin-bottom: 14px;
+}
+#modalCierre .pay-person {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 12px;
+  margin-bottom: 10px;
+}
+#modalCierre .pay-person.paid {
+  border-color: rgba(46,204,113,.4);
+  background: rgba(46,204,113,.05);
+}
+#modalCierre .pp-top {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 9px;
+}
+#modalCierre .pp-top .avatar-lg {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 10.5px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #04211d;
+  flex-shrink: 0;
+}
+#modalCierre .pp-name { font-size: 12.5px; font-weight: 700; flex: 1; }
+#modalCierre .pp-amt { font-size: 13px; font-weight: 700; }
+#modalCierre .pp-check { color: var(--color-success); font-size: 15px; }
+
+#modalCierre .pay-methods {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+#modalCierre .pm-chip {
+  flex: 1;
+  min-width: 56px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  padding: 6px 4px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  min-height: 38px;
+  justify-content: center;
+  transition: var(--t);
+}
+#modalCierre .pm-chip.active {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: #000;
+}
+#modalCierre .pm-chip i { font-size: 12px; }
+
+/* ═══════════════════════════════════════════════════════════════
+   SECCIÓN 10 — TECLADO NUMÉRICO Y VUELTO
+   ═══════════════════════════════════════════════════════════════ */
+
+#modalCierre .keypad-box {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 14px;
+}
+#modalCierre .keypad-amount {
+  font-size: 24px;
+  font-weight: 800;
+  text-align: center;
+  padding: 8px 0;
+  color: var(--color-accent);
+}
+#modalCierre .quick-cash {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-bottom: 6px;
+}
+#modalCierre .quick-cash button {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-sec);
+  padding: 8px 4px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  min-height: 36px;
+  transition: var(--t);
+}
+#modalCierre .quick-cash button:hover {
+  background: var(--color-hover);
+  color: var(--color-text);
+}
+#modalCierre .vuelto-line {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--color-text-sec);
+  padding-top: 8px;
+  border-top: 1px dashed var(--color-border);
+  margin-top: 4px;
+}
+#modalCierre .vuelto-line b {
+  color: var(--color-success);
+  font-weight: 700;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SECCIÓN 11 — PIE DEL MODAL
+   ═══════════════════════════════════════════════════════════════ */
+
+#modalCierre .modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 22px;
+  border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SECCIÓN 12 — RESPONSIVE
+   ═══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 900px) {
+  #modalCierre .cobro-body { grid-template-columns: 1fr; }
+  #modalCierre .cobro-left {
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+  }
+  #modalCierre .cobro-modal { max-height: 96vh; }
+}
+
+@media (max-width: 600px) {
+  #modalCierre .cobro-modal {
+    max-height: 100vh;
+    border-radius: 0;
+  }
+  #modalCierre .modal-footer {
+    flex-direction: column-reverse;
+    padding: 14px;
+  }
+  #modalCierre .modal-footer .btn-primary,
+  #modalCierre .modal-footer .btn-secondary,
+  #modalCierre .modal-footer .btn-ghost {
+    width: 100%;
+    justify-content: center;
+  }
+  #modalCierre .cobro-left,
+  #modalCierre .cobro-right { padding: 16px; }
+  #modalCierre .discount-row { grid-template-columns: 1fr; }
+  #modalCierre .split-person-card { flex-wrap: wrap; }
+  #modalCierre .spc-amount-input { width: 100%; }
+}

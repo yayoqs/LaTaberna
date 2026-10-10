@@ -1,10 +1,27 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db.js
-   Versión: 1.4.2
+   Versión: 1.6.7
    Propósito: Orquestador de base de datos (Appwrite + localStorage).
-              v1.4.2: corregida creación de staff con ID automático
-                      (null en lugar de 'unique()').
+              v1.6.7: A.76: se agrega carga inicial de cartas.
+                      'cartas' se suma a la lista de colecciones
+                      paralelas en init(). Se agrega
+                      _procesarCartas siguiendo el patrón de
+                      _procesarVariantes. Célula E agrega el
+                      despacho CARTAS_INICIALIZAR en bootstrap.js
+                      v1.0.23. Coexistencia con el despacho
+                      incremental de carta-editor/acciones.js
+                      v2.0.3 (guardar y cargar manual). Aprobado
+                      por Coordinación 2026-10-09 20:00 UTC.
+              v1.6.6: hallazgo 3 del saneamiento post-movimientos.
+              v1.6.5: A.74: carga inicial de movimientos en paralelo.
+              v1.6.4: A.71: sincronizarLabelsStaff y vincularCuentaStaff
+                      usan DBAppwrite.invocarAsignarRol (SDK oficial).
+              v1.6.3: A.46: carga inicial de variantes.
+              v1.6.2: A.13: _cargarConfiguracion filtra por espacioId.
+              v1.6.1: Restaurado el bloque de idempotencia en
+                      cerrarPedido.
+              v1.6.0: JWT en llamadas a asignar-rol.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -18,8 +35,6 @@ import { DBShim } from './db-shim.js';
 import { Deps } from './lib/deps.js';
 import { Roles } from './roles.js';
 import { Auth } from './auth.js';
-import { URL_FUNCION_ASIGNAR_ROL } from './config-appwrite.js';
-import { inicializarAuth } from './auth.js';
 
 export const DB = (function() {
   const core = DBCore;
@@ -36,6 +51,33 @@ export const DB = (function() {
     mesaVacia
   };
 
+  // ── IDEMPOTENCIA DE CIERRE DE PEDIDO ─────────────────────
+  const _clavesIdempotencia = new Map();
+
+  function _cargarClavesIdempotencia() {
+    try {
+      const raw = localStorage.getItem('db_idempotencia');
+      if (raw) {
+        const obj = JSON.parse(raw);
+        Object.keys(obj).forEach(k => _clavesIdempotencia.set(k, obj[k]));
+      }
+    } catch (e) {
+      Logger.warn('[DB] No se pudo cargar claves de idempotencia:', e.message);
+    }
+  }
+
+  function _guardarClavesIdempotencia() {
+    try {
+      const obj = {};
+      _clavesIdempotencia.forEach((v, k) => { obj[k] = v; });
+      localStorage.setItem('db_idempotencia', JSON.stringify(obj));
+    } catch (e) {
+      Logger.warn('[DB] No se pudo guardar claves de idempotencia:', e.message);
+    }
+  }
+
+  _cargarClavesIdempotencia();
+
   /* ── STAFF ─────────────────────────────────────────────── */
 
   function _rolesActuales() {
@@ -50,8 +92,6 @@ export const DB = (function() {
     const rolesActuales = _rolesActuales();
     if (rolesActuales.includes('master')) return;
 
-    // Para cada rol objetivo, debe existir al menos un rol actual
-    // que pueda asignarlo.
     const puedeAsignar = rolesObjetivo.every(rolObjetivo =>
       rolesActuales.some(rolActual =>
         Roles.puedeAsignar(rolActual, rolObjetivo)
@@ -83,17 +123,8 @@ export const DB = (function() {
 
   combined.crearOActualizarStaff = async function(datos) {
     const {
-      nombre,
-      usuarioId,
-      espacioId,
-      roles,
-      rolPrincipal,
-      estado,
-      fechaIngreso,
-      telefono,
-      email,
-      notas,
-      tokenVinculacion
+      nombre, usuarioId, espacioId, roles, rolPrincipal, estado,
+      fechaIngreso, telefono, email, notas, tokenVinculacion
     } = datos;
 
     if (!usuarioId || !espacioId) throw new Error('usuarioId y espacioId son obligatorios');
@@ -104,13 +135,10 @@ export const DB = (function() {
     })();
 
     const rolPrincipalFinal = rolPrincipal || rolesArray[0] || 'mesero';
-
     _validarAsignacionRoles(rolesArray, rolPrincipalFinal);
 
     const registro = {
-      nombre,
-      usuarioId,
-      espacioId,
+      nombre, usuarioId, espacioId,
       roles: JSON.stringify(rolesArray),
       rolPrincipal: rolPrincipalFinal,
       estado: estado || 'activo',
@@ -122,15 +150,12 @@ export const DB = (function() {
     };
 
     let resultado;
-
     if (appwrite && appwrite.habilitado) {
       const existente = await this.obtenerStaffPorUsuario(usuarioId, espacioId);
       if (existente) {
         await appwrite.actualizar('staff', existente.id, registro);
         resultado = { ...existente, ...registro, id: existente.id };
       } else {
-        // ID automático: pasamos null para que DBAppwrite genere
-        // un ID único mediante Appwrite.ID.unique()
         resultado = await appwrite.crear('staff', null, registro);
       }
     } else {
@@ -158,24 +183,21 @@ export const DB = (function() {
 
   combined.vincularCuentaStaff = async function(token) {
     if (!token) throw new Error('Token de vinculación requerido');
-
     const usuarioId = await this.obtenerIdUsuarioActual?.();
     if (!usuarioId) return { exito: false, error: 'No hay cuenta activa para vincular' };
 
     try {
-      const response = await fetch(URL_FUNCION_ASIGNAR_ROL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, userId: usuarioId })
-      });
-      const data = await response.json();
-      if (!data.exito) {
-        Logger.warn('[DB] No se pudo canjear token:', data.error);
-        return { exito: false, error: data.error || 'Error al canjear token' };
+      const respuesta = await DBAppwrite.invocarAsignarRol({ token, userId: usuarioId });
+
+      if (!respuesta || respuesta.exito !== true) {
+        const mensaje = respuesta?.error || 'Error al canjear token';
+        Logger.warn('[DB] No se pudo canjear token:', mensaje);
+        return { exito: false, error: mensaje };
       }
-      return { exito: true, staff: data.staff };
+
+      return { exito: true, staff: respuesta.staff };
     } catch (e) {
-      Logger.error('[DB] Error al llamar a asignar-rol para vinculación:', e);
+      Logger.error('[DB] Error al invocar asignar-rol para vinculación:', e);
       return { exito: false, error: 'No se pudo conectar con el servicio de vinculación' };
     }
   };
@@ -185,19 +207,17 @@ export const DB = (function() {
 
     if (appwrite && appwrite.habilitado) {
       try {
-        const response = await fetch(URL_FUNCION_ASIGNAR_ROL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: usuarioId, espacioId, roles })
-        });
-        const data = await response.json();
-        if (!data.success) {
-          Logger.warn('[DB] No se pudo sincronizar labels:', data.error);
-          return { exito: false, error: data.error || 'Error al sincronizar labels' };
+        const respuesta = await DBAppwrite.invocarAsignarRol({ userId: usuarioId, espacioId, roles });
+
+        if (!respuesta || respuesta.success !== true) {
+          const mensaje = respuesta?.error || 'Error al sincronizar labels';
+          Logger.warn('[DB] No se pudo sincronizar labels:', mensaje);
+          return { exito: false, error: mensaje };
         }
+
         return { exito: true };
       } catch (e) {
-        Logger.error('[DB] Error al llamar a la función de sincronización:', e);
+        Logger.error('[DB] Error al invocar la función de sincronización:', e);
         return { exito: false, error: e.message };
       }
     }
@@ -214,7 +234,7 @@ export const DB = (function() {
     }
   };
 
-  /* ── RESTO DEL ORQUESTADOR (sin cambios) ───────────────── */
+  /* ── RESTO DEL ORQUESTADOR ───────────────── */
 
   combined.init = async function() {
     try {
@@ -232,7 +252,9 @@ export const DB = (function() {
 
       Deps.registrar('db', combined);
 
-      await inicializarAuth();
+      // NOTA: El arranque de Auth se hace exclusivamente en bootstrap.js.
+      // No llamar a inicializarAuth() aquí.
+
       await this._cargarConfiguracion();
       this._cargarMozosLocal();
 
@@ -246,7 +268,10 @@ export const DB = (function() {
             'mesas',
             'comandas',
             'insumos',
-            'recetas'
+            'recetas',
+            'variantes',
+            'movimientos',
+            'cartas'
           ].map(function(coleccion) {
             return appwrite.listar(coleccion).then(function(lista) {
               resultados[coleccion] = lista;
@@ -264,6 +289,9 @@ export const DB = (function() {
           this._procesarComandas(resultados.comandas);
           this._procesarInsumos(resultados.insumos);
           this._procesarRecetas(resultados.recetas);
+          this._procesarVariantes(resultados.variantes);
+          this._procesarMovimientos(resultados.movimientos);
+          this._procesarCartas(resultados.cartas);
 
           Logger.info('[DB] Datos cargados exitosamente.');
         } catch (e) {
@@ -335,6 +363,9 @@ export const DB = (function() {
       this.mesas = lista.map(m => this._normalizarMesa(m));
     } else {
       this._cargarMesasLocal();
+      if (!this.mesas || this.mesas.length === 0) {
+        this._inicializarMesas();
+      }
     }
     this.mesas.sort((a, b) => parseInt(a.numero) - parseInt(b.numero));
   };
@@ -362,6 +393,99 @@ export const DB = (function() {
     }
   };
 
+  combined._procesarVariantes = function(lista) {
+    if (lista && Array.isArray(lista) && lista.length > 0) {
+      this.variantes = lista.map(v => this._normalizarVariante(v));
+    } else {
+      this._cargarVariantesLocal();
+    }
+    Store.despachar({ type: 'VARIANTES_INICIALIZAR', payload: this.variantes || [] });
+  };
+
+  /**
+   * A.74: normaliza los movimientos que llegan de Appwrite.
+   * Aplica la retención de 30 días antes de cargar al array.
+   */
+  combined._procesarMovimientos = function(lista) {
+    const limiteFecha = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    if (lista && Array.isArray(lista) && lista.length > 0) {
+      this.movimientos = lista
+        .map(m => this._normalizarMovimiento(m))
+        .filter(m => m.fecha && m.fecha >= limiteFecha)
+        .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    } else {
+      this._cargarMovimientosLocal();
+      this.movimientos = (this.movimientos || [])
+        .filter(m => m.fecha && m.fecha >= limiteFecha)
+        .sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
+    }
+  };
+
+  /**
+   * A.76: normaliza las cartas que llegan de Appwrite y las carga
+   * en DB.cartas. El despacho al Store lo hace bootstrap.js
+   * (Célula E, v1.0.23) o el propio carta-editor al guardar. El
+   * array `productos` puede venir serializado como string JSON
+   * desde la columna varchar 10000. Se parsea aquí.
+   *
+   * Coexistencia: el despacho de carta-editor/acciones.js sigue
+   * vivo para actualizaciones incrementales tras guardar o cargar
+   * manual. Este método cubre solo la carga inicial.
+   */
+  combined._procesarCartas = function(lista) {
+    if (lista && Array.isArray(lista) && lista.length > 0) {
+      this.cartas = lista.map(c => {
+        const carta = { ...c };
+        if (typeof carta.productos === 'string') {
+          try {
+            const parsed = JSON.parse(carta.productos);
+            carta.productos = Array.isArray(parsed) ? parsed : [];
+          } catch (e) {
+            Logger.warn('[DB] Error al parsear productos de carta ' + carta.id + ':', e.message);
+            carta.productos = [];
+          }
+        } else if (!Array.isArray(carta.productos)) {
+          carta.productos = [];
+        }
+        return carta;
+      });
+    } else {
+      this._cargarCartasLocal();
+    }
+    Logger.info('[DB] Cartas procesadas: ' + (this.cartas || []).length);
+  };
+
+  combined._cargarCartasLocal = function() {
+    const raw = localStorage.getItem('pubpos_cartas');
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          this.cartas = parsed.map(c => {
+            const carta = { ...c };
+            if (typeof carta.productos === 'string') {
+              try {
+                const p = JSON.parse(carta.productos);
+                carta.productos = Array.isArray(p) ? p : [];
+              } catch { carta.productos = []; }
+            } else if (!Array.isArray(carta.productos)) {
+              carta.productos = [];
+            }
+            return carta;
+          });
+        } else {
+          this.cartas = [];
+        }
+      } catch (e) {
+        Logger.error('[DB] Error al parsear cartas locales:', e);
+        this.cartas = [];
+      }
+    } else {
+      this.cartas = [];
+    }
+  };
+
   combined._cargarTodoLocal = function() {
     this._cargarProductosLocal();
     this._cargarPedidosLocal();
@@ -369,7 +493,18 @@ export const DB = (function() {
     this._cargarComandasLocal();
     this._cargarInsumosLocal();
     this._cargarRecetasLocal();
-    this.saveMesas();
+    this._cargarVariantesLocal();
+    this._cargarMovimientosLocal();
+    this._cargarCartasLocal();
+    // v1.6.6: los tres cargadores que faltaban en el path offline.
+    this._cargarPedidosDeliveryLocal();
+    this._cargarProveedoresLocal();
+    this._cargarEntradasLocal();
+    if (!this.mesas || this.mesas.length === 0) {
+      this._inicializarMesas();
+    } else {
+      this.saveMesas();
+    }
     Logger.info('[DB] Todos los datos cargados desde localStorage.');
   };
 
@@ -454,13 +589,27 @@ export const DB = (function() {
   };
 
   combined._cargarConfiguracion = async function() {
-    if (typeof appwrite !== 'undefined' && appwrite.habilitado) {
+    const espacioId = this.espacioActivoId();
+
+    if (typeof appwrite !== 'undefined' && appwrite.habilitado && espacioId) {
       try {
-        const configAppwrite = await appwrite.listar('configuracion');
-        const docGlobal = configAppwrite.find(function(d) { return d.clave === 'global'; });
+        const configAppwrite = await appwrite.listar('configuracion', {
+          filtros: [Appwrite.Query.equal('clave', 'global')]
+        });
+
+        let docGlobal = configAppwrite.find(function(d) {
+          return d.espacioId === espacioId && d.clave === 'global';
+        });
+
+        if (!docGlobal) {
+          docGlobal = configAppwrite.find(function(d) {
+            return d.id === 'global' && d.espacioId === espacioId;
+          });
+        }
+
         if (docGlobal && docGlobal.valor) {
           this.config = JSON.parse(docGlobal.valor);
-          Logger.info('[DB] Configuración cargada desde Appwrite.');
+          Logger.info('[DB] Configuración cargada desde Appwrite para espacio ' + espacioId + '.');
           if (!this.config.zonas) {
             this.config.zonas = [{ nombre: 'salon', cantidad: 12 }];
           }
@@ -504,22 +653,67 @@ export const DB = (function() {
     return 'esp_taberna';
   };
 
-  combined.cerrarPedido = async function(id, formaPago, total, descuento) {
+  combined.recargarMovimientos = async function() {
+    if (!appwrite || !appwrite.habilitado) {
+      this._cargarMovimientosLocal();
+      Store.despachar({
+        type: 'MOVIMIENTOS_INICIALIZAR',
+        payload: this.movimientos || []
+      });
+      return this.movimientos || [];
+    }
+
+    try {
+      const lista = await appwrite.listar('movimientos');
+      this._procesarMovimientos(lista);
+      Store.despachar({
+        type: 'MOVIMIENTOS_INICIALIZAR',
+        payload: this.movimientos || []
+      });
+      Logger.info('[DB] Movimientos recargados al Store: ' + (this.movimientos || []).length);
+      return this.movimientos || [];
+    } catch (e) {
+      Logger.warn('[DB] Error al recargar movimientos:', e);
+      return this.movimientos || [];
+    }
+  };
+
+  // ── CIERRE DE PEDIDO CON IDEMPOTENCIA ─────────────────────
+  combined.cerrarPedido = async function(id, formaPago, total, descuento, claveIdempotencia) {
     const pedido = this.pedidos.find(p => p.id === id);
     if (!pedido) { Logger.warn(`[DB] Pedido ${id} no encontrado.`); return null; }
+
+    if (claveIdempotencia) {
+      const resultadoPrevio = _clavesIdempotencia.get(claveIdempotencia);
+      if (resultadoPrevio) {
+        Logger.info(`[DB] Idempotencia: operación ${claveIdempotencia} ya ejecutada, devolviendo resultado previo.`);
+        return this.pedidos.find(p => p.id === resultadoPrevio.pedidoId) || pedido;
+      }
+      _clavesIdempotencia.set(claveIdempotencia, { pedidoId: id, timestamp: Date.now() });
+      _guardarClavesIdempotencia();
+    }
+
     if (pedido.estado === 'cerrada' || pedido.estado === 'cerrado') {
       Logger.warn(`[DB] El pedido ${id} ya está cerrado.`);
       return pedido;
     }
+
     if (appwrite && appwrite.habilitado) {
       try {
-        await appwrite.actualizar('pedidos', id, { estado: 'cerrada', total: total });
+        await appwrite.actualizar('pedidos', id, { estado: 'cerrada', total });
         Logger.info(`[DB] Pedido ${id} actualizado en Appwrite.`);
-      } catch (e) { Logger.error("[DB] Error al actualizar pedido en Appwrite:", e); return null; }
+      } catch (e) {
+        Logger.error("[DB] Error al actualizar pedido en Appwrite:", e);
+        return null;
+      }
     }
+
     pedido.estado = 'cerrada';
     pedido.total = total;
+    pedido.descuento = descuento || 0;
     pedido.actualizadoEn = new Date().toISOString();
+    this.savePedidos();
+    EventBus.emit('pedido:cerrado', { id, total, pedidoId: id });
     return pedido;
   };
 

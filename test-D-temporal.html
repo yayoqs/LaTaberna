@@ -1,68 +1,56 @@
+<!--
+  LaTaberna - PubPOS — Test D Temporal (A.52 guardarProducto)
+  Archivo: test-D-temporal.html (raíz)
+  Versión: 1.0.0
+  Propósito: Diagnóstico del fix A.52. Valida que
+             receta-repository.guardarProducto persiste
+             categoria, precio, descripcion, imagen, alergenos,
+             y respeta el estado del input (no lo hardcodea a
+             'disponible').
+
+  Este test es temporal. Se elimina cuando:
+    · pase verde contra el fix de receta-repository v1.2.1;
+    · sus aserciones se absorban al Bloque 12 del unificado.
+
+  Credenciales: jefePub / jefe1234 en espacio PubPrueba.
+-->
 <!DOCTYPE html>
 <html lang="es-CL">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-  <title>Test D — Temporal: Perfil v2</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test D Temporal — A.52 guardarProducto</title>
   <link rel="stylesheet" href="css/vars.css">
   <link rel="stylesheet" href="css/base.css">
-  <link rel="stylesheet" href="css/layout.css">
-  <link rel="stylesheet" href="css/modals.css">
-  <link rel="stylesheet" href="css/perfil.css">
   <script src="js/appwrite.min.js"></script>
   <style>
-    html, body {
-      height: auto;
-      min-height: 100vh;
-      overflow-y: auto;
-      overflow-x: hidden;
-      margin: 0;
-      padding: 0;
-    }
-    body {
-      display: block;
-      background: #0f0f14;
-      color: #f1f5f9;
-      font-family: 'Nunito', system-ui, sans-serif;
-      padding: 20px;
-      box-sizing: border-box;
-    }
-    .panel-test {
-      background: #1a1a24;
-      border: 1px solid #2e2e42;
-      border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 20px;
-      box-sizing: border-box;
-    }
+    html, body { height: auto; min-height: 100vh; overflow-y: auto; margin: 0; }
+    body { display: block; background: #0f0f14; color: #f1f5f9; font-family: 'Nunito', system-ui, sans-serif; padding: 20px; box-sizing: border-box; }
+    .panel-test { background: #1a1a24; border: 1px solid #2e2e42; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
     .panel-test h2 { font-size: 18px; margin: 0 0 12px; }
     .log-positivo { color: #22c55e; font-weight: 700; }
     .log-error { color: #ef4444; font-weight: 700; }
     .log-info { color: #60a5fa; font-weight: 700; }
+    .log-seccion { color: #f59e0b; font-weight: 800; font-size: 14px; margin-top: 16px; margin-bottom: 6px; padding-top: 8px; border-top: 1px solid #2e2e42; }
     code { background: #252535; padding: 2px 6px; border-radius: 4px; }
-    #view-perfil { display: block; height: auto; min-height: 0; overflow: visible; }
-    @media (max-width: 768px) {
-      body { padding: 12px; }
-      .panel-test { padding: 14px; }
-    }
   </style>
 </head>
+
 <body>
+
   <div class="panel-test">
-    <h2>Test D — Temporal: Perfil v2</h2>
-    <p style="font-size:13px; color:#94a3b8; margin:0 0 8px;">
-      Verifica la interfaz real de perfil: render, paneles, pestañas, edición y administración de roles.
-    </p>
+    <h2>Test D Temporal — A.52 guardarProducto</h2>
     <div id="logTest"></div>
   </div>
-  <main id="view-perfil"></main>
 
   <script type="module">
-    import { Auth } from './js/auth.js';
-    import { DB } from './js/db.js';
+    import { Auth }       from './js/auth.js';
+    import { DB }         from './js/db.js';
     import { DBAppwrite } from './js/db-appwrite.js';
-    import { Logger } from './js/lib/logger.js';
-    import { Perfil } from './js/ui/perfil.js';
+    import { Logger }     from './js/lib/logger.js';
+    import { Store }      from './js/lib/store.js';
+    import { Deps }       from './js/lib/deps.js';
+    import { crearRecetaRepo } from './js/repositorios/receta-repository.js';
 
     Logger.setLevel('ERROR');
     const log = document.getElementById('logTest');
@@ -75,129 +63,280 @@
       log.appendChild(fila);
       resultados.push({ nombre, ok });
     }
+
     function agregarInfo(mensaje) {
       const fila = document.createElement('div');
       fila.className = 'log-info';
       fila.innerHTML = `ℹ️ ${mensaje}`;
       log.appendChild(fila);
     }
+
+    function agregarSeccion(titulo) {
+      const fila = document.createElement('div');
+      fila.className = 'log-seccion';
+      fila.textContent = `── ${titulo} ──`;
+      log.appendChild(fila);
+    }
+
     const esperar = ms => new Promise(r => setTimeout(r, ms));
 
+    async function esperarHasta(fn, timeout = 8000, intervalo = 200) {
+      const inicio = Date.now();
+      while (Date.now() - inicio < timeout) {
+        const r = await fn();
+        if (r) return r;
+        await esperar(intervalo);
+      }
+      return null;
+    }
+
+    async function leerProductoRemoto(id) {
+      try {
+        return await DBAppwrite.baseDeDatos.getRow({
+          databaseId: DBAppwrite.idBaseDeDatos,
+          tableId: DBAppwrite.COLECCIONES.productos,
+          rowId: id
+        });
+      } catch { return null; }
+    }
+
+    const idsCreados = [];
+
     async function run() {
-      Logger.setLevel('ERROR');
       log.innerHTML = '';
 
+      Deps.registrar('auth', Auth);
       await DB.init();
       await Auth.cerrarSesion();
-      const loginMaster = await Auth.iniciarSesion('master', 'master123');
-      if (!loginMaster) { agregarResultado('Login master', false); return; }
-      agregarResultado('Login master', true);
 
-      // Generar nombre corto (máximo 30 caracteres)
-      const sufijo = Date.now().toString().slice(-8);
-      const nombreAdmin = `tpa_${sufijo}`; // 4 + 8 = 12 caracteres
-      const passwordAdmin = 'Pass12345';
-      agregarInfo(`Creando admin temporal: ${nombreAdmin}`);
-
-      const regAdmin = await Auth.registrarUsuario(nombreAdmin, passwordAdmin);
-      if (!regAdmin.exito) {
-        agregarResultado('Registrar admin temporal', false, regAdmin.error);
+      const loginOk = await Auth.iniciarSesion('jefePub', 'jefe1234');
+      if (!loginOk) {
+        agregarResultado('Login jefePub/jefe1234', false);
         return;
       }
-      agregarResultado('Registrar admin temporal', true);
 
-      const staffAdmin = await DB.crearOActualizarStaff({
-        nombre: 'Admin Perfil Test',
-        usuarioId: regAdmin.usuarioId,
-        espacioId: 'lataberna',
-        roles: ['admin'],
-        rolPrincipal: 'admin',
-        estado: 'activo',
-        tokenVinculacion: ''
+      const espacioId = Auth.obtenerLocalActivo()?.id || null;
+      agregarResultado('Login jefePub/jefe1234', true, `Espacio: ${espacioId}`);
+
+      const repo = crearRecetaRepo();
+      const ts = Date.now().toString().slice(-6);
+
+      // ════════════════════════════════════════════════════════
+      // CASO A — Producto nuevo sin estado → persiste 'disponible'
+      // ════════════════════════════════════════════════════════
+      agregarSeccion('Caso A — Producto nuevo sin estado');
+
+      const pA = await repo.guardarProducto({
+        nombre: `Temporal A ${ts}`,
+        categoria: 'test_temporal',
+        activo: true,
+        destino: 'cocina'
+        // Sin campo `estado` intencionalmente.
       });
-      if (!staffAdmin) { agregarResultado('Crear staff admin temporal', false); return; }
-      agregarResultado('Crear staff admin temporal', true);
 
-      await Auth.cerrarSesion();
-      const loginAdmin = await Auth.iniciarSesion(nombreAdmin, passwordAdmin);
-      if (!loginAdmin) { agregarResultado('Login admin temporal', false); return; }
-      agregarResultado('Login admin temporal', true);
+      if (!pA?.id) {
+        agregarResultado('Caso A · Producto creado', false, 'devolvió null');
+        return;
+      }
+      idsCreados.push(pA.id);
+      agregarResultado('Caso A · Producto creado', true, pA.id);
 
-      Perfil.activar();
       await esperar(500);
+      const docA = await leerProductoRemoto(pA.id);
+      agregarResultado('Caso A · Doc en Appwrite', !!docA);
 
-      const vistaPerfil = document.getElementById('view-perfil');
-      agregarResultado('Vista perfil creada', !!vistaPerfil && !!vistaPerfil.querySelector('.main-layout'));
-      agregarResultado('Header perfil existe', !!document.querySelector('#view-perfil .perfil-header'));
-      agregarResultado('Panel izquierdo existe', !!document.getElementById('panelIzquierdoPerfil'));
-      agregarResultado('Panel derecho existe', !!document.getElementById('panelDerechoPerfil'));
-
-      const idCard = document.getElementById('perfilIdCard');
-      agregarResultado('ID card existe', !!idCard);
-      agregarResultado('Nombre visible en ID card', idCard?.textContent.includes(nombreAdmin));
-
-      const modoVitrina = document.getElementById('modoVitrinaPerfil');
-      const modoEdicion = document.getElementById('modoEdicionPerfil');
-      agregarResultado('Modo vitrina visible', modoVitrina && modoVitrina.style.display !== 'none');
-      agregarResultado('Modo edición oculto', modoEdicion && (modoEdicion.style.display === 'none' || !modoEdicion.style.display));
-
-      const btnEditarPerfil = document.getElementById('btnEditarPerfil');
-      agregarResultado('Botón editar perfil existe', !!btnEditarPerfil);
-      if (btnEditarPerfil) {
-        btnEditarPerfil.click();
-        await esperar(300);
-        agregarResultado('Modo edición visible tras clic', modoEdicion && modoEdicion.style.display !== 'none');
-        agregarResultado('Modo vitrina oculto tras clic', modoVitrina && modoVitrina.style.display === 'none');
+      if (docA) {
+        agregarResultado(
+          'Caso A · estado = "disponible" por defecto',
+          docA.estado === 'disponible',
+          `estado=${docA.estado}`
+        );
       }
 
-      const tabs = document.querySelectorAll('#view-perfil .central-tab');
-      const tabsVisibles = [...tabs].filter(t => t.classList.contains('visible'));
-      agregarResultado('Pestañas visibles existentes', tabsVisibles.length >= 3);
+      // ════════════════════════════════════════════════════════
+      // CASO B — Producto con estado 'agotado' → persiste 'agotado'
+      // ════════════════════════════════════════════════════════
+      agregarSeccion('Caso B — Producto con estado "agotado"');
 
-      const tabPublico = document.querySelector('#view-perfil .central-tab[data-tab="publico"]');
-      agregarResultado('Pestaña pública activa por defecto', tabPublico?.classList.contains('activo'));
+      const pB = await repo.guardarProducto({
+        nombre: `Temporal B ${ts}`,
+        categoria: 'test_temporal',
+        activo: true,
+        destino: 'cocina',
+        estado: 'agotado'
+      });
 
-      const inputApodo = document.getElementById('editarApodo');
-      if (inputApodo) {
-        inputApodo.value = 'Apodo Temporal';
-        const btnGuardarPublico = document.getElementById('btnGuardarPerfilPublico');
-        if (btnGuardarPublico) {
-          btnGuardarPublico.click();
-          await esperar(300);
-          agregarResultado('Apodo guardado sin errores', true);
+      if (!pB?.id) {
+        agregarResultado('Caso B · Producto agotado creado', false);
+      } else {
+        idsCreados.push(pB.id);
+        agregarResultado('Caso B · Producto agotado creado', true, pB.id);
+
+        await esperar(500);
+        const docB1 = await leerProductoRemoto(pB.id);
+        agregarResultado(
+          'Caso B · estado = "agotado" en Appwrite',
+          docB1?.estado === 'agotado',
+          `estado=${docB1?.estado}`
+        );
+
+        // Editar OTRO campo del producto agotado.
+        const pBEdit = await repo.guardarProducto({
+          ...pB,
+          id: pB.id,
+          nombre: `Temporal B Editado ${ts}`,
+          categoria: 'test_temporal',
+          activo: true,
+          destino: 'cocina',
+          estado: 'agotado'
+        });
+
+        await esperar(500);
+        const docB2 = await leerProductoRemoto(pB.id);
+        agregarResultado(
+          'Caso B · Edición preserva estado "agotado"',
+          docB2?.estado === 'agotado',
+          `estado=${docB2?.estado}`
+        );
+        agregarResultado(
+          'Caso B · Nombre editado persistió',
+          docB2?.nombre === `Temporal B Editado ${ts}`,
+          docB2?.nombre
+        );
+      }
+
+      // ════════════════════════════════════════════════════════
+      // CASO C — Todos los campos persistidos
+      // ════════════════════════════════════════════════════════
+      agregarSeccion('Caso C — Todos los campos persistidos');
+
+      const pC = await repo.guardarProducto({
+        nombre: `Temporal C ${ts}`,
+        categoria: 'bebidas_premium',
+        precio: 4500,
+        descripcion: 'Descripción de prueba con acentos: ñáéíóú',
+        imagen: 'https://placehold.co/200x200/6366f1/fff?text=TestC',
+        activo: true,
+        destino: 'barra',
+        estado: 'disponible',
+        alergenos: ['gluten', 'lactosa']
+      });
+
+      if (!pC?.id) {
+        agregarResultado('Caso C · Producto completo creado', false);
+      } else {
+        idsCreados.push(pC.id);
+        agregarResultado('Caso C · Producto completo creado', true, pC.id);
+
+        await esperar(500);
+        const docC = await leerProductoRemoto(pC.id);
+        agregarResultado('Caso C · Doc en Appwrite', !!docC);
+
+        if (docC) {
+          agregarResultado('Caso C · categoria persistida', docC.categoria === 'bebidas_premium', `categoria=${docC.categoria}`);
+          agregarResultado('Caso C · precio persistido', Number(docC.precio) === 4500, `precio=${docC.precio}`);
+          agregarResultado('Caso C · descripcion persistida', docC.descripcion === 'Descripción de prueba con acentos: ñáéíóú', `descripcion=${docC.descripcion}`);
+          agregarResultado('Caso C · imagen persistida', docC.imagen === 'https://placehold.co/200x200/6366f1/fff?text=TestC', `imagen=${docC.imagen}`);
+          agregarResultado('Caso C · destino persistido', docC.destino === 'barra', `destino=${docC.destino}`);
+          agregarResultado('Caso C · estado persistido', docC.estado === 'disponible', `estado=${docC.estado}`);
+          agregarResultado('Caso C · activo persistido', docC.activo === true, `activo=${docC.activo}`);
+
+          // alergenos viaja como string JSON en columna varchar.
+          let alergenosParseados = null;
+          try { alergenosParseados = JSON.parse(docC.alergenos || '[]'); } catch {}
+          agregarResultado(
+            'Caso C · alergenos persistidos como JSON parseable',
+            Array.isArray(alergenosParseados) && alergenosParseados.length === 2,
+            `tipo=${typeof docC.alergenos} valor=${docC.alergenos}`
+          );
+          agregarResultado(
+            'Caso C · alergenos contienen gluten',
+            Array.isArray(alergenosParseados) && alergenosParseados.includes('gluten')
+          );
+          agregarResultado(
+            'Caso C · alergenos contienen lactosa',
+            Array.isArray(alergenosParseados) && alergenosParseados.includes('lactosa')
+          );
         }
       }
 
-      const tabPrefs = document.querySelector('#view-perfil .central-tab[data-tab="preferencias"]');
-      if (tabPrefs) {
-        tabPrefs.click();
-        await esperar(300);
-        agregarResultado('Pestaña preferencias activada', document.getElementById('tab-preferencias')?.classList.contains('activo'));
-      }
+      // ════════════════════════════════════════════════════════
+      // CASO D — Producto sin alergenos → persiste '[]'
+      // ════════════════════════════════════════════════════════
+      agregarSeccion('Caso D — Producto sin alergenos');
 
-      const tabAdmin = document.querySelector('#view-perfil .central-tab[data-tab="admin"]');
-      agregarResultado('Pestaña admin visible', tabAdmin?.classList.contains('visible'));
-      if (tabAdmin) {
-        tabAdmin.click();
+      const pD = await repo.guardarProducto({
+        nombre: `Temporal D ${ts}`,
+        categoria: 'test_temporal',
+        activo: true,
+        destino: 'cocina'
+        // Sin alergenos intencionalmente.
+      });
+
+      if (!pD?.id) {
+        agregarResultado('Caso D · Producto sin alergenos creado', false);
+      } else {
+        idsCreados.push(pD.id);
+        agregarResultado('Caso D · Producto sin alergenos creado', true, pD.id);
+
         await esperar(500);
-        const tabAdminContent = document.getElementById('tab-admin');
-        agregarResultado('Pestaña admin activa', tabAdminContent?.classList.contains('activo'));
-        agregarResultado('Botón nuevo staff en pestaña admin', !!tabAdminContent?.querySelector('#btnNuevoStaff'));
-        agregarResultado('Lista personal en pestaña admin', !!tabAdminContent?.querySelector('#listaPersonalContainer'));
+        const docD = await leerProductoRemoto(pD.id);
+        agregarResultado('Caso D · Doc en Appwrite', !!docD);
+
+        if (docD) {
+          let alergenosParseados = null;
+          let parseError = null;
+          try { alergenosParseados = JSON.parse(docD.alergenos || '[]'); } catch (e) { parseError = e.message; }
+          agregarResultado(
+            'Caso D · alergenos persistidos como JSON parseable',
+            Array.isArray(alergenosParseados) && alergenosParseados.length === 0,
+            `tipo=${typeof docD.alergenos} valor=${docD.alergenos}${parseError ? ` error=${parseError}` : ''}`
+          );
+        }
       }
 
-      const btnVolver = document.getElementById('btnVolverVitrina');
-      if (btnVolver) {
-        btnVolver.click();
-        await esperar(300);
-        agregarResultado('Volver a vitrina funciona', modoVitrina && modoVitrina.style.display !== 'none');
+      // ════════════════════════════════════════════════════════
+      // CASO E — Alergenos como string pre-serializado
+      // ════════════════════════════════════════════════════════
+      agregarSeccion('Caso E — Alergenos como string pre-serializado');
+
+      const pE = await repo.guardarProducto({
+        nombre: `Temporal E ${ts}`,
+        categoria: 'test_temporal',
+        activo: true,
+        destino: 'cocina',
+        alergenos: JSON.stringify(['mani', 'huevo'])
+      });
+
+      if (!pE?.id) {
+        agregarResultado('Caso E · Producto con string pre-serializado', false);
+      } else {
+        idsCreados.push(pE.id);
+        agregarResultado('Caso E · Producto con string pre-serializado', true, pE.id);
+
+        await esperar(500);
+        const docE = await leerProductoRemoto(pE.id);
+        let alergenosParseados = null;
+        try { alergenosParseados = JSON.parse(docE?.alergenos || '[]'); } catch {}
+        agregarResultado(
+          'Caso E · String pre-serializado se conserva',
+          Array.isArray(alergenosParseados) && alergenosParseados.includes('mani') && alergenosParseados.includes('huevo'),
+          `alergenos=${docE?.alergenos}`
+        );
       }
 
-      await Auth.cerrarSesion();
-      await Auth.iniciarSesion('master', 'master123');
-      if (staffAdmin?.id) await DBAppwrite.eliminar('staff', staffAdmin.id);
-      const staffActual = await DB.obtenerStaffPorEspacio('lataberna');
-      agregarResultado('Staff admin temporal eliminado', !staffActual.some(s => s.id === staffAdmin?.id));
+      // ════════════════════════════════════════════════════════
+      // LIMPIEZA
+      // ════════════════════════════════════════════════════════
+      agregarSeccion('Limpieza');
+
+      let limpiezaOk = true;
+      for (const id of idsCreados) {
+        try { await DBAppwrite.eliminar('productos', id); }
+        catch { limpiezaOk = false; }
+      }
+      agregarResultado('Productos de prueba eliminados', limpiezaOk, `${idsCreados.length} docs`);
+
       await Auth.cerrarSesion();
 
       const total = resultados.length;
@@ -206,15 +345,22 @@
       const resumen = document.createElement('div');
       resumen.style.marginTop = '12px';
       resumen.className = fallaron === 0 ? 'log-positivo' : 'log-error';
-      resumen.innerHTML = `<strong>Resumen:</strong> ${pasaron} correctos, ${fallaron} fallidos.`;
+      resumen.innerHTML = `<strong>Resumen temporal A.52:</strong> ${pasaron} correctos, ${fallaron} fallidos.`;
       log.appendChild(resumen);
-      Logger.info(`[test-D-temporal-perfil-v2] Finalizado. ${pasaron}/${total} correctos.`);
     }
 
-    window.addEventListener('load', () => run().catch(e => {
-      log.innerHTML += `<div class="log-error">Error: ${e.message}</div>`;
-      console.error(e);
-    }));
+    const _arrancar = () => {
+      run().catch(e => {
+        log.innerHTML += `<div class="log-error">Error fatal: ${e.message}</div>`;
+        console.error(e);
+      });
+    };
+
+    if (document.readyState === 'loading') {
+      window.addEventListener('load', _arrancar);
+    } else {
+      setTimeout(_arrancar, 100);
+    }
   </script>
 </body>
 </html>

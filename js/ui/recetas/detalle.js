@@ -1,10 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — RECETAS SUBMÓDULO (ES6)
    Archivo: js/ui/recetas/detalle.js
-   Versión: 1.1.2
+   Versión: 1.1.3
    Propósito: Modal de detalle rápido, árbol de ingredientes y exportación PDF.
-              Hallazgo H15: reemplazado setTimeout por verificación de
-              readyState en la exportación de PDF.
+              v1.1.3: búsqueda de stock por tipo 'cocina'. Export sin window.open.
    ================================================================ */
 
 import { Store } from '../../lib/store.js';
@@ -37,11 +36,8 @@ export function mostrarDetalle(idReceta) {
         </div>
       </div>`;
     const vista = document.getElementById('view-recetas');
-    if (vista) {
-      vista.appendChild(modal);
-    } else {
-      document.body.appendChild(modal);
-    }
+    if (vista) vista.appendChild(modal);
+    else document.body.appendChild(modal);
     document.getElementById('btnCerrarDetalle').addEventListener('click', cerrarDetalle);
     document.getElementById('btnCerrarDetalle2').addEventListener('click', cerrarDetalle);
     document.getElementById('btnExportarPDF').addEventListener('click', () => exportarPDF(idReceta));
@@ -50,9 +46,8 @@ export function mostrarDetalle(idReceta) {
   const tipoReceta = recetaConProducto.es_intermedio ? 'Preparación intermedia' : 'Producto final';
   document.getElementById('detalleTitulo').innerHTML = `<i class="fas fa-utensils"></i> ${nombre} <span class="recetas-chip-nivel">${recetaConProducto.nivel || 'sin_nivel'}</span> <span class="recetas-tipo-badge">${tipoReceta}</span>`;
   if (recetaConProducto.es_intermedio) {
-    const tipoInsumo = (recetaConProducto.destino === 'barra') ? 'barra' : 'cocina';
     const insumos = state.insumos || [];
-    const insumo = insumos.find(i => i.nombre === nombre && i.tipo === tipoInsumo);
+    const insumo = insumos.find(i => i.nombre === nombre && i.tipo === 'cocina');
     const stock = insumo ? insumo.stock : 0;
     const unidad = insumo ? insumo.unidad : (recetaConProducto.unidadStock || '');
     document.getElementById('detalleTitulo').innerHTML += ` <span class="recetas-stock-info">Stock: ${stock} ${unidad}</span>`;
@@ -113,9 +108,8 @@ export function construirArbolIngredientes(ingredientes, state, profundidad) {
 function _obtenerStockSubreceta(subReceta, state) {
   const subConProducto = DBInventario.obtenerRecetaConProducto(subReceta.id);
   const nombre = subConProducto ? subConProducto.nombre : '';
-  const tipoInsumo = (subReceta.destino === 'barra') ? 'barra' : 'cocina';
   const insumos = state.insumos || [];
-  const insumo = insumos.find(i => i.nombre === nombre && i.tipo === tipoInsumo);
+  const insumo = insumos.find(i => i.nombre === nombre && i.tipo === 'cocina');
   const stock = insumo ? insumo.stock : 0;
   const unidad = insumo ? insumo.unidad : (subReceta.unidadStock || '');
   return `${stock} ${unidad}`;
@@ -165,9 +159,6 @@ export function exportarPDF(idReceta) {
     }, 1000);
   };
 
-  if (iframe.contentWindow.document.readyState === 'complete') {
-    intentarImprimir();
-  } else {
-    iframe.onload = intentarImprimir;
-  }
+  if (iframe.contentWindow.document.readyState === 'complete') intentarImprimir();
+  else iframe.onload = intentarImprimir;
 }

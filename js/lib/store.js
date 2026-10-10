@@ -1,12 +1,17 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/lib/store.js
-   Versión: 2.0.9
+   Versión: 2.0.15
    Propósito: Estado centralizado con slices 'cliente', 'menus',
-              'precargas_cliente', 'usuario' e 'insumos'.
-              v2.0.9: Renombra slice 'ingredientes' a 'insumos'.
-                      Mantiene compatibilidad temporal con tipos
-                      de acción antiguos.
+              'precargas_cliente', 'usuario', 'insumos', 'variantes'
+              y 'movimientos'.
+              v2.0.15: A.74: agrega slice 'movimientos' como log
+              append-only de ajustes y consumos de stock. Contrato:
+              MOVIMIENTOS_INICIALIZAR, MOVIMIENTO_REGISTRADO,
+              MOVIMIENTOS_LIMPIAR.
+              v2.0.14: rename slice 'menus' → 'cartas'.
+              v2.0.13: slice 'variantes'. Extiende pedidosReducer
+              para items con opciones y alergias_manuales.
    ================================================================ */
 
 import { EventBus } from './eventBus.js';
@@ -19,16 +24,18 @@ const Store = (() => {
     pedidosDelivery: [],
     comandas: [],
     productos: [],
-    insumos: [],   // ← renombrado desde ingredientes
+    insumos: [],
     recetas: [],
     mozos: [],
     config: {},
     espacios: [],
     espacioActivo: null,
-    menus: [],
+    cartas: [],
     precargas_cliente: [],
     usuario: null,
-    cliente: { permitePrepedidos: false, mesa: null }
+    cliente: { permitePrepedidos: false, mesa: null },
+    variantes: [],
+    movimientos: []
   };
 
   const listeners = [];
@@ -73,6 +80,31 @@ const Store = (() => {
     };
   }
 
+  /* ── HELPERS PRIVADOS ─────────────────────────── */
+
+  function _calcularTotalItems(items) {
+    return (items || []).reduce(
+      (sum, it) => sum + (it.precio || 0) * (it.qty || 1), 0
+    );
+  }
+
+  /**
+   * Compara dos ítems para deduplicación.
+   * Dos ítems son el mismo si:
+   *   · Tienen el mismo prodId.
+   *   · Ninguno de los dos fue enviado.
+   *   · Tienen exactamente las mismas opciones seleccionadas.
+   *   · Tienen exactamente las mismas alergias manuales.
+   */
+  function _esMismoItem(a, b) {
+    if (!a || !b) return false;
+    if (a.prodId !== b.prodId) return false;
+    if (a.enviado || b.enviado) return false;
+    if (JSON.stringify(a.opciones || []) !== JSON.stringify(b.opciones || [])) return false;
+    if (JSON.stringify(a.alergias_manuales || []) !== JSON.stringify(b.alergias_manuales || [])) return false;
+    return true;
+  }
+
   function rootReducer(currentState, action) {
     const newState = { ...currentState };
 
@@ -81,16 +113,18 @@ const Store = (() => {
     newState.pedidosDelivery    = deliveryReducer(newState.pedidosDelivery, action, newState);
     newState.comandas           = comandasReducer(newState.comandas, action, newState);
     newState.productos          = productosReducer(newState.productos, action, newState);
-    newState.insumos            = insumosReducer(newState.insumos, action, newState);   // ← actualizado
+    newState.insumos            = insumosReducer(newState.insumos, action, newState);
     newState.recetas            = recetasReducer(newState.recetas, action, newState);
     newState.mozos              = mozosReducer(newState.mozos, action, newState);
     newState.config             = configReducer(newState.config, action, newState);
     newState.espacios           = espaciosReducer(newState.espacios, action, newState);
     newState.espacioActivo      = espacioActivoReducer(newState.espacioActivo, action, newState);
-    newState.menus              = menusReducer(newState.menus, action);
+    newState.cartas             = cartasReducer(newState.cartas, action);
     newState.precargas_cliente  = precargasClienteReducer(newState.precargas_cliente, action);
     newState.usuario            = usuarioReducer(newState.usuario, action);
     newState.cliente            = clienteReducer(newState.cliente, action);
+    newState.variantes          = variantesReducer(newState.variantes, action);
+    newState.movimientos        = movimientosReducer(newState.movimientos, action);
 
     return newState;
   }
@@ -118,31 +152,6 @@ const Store = (() => {
         const { numero, cambios } = action.payload;
         return mesas.map(m => String(m.numero) === String(numero) ? { ...m, ...cambios } : m);
       }
-      case 'COMANDA_ITEM_AGREGAR': {
-        const { numeroMesa, item } = action.payload;
-        return mesas.map(m => {
-          if (String(m.numero) !== String(numeroMesa)) return m;
-          const items = m.items || [];
-          const nuevoItem = { ...item, qty: 1, obs: item.obs || '', enviado: false };
-          return { ...m, items: [...items, nuevoItem] };
-        });
-      }
-      case 'COMANDA_ITEM_CAMBIAR': {
-        const { numeroMesa, index, cambios } = action.payload;
-        return mesas.map(m => {
-          if (String(m.numero) !== String(numeroMesa)) return m;
-          const items = (m.items || []).map((item, i) => i === index ? { ...item, ...cambios } : item);
-          return { ...m, items };
-        });
-      }
-      case 'COMANDA_ITEM_QUITAR': {
-        const { numeroMesa, index } = action.payload;
-        return mesas.map(m => {
-          if (String(m.numero) !== String(numeroMesa)) return m;
-          const items = (m.items || []).filter((_, i) => i !== index);
-          return { ...m, items };
-        });
-      }
       default: return mesas;
     }
   }
@@ -162,6 +171,57 @@ const Store = (() => {
       case 'PEDIDO_CERRADO': {
         const { id, total, actualizadoEn } = action.payload;
         return pedidos.map(p => p.id === id ? { ...p, estado: 'cerrada', total, actualizadoEn } : p);
+      }
+      case 'PEDIDO_ITEM_AGREGAR': {
+        const { pedidoId, item } = action.payload;
+        return pedidos.map(p => {
+          if (p.id !== pedidoId) return p;
+          const items = Array.isArray(p.items) ? [...p.items] : [];
+
+          const idx = items.findIndex(it => _esMismoItem(it, item));
+
+          if (idx >= 0) {
+            items[idx] = {
+              ...items[idx],
+              qty: (items[idx].qty || 1) + 1
+            };
+          } else {
+            items.push({
+              ...item,
+              qty: item.qty || 1,
+              obs: item.obs || '',
+              enviado: false,
+              opciones: Array.isArray(item.opciones) ? item.opciones : [],
+              alergias_manuales: Array.isArray(item.alergias_manuales) ? item.alergias_manuales : []
+            });
+          }
+
+          return {
+            ...p,
+            items,
+            total: _calcularTotalItems(items)
+          };
+        });
+      }
+      case 'PEDIDO_ITEM_CAMBIAR': {
+        const { pedidoId, index, cambios } = action.payload;
+        return pedidos.map(p => {
+          if (p.id !== pedidoId) return p;
+          const items = Array.isArray(p.items)
+            ? p.items.map((it, i) => i === index ? { ...it, ...cambios } : it)
+            : [];
+          return { ...p, items, total: _calcularTotalItems(items) };
+        });
+      }
+      case 'PEDIDO_ITEM_QUITAR': {
+        const { pedidoId, index } = action.payload;
+        return pedidos.map(p => {
+          if (p.id !== pedidoId) return p;
+          const items = Array.isArray(p.items)
+            ? p.items.filter((_, i) => i !== index)
+            : [];
+          return { ...p, items, total: _calcularTotalItems(items) };
+        });
       }
       default: return pedidos;
     }
@@ -213,11 +273,9 @@ const Store = (() => {
   function insumosReducer(insumos, action) {
     switch (action.type) {
       case 'INSUMOS_INICIALIZAR':
-      case 'INGREDIENTES_INICIALIZAR':   // alias temporal (una iteración)
         return action.payload || [];
       case 'INSUMOS_GUARDADO':
       case 'INSUMO_GUARDADO':
-      case 'INGREDIENTE_GUARDADO':       // alias temporal (una iteración)
         return [...insumos.filter(i => i.id !== action.payload.id), action.payload];
       default: return insumos;
     }
@@ -263,10 +321,10 @@ const Store = (() => {
     }
   }
 
-  function menusReducer(menus, action) {
+  function cartasReducer(cartas, action) {
     switch (action.type) {
-      case 'MENUS_INICIALIZAR': return action.payload || [];
-      default: return menus;
+      case 'CARTAS_INICIALIZAR': return action.payload || [];
+      default: return cartas;
     }
   }
 
@@ -298,6 +356,64 @@ const Store = (() => {
         return { ...cliente, mesa: action.payload };
       default:
         return cliente;
+    }
+  }
+
+  function variantesReducer(variantes, action) {
+    switch (action.type) {
+      case 'VARIANTES_INICIALIZAR':
+        return action.payload || [];
+      case 'VARIANTE_GUARDADA': {
+        const nueva = action.payload;
+        if (!nueva || !nueva.id) return variantes;
+        const existe = variantes.some(v => v.id === nueva.id);
+        if (existe) {
+          return variantes.map(v => v.id === nueva.id ? nueva : v);
+        }
+        return [...variantes, nueva];
+      }
+      case 'VARIANTE_ELIMINADA':
+        return variantes.filter(v => v.id !== action.payload);
+      default:
+        return variantes;
+    }
+  }
+
+  /**
+   * A.74: reducer del slice `movimientos`.
+   * Log append-only de ajustes y consumos de stock.
+   * La retención de 30 días se aplica al cargar desde Appwrite,
+   * no en el reducer.
+   */
+  function movimientosReducer(movimientos, action) {
+    switch (action.type) {
+      case 'MOVIMIENTOS_INICIALIZAR': {
+        const lista = Array.isArray(action.payload) ? action.payload : [];
+        // Ordenar por fecha descendente (más reciente primero).
+        const ordenados = lista.slice().sort((a, b) => {
+          const fa = a && a.fecha ? new Date(a.fecha).getTime() : 0;
+          const fb = b && b.fecha ? new Date(b.fecha).getTime() : 0;
+          return fb - fa;
+        });
+        return ordenados;
+      }
+      case 'MOVIMIENTO_REGISTRADO': {
+        const nuevo = action.payload;
+        if (!nuevo || !nuevo.id) return movimientos;
+        // Dedupe por id: si ya existe, se reemplaza.
+        const idx = movimientos.findIndex(m => m.id === nuevo.id);
+        if (idx >= 0) {
+          const copia = movimientos.slice();
+          copia[idx] = nuevo;
+          return copia;
+        }
+        // Prepend (el más reciente va primero).
+        return [nuevo, ...movimientos];
+      }
+      case 'MOVIMIENTOS_LIMPIAR':
+        return [];
+      default:
+        return movimientos;
     }
   }
 

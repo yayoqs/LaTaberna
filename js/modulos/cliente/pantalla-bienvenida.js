@@ -1,10 +1,14 @@
 /* ================================================================
    LaTaberna - PubPOS — Módulo (ES6)
    Archivo: js/modulos/cliente/pantalla-bienvenida.js
-   Versión: 2.3.1
+   Versión: 2.3.4
    Propósito: Panel de control post-validación.
-              - Avisos con ID autogenerado (null en DBAppwrite.crear)
-              - Vistazo de pedidos con await en ID de usuario
+   v2.3.4: Paquete 6 — importar obtenerEspacioRestaurante desde
+     contexto-qr.js en lugar de principal.js, para romper ciclo
+     de importación.
+   v2.3.3: aviso si falta el parámetro ?espacio= del QR.
+   v2.3.2: avisos con ID autogenerado, vistazo de pedidos con
+           await en ID de usuario, sin fallback de espacioId.
    ================================================================ */
 
 import { EventBus } from '../../lib/eventBus.js';
@@ -13,6 +17,7 @@ import { Auth } from '../../auth.js';
 import { DBAppwrite } from '../../db-appwrite.js';
 import { Logger } from '../../lib/logger.js';
 import { mostrarEntrada } from '../../utils.js';
+import { obtenerEspacioRestaurante } from './contexto-qr.js';
 
 const PantallaBienvenida = (() => {
   let _vista = null;
@@ -21,9 +26,8 @@ const PantallaBienvenida = (() => {
   let _interfazActivada = false;
   let _activada = false;
 
-  // Control anti-duplicado para llamados al garzón
   let _ultimoLlamado = 0;
-  const _cooldownLlamado = 10000; // 10 segundos
+  const _cooldownLlamado = 10000;
 
   let _abortController = null;
   let _abortControllerPanel = null;
@@ -138,14 +142,18 @@ const PantallaBienvenida = (() => {
 
   function _obtenerEspacioId() {
     const local = Auth.obtenerLocalActivo?.();
-    return local?.id || 'lataberna';
+    return local?.id || null;
   }
 
   async function _crearAviso(tipo, mesaId) {
+    const espacioId = _obtenerEspacioId();
+    if (!espacioId) {
+      Logger.warn('[PantallaBienvenida] No hay local activo, no se crea aviso.');
+      return;
+    }
+
     try {
       const usuarioId = await Auth.obtenerIdUsuarioAppwrite?.() || '';
-      const espacioId = _obtenerEspacioId();
-      // ID autogenerado: usar null en lugar de 'unique()'
       await DBAppwrite.crear('avisos', null, {
         tipo,
         mesaId: String(mesaId),
@@ -172,10 +180,8 @@ const PantallaBienvenida = (() => {
     _mesa = mesaId;
     if (estadoEl) estadoEl.textContent = `Vinculado a ${_mesa === 'barra' ? 'Barra' : 'Mesa ' + _mesa}.`;
 
-    // Feedback local inmediato
     EventBus.emit('cliente:mesa_ingresada', { mesa: _mesa });
 
-    // Persistir aviso en laTaberna_Avisos
     _crearAviso('vinculacion', _mesa);
 
     const cardIngreso = document.getElementById('cardIngresoMesa');
@@ -269,7 +275,7 @@ const PantallaBienvenida = (() => {
         <div class="pedido-badge" id="badgeCantidadPedidos" style="display:none;">0 activo</div>
       </div>
       <div class="menu-grid">
-        <div class="action-card order-mode" id="cardGastronomica"><div class="action-icon"><i class="fa-solid fa-scroll"></i></div><div class="action-details"><h4>Armar mi Pedido</h4><p>Explora la carta digital y arma tu orden.</p></div></div>
+        <div class="action-card order-mode" id="cardGastronomica"><div class="action-icon"><i class="fa-solid fa-scroll"></i></div><div class="action-details"><h4>Armar mi Pedido</h4><p id="mensajeGastroPanel">Explora la carta digital y arma tu orden.</p></div></div>
         <div class="action-card events-mode" id="cardEntretenimiento"><div class="action-icon"><i class="fa-solid fa-cake-candles"></i></div><div class="action-details"><h4>Eventos en Vivo & Karaoke</h4><p id="mensajeEvento">Próximo evento a las 22:00 hrs</p></div></div>
       </div>
     `;
@@ -277,6 +283,15 @@ const PantallaBienvenida = (() => {
     const iniciales = Auth.obtenerNombre()?.split(' ').map(n => n.charAt(0).toUpperCase()).slice(0, 2).join('') || '??';
     const avatarPrincipal = document.getElementById('avatarPrincipal');
     if (avatarPrincipal) avatarPrincipal.textContent = iniciales;
+
+    // v2.3.3 — Aviso si falta el espacio del QR.
+    const espacioQR = obtenerEspacioRestaurante();
+    if (!espacioQR) {
+      const mensajePanel = document.getElementById('mensajeGastroPanel');
+      if (mensajePanel) {
+        mensajePanel.innerHTML = '<span style="color:var(--color-danger);">⚠ Escanea el QR del restaurante para poder enviar tu pedido.</span>';
+      }
+    }
 
     document.getElementById('btnHacerPedido').addEventListener('click', _irAlMenu, { signal });
     document.getElementById('btnLlamarGarzon').addEventListener('click', _llamarGarzon, { signal });
@@ -292,7 +307,7 @@ const PantallaBienvenida = (() => {
   function _llamarGarzon() {
     const ahora = Date.now();
     if (ahora - _ultimoLlamado < _cooldownLlamado) {
-      return; // Evitar duplicados en tiempo corto
+      return;
     }
     _ultimoLlamado = ahora;
 

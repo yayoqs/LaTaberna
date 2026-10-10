@@ -1,10 +1,21 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/db-fusion.js
-   Versión: 1.1.4
+   Versión: 1.2.1
    Propósito: Lógica de fusión y liberación de mesas virtuales.
-              v1.1.4: liberarMesasFusionadas ahora es asíncrona y
-                      elimina la mesa virtual en Appwrite.
+              v1.2.1: A.56 (Regla 22 del brief). fusionarMesas y
+                      liberarMesasFusionadas verifican el retorno
+                      real de cada operación de Appwrite antes de
+                      mutar memoria. Si una operación crítica
+                      falla, se revierten las que ya se aplicaron
+                      y se aborta sin tocar el Store ni emitir
+                      eventos de éxito. Fin del patrón "log de
+                      éxito sin verificar retorno" (§4.5 de la
+                      regla de control de regresiones).
+              v1.2.0: A.4: liberarMesasFusionadas restaura estado
+                      'libre' y pedidoId '' de cada mesa original
+                      en Appwrite.
+              v1.1.x: versiones previas.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -51,21 +62,7 @@ export const DBFusion = (function() {
     });
     todasOriginales = [...new Set(todasOriginales)].sort((a, b) => a - b);
 
-    // Marcar las originales como fusionadas localmente y en Appwrite
-    for (const num of todasOriginales) {
-      const original = this.mesas.find(m => String(m.numero) === String(num) && !m.esVirtual);
-      if (original) original.estado = 'fusionada';
-
-      if (DBAppwrite && DBAppwrite.habilitado) {
-        try {
-          await DBAppwrite.actualizar('mesas', String(num), { estado: 'fusionada' });
-          Logger.info('[DBFusion] Mesa original ' + num + ' marcada como fusionada en Appwrite.');
-        } catch (e) {
-          Logger.warn('[DBFusion] Error al marcar mesa original ' + num + ' en Appwrite:', e);
-        }
-      }
-    }
-
+    // Consolidar items, total, comensales y pedidoId único.
     let itemsConsolidados = [];
     let totalConsolidado = 0;
     let comensalesTotales = 0;
@@ -91,11 +88,6 @@ export const DBFusion = (function() {
           totalConsolidado += (pedido.total || 0);
         }
       }
-
-      if (m.esVirtual) {
-        const idx = this.mesas.findIndex(mesa => mesa.numero === m.numero);
-        if (idx >= 0) this.mesas.splice(idx, 1);
-      }
     });
 
     const nombreVisible = (nombrePersonalizado && nombrePersonalizado.trim()) || todasOriginales.join('+');
@@ -107,6 +99,33 @@ export const DBFusion = (function() {
       return null;
     }
 
+    const hayAppwrite = DBAppwrite && DBAppwrite.habilitado;
+
+    // A.56: persistir ANTES de mutar memoria.
+    // 1. Marcar cada mesa original como 'fusionada'. Si alguna
+    //    falla, revertir las ya aplicadas y abortar.
+    if (hayAppwrite) {
+      const marcadas = [];
+      for (const num of todasOriginales) {
+        const resultado = await DBAppwrite.actualizar('mesas', String(num), { estado: 'fusionada' });
+
+        if (!resultado) {
+          Logger.error(
+            '[DBFusion] No se pudo marcar la mesa original ' + num +
+            ' como fusionada en Appwrite. Abortando fusión y revirtiendo.'
+          );
+          // Rollback de las que sí se marcaron
+          for (const numRollback of marcadas) {
+            await DBAppwrite.actualizar('mesas', String(numRollback), { estado: 'libre' })
+              .catch(e => Logger.warn('[DBFusion] Rollback falló para mesa ' + numRollback + ':', e));
+          }
+          return null;
+        }
+        marcadas.push(num);
+      }
+    }
+
+    // 2. Crear la mesa virtual. Si falla, revertir originales y abortar.
     const mesaVirtual = {
       numero: nombreVisible,
       _rowId: rowId,
@@ -123,53 +142,102 @@ export const DBFusion = (function() {
       zona: mesasSeleccionadas[0].zona || 'salon'
     };
 
+    if (hayAppwrite) {
+      const local = Auth.obtenerLocalActivo ? Auth.obtenerLocalActivo() : null;
+      const datosMesa = {
+        numero: mesaVirtual.numero,
+        estado: mesaVirtual.estado,
+        pedidoId: mesaVirtual.pedidoId || '',
+        comensales: mesaVirtual.comensales,
+        zona: mesaVirtual.zona || 'salon',
+        esVirtual: true,
+        mesasFusionadas: JSON.stringify(todasOriginales),
+        espacioId: local ? local.id : ''
+      };
+
+      const creada = await DBAppwrite.crear('mesas', rowId, datosMesa);
+      if (!creada) {
+        Logger.error(
+          '[DBFusion] No se pudo crear la mesa virtual en Appwrite. ' +
+          'Revirtiendo mesas originales y abortando.'
+        );
+        for (const num of todasOriginales) {
+          await DBAppwrite.actualizar('mesas', String(num), { estado: 'libre' })
+            .catch(e => Logger.warn('[DBFusion] Rollback falló para mesa ' + num + ':', e));
+        }
+        return null;
+      }
+      Logger.info('[DBFusion] Mesa virtual persistida en Appwrite con rowId ' + rowId);
+    }
+
+    // 3. Todo persistido. Recién ahora se muta memoria.
+    for (const num of todasOriginales) {
+      const original = this.mesas.find(m => String(m.numero) === String(num) && !m.esVirtual);
+      if (original) original.estado = 'fusionada';
+    }
+
+    // Eliminar mesas virtuales anteriores (si eran parte de la fusión)
+    mesasSeleccionadas.forEach(m => {
+      if (m.esVirtual) {
+        const idx = this.mesas.findIndex(mesa => mesa.numero === m.numero);
+        if (idx >= 0) this.mesas.splice(idx, 1);
+      }
+    });
+
     this.mesas.push(mesaVirtual);
     this.saveMesas();
 
-    if (DBAppwrite && DBAppwrite.habilitado) {
-      try {
-        const local = Auth.obtenerLocalActivo ? Auth.obtenerLocalActivo() : null;
-        const datosMesa = {
-          numero: mesaVirtual.numero,
-          estado: mesaVirtual.estado,
-          pedidoId: mesaVirtual.pedidoId || '',
-          comensales: mesaVirtual.comensales,
-          zona: mesaVirtual.zona || 'salon',
-          esVirtual: true,
-          mesasFusionadas: JSON.stringify(todasOriginales),
-          espacioId: local ? local.id : ''
-        };
-        await DBAppwrite.crear('mesas', rowId, datosMesa);
-        Logger.info('[DBFusion] Mesa virtual persistida en Appwrite con rowId ' + rowId);
-      } catch (e) {
-        Logger.error('[DBFusion] Error al persistir mesa virtual en Appwrite:', e);
-      }
-    }
-
-    EventBus.emit('mesas:guardadas', this.mesas);
     return mesaVirtual;
   };
 
   module.liberarMesasFusionadas = async function(mesaVirtual) {
-    if (!mesaVirtual.esVirtual || !mesaVirtual.mesasFusionadas) return;
+    if (!mesaVirtual || !mesaVirtual.esVirtual || !mesaVirtual.mesasFusionadas) return;
 
-    // Eliminar mesa virtual en Appwrite
-    if (DBAppwrite && DBAppwrite.habilitado) {
+    const hayAppwrite = DBAppwrite && DBAppwrite.habilitado;
+
+    // A.56: persistir ANTES de mutar memoria.
+    // 1. Eliminar la mesa virtual en Appwrite. Si falla, abortar:
+    //    la memoria no debe divergir.
+    if (hayAppwrite) {
       const rowIdVirtual = mesaVirtual._rowId || mesaVirtual.numero;
-      try {
-        await DBAppwrite.eliminar('mesas', String(rowIdVirtual));
-        Logger.info('[DBFusion] Mesa virtual ' + rowIdVirtual + ' eliminada en Appwrite.');
-      } catch (e) {
-        Logger.warn('[DBFusion] No se pudo eliminar mesa virtual en Appwrite:', e);
+      const eliminada = await DBAppwrite.eliminar('mesas', String(rowIdVirtual));
+      if (!eliminada) {
+        Logger.error(
+          '[DBFusion] No se pudo eliminar la mesa virtual ' + rowIdVirtual +
+          ' en Appwrite. Abortando liberación.'
+        );
+        return;
+      }
+      Logger.info('[DBFusion] Mesa virtual ' + rowIdVirtual + ' eliminada en Appwrite.');
+    }
+
+    // 2. Restaurar cada original a 'libre'. Best-effort individual:
+    //    si una falla, se loguea y se continúa. La memoria se
+    //    actualiza igual para no bloquear el resto del flujo.
+    if (hayAppwrite) {
+      for (const num of mesaVirtual.mesasFusionadas) {
+        const restaurada = await DBAppwrite.actualizar('mesas', String(num), {
+          estado: 'libre',
+          pedidoId: ''
+        });
+        if (!restaurada) {
+          Logger.error(
+            '[DBFusion] No se pudo restaurar la mesa original ' + num +
+            ' en Appwrite. La mesa queda huérfana en estado fusionada.'
+          );
+        } else {
+          Logger.info('[DBFusion] Mesa original ' + num + ' restaurada a libre en Appwrite.');
+        }
       }
     }
 
-    mesaVirtual.mesasFusionadas.forEach(num => {
+    // 3. Mutar memoria.
+    for (const num of mesaVirtual.mesasFusionadas) {
       const idx = this.mesas.findIndex(m => m.numero === num);
       if (idx >= 0) {
         this.mesas[idx] = mesaVacia(num);
       }
-    });
+    }
 
     const idxVirtual = this.mesas.findIndex(m => m.numero === mesaVirtual.numero);
     if (idxVirtual >= 0) {
@@ -177,7 +245,6 @@ export const DBFusion = (function() {
     }
 
     this.saveMesas();
-    EventBus.emit('mesas:guardadas', this.mesas);
   };
 
   return module;

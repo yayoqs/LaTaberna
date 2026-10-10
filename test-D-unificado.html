@@ -1,9 +1,40 @@
+<!--
+  LaTaberna - PubPOS — Test D Unificado
+  Archivo: test-D-unificado.html (raíz)
+  Versión: 3.10.3
+  Propósito: batería completa de Célula D (Administración).
+             Cubre jerarquía de roles, alta de staff, configuración
+             por espacio, despensa, insumo vendible, editor de
+             cartas, sección Catálogo, editor de variantes y Modo
+             Variantes del editor de cartas.
+  Credenciales: jefePub / jefe1234 en espacio PubPrueba.
+
+  v3.10.3: Bloque 3 — timeout del assert "Staff aparece en la
+           lista" sube de 15s a 40s. El re-render de la pestaña
+           Personal se dispara después de cerrar el modal de
+           contraseña y sufre el mismo cold start variable que
+           el modal (17s a 24s en corridas consecutivas).
+  v3.10.2: dos cambios.
+           · Bloque 3: timeout del modal de contraseña temporal
+             sube de 20s a 40s. La serverless registrar-usuario
+             tiene cold start variable (16.9s en una corrida,
+             >20s en la siguiente). 20s era demasiado ajustado.
+           · Bloque 12: normaliza recetas antes de despachar al
+             Store (§5.2). Elimina el error de consola
+             "receta.ingredientes.reduce is not a function".
+  v3.10.1: migra Bloque 9 al slice cartas (CARTAS_INICIALIZAR)
+           tras el rename E.x13 (brief D.13). Agrega dos aserciones
+           que validan el cambio de slice.
+  v3.10.0: agrega Bloque 12 (Modo Variantes del Editor de Cartas) y
+           limpieza temprana de huérfanos de config.
+  v3.9.x:  paquetes del sistema de variantes (bloques 10 y 11).
+-->
 <!DOCTYPE html>
 <html lang="es-CL">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, viewport-fit=cover">
-  <title>Test D — Unificado</title>
+  <title>Test D — Unificado v3.10.3</title>
   <link rel="stylesheet" href="css/vars.css">
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/layout.css">
@@ -11,127 +42,88 @@
   <link rel="stylesheet" href="css/config.css">
   <link rel="stylesheet" href="css/perfil.css">
   <link rel="stylesheet" href="css/despensa.css">
+  <link rel="stylesheet" href="css/carta-editor.css">
   <script src="js/appwrite.min.js"></script>
+
+  <!-- ════════════════════════════════════════════════════════════
+       SECCIÓN 0.1 — ESTILOS PROPIOS DEL TEST
+       ════════════════════════════════════════════════════════════ -->
   <style>
-    html, body {
-      height: auto;
-      min-height: 100vh;
-      overflow-y: auto;
-      overflow-x: hidden;
-      margin: 0;
-      padding: 0;
-    }
-
-    body {
-      display: block;
-      background: #0f0f14;
-      color: #f1f5f9;
-      font-family: 'Nunito', system-ui, sans-serif;
-      padding: 20px;
-      box-sizing: border-box;
-    }
-
-    .panel-test {
-      background: #1a1a24;
-      border: 1px solid #2e2e42;
-      border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 20px;
-      box-sizing: border-box;
-    }
-
-    .panel-test h2 {
-      font-size: 18px;
-      margin: 0 0 12px;
-    }
-
+    html, body { height: auto; min-height: 100vh; overflow-y: auto; overflow-x: hidden; margin: 0; padding: 0; }
+    body { display: block; background: #0f0f14; color: #f1f5f9; font-family: 'Nunito', system-ui, sans-serif; padding: 20px; box-sizing: border-box; }
+    .panel-test { background: #1a1a24; border: 1px solid #2e2e42; border-radius: 12px; padding: 20px; margin-bottom: 20px; box-sizing: border-box; }
+    .panel-test h2 { font-size: 18px; margin: 0 0 12px; }
     .log-positivo { color: #22c55e; font-weight: 700; }
     .log-error { color: #ef4444; font-weight: 700; }
     .log-info { color: #60a5fa; font-weight: 700; }
-
-    code {
-      background: #252535;
-      padding: 2px 6px;
-      border-radius: 4px;
-    }
-
-    #view-config,
-    #view-despensa,
-    #view-perfil {
-      display: block;
-      height: auto;
-      min-height: 0;
-      overflow: visible;
-    }
-
-    @media (max-width: 768px) {
-      body { padding: 12px; }
-      .panel-test { padding: 14px; }
-    }
+    .log-seccion { color: #f59e0b; font-weight: 800; font-size: 14px; margin-top: 16px; margin-bottom: 6px; padding-top: 8px; border-top: 1px solid #2e2e42; }
+    code { background: #252535; padding: 2px 6px; border-radius: 4px; }
+    #view-perfil, #view-config, #view-despensa, #view-carta-editor { display: block; height: auto; min-height: 0; overflow: visible; }
+    #contenedor-variantes-test { min-height: 500px; display: block; margin-bottom: 20px; }
+    body.test-mode .ve-overlay { position: relative !important; inset: auto !important; background: transparent !important; z-index: auto !important; height: auto !important; }
+    body.test-mode .ve-editor { border: 1px solid #2e2e42; border-radius: 12px; height: 700px !important; }
   </style>
 </head>
-<body>
 
+<body class="test-mode">
+
+  <!-- ════════════════════════════════════════════════════════════
+       SECCIÓN 0.2 — DOM DEL TEST
+       ════════════════════════════════════════════════════════════ -->
   <div class="panel-test">
-    <h2>Test D — Unificado</h2>
-    <p style="font-size:13px; color:#94a3b8; margin:0 0 8px;">
-      Batería completa: jerarquía de roles, alta de staff, sección personal,
-      configuración por espacio, despensa, perfil y limpieza.
-    </p>
+    <h2>Test D — Unificado v3.10.3</h2>
     <div id="logTest"></div>
   </div>
 
-  <div class="panel-test">
-    <h2>Render Master</h2>
-    <div id="tab-master-test"></div>
-  </div>
-
-  <div class="panel-test">
-    <h2>Render Admin</h2>
-    <div id="tab-admin-test"></div>
-  </div>
-
-  <div class="panel-test">
-    <h2>Render Gerente</h2>
-    <div id="tab-gerente-test"></div>
-  </div>
-
-  <div class="panel-test">
-    <h2>Sección Personal (como master)</h2>
-    <div id="sec-personal-test"></div>
-  </div>
-
-  <div class="panel-test">
-    <h2>Configuración por espacio</h2>
-    <div id="view-config"></div>
-  </div>
-
-  <div class="panel-test">
-    <h2>Despensa</h2>
-    <div id="view-despensa"></div>
-  </div>
-
-  <div class="panel-test">
-    <h2>Perfil</h2>
-    <div id="view-perfil"></div>
-  </div>
+  <main id="view-perfil"></main>
+  <div id="view-config"></div>
+  <div id="view-despensa"></div>
+  <main id="view-carta-editor" class="view"></main>
+  <div id="contenedor-variantes-test"></div>
 
   <script type="module">
-    import { Auth } from './js/auth.js';
-    import { Roles } from './js/roles.js';
-    import { DB } from './js/db.js';
-    import { DBAppwrite } from './js/db-appwrite.js';
-    import { Logger } from './js/lib/logger.js';
-    import { Store } from './js/lib/store.js';
-    import { renderTabAdmin } from './js/ui/perfil/admin-roles.js';
-    import { Config } from './js/ui/config.js';
-    import { Despensa } from './js/ui/despensa.js';
-    import { Perfil } from './js/ui/perfil.js';
-    import { InventarioService } from './js/servicios/inventario-service.js';
+    // ════════════════════════════════════════════════════════════
+    //  SECCIÓN 0.3 — IMPORTS
+    // ════════════════════════════════════════════════════════════
+
+    // ── Core (Célula A) ────────────────────────────────────────
+    import { Auth }        from './js/auth.js';
+    import { Roles }       from './js/roles.js';
+    import { DB }          from './js/db.js';
+    import { DBAppwrite }  from './js/db-appwrite.js';
+
+    // ── Infraestructura (Célula E) ─────────────────────────────
+    import { Logger }      from './js/lib/logger.js';
+    import { Store }       from './js/lib/store.js';
+    import { Deps }        from './js/lib/deps.js';
+
+    // ── Repositorios y servicios ───────────────────────────────
     import { crearInventarioRepo } from './js/repositorios/inventario-repository.js';
+    import { crearVarianteRepo }   from './js/repositorios/variante-repository.js';
+    import { crearRecetaRepo }     from './js/repositorios/receta-repository.js';
+    import { InventarioService }   from './js/servicios/inventario-service.js';
+
+    // ── Vistas de Célula D ─────────────────────────────────────
+    import { renderTabAdmin } from './js/ui/perfil/admin-roles.js';
+    import { Config }         from './js/ui/config.js';
+    import { Perfil }         from './js/ui/perfil.js';
+    import { Despensa }       from './js/ui/despensa.js';
+    import * as ModalInsumo   from './js/ui/despensa/modal-insumo.js';
+    import { setFiltroVendibles, getFiltroVendibles } from './js/ui/despensa/estado.js';
+
+    // ── Carta Editor ───────────────────────────────────────────
+    import { CartaEditor }    from './js/ui/carta-editor.js';
+    import { getMenuActivo, setMenuActivo } from './js/ui/carta-editor/estado.js';
+    import { guardarMenu }    from './js/ui/carta-editor/acciones.js';
+    import * as cicloVidaVariantes from './js/ui/carta-editor/variantes/ciclo-vida.js';
+
+    console.log('[Test D] Módulos importados correctamente');
+
+    // ════════════════════════════════════════════════════════════
+    //  SECCIÓN 0.4 — SISTEMA DE LOG DEL TEST
+    // ════════════════════════════════════════════════════════════
 
     Logger.setLevel('DEBUG');
-
     const log = document.getElementById('logTest');
     const resultados = [];
 
@@ -149,6 +141,17 @@
       fila.innerHTML = `ℹ️ ${mensaje}`;
       log.appendChild(fila);
     }
+
+    function agregarSeccion(titulo) {
+      const fila = document.createElement('div');
+      fila.className = 'log-seccion';
+      fila.textContent = `── ${titulo} ──`;
+      log.appendChild(fila);
+    }
+
+    // ════════════════════════════════════════════════════════════
+    //  SECCIÓN 0.5 — HELPERS GENERALES
+    // ════════════════════════════════════════════════════════════
 
     const esperar = ms => new Promise(r => setTimeout(r, ms));
 
@@ -175,137 +178,203 @@
       return null;
     }
 
+    async function esperarHasta(fn, timeout = 10000, intervalo = 200) {
+      const inicio = Date.now();
+      while (Date.now() - inicio < timeout) {
+        const r = await fn();
+        if (r) return r;
+        await esperar(intervalo);
+      }
+      return null;
+    }
+
+    async function leerConfigRemoto(espacioId) {
+      try {
+        const doc = await DBAppwrite.baseDeDatos.getRow({
+          databaseId: DBAppwrite.idBaseDeDatos,
+          tableId: DBAppwrite.COLECCIONES.configuracion,
+          rowId: `${espacioId}_global`
+        });
+        return doc?.valor ? JSON.parse(doc.valor) : null;
+      } catch (e) {
+        if (e.code === 404) return null;
+        return null;
+      }
+    }
+
+    function escribir(input, valor) {
+      input.value = valor;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+
+    function disparar(input, tipo = 'change') {
+      input.dispatchEvent(new Event(tipo, { bubbles: true }));
+    }
+
+    // ════════════════════════════════════════════════════════════
+    //  FUNCIÓN PRINCIPAL — run()
+    // ════════════════════════════════════════════════════════════
+
     async function run() {
+      console.log('[Test D] run() iniciado');
       Logger.setLevel('ERROR');
       log.innerHTML = '';
 
-      // ── Inicialización ────────────────────────────────
-      await Auth.cerrarSesion();
+      // ── Limpieza temprana de huérfanos de config ────────────
+      // Elimina docs con clave='global' y espacioId='PubPrueba'
+      // que NO sean 'PubPrueba_global'. Evita falsos positivos
+      // en el assert del Bloque 5 por residuos de corridas
+      // anteriores que no llegaron a limpiar.
+      try {
+        const configsPrevios = await DBAppwrite.listar('configuracion');
+        const huerfanosPrevios = configsPrevios.filter(d =>
+          d.clave === 'global' &&
+          d.espacioId === 'PubPrueba' &&
+          d.id !== 'PubPrueba_global'
+        );
+        for (const h of huerfanosPrevios) {
+          try { await DBAppwrite.eliminar('configuracion', h.id); } catch { /* ignorar */ }
+        }
+        if (huerfanosPrevios.length > 0) {
+          console.log(`[Test D] Limpieza temprana: ${huerfanosPrevios.length} huérfanos de config eliminados.`);
+        }
+      } catch { /* ignorar */ }
+
+      // ══════════════════════════════════════════════════════════
+      //  SECCIÓN 1 — SETUP INICIAL
+      // ══════════════════════════════════════════════════════════
+
+      Deps.registrar('auth', Auth);
       await DB.init();
-      const loginMasterInicial = await Auth.iniciarSesion('master', 'master123');
-      if (!loginMasterInicial) {
-        agregarResultado('Login master inicial', false);
+      await Auth.cerrarSesion();
+      const loginOk = await Auth.iniciarSesion('jefePub', 'jefe1234');
+      if (!loginOk) {
+        agregarResultado('Login jefePub/jefe1234', false);
         return;
       }
-      agregarResultado('Login master inicial', true);
+      agregarResultado('Login jefePub/jefe1234', true);
 
-      // ── Bloque 1: Jerarquía de roles ─────────────────
-      agregarInfo('--- Bloque 1: Jerarquía de roles ---');
+      const usuarioOriginal = Auth.obtenerUsuarioActual();
+      const espacioId = Auth.obtenerLocalActivo()?.id || null;
+      agregarResultado('Espacio resuelto como PubPrueba', espacioId === 'PubPrueba', `Espacio: ${espacioId}`);
 
-      const usuarioMaster = Auth.obtenerUsuarioActual();
-      await renderTabAdmin(usuarioMaster, true, 'tab-master-test');
+      const rolesJefe = usuarioOriginal.rolesEfectivos || [];
+      agregarResultado('jefePub tiene rol owner', rolesJefe.includes('owner'), `Roles: ${rolesJefe.join(', ')}`);
+
+      agregarSeccion('Preparación de datos compartidos');
+
+      const docFalsoId = `PubPrueba_test_falso_${Date.now().toString().slice(-6)}`;
+      let placeholderStaffId = null;
+
+      const staffActual = await DB.obtenerStaffPorEspacio('PubPrueba');
+      if (staffActual.length === 0) {
+        try {
+          const placeholder = await DB.crearOActualizarStaff({
+            nombre: 'Placeholder Staff',
+            usuarioId: `sim_user_${Date.now()}`,
+            espacioId: 'PubPrueba',
+            roles: ['mesero'],
+            rolPrincipal: 'mesero',
+            estado: 'activo',
+            tokenVinculacion: `tk_placeholder_${Date.now()}`
+          });
+          if (placeholder?.id) {
+            placeholderStaffId = placeholder.id;
+            agregarResultado('Crear placeholder de staff', true, placeholder.id);
+          } else {
+            agregarResultado('Crear placeholder de staff', false, 'Devolvió null');
+          }
+        } catch (e) {
+          agregarResultado('Crear placeholder de staff', false, e.message);
+        }
+      } else {
+        agregarResultado('Staff ya presente en PubPrueba', true, `${staffActual.length} registros`);
+      }
+
+      // ══════════════════════════════════════════════════════════
+      //  BLOQUE 1 — JERARQUÍA VISUAL
+      // ══════════════════════════════════════════════════════════
+
+      agregarSeccion('BLOQUE 1 — Jerarquía visual (usuarios simulados)');
+
+      const adminPuro = { nombre: 'admin_puro', rolesEfectivos: ['admin'], rolPrincipal: 'admin', localActivoId: 'PubPrueba' };
+      const contenedorAdminPuro = document.createElement('div');
+      contenedorAdminPuro.id = 'tab-admin-puro-test';
+      document.body.appendChild(contenedorAdminPuro);
+      await renderTabAdmin(adminPuro, false, 'tab-admin-puro-test');
+
+      const checksAdminPuro = [...document.querySelectorAll('#tab-admin-puro-test .rol-check input[type="checkbox"]')];
+      const rolesVistosPuro = [...new Set(checksAdminPuro.map(c => c.dataset.rol))];
+      agregarResultado('Admin puro no ve owner', !rolesVistosPuro.includes('owner'));
+      agregarResultado('Admin puro no ve admin', !rolesVistosPuro.includes('admin'));
+      agregarResultado('Admin puro no ve jugador', !rolesVistosPuro.includes('jugador'));
+      agregarResultado('Admin puro ve chef', rolesVistosPuro.includes('chef'), `Roles vistos: ${rolesVistosPuro.join(', ')}`);
+      agregarResultado('Admin puro ve cocinaAyudante', rolesVistosPuro.includes('cocinaAyudante'));
+      agregarResultado('Admin puro ve barman', rolesVistosPuro.includes('barman'));
+      agregarResultado('Admin puro ve barraAyudante', rolesVistosPuro.includes('barraAyudante'));
+      agregarResultado('Admin puro ve mesero', rolesVistosPuro.includes('mesero'));
+      agregarResultado('Admin puro ve caja', rolesVistosPuro.includes('caja'));
+      agregarResultado('Admin puro ve repartidor', rolesVistosPuro.includes('repartidor'));
+      agregarResultado('Admin puro ve artista', rolesVistosPuro.includes('artista'));
+
+      const owner = { nombre: 'owner', rolesEfectivos: ['owner'], rolPrincipal: 'owner', localActivoId: 'PubPrueba' };
+      const contenedorOwner = document.createElement('div');
+      contenedorOwner.id = 'tab-owner-test';
+      document.body.appendChild(contenedorOwner);
+      await renderTabAdmin(owner, false, 'tab-owner-test');
+
+      const checksOwner = [...document.querySelectorAll('#tab-owner-test .rol-check input[type="checkbox"]')];
+      const rolesVistosOwner = [...new Set(checksOwner.map(c => c.dataset.rol))];
+      agregarResultado('Owner ve admin', rolesVistosOwner.includes('admin'), `Roles vistos: ${rolesVistosOwner.join(', ')}`);
+      agregarResultado('Owner no ve owner', !rolesVistosOwner.includes('owner'));
+      agregarResultado('Owner no ve jugador', !rolesVistosOwner.includes('jugador'));
+      agregarResultado('Owner ve chef', rolesVistosOwner.includes('chef'));
+      agregarResultado('Owner ve cocinaAyudante', rolesVistosOwner.includes('cocinaAyudante'));
+      agregarResultado('Owner ve barman', rolesVistosOwner.includes('barman'));
+      agregarResultado('Owner ve barraAyudante', rolesVistosOwner.includes('barraAyudante'));
+      agregarResultado('Owner ve mesero', rolesVistosOwner.includes('mesero'));
+      agregarResultado('Owner ve caja', rolesVistosOwner.includes('caja'));
+      agregarResultado('Owner ve repartidor', rolesVistosOwner.includes('repartidor'));
+      agregarResultado('Owner ve artista', rolesVistosOwner.includes('artista'));
+
+      const master = { nombre: 'master', rolesEfectivos: ['master'], rolPrincipal: 'master', localActivoId: 'PubPrueba' };
+      const contenedorMaster = document.createElement('div');
+      contenedorMaster.id = 'tab-master-test';
+      document.body.appendChild(contenedorMaster);
+      await renderTabAdmin(master, true, 'tab-master-test');
+
       const checksMaster = [...document.querySelectorAll('#tab-master-test .rol-check input[type="checkbox"]')];
-      const rolesMasterUnicos = [...new Set(checksMaster.map(c => c.dataset.rol))];
+      const rolesVistosMaster = [...new Set(checksMaster.map(c => c.dataset.rol))];
+      agregarResultado('Master ve owner', rolesVistosMaster.includes('owner'), `Roles vistos: ${rolesVistosMaster.join(', ')}`);
+      agregarResultado('Master no ve admin', !rolesVistosMaster.includes('admin'));
+      agregarResultado('Master no ve jugador', !rolesVistosMaster.includes('jugador'));
+      agregarResultado('Master no ve staff', ['chef','cocinaAyudante','barman','barraAyudante','mesero','caja','repartidor','artista'].every(r => !rolesVistosMaster.includes(r)));
 
-      agregarResultado(
-        'Master solo puede asignar admin',
-        rolesMasterUnicos.length === 1 && rolesMasterUnicos[0] === 'admin',
-        `Roles únicos: ${rolesMasterUnicos.join(', ')}`
-      );
+      // ══════════════════════════════════════════════════════════
+      //  BLOQUE 2 — JERARQUÍA LÓGICA
+      // ══════════════════════════════════════════════════════════
 
-      const nombreAdmin = `tpa_${Date.now().toString().slice(-8)}`;
-      const passwordAdmin = 'Pass12345';
-      const regAdmin = await Auth.registrarUsuario(nombreAdmin, passwordAdmin);
-      if (!regAdmin.exito) {
-        agregarResultado('Registrar admin', false, regAdmin.error);
-        return;
-      }
+      agregarSeccion('BLOQUE 2 — Jerarquía lógica');
+      agregarResultado('owner puede asignar admin', Roles.puedeAsignar('owner', 'admin') === true);
+      agregarResultado('owner puede asignar mesero', Roles.puedeAsignar('owner', 'mesero') === true);
+      agregarResultado('owner NO puede asignar owner', Roles.puedeAsignar('owner', 'owner') === false);
+      agregarResultado('admin puede asignar mesero', Roles.puedeAsignar('admin', 'mesero') === true);
+      agregarResultado('admin NO puede asignar admin', Roles.puedeAsignar('admin', 'admin') === false);
+      agregarResultado('mesero NO puede asignar mesero', Roles.puedeAsignar('mesero', 'mesero') === false);
+      agregarResultado('master puede asignar owner', Roles.puedeAsignar('master', 'owner') === true);
 
-      const staffAdmin = await DB.crearOActualizarStaff({
-        nombre: 'Admin Test',
-        usuarioId: regAdmin.usuarioId,
-        espacioId: 'lataberna',
-        roles: ['admin'],
-        rolPrincipal: 'admin',
-        estado: 'activo',
-        tokenVinculacion: ''
-      });
-      agregarResultado('Crear staff admin', !!staffAdmin);
+      // ══════════════════════════════════════════════════════════
+      //  BLOQUE 3 — ALTA DE STAFF CON CONTRASEÑA TEMPORAL
+      // ══════════════════════════════════════════════════════════
 
-      await Auth.cerrarSesion();
-      const loginAdmin1 = await Auth.iniciarSesion(nombreAdmin, passwordAdmin);
-      if (!loginAdmin1) {
-        agregarResultado('Login admin (Bloque 1)', false);
-        return;
-      }
-      agregarResultado('Login admin (Bloque 1)', true);
+      agregarSeccion('BLOQUE 3 — Alta de staff con contraseña temporal');
 
-      const usuarioAdmin = Auth.obtenerUsuarioActual();
-      await renderTabAdmin(usuarioAdmin, false, 'tab-admin-test');
-      const checksAdmin = [...document.querySelectorAll('#tab-admin-test .rol-check input[type="checkbox"]')];
-      const rolesAdminUnicos = [...new Set(checksAdmin.map(c => c.dataset.rol))];
+      const contenedorAlta = document.createElement('div');
+      contenedorAlta.id = 'tab-alta-test';
+      document.body.appendChild(contenedorAlta);
+      await renderTabAdmin(usuarioOriginal, false, 'tab-alta-test');
 
-      agregarResultado('Admin no ve admin', !rolesAdminUnicos.includes('admin'));
-      agregarResultado('Admin no ve master', !rolesAdminUnicos.includes('master'));
-      agregarResultado('Admin no ve artista', !rolesAdminUnicos.includes('artista'));
-      agregarResultado('Admin ve gerente', rolesAdminUnicos.includes('gerente'));
-      agregarResultado('Admin ve cocinaAyudante', rolesAdminUnicos.includes('cocinaAyudante'));
-      agregarResultado('Admin ve barraAyudante', rolesAdminUnicos.includes('barraAyudante'));
-      agregarResultado('Admin ve mesero', rolesAdminUnicos.includes('mesero'));
-      agregarResultado('Admin ve caja', rolesAdminUnicos.includes('caja'));
-      agregarResultado('Admin ve repartidor', rolesAdminUnicos.includes('repartidor'));
-
-      await Auth.cerrarSesion();
-      const loginMaster2 = await Auth.iniciarSesion('master', 'master123');
-      if (!loginMaster2) {
-        agregarResultado('Login master (para crear gerente)', false);
-        return;
-      }
-      const nombreGerente = `tge_${Date.now().toString().slice(-8)}`;
-      const passwordGerente = 'Pass12345';
-      const regGerente = await Auth.registrarUsuario(nombreGerente, passwordGerente);
-      if (!regGerente.exito) {
-        agregarResultado('Registrar gerente', false, regGerente.error);
-        return;
-      }
-
-      const staffGerente = await DB.crearOActualizarStaff({
-        nombre: 'Gerente Test',
-        usuarioId: regGerente.usuarioId,
-        espacioId: 'lataberna',
-        roles: ['gerente'],
-        rolPrincipal: 'gerente',
-        estado: 'activo',
-        tokenVinculacion: ''
-      });
-      agregarResultado('Crear staff gerente', !!staffGerente);
-
-      await Auth.cerrarSesion();
-      const loginGerente = await Auth.iniciarSesion(nombreGerente, passwordGerente);
-      if (!loginGerente) {
-        agregarResultado('Login gerente', false);
-        return;
-      }
-      agregarResultado('Login gerente', true);
-
-      const usuarioGerente = Auth.obtenerUsuarioActual();
-      await renderTabAdmin(usuarioGerente, false, 'tab-gerente-test');
-      const checksGerente = [...document.querySelectorAll('#tab-gerente-test .rol-check input[type="checkbox"]')];
-      const rolesGerenteUnicos = [...new Set(checksGerente.map(c => c.dataset.rol))];
-
-      agregarResultado('Gerente no ve admin', !rolesGerenteUnicos.includes('admin'));
-      agregarResultado('Gerente no ve master', !rolesGerenteUnicos.includes('master'));
-      agregarResultado('Gerente ve mesero', rolesGerenteUnicos.includes('mesero'));
-      agregarResultado('Gerente ve caja', rolesGerenteUnicos.includes('caja'));
-      agregarResultado('Gerente ve repartidor', rolesGerenteUnicos.includes('repartidor'));
-      agregarResultado('Gerente ve cocinaAyudante', rolesGerenteUnicos.includes('cocinaAyudante'));
-      agregarResultado('Gerente ve barraAyudante', rolesGerenteUnicos.includes('barraAyudante'));
-
-      // ── Bloque 2: Alta de staff con contraseña temporal ──
-      agregarInfo('--- Bloque 2: Alta de staff ---');
-
-      await Auth.cerrarSesion();
-      const loginAdmin2 = await Auth.iniciarSesion(nombreAdmin, passwordAdmin);
-      if (!loginAdmin2) {
-        agregarResultado('Login admin (Bloque 2)', false);
-        return;
-      }
-      agregarResultado('Login admin (Bloque 2)', true);
-
-      const usuarioAdminAlta = Auth.obtenerUsuarioActual();
-      await renderTabAdmin(usuarioAdminAlta, false, 'tab-admin-test');
-
-      const btnNuevo = document.querySelector('#tab-admin-test #btnNuevoStaff');
+      const btnNuevo = document.querySelector('#tab-alta-test #btnNuevoStaff');
       agregarResultado('Botón Nuevo personal existe', !!btnNuevo);
       btnNuevo.click();
       await esperar(500);
@@ -313,8 +382,8 @@
       const modalAlta = await esperarElemento('#altaUsuario');
       agregarResultado('Modal de alta aparece', !!modalAlta);
 
-      const nombreUsuarioAlta = `tpa_${Date.now().toString().slice(-8)}`;
-      const nombreVisibleAlta = 'Personal de Prueba';
+      const nombreUsuarioAlta = `staff_pub_${Date.now().toString().slice(-8)}`;
+      const nombreVisibleAlta = `Personal Prueba ${Date.now().toString().slice(-4)}`;
       modalAlta.value = nombreUsuarioAlta;
       document.querySelector('#altaNombreVisible').value = nombreVisibleAlta;
 
@@ -339,54 +408,68 @@
       selectPrincipal.value = 'mesero';
       selectPrincipal.dispatchEvent(new Event('change', { bubbles: true }));
 
+      const t0Bloque3 = Date.now();
       document.querySelector('#btnConfirmarAltaStaff').click();
       agregarInfo('Confirmando alta...');
 
-      const inputPassword = await esperarElemento('#inputPasswordTemporal', 10000);
-      agregarResultado('Modal de contraseña temporal aparece', !!inputPassword);
-      agregarResultado('Input de contraseña es readonly', inputPassword?.readOnly === true);
-      agregarResultado('Contraseña visible no vacía', inputPassword?.value.length > 0);
-      agregarResultado('Botón copiar existe', !!document.querySelector('#btnCopiarPasswordTemporal'));
+      // v3.10.2: timeout subido de 20s a 40s. La serverless
+      // registrar-usuario tiene cold start variable (16.9s en una
+      // corrida, >20s en la siguiente). El fetch a la función de
+      // sincronización de labels falla por CORS y el navegador
+      // tarda varios segundos en dar el error de red, alargando el
+      // flujo total. 40s da margen real sin enmascarar bugs.
+      const inputPassword = await esperarElemento('#inputPasswordTemporal', 40000);
+      const msBloque3 = Date.now() - t0Bloque3;
+      agregarResultado('Modal de contraseña temporal aparece', !!inputPassword, inputPassword ? `${msBloque3}ms` : `no en 40s`);
 
-      const modalPassword = inputPassword?.closest('.modal-overlay');
-      const textoAdvertencia = modalPassword?.textContent || '';
-      agregarResultado('Advertencia de no volver a mostrar', textoAdvertencia.includes('no se volverá a mostrar'));
+      if (inputPassword) {
+        agregarResultado('Input de contraseña es readonly', inputPassword.readOnly === true);
+        agregarResultado('Contraseña visible no vacía', inputPassword.value.length > 0);
+        agregarResultado('Botón copiar existe', !!document.querySelector('#btnCopiarPasswordTemporal'));
+        const modalPassword = inputPassword.closest('.modal-overlay');
+        const textoAdvertencia = modalPassword?.textContent || '';
+        agregarResultado('Advertencia de no volver a mostrar', textoAdvertencia.includes('no se volverá a mostrar'));
+        document.querySelector('#btnContinuarPasswordTemporal')?.click();
+      }
 
-      document.querySelector('#btnContinuarPasswordTemporal')?.click();
-
-      const staffCreado = await esperarStaffEnLista('tab-admin-test', nombreVisibleAlta, 15000);
+      // v3.10.3: timeout subido de 15s a 40s. El re-render de la
+      // pestaña Personal se dispara DESPUÉS de cerrar el modal de
+      // contraseña, y la llamada a DB.obtenerStaffPorEspacio sufre
+      // el mismo cold start variable que el modal (17s a 24s en
+      // corridas consecutivas). 15s no alcanzaba cuando el cold
+      // start se alargaba.
+      const staffCreado = await esperarStaffEnLista('tab-alta-test', nombreVisibleAlta, 40000);
       agregarResultado('Staff aparece en la lista', !!staffCreado);
 
-      // ── Bloque 3: Sección Personal completa (master) ──
-      agregarInfo('--- Bloque 3: Sección Personal completa ---');
+      // ══════════════════════════════════════════════════════════
+      //  BLOQUE 4 — SECCIÓN PERSONAL COMPLETA
+      // ══════════════════════════════════════════════════════════
 
-      await Auth.cerrarSesion();
-      const loginMaster3 = await Auth.iniciarSesion('master', 'master123');
-      if (!loginMaster3) {
-        agregarResultado('Login master (Bloque 3)', false);
-        return;
-      }
-      const usuarioMaster2 = Auth.obtenerUsuarioActual();
-      const esMasterReal = usuarioMaster2.rolesEfectivos.includes('master');
-      await renderTabAdmin(usuarioMaster2, esMasterReal, 'sec-personal-test');
+      agregarSeccion('BLOQUE 4 — Sección Personal completa');
+
+      const contenedorPersonal = document.createElement('div');
+      contenedorPersonal.id = 'sec-personal-test';
+      document.body.appendChild(contenedorPersonal);
+      await renderTabAdmin(usuarioOriginal, false, 'sec-personal-test');
 
       agregarResultado('Botón nuevo existe', !!document.querySelector('#sec-personal-test #btnNuevoStaff'));
       agregarResultado('Búsqueda existe', !!document.querySelector('#sec-personal-test #buscarPersonalInput'));
       agregarResultado('Lista existe', !!document.querySelector('#sec-personal-test #listaPersonalContainer'));
-      agregarResultado(
-        'Nota muestra master',
-        document.querySelector('#sec-personal-test .nota-privacidad')?.textContent.includes('master')
-      );
+      agregarResultado('Nota muestra rol correcto', document.querySelector('#sec-personal-test .nota-privacidad')?.textContent.includes('owner'));
 
-      // ── Bloque 4: Configuración por espacio ─────────────
-      agregarInfo('--- Bloque 4: Configuración por espacio ---');
+      // ══════════════════════════════════════════════════════════
+      //  BLOQUE 5 — CONFIGURACIÓN POR ESPACIO
+      // ══════════════════════════════════════════════════════════
 
-      const espacioFalso = 'espacio_falso_' + Date.now();
-      await DBAppwrite.crear('configuracion', 'unique()', {
+      agregarSeccion('BLOQUE 5 — Configuración por espacio');
+
+      await DBAppwrite.crear('configuracion', docFalsoId, {
         clave: 'global',
-        valor: JSON.stringify({ nombreLocal: 'Falso' }),
-        espacioId: espacioFalso
+        valor: JSON.stringify({ nombreLocal: 'Falso' })
       });
+
+      await DBAppwrite.listar('mesas');
+      await esperar(200);
 
       Config.activar();
 
@@ -398,33 +481,62 @@
         document.getElementById('cfgCuit').value = '12345678';
         document.getElementById('cfgPie').value = 'Pie Test';
         document.getElementById('btnGuardarConfig').click();
-        await esperar(2000);
 
-        const configs = await DBAppwrite.listar('configuracion');
-        const docCorrecto = configs.find(d => d.clave === 'global' && d.espacioId === 'lataberna');
-        const docFalso = configs.find(d => d.clave === 'global' && d.espacioId === espacioFalso);
+        const inicioCfg = Date.now();
+        let docCorrecto = null;
+        while (Date.now() - inicioCfg < 8000) {
+          try {
+            const doc = await DBAppwrite.baseDeDatos.getRow({
+              databaseId: DBAppwrite.idBaseDeDatos,
+              tableId: DBAppwrite.COLECCIONES.configuracion,
+              rowId: 'PubPrueba_global'
+            });
+            if (doc && doc.valor && doc.valor.includes('La Taberna Test')) {
+              docCorrecto = { id: doc.$id, valor: doc.valor, espacioId: doc.espacioId };
+              break;
+            }
+          } catch (e) { }
+          await esperar(300);
+        }
 
         agregarResultado(
           'Documento con espacio correcto actualizado',
-          !!docCorrecto && docCorrecto.valor.includes('La Taberna Test')
+          !!docCorrecto && docCorrecto.valor.includes('La Taberna Test'),
+          docCorrecto ? `id: ${docCorrecto.id} (${Date.now() - inicioCfg}ms)` : 'no en 8s'
+        );
+
+        const docFalsoActual = await DBAppwrite.baseDeDatos.getRow({
+          databaseId: DBAppwrite.idBaseDeDatos,
+          tableId: DBAppwrite.COLECCIONES.configuracion,
+          rowId: docFalsoId
+        }).catch(() => null);
+
+        const docFalsoNoTocado = docFalsoActual && (docFalsoActual.valor || '').includes('Falso');
+        agregarResultado('Documento alternativo no fue tocado', docFalsoNoTocado);
+
+        const configsFinales = await DBAppwrite.listar('configuracion');
+        const configsPubGlobal = configsFinales.filter(d =>
+          d.clave === 'global' &&
+          d.espacioId === 'PubPrueba' &&
+          d.id !== docFalsoId
         );
         agregarResultado(
-          'Documento con espacio falso no fue tocado',
-          !!docFalso && docFalso.valor.includes('Falso')
+          'Solo existe 1 doc de config para PubPrueba (excluyendo el alternativo)',
+          configsPubGlobal.length === 1,
+          `${configsPubGlobal.length} docs`
         );
-
-        if (docFalso) await DBAppwrite.eliminar('configuracion', docFalso.id);
-        const configsDespues = await DBAppwrite.listar('configuracion');
-        const falsoEliminado = !configsDespues.some(d => d.id === docFalso?.id);
-        agregarResultado('Documento falso eliminado', falsoEliminado);
       }
 
-      // ── Bloque 5: Despensa ─────────────────────────────
-      agregarInfo('--- Bloque 5: Despensa ---');
-
+  
+      // ══════════════════════════════════════════════════════════
+      //  BLOQUE 6 — DESPENSA
+      // ══════════════════════════════════════════════════════════
+      
+      agregarSeccion('BLOQUE 6 — Despensa');
+      
       const inventarioRepo = crearInventarioRepo();
       InventarioService.configurar(inventarioRepo);
-
+      
       const nombreInsumoBase = 'Insumo Base Temporal ' + Date.now();
       const insumoBase = await InventarioService.guardarInsumo({
         nombre: nombreInsumoBase,
@@ -436,27 +548,27 @@
         tipo: 'cocina',
         costo_manual: 100
       });
-
+      
       if (!insumoBase?.exito) {
         agregarResultado('Crear insumo base', false, insumoBase?.error || 'Sin resultado');
         return;
       }
       const insumoBaseId = insumoBase.datos?.id || insumoBase.datos?._id;
       agregarResultado('Crear insumo base', !!insumoBaseId, insumoBaseId);
-
+      
       Despensa.activar();
       await esperar(500);
-
+      
       const vistaDespensa = document.getElementById('view-despensa');
       agregarResultado('Vista despensa creada', !!vistaDespensa && !!vistaDespensa.querySelector('.main-layout'));
-
+      
       const panelTabs = document.querySelectorAll('#view-despensa .panel-tab');
       agregarResultado('Dos pestañas panel izquierdo', panelTabs.length === 2);
       agregarResultado('Pestaña proveedores activa', panelTabs[0]?.classList.contains('activo'));
-
+      
       const centralTabs = document.querySelectorAll('#view-despensa .central-tab');
       agregarResultado('Dos pestañas centrales', centralTabs.length === 2);
-
+      
       const searchInput = document.getElementById('inventarioSearch');
       agregarResultado('Input de búsqueda existe', !!searchInput);
       if (searchInput) {
@@ -468,7 +580,7 @@
         searchInput.dispatchEvent(new Event('input', { bubbles: true }));
         await esperar(200);
       }
-
+      
       const inputCompra = document.getElementById('inputCompra');
       const btnAddCompra = document.getElementById('btnAddCompra');
       agregarResultado('Input lista de compras existe', !!inputCompra && !!btnAddCompra);
@@ -479,7 +591,7 @@
         const listaCompras = document.getElementById('listaCompras');
         const itemAgregado = listaCompras?.textContent.includes('Item Temporal Test');
         agregarResultado('Item agregado a lista', itemAgregado);
-
+      
         if (itemAgregado) {
           const btnQuitar = await esperarElemento('#listaCompras .btn-quitar[data-item="Item Temporal Test"]');
           if (btnQuitar) {
@@ -492,7 +604,7 @@
           }
         }
       }
-
+      
       const btnNuevoProveedor = document.getElementById('btnNuevoProveedor');
       agregarResultado('Botón nuevo proveedor existe', !!btnNuevoProveedor);
       if (btnNuevoProveedor) {
@@ -500,7 +612,7 @@
         await esperar(300);
         const modalProv = await esperarElemento('#modalProveedor');
         agregarResultado('Modal proveedor abre', !!modalProv && modalProv.style.display === 'flex');
-
+      
         if (modalProv) {
           const nombreProv = 'Proveedor Temporal ' + Date.now();
           document.getElementById('provNombre').value = nombreProv;
@@ -510,10 +622,12 @@
           document.getElementById('provEmail').value = 'prov@test.cl';
           document.getElementById('provRubro').value = 'Test';
           document.getElementById('btnGuardarModalProv').click();
-          await esperar(1000);
-
-          const listaProv = await DBAppwrite.listar('proveedores');
-          const creado = listaProv.find(p => p.nombre === nombreProv);
+      
+          const creado = await esperarHasta(async () => {
+            const lista = await DBAppwrite.listar('proveedores');
+            return lista.find(p => p.nombre === nombreProv) || null;
+          }, 8000, 200);
+      
           agregarResultado('Proveedor creado en Appwrite', !!creado);
           if (creado) {
             await DBAppwrite.eliminar('proveedores', creado.id);
@@ -521,7 +635,7 @@
           }
         }
       }
-
+      
       const btnNuevoProducto = document.getElementById('btnNuevoProducto');
       agregarResultado('Botón nuevo producto existe', !!btnNuevoProducto);
       if (btnNuevoProducto) {
@@ -529,7 +643,7 @@
         await esperar(300);
         const modalInsumo = await esperarElemento('#modalInsumo');
         agregarResultado('Modal insumo abre', !!modalInsumo && modalInsumo.style.display === 'flex');
-
+      
         if (modalInsumo) {
           const nombreInsumo = 'Insumo Temporal ' + Date.now();
           document.getElementById('insumoNombre').value = nombreInsumo;
@@ -541,10 +655,12 @@
           document.getElementById('insumoUbicacion').value = 'Test';
           document.getElementById('insumoCostoManual').value = '100';
           document.getElementById('btnGuardarModalInsumo').click();
-          await esperar(1000);
-
-          const listaIns = await DBAppwrite.listar('insumos');
-          const creadoIns = listaIns.find(i => i.nombre === nombreInsumo);
+      
+          const creadoIns = await esperarHasta(async () => {
+            const lista = await DBAppwrite.listar('insumos');
+            return lista.find(i => i.nombre === nombreInsumo) || null;
+          }, 8000, 200);
+      
           agregarResultado('Insumo creado en Appwrite', !!creadoIns);
           if (creadoIns) {
             await DBAppwrite.eliminar('insumos', creadoIns.id);
@@ -552,22 +668,234 @@
           }
         }
       }
-
+      
       if (insumoBaseId) {
         await DBAppwrite.eliminar('insumos', insumoBaseId);
         agregarResultado('Insumo base eliminado', true);
       }
-
-      // ── Bloque 6: Perfil ───────────────────────────────
-      agregarInfo('--- Bloque 6: Perfil ---');
-
-      await Auth.cerrarSesion();
-      const loginAdminPerfil = await Auth.iniciarSesion(nombreAdmin, passwordAdmin);
-      if (!loginAdminPerfil) {
-        agregarResultado('Login admin (Perfil)', false);
-        return;
+      
+      // ══════════════════════════════════════════════════════════
+      //  6m. MOVIMIENTOS DEL INVENTARIO (paquete movimientos)
+      // ══════════════════════════════════════════════════════════
+      
+      agregarInfo('6m. Movimientos del inventario');
+      
+      const ts6m = Date.now().toString().slice(-6);
+      const insumoMovNombre = `Insumo Movimiento Test ${ts6m}`;
+      let insumoMovId = null;
+      
+      const insumoMov = await InventarioService.guardarInsumo({
+        nombre: insumoMovNombre,
+        stock: 5,
+        stock_minimo: 1,
+        unidad: 'u',
+        categoria: 'test_movimientos',
+        tipo: 'cocina',
+        ubicacion: `Test Mov ${ts6m}`
+      });
+      
+      insumoMovId = insumoMov?.datos?.id || insumoMov?.datos?._id || null;
+      agregarResultado('6m · Insumo para movimientos creado', !!insumoMovId, insumoMovId);
+      
+      if (!insumoMovId) {
+        agregarInfo('6m · Sin insumo de movimientos, se salta el sub-bloque.');
+      } else {
+        // Helper: filtra movimientos del Store por insumoId de prueba.
+        const movsPorInsumo = () =>
+          (Store.obtenerEstado().movimientos || []).filter(m => m.insumoId === insumoMovId);
+      
+        const totalInicial = movsPorInsumo().length;
+        agregarResultado(
+          '6m · Sin movimientos iniciales para el insumo',
+          totalInicial === 0,
+          `${totalInicial} movs`
+        );
+      
+        // ── 6m.1 — Ajuste positivo genera movimiento tipo entrada ──
+        const rAjustePos = await InventarioService.ajustarStock(
+          insumoMovId, 3, 'Test 6m entrada'
+        );
+        agregarResultado('6m · Ajuste +3 devuelve exito', rAjustePos?.exito === true);
+      
+        await esperar(800);
+      
+        const movsPos = movsPorInsumo();
+        agregarResultado(
+          '6m · Movimiento entrada registrado en Store',
+          movsPos.length === 1,
+          `${movsPos.length} movs`
+        );
+      
+        if (movsPos.length >= 1) {
+          const m = movsPos[0];
+          agregarResultado('6m · Movimiento tipo entrada', m.tipo === 'entrada', m.tipo);
+          agregarResultado(
+            '6m · Movimiento cantidad = +3',
+            Number(m.cantidad) === 3,
+            `cantidad=${m.cantidad}`
+          );
+          agregarResultado(
+            '6m · Movimiento con insumoNombre denormalizado',
+            m.insumoNombre === insumoMovNombre,
+            m.insumoNombre
+          );
+          agregarResultado(
+            '6m · Movimiento con unidad denormalizada',
+            m.unidad === 'u',
+            m.unidad
+          );
+        }
+      
+        // ── 6m.2 — El panel renderiza la fila sin recargar vista ──
+        const tabMov = document.querySelector('#view-despensa .central-tab[data-tab="movimientos"]');
+        agregarResultado('6m · Pestaña Movimientos existe', !!tabMov);
+      
+        if (tabMov) {
+          tabMov.click();
+          await esperar(400);
+      
+          const contMov = document.getElementById('movimientosContainer');
+          agregarResultado(
+            '6m · Panel de movimientos renderiza el insumo',
+            !!contMov && contMov.textContent.includes(insumoMovNombre),
+            contMov ? 'fila visible' : 'sin contenedor'
+          );
+        }
+      
+        // ── 6m.3 — Filtro por tipo sobre el slice ──
+        const contMov = document.getElementById('movimientosContainer');
+        const filtroEntradas = document.querySelector('#view-despensa .mov-filtro-btn[data-filtro="entrada"]');
+        const filtroSalidas = document.querySelector('#view-despensa .mov-filtro-btn[data-filtro="salida"]');
+        const filtroTodos = document.querySelector('#view-despensa .mov-filtro-btn[data-filtro="todos"]');
+      
+        if (filtroEntradas && filtroSalidas && filtroTodos && contMov) {
+          filtroEntradas.click();
+          await esperar(300);
+          agregarResultado(
+            '6m · Filtro "Entradas" mantiene el insumo',
+            contMov.textContent.includes(insumoMovNombre)
+          );
+      
+          filtroSalidas.click();
+          await esperar(300);
+          agregarResultado(
+            '6m · Filtro "Salidas" oculta el insumo',
+            !contMov.textContent.includes(insumoMovNombre)
+          );
+      
+          filtroTodos.click();
+          await esperar(300);
+          agregarResultado(
+            '6m · Filtro "Todos" recupera el insumo',
+            contMov.textContent.includes(insumoMovNombre)
+          );
+        } else {
+          agregarResultado('6m · Controles de filtro disponibles', false);
+        }
+      
+        // ── 6m.4 — Delta 0 no genera movimiento ──
+        const movsAntesDelta0 = movsPorInsumo().length;
+        const rDelta0 = await InventarioService.ajustarStock(
+          insumoMovId, 0, 'Test 6m delta cero'
+        );
+        await esperar(800);
+        const movsDespuesDelta0 = movsPorInsumo().length;
+        agregarResultado(
+          '6m · Delta 0 no genera movimiento',
+          movsDespuesDelta0 === movsAntesDelta0,
+          `${movsAntesDelta0} → ${movsDespuesDelta0}`
+        );
+      
+        // ── 6m.5 — Delta negativo con recorte a 0 registra delta efectivo ──
+        // Stock antes: 5 + 3 = 8 (delta 0 no lo modifica).
+        // Delta solicitado: -100.
+        // Stock nuevo: max(0, 8 - 100) = 0.
+        // Delta efectivo: -8.
+        const movsAntesRecorte = movsPorInsumo().length;
+        const rRecorte = await InventarioService.ajustarStock(
+          insumoMovId, -100, 'Test 6m recorte a cero'
+        );
+        await esperar(800);
+      
+        const movsRecorte = movsPorInsumo();
+        agregarResultado(
+          '6m · Ajuste -100 registra un movimiento',
+          movsRecorte.length === movsAntesRecorte + 1,
+          `${movsAntesRecorte} → ${movsRecorte.length}`
+        );
+      
+        if (movsRecorte.length >= 1) {
+          const mRec = movsRecorte[0];
+          agregarResultado(
+            '6m · Movimiento registra delta efectivo (-8), no solicitado (-100)',
+            Number(mRec.cantidad) === -8,
+            `cantidad=${mRec.cantidad}`
+          );
+          agregarResultado(
+            '6m · Movimiento tipo salida',
+            mRec.tipo === 'salida',
+            mRec.tipo
+          );
+        }
+      
+        // ── 6m.6 — Stock final 0 ──
+        const insumoFinal = (Store.obtenerEstado().insumos || []).find(i => i.id === insumoMovId);
+        agregarResultado(
+          '6m · Stock final es 0',
+          Number(insumoFinal?.stock) === 0,
+          `stock=${insumoFinal?.stock}`
+        );
+      
+        // ── 6m.7 — Persistencia en Appwrite ──
+        const movsRemotos = await esperarHasta(async () => {
+          try {
+            const lista = await DBAppwrite.listar('movimientos');
+            const filtrados = lista.filter(m => m.insumoId === insumoMovId);
+            return filtrados.length >= 2 ? filtrados : null;
+          } catch { return null; }
+        }, 8000, 300);
+      
+        agregarResultado(
+          '6m · Movimientos persistidos en Appwrite',
+          Array.isArray(movsRemotos) && movsRemotos.length >= 2,
+          movsRemotos ? `${movsRemotos.length} filas` : 'no en 8s'
+        );
+      
+        // ── 6m.8 — Limpieza ──
+        let movsLimpiados = true;
+        try {
+          const todosMovs = await DBAppwrite.listar('movimientos');
+          for (const m of todosMovs) {
+            if (m.insumoId === insumoMovId) {
+              try { await DBAppwrite.eliminar('movimientos', m.id); }
+              catch { movsLimpiados = false; }
+            }
+          }
+        } catch { movsLimpiados = false; }
+        agregarResultado('6m · Movimientos de test eliminados de Appwrite', movsLimpiados);
+      
+        try {
+          await DBAppwrite.eliminar('insumos', insumoMovId);
+          agregarResultado('6m · Insumo de test eliminado', true);
+        } catch (e) {
+          agregarResultado('6m · Insumo de test eliminado', false, e.message);
+        }
+      
+        // Refrescar el slice del Store para no dejar residuos entre corridas.
+        try {
+          if (typeof DB.recargarMovimientos === 'function') {
+            await DB.recargarMovimientos();
+          } else {
+            Store.despachar({ type: 'MOVIMIENTOS_LIMPIAR', payload: [] });
+          }
+        } catch { /* ignorar */ }
       }
-      agregarResultado('Login admin (Perfil)', true);
+
+      // ══════════════════════════════════════════════════════════
+      //  BLOQUE 7 — PERFIL Y GUÍAS
+      // ══════════════════════════════════════════════════════════
+
+      agregarSeccion('BLOQUE 7 — Perfil y Guías');
 
       Perfil.activar();
       await esperar(500);
@@ -580,107 +908,1372 @@
 
       const idCard = document.getElementById('perfilIdCard');
       agregarResultado('ID card existe', !!idCard);
-      agregarResultado('Nombre visible en ID card', idCard?.textContent.includes(nombreAdmin));
 
-      const modoVitrina = document.getElementById('modoVitrinaPerfil');
-      const modoEdicion = document.getElementById('modoEdicionPerfil');
-      agregarResultado('Modo vitrina visible', modoVitrina && modoVitrina.style.display !== 'none');
-      agregarResultado('Modo edición oculto', modoEdicion && (modoEdicion.style.display === 'none' || !modoEdicion.style.display));
+      const guiasVisibles = document.getElementById('perfilSeccionGuias');
+      agregarResultado('Guías no visibles para owner', !guiasVisibles);
 
-      const btnEditarPerfil = document.getElementById('btnEditarPerfil');
-      agregarResultado('Botón editar perfil existe', !!btnEditarPerfil);
-      if (btnEditarPerfil) {
-        btnEditarPerfil.click();
-        await esperar(300);
-        agregarResultado('Modo edición visible tras clic', modoEdicion && modoEdicion.style.display !== 'none');
-        agregarResultado('Modo vitrina oculto tras clic', modoVitrina && modoVitrina.style.display === 'none');
+      // ══════════════════════════════════════════════════════════
+      //  BLOQUE 8 — INSUMO VENDIBLE (D.6/D.7/D.8)
+      // ══════════════════════════════════════════════════════════
+
+      agregarSeccion('BLOQUE 8 — Insumo Vendible (D.6/D.7/D.8)');
+
+      const ts8 = Date.now().toString().slice(-6);
+      const ubicacion8 = `Test Vendible ${ts8}`;
+      let id8A = null, id8B = null, id8C = null;
+
+      agregarInfo('8a. Persistencia del insumo vendible');
+
+      const insumo8A = await InventarioService.guardarInsumo({
+        nombre: `Insumo Vendible A ${ts8}`,
+        stock: 5, unidad: 'u', stock_minimo: 1,
+        categoria: 'barra', tipo: 'cocina', ubicacion: ubicacion8,
+        vendible: true, precio_venta: 2500, destino: 'barra'
+      });
+      if (!insumo8A?.exito) {
+        agregarResultado('8a · Crear insumo A vendible', false, insumo8A?.error);
+      } else {
+        id8A = insumo8A.datos?.id;
+        agregarResultado('8a · Crear insumo A vendible', !!id8A, id8A);
+
+        let docA = null;
+        await esperarHasta(async () => {
+          try {
+            docA = await DBAppwrite.baseDeDatos.getRow({
+              databaseId: DBAppwrite.idBaseDeDatos,
+              tableId: DBAppwrite.COLECCIONES.insumos,
+              rowId: id8A
+            });
+            return docA;
+          } catch { return null; }
+        }, 8000);
+
+        agregarResultado('8a · A · vendible=true en Appwrite', docA?.vendible === true, `vendible=${docA?.vendible}`);
+        agregarResultado('8a · A · precio_venta=2500 en Appwrite', docA?.precio_venta === 2500, `precio_venta=${docA?.precio_venta}`);
+        agregarResultado('8a · A · destino=barra en Appwrite', docA?.destino === 'barra', `destino=${docA?.destino}`);
       }
 
-      const tabs = document.querySelectorAll('#view-perfil .central-tab');
-      const tabsVisibles = [...tabs].filter(t => t.classList.contains('visible'));
-      agregarResultado('Pestañas visibles existentes', tabsVisibles.length >= 3);
+      const insumo8B = await InventarioService.guardarInsumo({
+        nombre: `Insumo Operativo B ${ts8}`,
+        stock: 10, unidad: 'kg', stock_minimo: 2,
+        categoria: 'cocina', tipo: 'cocina', ubicacion: ubicacion8,
+        vendible: false
+      });
+      if (insumo8B?.exito) {
+        id8B = insumo8B.datos?.id;
+        agregarResultado('8a · Crear insumo B operativo', !!id8B, id8B);
 
-      const tabPublico = document.querySelector('#view-perfil .central-tab[data-tab="publico"]');
-      agregarResultado('Pestaña pública activa por defecto', tabPublico?.classList.contains('activo'));
+        const docB = id8B
+          ? await DBAppwrite.baseDeDatos.getRow({
+              databaseId: DBAppwrite.idBaseDeDatos,
+              tableId: DBAppwrite.COLECCIONES.insumos,
+              rowId: id8B
+            }).catch(() => null)
+          : null;
+        agregarResultado('8a · B · vendible=false en Appwrite', docB?.vendible === false, `vendible=${docB?.vendible}`);
+        agregarResultado('8a · B · precio_venta=0 en Appwrite', docB?.precio_venta === 0, `precio_venta=${docB?.precio_venta}`);
+      } else {
+        agregarResultado('8a · Crear insumo B operativo', false, insumo8B?.error);
+      }
 
-      const inputApodo = document.getElementById('editarApodo');
-      if (inputApodo) {
-        inputApodo.value = 'Apodo Temporal';
-        const btnGuardarPublico = document.getElementById('btnGuardarPerfilPublico');
-        if (btnGuardarPublico) {
-          btnGuardarPublico.click();
+      const insumo8C = await InventarioService.guardarInsumo({
+        nombre: `Insumo Vendible C ${ts8}`,
+        stock: 8, unidad: 'u', stock_minimo: 1,
+        categoria: 'cocina', tipo: 'cocina', ubicacion: ubicacion8,
+        vendible: true, precio_venta: 3500, destino: 'cocina'
+      });
+      if (insumo8C?.exito) {
+        id8C = insumo8C.datos?.id;
+        agregarResultado('8a · Crear insumo C vendible', !!id8C, id8C);
+      } else {
+        agregarResultado('8a · Crear insumo C vendible', false, insumo8C?.error);
+      }
+
+      agregarInfo('8b. Modal carga insumo vendible');
+
+      if (id8A) {
+        ModalInsumo.mostrar(insumo8A.datos, null);
+        await esperar(200);
+
+        const modal8 = document.getElementById('modalInsumo');
+        agregarResultado('8b · Modal abierto', !!modal8 && modal8.style.display === 'flex');
+
+        const toggle8 = document.getElementById('insumoVendible');
+        const bloque8 = document.getElementById('bloqueVendible');
+        const btnGuardar8 = document.getElementById('btnGuardarModalInsumo');
+
+        agregarResultado('8b · Toggle cargado activo', toggle8?.checked === true);
+        agregarResultado('8b · Bloque vendible visible', bloque8?.style.display === 'block');
+        agregarResultado('8b · Precio cargado (2500)', String(document.getElementById('insumoPrecioVenta')?.value) === '2500');
+        agregarResultado('8b · Destino cargado (barra)', document.getElementById('insumoDestino')?.value === 'barra');
+        agregarResultado(
+          '8b · Copy "Guardar y publicar en carta"',
+          btnGuardar8?.textContent.trim() === 'Guardar y publicar en carta',
+          btnGuardar8?.textContent
+        );
+
+        agregarInfo('8c. Desmarcar toggle y guardar');
+
+        toggle8.checked = false;
+        toggle8.dispatchEvent(new Event('change', { bubbles: true }));
+        await esperar(100);
+
+        agregarResultado('8c · Bloque oculto tras desmarcar', bloque8?.style.display === 'none');
+        agregarResultado('8c · Copy "Guardar" tras desmarcar', btnGuardar8?.textContent.trim() === 'Guardar', btnGuardar8?.textContent);
+
+        btnGuardar8.click();
+        await esperar(1500);
+
+        let docADespues = null;
+        await esperarHasta(async () => {
+          try {
+            docADespues = await DBAppwrite.baseDeDatos.getRow({
+              databaseId: DBAppwrite.idBaseDeDatos,
+              tableId: DBAppwrite.COLECCIONES.insumos,
+              rowId: id8A
+            });
+            return docADespues?.vendible === false;
+          } catch { return null; }
+        }, 8000);
+
+        agregarResultado('8c · A · vendible=false tras guardar', docADespues?.vendible === false, `vendible=${docADespues?.vendible}`);
+        agregarResultado('8c · A · precio_venta=0 tras desmarcar', docADespues?.precio_venta === 0, `precio_venta=${docADespues?.precio_venta}`);
+        agregarResultado('8c · A · destino=cocina tras desmarcar', docADespues?.destino === 'cocina', `destino=${docADespues?.destino}`);
+      }
+
+      agregarInfo('8d. Filtro vendibles');
+
+      setFiltroVendibles(false);
+      Despensa.activar();
+      await esperar(500);
+
+      const chip8 = document.getElementById('chipVendibles');
+      agregarResultado('8d · Chip Vendibles existe', !!chip8);
+
+      if (chip8) {
+        chip8.click();
+        await esperar(400);
+
+        const contenedor8 = document.getElementById('espaciosContainer');
+        const nombresVisibles = () =>
+          [...(contenedor8?.querySelectorAll('.producto-item .nombre') || [])].map(n => n.textContent.trim());
+
+        const visiblesConFiltro = nombresVisibles();
+        agregarResultado(
+          '8d · Con filtro: A (desmarcado) no aparece',
+          !visiblesConFiltro.some(n => n.includes(`A ${ts8}`)),
+          visiblesConFiltro.join(' | ')
+        );
+        agregarResultado('8d · Con filtro: B (no vendible) no aparece', !visiblesConFiltro.some(n => n.includes(`B ${ts8}`)));
+        agregarResultado('8d · Con filtro: C (vendible) sí aparece', visiblesConFiltro.some(n => n.includes(`C ${ts8}`)));
+
+        chip8.click();
+        await esperar(400);
+
+        const visiblesSinFiltro = nombresVisibles();
+        agregarResultado('8d · Sin filtro: A aparece', visiblesSinFiltro.some(n => n.includes(`A ${ts8}`)));
+        agregarResultado('8d · Sin filtro: B aparece', visiblesSinFiltro.some(n => n.includes(`B ${ts8}`)));
+        agregarResultado('8d · Sin filtro: C aparece', visiblesSinFiltro.some(n => n.includes(`C ${ts8}`)));
+
+        agregarInfo('8e. Badge vendible en la ficha');
+
+        const badges8 = [...(contenedor8?.querySelectorAll('.producto-item .badge-vendible') || [])];
+        agregarResultado('8e · Al menos un badge renderizado', badges8.length >= 1, `${badges8.length} badges`);
+
+        const badgeC = badges8.find(b =>
+          b.closest('.producto-item')?.querySelector('.nombre')?.textContent.includes(`C ${ts8}`)
+        );
+        agregarResultado('8e · Badge de C existe', !!badgeC);
+        agregarResultado('8e · Badge C contiene $3500', badgeC?.textContent.includes('$3500'), badgeC?.textContent);
+        agregarResultado('8e · Badge C contiene "Cocina"', badgeC?.textContent.includes('Cocina'), badgeC?.textContent);
+
+        const filaA8 = [...(contenedor8?.querySelectorAll('.producto-item') || [])]
+          .find(f => f.querySelector('.nombre')?.textContent.includes(`A ${ts8}`));
+        agregarResultado('8e · A no tiene badge tras desmarcar', !filaA8?.querySelector('.badge-vendible'));
+      }
+
+      for (const id of [id8A, id8B, id8C]) {
+        if (!id) continue;
+        try { await DBAppwrite.eliminar('insumos', id); }
+        catch (e) { Logger.warn(`[Test] No se pudo eliminar insumo ${id}: ${e.message}`); }
+      }
+
+      let insumos8Limpios = true;
+      for (const id of [id8A, id8B, id8C]) {
+        if (!id) continue;
+        try {
+          await DBAppwrite.baseDeDatos.getRow({
+            databaseId: DBAppwrite.idBaseDeDatos,
+            tableId: DBAppwrite.COLECCIONES.insumos,
+            rowId: id
+          });
+          insumos8Limpios = false;
+        } catch (e) {
+          if (e.code !== 404) insumos8Limpios = false;
+        }
+      }
+      agregarResultado('8 · Insumos temporales eliminados', insumos8Limpios);
+
+      // ══════════════════════════════════════════════════════════
+      //  BLOQUE 9 — CARTA EDITOR
+      // ══════════════════════════════════════════════════════════
+
+      agregarSeccion('BLOQUE 9 — Carta Editor');
+
+      agregarInfo('9a. Render básico');
+
+      CartaEditor.activar();
+      await esperar(500);
+
+      const vistaCarta = document.getElementById('view-carta-editor');
+      agregarResultado('9a · Vista renderizada', !!vistaCarta && !!vistaCarta.querySelector('.canvas-wrap'));
+      agregarResultado('9a · Header renderizado', !!document.querySelector('#view-carta-editor .menu-header'));
+      agregarResultado('9a · Canvas renderizado', !!document.getElementById('menuCanvas'));
+      agregarResultado('9a · Sidebar renderizada', !!document.getElementById('menuSidebar'));
+      agregarResultado('9a · Bottom sheet renderizado', !!document.getElementById('menuBottomSheet'));
+      agregarResultado('9a · Panel de propiedades renderizado', !!document.getElementById('menuPropsPanel'));
+
+      agregarInfo('9b. Sin eventos inline');
+
+      const htmlVistaCarta = vistaCarta.innerHTML;
+      agregarResultado('9b · Sin onerror en el HTML', !htmlVistaCarta.includes('onerror='));
+      agregarResultado('9b · Sin onclick en el HTML', !htmlVistaCarta.includes('onclick='));
+
+      agregarInfo('9c. limpiar() destruye el DOM');
+
+      CartaEditor.limpiar();
+      await esperar(200);
+
+      const vistaCartaTrasLimpiar = document.getElementById('view-carta-editor');
+      agregarResultado('9c · Vista sigue en DOM', !!vistaCartaTrasLimpiar);
+      agregarResultado('9c · Vista vacía tras limpiar', vistaCartaTrasLimpiar.innerHTML.trim() === '');
+
+      agregarInfo('9d. Múltiples activaciones sin degradación');
+
+      for (let i = 0; i < 3; i++) {
+        CartaEditor.activar();
+        await esperar(200);
+        CartaEditor.limpiar();
+        await esperar(100);
+      }
+
+      CartaEditor.activar();
+      await esperar(400);
+
+      const fab9 = document.getElementById('menuFabBtn');
+      const radial9 = document.getElementById('menuRadialMenu');
+      agregarResultado('9d · Fab y radial existen tras múltiples activaciones', !!fab9 && !!radial9);
+
+      if (fab9 && radial9) {
+        fab9.click();
+        await esperar(100);
+        agregarResultado('9d · 1 click abre el radial', radial9.classList.contains('active'));
+
+        fab9.click();
+        await esperar(100);
+        agregarResultado('9d · 2 clicks cierran el radial', !radial9.classList.contains('active'));
+      }
+
+      agregarInfo('9e. Persistencia real en Appwrite');
+
+      const ts9 = Date.now().toString().slice(-6);
+      const nombreCarta9 = `Carta Test ${ts9}`;
+      let carta9Id = null;
+
+      const carta9 = {
+        nombre: nombreCarta9,
+        productos: [],
+        estado: 'borrador',
+        fondo: '#1e3a2f',
+        tipografia: "'Georgia', serif",
+        grilla: true
+      };
+
+      const guardada9 = await guardarMenu(carta9);
+      agregarResultado('9e · Carta guardada (retorno)', !!guardada9?.id, guardada9?.id);
+
+      if (guardada9?.id) {
+        carta9Id = guardada9.id;
+
+        const doc9 = await esperarHasta(async () => {
+          try {
+            const d = await DBAppwrite.baseDeDatos.getRow({
+              databaseId: DBAppwrite.idBaseDeDatos,
+              tableId: DBAppwrite.COLECCIONES['cartas'],
+              rowId: carta9Id
+            });
+            return d;
+          } catch { return null; }
+        }, 8000);
+
+        agregarResultado('9e · Doc existe en Appwrite', !!doc9);
+
+        if (doc9) {
+          agregarResultado('9e · fondo persistido', doc9.fondo === '#1e3a2f', `fondo=${doc9.fondo}`);
+          agregarResultado('9e · tipografia persistida', doc9.tipografia === "'Georgia', serif", `tipografia=${doc9.tipografia}`);
+          agregarResultado('9e · grilla persistida', doc9.grilla === true, `grilla=${doc9.grilla}`);
+
+          let productosParseados9 = null;
+          let parseError9 = null;
+          try {
+            productosParseados9 = JSON.parse(doc9.productos || '[]');
+          } catch (e) {
+            parseError9 = e.message;
+          }
+
+          agregarResultado(
+            '9e · productos guardado como JSON string parseable',
+            Array.isArray(productosParseados9),
+            `tipo=${typeof doc9.productos}${parseError9 ? ` · ${parseError9}` : ''}`
+          );
+        }
+
+        await esperar(500);
+        const state9 = Store.obtenerEstado();
+
+        // v3.10.1: el slice correcto ahora es `cartas` tras E.x13 (D.13).
+        agregarResultado(
+          '9e · Store tiene el slice cartas (rename E.x13)',
+          Array.isArray(state9.cartas),
+          `tipo=${typeof state9.cartas}`
+        );
+        agregarResultado(
+          '9e · Slice legacy menus ya no existe',
+          state9.menus === undefined,
+          `menus=${typeof state9.menus}`
+        );
+
+        const enStore9 = (state9.cartas || []).find(m => m.id === carta9Id);
+        agregarResultado(
+          '9e · Store tiene productos como array',
+          Array.isArray(enStore9?.productos),
+          `tipo=${typeof enStore9?.productos}`
+        );
+
+        const item9 = document.querySelector(`#menuSidebarList .menu-item[data-id="${carta9Id}"]`);
+        agregarResultado('9e · Item en sidebar', !!item9);
+
+        if (item9) {
+          item9.click();
           await esperar(300);
-          agregarResultado('Apodo guardado sin errores', true);
+
+          agregarResultado('9e · Carta activa tras click', getMenuActivo()?.id === carta9Id);
+
+          const canvas9 = document.getElementById('menuCanvas');
+          const bgSelect9 = document.getElementById('menuBgSelect');
+          const fontSelect9 = document.getElementById('menuFontSelect');
+          const gridToggle9 = document.getElementById('menuGridToggle');
+
+          agregarResultado('9e · Canvas aplica fondo', canvas9?.style.backgroundColor === 'rgb(30, 58, 47)', `bg=${canvas9?.style.backgroundColor}`);
+          agregarResultado('9e · Canvas tiene clase grid', canvas9?.classList.contains('grid'));
+          agregarResultado('9e · Select fondo sincronizado', bgSelect9?.value === '#1e3a2f', `valor=${bgSelect9?.value}`);
+          agregarResultado('9e · Select tipografía sincronizado', fontSelect9?.value === "'Georgia', serif", `valor=${fontSelect9?.value}`);
+          agregarResultado('9e · Toggle grilla sincronizado', gridToggle9?.checked === true);
+        }
+
+        agregarInfo('9f. guardarMenu controla errores de Appwrite');
+
+        const guardadaFalso9 = await guardarMenu({
+          id: 'carta_inexistente_' + ts9,
+          nombre: 'Carta Falsa ' + ts9,
+          productos: [],
+          estado: 'borrador',
+          fondo: '#1a1a2e',
+          tipografia: "'Inter', sans-serif",
+          grilla: false
+        });
+        agregarResultado(
+          '9f · guardarMenu devuelve null cuando Appwrite falla',
+          guardadaFalso9 === null,
+          `retorno=${guardadaFalso9 === null ? 'null' : typeof guardadaFalso9}`
+        );
+
+        try {
+          await DBAppwrite.eliminar('cartas', carta9Id);
+
+          // v3.10.1: el slice correcto ahora es `cartas` tras E.x13 (D.13).
+          const state9Limpieza = Store.obtenerEstado();
+          const cartas9 = (state9Limpieza.cartas || []).filter(m => m.id !== carta9Id);
+          Store.despachar({ type: 'CARTAS_INICIALIZAR', payload: cartas9 });
+          agregarResultado('9 · Carta temporal eliminada', true);
+        } catch (e) {
+          agregarResultado('9 · Carta temporal eliminada', false, e.message);
         }
       }
 
-      const tabPrefs = document.querySelector('#view-perfil .central-tab[data-tab="preferencias"]');
-      if (tabPrefs) {
-        tabPrefs.click();
-        await esperar(300);
-        agregarResultado('Pestaña preferencias activada', document.getElementById('tab-preferencias')?.classList.contains('activo'));
+      setMenuActivo(null);
+      CartaEditor.limpiar();
+      await esperar(100);
+
+      // ══════════════════════════════════════════════════════════
+      //  BLOQUE 10 — SECCIÓN CATÁLOGO EN CONFIGURACIÓN
+      // ══════════════════════════════════════════════════════════
+
+      agregarSeccion('BLOQUE 10 — Sección Catálogo en Configuración');
+
+      agregarInfo('10a. Pestaña Catálogo en el panel izquierdo');
+
+      Config.activar();
+      await esperar(500);
+
+      const vistaConfig10 = document.getElementById('view-config');
+      agregarResultado('10a · Vista Config renderizada', !!vistaConfig10 && !!vistaConfig10.querySelector('.main-layout'));
+
+      const navBtns10 = [...document.querySelectorAll('#view-config .nav-btn')];
+      const navCatalogo10 = navBtns10.find(b => b.dataset.seccion === 'catalogo');
+      agregarResultado('10a · Botón de nav Catálogo existe', !!navCatalogo10);
+
+      const seccionCatalogo10 = document.getElementById('sec-catalogo');
+      agregarResultado('10a · Sección #sec-catalogo existe', !!seccionCatalogo10);
+
+      const totalSecciones10 = document.querySelectorAll('#view-config .nav-btn').length;
+      agregarResultado('10a · Panel izquierdo tiene 5 pestañas', totalSecciones10 === 5, `${totalSecciones10} pestañas`);
+
+      agregarInfo('10b. Cambio a pestaña Catálogo');
+
+      if (navCatalogo10) {
+        navCatalogo10.click();
+        await esperar(200);
+
+        agregarResultado('10b · Botón Catálogo con clase activo', navCatalogo10.classList.contains('activo'));
+        agregarResultado('10b · Sección Catálogo visible', seccionCatalogo10?.classList.contains('activo'));
       }
 
-      const tabAdmin = document.querySelector('#view-perfil .central-tab[data-tab="admin"]');
-      agregarResultado('Pestaña admin visible', tabAdmin?.classList.contains('visible'));
-      if (tabAdmin) {
-        tabAdmin.click();
+      agregarInfo('10c. Campo kds_colapso_variantes');
+
+      const inputColapso10 = document.getElementById('cfgKdsColapsoVariantes');
+      agregarResultado('10c · Input kds_colapso_variantes existe', !!inputColapso10);
+      agregarResultado('10c · Input es tipo number', inputColapso10?.type === 'number');
+      agregarResultado('10c · Input tiene min=1', inputColapso10?.min === '1');
+      agregarResultado('10c · Input tiene max=10', inputColapso10?.max === '10');
+
+      const valorInicial10 = inputColapso10?.value;
+      agregarResultado(
+        '10c · Valor inicial válido (1-10)',
+        !!valorInicial10 && Number(valorInicial10) >= 1 && Number(valorInicial10) <= 10,
+        `valor=${valorInicial10}`
+      );
+
+      const helpText10 = document.querySelector('#sec-catalogo .campo-help');
+      agregarResultado('10c · Texto de ayuda presente', !!helpText10);
+
+      const btnGuardarCatalogo10 = document.getElementById('btnGuardarCatalogo');
+      agregarResultado('10c · Botón Guardar de Catálogo existe', !!btnGuardarCatalogo10);
+
+      agregarInfo('10d. Persistencia con valor válido');
+
+      const valorPrueba10 = 5;
+      inputColapso10.value = String(valorPrueba10);
+      btnGuardarCatalogo10.click();
+      await esperar(500);
+
+      const configDespues10 = await esperarHasta(async () => {
+        const cfg = await leerConfigRemoto('PubPrueba');
+        return cfg?.kds_colapso_variantes === valorPrueba10 ? cfg : null;
+      }, 8000, 300);
+
+      agregarResultado(
+        '10d · kds_colapso_variantes persistido en Appwrite',
+        configDespues10?.kds_colapso_variantes === valorPrueba10,
+        `valor=${configDespues10?.kds_colapso_variantes}`
+      );
+
+      agregarResultado(
+        '10d · Store refleja el valor',
+        Store.obtenerEstado().config?.kds_colapso_variantes === valorPrueba10,
+        `store=${Store.obtenerEstado().config?.kds_colapso_variantes}`
+      );
+
+      agregarInfo('10e. Normalización de rango');
+
+      inputColapso10.value = '99';
+      btnGuardarCatalogo10.click();
+      await esperar(500);
+
+      const configAlto10 = await esperarHasta(async () => {
+        const cfg = await leerConfigRemoto('PubPrueba');
+        return cfg?.kds_colapso_variantes === 10 ? cfg : null;
+      }, 8000, 300);
+
+      agregarResultado(
+        '10e · Valor 99 recortado a 10',
+        configAlto10?.kds_colapso_variantes === 10,
+        `valor=${configAlto10?.kds_colapso_variantes}`
+      );
+
+      Config.activar();
+      await esperar(300);
+      const navCatalogo10b = [...document.querySelectorAll('#view-config .nav-btn')]
+        .find(b => b.dataset.seccion === 'catalogo');
+      navCatalogo10b?.click();
+      await esperar(200);
+
+      const inputColapso10b = document.getElementById('cfgKdsColapsoVariantes');
+      inputColapso10b.value = '-5';
+      document.getElementById('btnGuardarCatalogo').click();
+      await esperar(500);
+
+      const configBajo10 = await esperarHasta(async () => {
+        const cfg = await leerConfigRemoto('PubPrueba');
+        return cfg?.kds_colapso_variantes === 1 ? cfg : null;
+      }, 8000, 300);
+
+      agregarResultado(
+        '10e · Valor -5 recortado a 1',
+        configBajo10?.kds_colapso_variantes === 1,
+        `valor=${configBajo10?.kds_colapso_variantes}`
+      );
+
+      agregarInfo('10f. Recarga del valor guardado');
+
+      Config.activar();
+      await esperar(300);
+      const navCatalogo10c = [...document.querySelectorAll('#view-config .nav-btn')]
+        .find(b => b.dataset.seccion === 'catalogo');
+      navCatalogo10c?.click();
+      await esperar(200);
+
+      const inputColapso10c = document.getElementById('cfgKdsColapsoVariantes');
+      agregarResultado(
+        '10f · Al reactivar, input refleja el último valor guardado (1)',
+        inputColapso10c?.value === '1',
+        `valor=${inputColapso10c?.value}`
+      );
+
+      inputColapso10c.value = '3';
+      document.getElementById('btnGuardarCatalogo').click();
+      await esperar(500);
+
+      const configFinal10 = await esperarHasta(async () => {
+        const cfg = await leerConfigRemoto('PubPrueba');
+        return cfg?.kds_colapso_variantes === 3 ? cfg : null;
+      }, 8000, 300);
+
+      agregarResultado(
+        '10f · Valor final restaurado a 3',
+        configFinal10?.kds_colapso_variantes === 3,
+        `valor=${configFinal10?.kds_colapso_variantes}`
+      );
+
+      agregarInfo('10g. Botón "Gestionar variantes" abre el editor');
+
+      const btnGestionar10g = document.getElementById('btnGestionarVariantes');
+      agregarResultado('10g · Botón "Gestionar variantes" existe', !!btnGestionar10g);
+
+      if (btnGestionar10g) {
+        btnGestionar10g.click();
+
+        const montado10g = await esperarHasta(() => {
+          const contenedor = document.getElementById('contenedor-variantes-modal');
+          if (!contenedor) return null;
+          const overlay = contenedor.querySelector('.ve-overlay');
+          return overlay ? contenedor : null;
+        }, 8000, 200);
+
+        agregarResultado('10g · Editor de variantes montado', !!montado10g);
+
+        if (montado10g) {
+          agregarResultado('10g · Header del editor presente', !!montado10g.querySelector('.ve-header'));
+          agregarResultado('10g · Lista de variantes presente', !!montado10g.querySelector('.ve-panel-vars'));
+
+          const btnCerrar10g = montado10g.querySelector('[data-action="cerrar-editor"]');
+          if (btnCerrar10g) {
+            btnCerrar10g.click();
+            await esperar(500);
+
+            const contenedorTrasCierre = document.getElementById('contenedor-variantes-modal');
+            agregarResultado('10g · Editor cerrado y contenedor eliminado', !contenedorTrasCierre);
+
+            const seccionCatalogo10g = document.getElementById('sec-catalogo');
+            agregarResultado('10g · Sección Catálogo sigue visible tras cerrar', !!seccionCatalogo10g);
+          }
+        }
+      }
+
+      // ══════════════════════════════════════════════════════════
+      //  BLOQUE 11 — EDITOR DE VARIANTES
+      // ══════════════════════════════════════════════════════════
+
+      agregarSeccion('BLOQUE 11 — Editor de Variantes');
+
+      const variantesCreadasIds = [];
+      let variante11Id = null;
+
+      agregarInfo('11a. Montar el editor');
+
+      const contenedorVariantes = document.getElementById('contenedor-variantes-test');
+      await cicloVidaVariantes.montar(contenedorVariantes, { onCerrar: () => {} });
+      await esperar(500);
+
+      agregarResultado('11a · Overlay renderizado', !!contenedorVariantes.querySelector('.ve-overlay'));
+      agregarResultado('11a · Header renderizado', !!contenedorVariantes.querySelector('.ve-header'));
+      agregarResultado('11a · Panel izquierdo (desktop)', !!contenedorVariantes.querySelector('.ve-panel-vars'));
+      agregarResultado('11a · Panel centro (desktop)', !!contenedorVariantes.querySelector('.ve-panel-center'));
+      agregarResultado('11a · Panel derecho (desktop)', !!contenedorVariantes.querySelector('.ve-panel-opt'));
+      agregarResultado('11a · Pills móvil', !!contenedorVariantes.querySelector('.ve-pills'));
+      agregarResultado('11a · Cards móvil', !!contenedorVariantes.querySelector('.ve-cards'));
+      agregarResultado('11a · Indicador de guardado', !!document.getElementById('ve-indicador'));
+      agregarResultado('11a · Modal de insumo presente', !!document.getElementById('ve-modal-insumo'));
+
+      const indicadorInicial11 = document.getElementById('ve-indicador');
+      agregarResultado('11a · Indicador arranca limpio', indicadorInicial11?.classList.contains('limpio'));
+
+      agregarInfo('11b. Crear variante');
+
+      const varianteRepo11 = crearVarianteRepo();
+      const btnNuevaVar11 = contenedorVariantes.querySelector('[data-action="nueva-variante"]');
+      agregarResultado('11b · Botón "Nueva" existe', !!btnNuevaVar11);
+
+      if (btnNuevaVar11) {
+        btnNuevaVar11.click();
+        await esperar(400);
+
+        const varianteActiva11 = cicloVidaVariantes._internals.getVarianteActiva();
+        agregarResultado('11b · Variante activa creada', !!varianteActiva11?.id, varianteActiva11?.id);
+        agregarResultado('11b · Nombre por defecto', varianteActiva11?.nombre === 'Nueva variante');
+        agregarResultado('11b · Tipo por defecto "unica"', varianteActiva11?.tipo === 'unica');
+        agregarResultado('11b · max_seleccion por defecto 1', varianteActiva11?.max_seleccion === 1);
+
+        if (varianteActiva11?.id) {
+          variante11Id = varianteActiva11.id;
+          variantesCreadasIds.push(variante11Id);
+
+          const inputNombreVar11 = contenedorVariantes.querySelector('[data-field="var-nombre"]');
+          agregarResultado('11b · Input nombre de la variante existe', !!inputNombreVar11);
+          if (inputNombreVar11) {
+            escribir(inputNombreVar11, `Test Variante ${Date.now().toString().slice(-6)}`);
+            await esperar(900);
+
+            const guardada11 = cicloVidaVariantes._internals.getVarianteActiva();
+            agregarResultado('11b · Nombre editado en estado', guardada11?.nombre.startsWith('Test Variante'), guardada11?.nombre);
+
+            const persistio11 = await esperarHasta(async () => {
+              const lista = await varianteRepo11.obtenerTodas();
+              const encontrada = lista.find(v => v.id === variante11Id);
+              return encontrada && encontrada.nombre.startsWith('Test Variante') ? encontrada : null;
+            }, 8000, 300);
+
+            agregarResultado('11b · Variante persistida en Appwrite', !!persistio11, persistio11?.id);
+            agregarResultado('11b · Nombre persistido correctamente', persistio11?.nombre?.startsWith('Test Variante'), persistio11?.nombre);
+          }
+        }
+      }
+
+      agregarInfo('11c. Cambiar tipo a múltiple');
+
+      const radioMultiple11 = contenedorVariantes.querySelector('input[data-field="var-tipo"][value="multiple"]');
+      agregarResultado('11c · Radio múltiple existe', !!radioMultiple11);
+
+      if (radioMultiple11) {
+        radioMultiple11.checked = true;
+        disparar(radioMultiple11, 'change');
+        await esperar(400);
+
+        const v11 = cicloVidaVariantes._internals.getVarianteActiva();
+        agregarResultado('11c · Tipo cambió a múltiple', v11?.tipo === 'multiple', v11?.tipo);
+
+        const inputMax11 = contenedorVariantes.querySelector('[data-field="var-max"]');
+        if (inputMax11) {
+          escribir(inputMax11, '3');
+          await esperar(900);
+
+          const persistio11c = await esperarHasta(async () => {
+            const lista = await varianteRepo11.obtenerTodas();
+            const encontrada = lista.find(v => v.id === variante11Id);
+            return encontrada?.max_seleccion === 3 ? encontrada : null;
+          }, 8000, 300);
+
+          agregarResultado('11c · max_seleccion=3 persistido', persistio11c?.max_seleccion === 3, `max=${persistio11c?.max_seleccion}`);
+        }
+      }
+
+      agregarInfo('11d. Crear opción');
+
+      const btnNuevaOpcion11 = contenedorVariantes.querySelector('[data-action="nueva-opcion"]');
+      agregarResultado('11d · Botón "Añadir opción" existe', !!btnNuevaOpcion11);
+
+      if (btnNuevaOpcion11) {
+        btnNuevaOpcion11.click();
+        await esperar(400);
+
+        const opActiva11 = cicloVidaVariantes._internals.getOpcionActiva();
+        agregarResultado('11d · Opción activa creada (estado)', !!opActiva11);
+        agregarResultado('11d · Marcada como nueva', cicloVidaVariantes._internals.getOpcionActiva()?.id === '');
+
+        const inputOpNombre11 = contenedorVariantes.querySelector('[data-field="op-nombre"]');
+        agregarResultado('11d · Input nombre de opción existe', !!inputOpNombre11);
+
+        if (inputOpNombre11) {
+          escribir(inputOpNombre11, 'Test Opción');
+          await esperar(400);
+
+          const inputOpPrecio11 = contenedorVariantes.querySelector('[data-field="op-precio"]');
+          if (inputOpPrecio11) {
+            escribir(inputOpPrecio11, '500');
+            await esperar(200);
+          }
+
+          const chipGluten11 = contenedorVariantes.querySelector('[data-action="toggle-alergeno"][data-alergeno="gluten"]');
+          agregarResultado('11d · Chip alérgeno gluten existe', !!chipGluten11);
+          if (chipGluten11) {
+            chipGluten11.click();
+            await esperar(300);
+            const op11 = cicloVidaVariantes._internals.getOpcionActiva();
+            agregarResultado('11d · Alérgeno gluten agregado', op11?.alergenos?.includes('gluten'));
+          }
+
+          const btnCerrarOp11 = contenedorVariantes.querySelector('[data-action="cerrar-opcion"]');
+          if (btnCerrarOp11) {
+            btnCerrarOp11.click();
+            await esperar(300);
+          }
+
+          const persistio11d = await esperarHasta(async () => {
+            const lista = await varianteRepo11.obtenerTodas();
+            const v11 = lista.find(x => x.id === variante11Id);
+            const op = (v11?.opciones || []).find(o => o.nombre === 'Test Opción');
+            return op || null;
+          }, 8000, 300);
+
+          agregarResultado('11d · Opción persistida en variante', !!persistio11d, persistio11d?.id);
+          agregarResultado('11d · Opción con ID generado', !!persistio11d?.id, persistio11d?.id);
+          agregarResultado('11d · Precio persistido 500', persistio11d?.precio_delta === 500, `precio=${persistio11d?.precio_delta}`);
+          agregarResultado('11d · Alérgeno gluten persistido', persistio11d?.alergenos?.includes('gluten'));
+
+          agregarInfo('11e. Editar opción');
+
+          if (persistio11d?.id) {
+            const fila11 = contenedorVariantes.querySelector(`.ve-tabla tr[data-action="seleccionar-opcion"][data-id="${persistio11d.id}"]`);
+            agregarResultado('11e · Fila de opción en tabla', !!fila11);
+
+            if (fila11) {
+              fila11.click();
+              await esperar(400);
+
+              const op11e = cicloVidaVariantes._internals.getOpcionActiva();
+              agregarResultado('11e · Opción cargada para edición', op11e?.id === persistio11d.id);
+
+              const inputDesc11 = contenedorVariantes.querySelector('[data-field="op-desc"]');
+              if (inputDesc11) {
+                escribir(inputDesc11, 'Descripción editada');
+                await esperar(900);
+
+                const persistida11e = await esperarHasta(async () => {
+                  const lista = await varianteRepo11.obtenerTodas();
+                  const v11 = lista.find(x => x.id === variante11Id);
+                  const o = (v11?.opciones || []).find(x => x.id === persistio11d.id);
+                  return o?.descripcion === 'Descripción editada' ? o : null;
+                }, 8000, 300);
+
+                agregarResultado('11e · Descripción editada persistida', !!persistida11e, persistida11e?.descripcion);
+              }
+
+              const btnCerrarOp11e = contenedorVariantes.querySelector('[data-action="cerrar-opcion"]');
+              if (btnCerrarOp11e) {
+                btnCerrarOp11e.click();
+                await esperar(300);
+              }
+            }
+          }
+        }
+      }
+
+      agregarInfo('11f. Desactivar variante');
+
+      const btnDesactivar11 = contenedorVariantes.querySelector('[data-action="desactivar-variante"]');
+      agregarResultado('11f · Botón desactivar variante existe', !!btnDesactivar11);
+
+      if (btnDesactivar11) {
+        btnDesactivar11.click();
         await esperar(500);
-        const tabAdminContent = document.getElementById('tab-admin');
-        agregarResultado('Pestaña admin activa', tabAdminContent?.classList.contains('activo'));
-        agregarResultado('Botón nuevo staff en pestaña admin', !!tabAdminContent?.querySelector('#btnNuevoStaff'));
-        agregarResultado('Lista personal en pestaña admin', !!tabAdminContent?.querySelector('#listaPersonalContainer'));
+
+        const modalConfirmar11 = document.querySelector('.modal-confirm-overlay');
+        agregarResultado('11f · Modal de confirmación abierto', !!modalConfirmar11);
+
+        const btnConfirmar11 = modalConfirmar11?.querySelector('.confirmar-btn');
+        agregarResultado('11f · Botón confirmar existe', !!btnConfirmar11);
+
+        if (btnConfirmar11) {
+          btnConfirmar11.click();
+          await esperar(500);
+
+          const v11f = cicloVidaVariantes._internals.getVarianteActiva();
+          agregarResultado('11f · Variante marcada como inactiva', v11f?.activo === false, `activo=${v11f?.activo}`);
+
+          const persistida11f = await esperarHasta(async () => {
+            const lista = await varianteRepo11.obtenerTodas();
+            const encontrada = lista.find(x => x.id === variante11Id);
+            return encontrada?.activo === false ? encontrada : null;
+          }, 8000, 300);
+
+          agregarResultado('11f · Estado inactivo persistido', persistida11f?.activo === false);
+        }
       }
 
-      const btnVolver = document.getElementById('btnVolverVitrina');
-      if (btnVolver) {
-        btnVolver.click();
-        await esperar(300);
-        agregarResultado('Volver a vitrina funciona', modoVitrina && modoVitrina.style.display !== 'none');
+      agregarInfo('11g. Verificación de layout');
+
+      const layoutDesktop11 = contenedorVariantes.querySelector('.ve-layout-desktop');
+      const layoutMovil11 = contenedorVariantes.querySelector('.ve-layout-movil');
+      agregarResultado('11g · Layout desktop existe', !!layoutDesktop11);
+      agregarResultado('11g · Layout móvil existe', !!layoutMovil11);
+
+      agregarInfo('11 · Limpieza del editor de variantes');
+
+      cicloVidaVariantes.desmontar();
+      await esperar(200);
+
+      const contenedorVacio11 = contenedorVariantes.innerHTML.trim() === '';
+      agregarResultado('11 · Contenedor desmontado (vacío)', contenedorVacio11);
+
+      let variantesLimpia11 = 0;
+      for (const id of variantesCreadasIds) {
+        try {
+          await DBAppwrite.eliminar('variantes', id);
+          variantesLimpia11++;
+        } catch (e) { /* ignorar */ }
+      }
+      agregarResultado('11 · Variantes creadas eliminadas', variantesLimpia11 === variantesCreadasIds.length, `${variantesLimpia11}/${variantesCreadasIds.length}`);
+
+      await esperar(500);
+      const residuo11 = await varianteRepo11.obtenerTodas();
+      const residuoTest11 = residuo11.filter(v => variantesCreadasIds.includes(v.id));
+      agregarResultado('11 · Sin residuo de variantes de test', residuoTest11.length === 0, `${residuoTest11.length} huérfanas`);
+
+      // ══════════════════════════════════════════════════════════
+      //  BLOQUE 12 — MODO VARIANTES DEL EDITOR DE CARTAS
+      // ══════════════════════════════════════════════════════════
+
+      agregarSeccion('BLOQUE 12 — Modo Variantes del Editor de Cartas');
+
+      const ts12 = Date.now().toString().slice(-6);
+      const ids12 = { productos: [], variantes: [], recetas: [] };
+      const nombres12 = {
+        p1: `Blq12 Con Receta ${ts12}`,
+        p2: `Blq12 Sin Receta ${ts12}`,
+        p3: `Blq12 Con Inactiva ${ts12}`
+      };
+
+      const buscarFila12 = (nombre) => {
+        return Array.from(document.querySelectorAll('.asig-fila-producto'))
+          .find(f => f.querySelector('.asig-producto-info strong')?.textContent === nombre);
+      };
+
+      const parsearVariantesIds12 = (producto) => {
+        if (!producto) return [];
+        if (Array.isArray(producto.variantes_ids)) return producto.variantes_ids;
+        if (typeof producto.variantes_ids === 'string') {
+          try {
+            const parsed = JSON.parse(producto.variantes_ids);
+            return Array.isArray(parsed) ? parsed : [];
+          } catch { return []; }
+        }
+        return [];
+      };
+
+      const leerProductoRemoto12 = async (id) => {
+        try {
+          return await DBAppwrite.baseDeDatos.getRow({
+            databaseId: DBAppwrite.idBaseDeDatos,
+            tableId: DBAppwrite.COLECCIONES.productos,
+            rowId: id
+          });
+        } catch { return null; }
+      };
+
+      agregarInfo('12a. Preparar datos de prueba');
+
+      const recetaRepo12 = crearRecetaRepo();
+      const varianteRepo12 = crearVarianteRepo();
+
+      const v12A = await varianteRepo12.guardarVariante({
+        id: `v_blq12_simple_${ts12}`,
+        nombre: `Blq12 Variante Simple ${ts12}`,
+        tipo: 'unica',
+        activo: true,
+        orden: 0,
+        opciones: [
+          { id: `op1_${ts12}`, nombre: 'Opción A', precio_delta: 0, activo: true, alergenos: [], requiere: [], excluye: [], insumos_delta: [], pasos_delta: [] }
+        ]
+      });
+      if (v12A?.id) ids12.variantes.push(v12A.id);
+      agregarResultado('12a · Variante simple creada', !!v12A?.id, v12A?.id);
+
+      const v12B = await varianteRepo12.guardarVariante({
+        id: `v_blq12_quitar_${ts12}`,
+        nombre: `Blq12 Variante Con Quitar ${ts12}`,
+        tipo: 'unica',
+        activo: true,
+        orden: 1,
+        opciones: [
+          { id: `opq1_${ts12}`, nombre: 'Sin pan', precio_delta: 0, activo: true, alergenos: [], requiere: [], excluye: [], insumos_delta: [{ insumoId: 'x', cantidad: 1, accion: 'quitar' }], pasos_delta: [] }
+        ]
+      });
+      if (v12B?.id) ids12.variantes.push(v12B.id);
+      agregarResultado('12a · Variante con quitar creada', !!v12B?.id, v12B?.id);
+
+      const v12C = await varianteRepo12.guardarVariante({
+        id: `v_blq12_inactiva_${ts12}`,
+        nombre: `Blq12 Variante Inactiva ${ts12}`,
+        tipo: 'unica',
+        activo: false,
+        orden: 2,
+        opciones: []
+      });
+      if (v12C?.id) ids12.variantes.push(v12C.id);
+      agregarResultado('12a · Variante inactiva creada', !!v12C?.id, v12C?.id);
+
+      const p12A = await recetaRepo12.guardarProducto({
+        nombre: nombres12.p1,
+        categoria: 'platos',
+        activo: true,
+        destino: 'cocina',
+        variantes_ids: []
+      });
+      if (p12A?.id) ids12.productos.push(p12A.id);
+      agregarResultado('12a · Producto con receta creado', !!p12A?.id, p12A?.id);
+
+      if (p12A?.id) {
+        const r12 = await recetaRepo12.guardarReceta({
+          productoId: p12A.id,
+          nivel: 'producto_final',
+          categoria: 'platos',
+          destino: 'cocina',
+          ingredientes: [],
+          instrucciones: 'Test Bloque 12'
+        });
+        if (r12?.id) ids12.recetas.push(r12.id);
+        agregarResultado('12a · Receta para producto creada', !!r12?.id, r12?.id);
       }
 
-      // ── Bloque 7: Limpieza de huella ───────────────────
-      agregarInfo('--- Bloque 7: Limpieza de huella ---');
+      const p12B = await recetaRepo12.guardarProducto({
+        nombre: nombres12.p2,
+        categoria: 'bebidas',
+        activo: true,
+        destino: 'barra',
+        variantes_ids: []
+      });
+      if (p12B?.id) ids12.productos.push(p12B.id);
+      agregarResultado('12a · Producto sin receta creado', !!p12B?.id, p12B?.id);
+
+      const p12C = await recetaRepo12.guardarProducto({
+        nombre: nombres12.p3,
+        categoria: 'extras',
+        activo: true,
+        destino: 'cocina',
+        variantes_ids: v12C?.id ? [v12C.id] : []
+      });
+      if (p12C?.id) ids12.productos.push(p12C.id);
+      agregarResultado('12a · Producto con variante inactiva creado', !!p12C?.id, p12C?.id);
+
+      await esperar(1000);
+
+      const prodsRemotos12 = await DBAppwrite.listar('productos');
+      const prodsNorm12 = prodsRemotos12.map(p => ({
+        ...p,
+        variantes_ids: parsearVariantesIds12(p)
+      }));
+      Store.despachar({ type: 'PRODUCTOS_INICIALIZAR', payload: prodsNorm12 });
+
+      const variantesRemotas12 = await varianteRepo12.obtenerTodas();
+      Store.despachar({ type: 'VARIANTES_INICIALIZAR', payload: variantesRemotas12 });
+
+      // v3.10.2: normalizamos las recetas antes de despachar. DBAppwrite.listar
+      // devuelve filas crudas: `ingredientes` viene como string JSON en la
+      // columna varchar. Despachar crudo al Store viola §5.2 del brief y hacía
+      // explotar al listener del editor de cartas (biblioteca.js) al intentar
+      // recorrer `ingredientes` como si fuera array.
+      const recetasRemotas12 = await DBAppwrite.listar('recetas');
+      const recetasNorm12 = recetasRemotas12.map(r => ({
+        ...r,
+        ingredientes: (() => {
+          if (Array.isArray(r.ingredientes)) return r.ingredientes;
+          if (typeof r.ingredientes === 'string' && r.ingredientes.trim()) {
+            try {
+              const p = JSON.parse(r.ingredientes);
+              return Array.isArray(p) ? p : [];
+            } catch { return []; }
+          }
+          return [];
+        })()
+      }));
+      Store.despachar({ type: 'RECETAS_INICIALIZAR', payload: recetasNorm12 });
+
+      await esperar(500);
+
+      const p3EnStore12 = (Store.obtenerEstado().productos || []).find(p => p.id === p12C?.id);
+      agregarResultado(
+        '12a · P3 en Store con variantes_ids array',
+        Array.isArray(p3EnStore12?.variantes_ids) && p3EnStore12.variantes_ids.includes(v12C.id),
+        JSON.stringify(p3EnStore12?.variantes_ids)
+      );
+
+      agregarInfo('12b. Montar editor de cartas');
+
+      CartaEditor.limpiar();
+      await esperar(200);
+      CartaEditor.activar();
+      await esperar(800);
+
+      const vista12 = document.getElementById('view-carta-editor');
+      agregarResultado('12b · Editor de cartas montado', !!vista12?.querySelector('.canvas-wrap'));
+      agregarResultado('12b · Switch de modo presente', !!vista12?.querySelector('#menuModoSwitch'));
+
+      const btnLienzo12 = vista12.querySelector('#menuModoSwitch [data-modo="lienzo"]');
+      const btnVariantes12 = vista12.querySelector('#menuModoSwitch [data-modo="variantes"]');
+      agregarResultado('12b · Botón Lienzo existe', !!btnLienzo12);
+      agregarResultado('12b · Botón Variantes existe', !!btnVariantes12);
+      agregarResultado('12b · Modo Lienzo arranca activo', btnLienzo12?.classList.contains('activo'));
+
+      agregarInfo('12c. Cambio a Modo Variantes');
+
+      btnVariantes12.click();
+      const tablaWrap12 = await esperarElemento('.asig-tabla-wrap', 8000);
+      agregarResultado('12c · Módulo de asignación montado', !!tablaWrap12);
+
+      await esperarHasta(
+        () => document.querySelector('#menuModoSwitch [data-modo="variantes"]')?.classList.contains('activo'),
+        2000, 100
+      );
+      agregarResultado('12c · Botón Variantes activo',
+        document.querySelector('#menuModoSwitch [data-modo="variantes"]')?.classList.contains('activo'));
+      agregarResultado('12c · Banda de contexto visible',
+        document.querySelector('#menuModoContexto')?.style.display === 'block');
+      agregarResultado('12c · Botón contexto oculto en modo Variantes',
+        document.getElementById('menuCtxBtn')?.style.display === 'none');
+
+      agregarInfo('12d. Listado de productos');
+
+      await esperar(500);
+
+      const cuerpoTabla12 = document.getElementById('asig-cuerpo-tabla');
+      agregarResultado('12d · Tabla presente', !!cuerpoTabla12);
+
+      const filas12 = cuerpoTabla12?.querySelectorAll('.asig-fila-producto') || [];
+      agregarResultado('12d · Filas renderizadas', filas12.length >= 3, `${filas12.length} filas`);
+
+      const filaP2Inicial12 = buscarFila12(nombres12.p2);
+      agregarResultado('12d · Fila del producto sin receta existe', !!filaP2Inicial12);
+      agregarResultado('12d · Producto sin receta tiene badge "Sin receta base"',
+        !!filaP2Inicial12?.querySelector('.asig-sin-receta'));
+
+      const filaP3Inicial12 = buscarFila12(nombres12.p3);
+      const chipInactiva12 = filaP3Inicial12?.querySelector('.asig-chip-variante.inactiva');
+      agregarResultado('12d · Chip de variante inactiva tiene clase inactiva', !!chipInactiva12);
+      agregarResultado('12d · Chip de variante inactiva tiene tooltip', !!chipInactiva12?.title);
+
+      agregarInfo('12e. Asignar variante sin advertencia');
+
+      const filaP1Accion12 = buscarFila12(nombres12.p1);
+      const btnAddP1_12 = filaP1Accion12?.querySelector('[data-action="asig-abrir-modal-agregar"]');
+      agregarResultado('12e · Botón añadir en P1 existe', !!btnAddP1_12);
+
+      if (btnAddP1_12) {
+        btnAddP1_12.click();
+        await esperar(500);
+
+        const modalAgregar12 = document.getElementById('asig-modal-agregar');
+        agregarResultado('12e · Modal agregar abierto', modalAgregar12?.classList.contains('activo'));
+
+        const itemVariante12A = modalAgregar12?.querySelector(`[data-action="asig-seleccionar-variante"][data-variante-id="v_blq12_simple_${ts12}"]`);
+        agregarResultado('12e · Variante simple disponible en modal', !!itemVariante12A);
+
+        if (itemVariante12A) {
+          itemVariante12A.click();
+          await esperar(1500);
+
+          const prodP1Remoto12 = await leerProductoRemoto12(p12A.id);
+          const idsP1_12 = parsearVariantesIds12(prodP1Remoto12);
+          agregarResultado('12e · Variante simple asignada a P1 en Appwrite',
+            idsP1_12.includes(`v_blq12_simple_${ts12}`), idsP1_12.join(','));
+
+          const filaP1Actualizada12 = buscarFila12(nombres12.p1);
+          const chipsP1_12 = filaP1Actualizada12?.querySelectorAll('.asig-chip-variante') || [];
+          agregarResultado('12e · Chip de variante simple en P1', chipsP1_12.length >= 1, `${chipsP1_12.length} chips`);
+        }
+      }
+
+      agregarInfo('12f. Asignar variante con advertencia');
+
+      const filaP2Accion12 = buscarFila12(nombres12.p2);
+      const btnAddP2_12 = filaP2Accion12?.querySelector('[data-action="asig-abrir-modal-agregar"]');
+      agregarResultado('12f · Botón añadir en P2 existe', !!btnAddP2_12);
+
+      if (btnAddP2_12) {
+        btnAddP2_12.click();
+        await esperar(500);
+
+        const modalAgregar12B = document.getElementById('asig-modal-agregar');
+        const itemVariante12B = modalAgregar12B?.querySelector(`[data-action="asig-seleccionar-variante"][data-variante-id="v_blq12_quitar_${ts12}"]`);
+        agregarResultado('12f · Variante con quitar disponible en modal', !!itemVariante12B);
+
+        if (itemVariante12B) {
+          itemVariante12B.click();
+          await esperar(600);
+
+          const modalAviso12 = document.getElementById('asig-modal-aviso');
+          agregarResultado('12f · Modal de aviso abierto', modalAviso12?.classList.contains('activo'));
+
+          const avisoBody12 = document.getElementById('asig-aviso-body');
+          agregarResultado('12f · Aviso menciona el producto', avisoBody12?.textContent.includes(nombres12.p2));
+          agregarResultado('12f · Aviso menciona la variante', avisoBody12?.textContent.includes(`Con Quitar ${ts12}`));
+          agregarResultado('12f · Aviso menciona opción problemática', avisoBody12?.textContent.includes('Sin pan'));
+
+          modalAviso12?.querySelector('[data-action="asig-cancelar-aviso"]')?.click();
+          await esperar(400);
+
+          agregarResultado('12f · Modal de aviso cerrado tras cancelar', !modalAviso12.classList.contains('activo'));
+
+          const prodP2Remoto12 = await leerProductoRemoto12(p12B.id);
+          const idsP2_12 = parsearVariantesIds12(prodP2Remoto12);
+          agregarResultado('12f · Variante con quitar NO asignada tras cancelar',
+            !idsP2_12.includes(`v_blq12_quitar_${ts12}`));
+
+          const filaP2Reintento12 = buscarFila12(nombres12.p2);
+          filaP2Reintento12.querySelector('[data-action="asig-abrir-modal-agregar"]').click();
+          await esperar(500);
+
+          document.querySelector(`[data-action="asig-seleccionar-variante"][data-variante-id="v_blq12_quitar_${ts12}"]`)?.click();
+          await esperar(600);
+
+          const btnConfirmarAviso12 = document.getElementById('asig-modal-aviso')?.querySelector('[data-action="asig-confirmar-aviso"]');
+          agregarResultado('12f · Botón confirmar aviso existe', !!btnConfirmarAviso12);
+
+          if (btnConfirmarAviso12) {
+            btnConfirmarAviso12.click();
+            await esperar(1500);
+
+            const prodP2Final12 = await leerProductoRemoto12(p12B.id);
+            const idsP2Final12 = parsearVariantesIds12(prodP2Final12);
+            agregarResultado('12f · Variante con quitar asignada a P2 tras confirmar',
+              idsP2Final12.includes(`v_blq12_quitar_${ts12}`), idsP2Final12.join(','));
+          }
+        }
+      }
+
+      agregarInfo('12g. Asignar segunda variante a P2');
+
+      const filaP2Segunda12 = buscarFila12(nombres12.p2);
+      filaP2Segunda12?.querySelector('[data-action="asig-abrir-modal-agregar"]')?.click();
+      await esperar(500);
+
+      document.querySelector(`[data-action="asig-seleccionar-variante"][data-variante-id="v_blq12_simple_${ts12}"]`)?.click();
+      await esperar(400);
+
+      if (document.getElementById('asig-modal-aviso')?.classList.contains('activo')) {
+        document.querySelector('[data-action="asig-confirmar-aviso"]')?.click();
+      }
+      await esperar(1500);
+
+      const prodP2ConDos12 = await leerProductoRemoto12(p12B.id);
+      const idsP2ConDos12 = parsearVariantesIds12(prodP2ConDos12);
+      agregarResultado('12g · P2 tiene 2 variantes asignadas', idsP2ConDos12.length === 2, idsP2ConDos12.join(','));
+
+      agregarInfo('12h. Reordenar variantes');
+
+      const filaP2Reorden12 = buscarFila12(nombres12.p2);
+      const chipsP2Reorden12 = [...(filaP2Reorden12?.querySelectorAll('.asig-chip-variante') || [])];
+      agregarResultado('12h · P2 tiene 2 chips', chipsP2Reorden12.length === 2);
+
+      if (chipsP2Reorden12.length === 2) {
+        const idPrimero12 = chipsP2Reorden12[0].dataset.varianteId;
+        const idUltimo12 = chipsP2Reorden12[1].dataset.varianteId;
+        agregarInfo(`12h · Orden antes: [${idPrimero12}, ${idUltimo12}]`);
+
+        const btnSubir12 = chipsP2Reorden12[1].querySelector('[data-action="asig-subir-variante"]');
+        agregarResultado('12h · Botón subir del segundo chip existe', !!btnSubir12);
+
+        if (btnSubir12) {
+          btnSubir12.click();
+          await esperar(1500);
+
+          const prodP2Reorden12 = await leerProductoRemoto12(p12B.id);
+          const idsReorden12 = parsearVariantesIds12(prodP2Reorden12);
+          agregarInfo(`12h · Orden después: [${idsReorden12.join(', ')}]`);
+          agregarResultado(
+            '12h · Orden invertido en Appwrite',
+            idsReorden12[0] === idUltimo12 && idsReorden12[1] === idPrimero12,
+            idsReorden12.join(',')
+          );
+        }
+      }
+
+      agregarInfo('12i. Quitar variante');
+
+      const filaP2Quitar12 = buscarFila12(nombres12.p2);
+      const chipAQuitar12 = [...(filaP2Quitar12?.querySelectorAll('.asig-chip-variante') || [])]
+        .find(c => c.dataset.varianteId === `v_blq12_simple_${ts12}`);
+      agregarResultado('12i · Chip de variante simple encontrado', !!chipAQuitar12);
+
+      if (chipAQuitar12) {
+        chipAQuitar12.querySelector('[data-action="asig-quitar-variante"]').click();
+        await esperar(600);
+
+        const modalConfirm12 = document.querySelector('.modal-confirm-overlay');
+        agregarResultado('12i · Modal de confirmación abierto', !!modalConfirm12);
+
+        const btnConfirm12 = modalConfirm12?.querySelector('.confirmar-btn');
+        agregarResultado('12i · Botón confirmar existe', !!btnConfirm12);
+
+        if (btnConfirm12) {
+          btnConfirm12.click();
+          await esperar(1500);
+
+          const prodP2Quitado12 = await leerProductoRemoto12(p12B.id);
+          const idsQuitado12 = parsearVariantesIds12(prodP2Quitado12);
+          agregarResultado('12i · Variante simple quitada de P2',
+            !idsQuitado12.includes(`v_blq12_simple_${ts12}`), idsQuitado12.join(','));
+          agregarResultado('12i · P2 conserva variante con quitar',
+            idsQuitado12.includes(`v_blq12_quitar_${ts12}`));
+        }
+      }
+
+      agregarInfo('12j. Panel lateral con opciones');
+
+      const filaP2Panel12 = buscarFila12(nombres12.p2);
+      const chipV2Panel12 = [...(filaP2Panel12?.querySelectorAll('.asig-chip-variante') || [])]
+        .find(c => c.dataset.varianteId === `v_blq12_quitar_${ts12}`);
+      agregarResultado('12j · Chip de variante con quitar encontrado', !!chipV2Panel12);
+
+      if (chipV2Panel12) {
+        chipV2Panel12.querySelector('[data-action="asig-abrir-panel"]').click();
+        await esperar(500);
+
+        const panel12 = document.getElementById('asig-panel-lateral');
+        agregarResultado('12j · Panel lateral abierto', panel12?.classList.contains('abierto'));
+
+        const panelTitulo12 = document.getElementById('asig-panel-titulo');
+        agregarResultado('12j · Título del panel correcto',
+          panelTitulo12?.textContent.includes(`Con Quitar ${ts12}`), panelTitulo12?.textContent);
+
+        const panelBody12 = document.getElementById('asig-panel-body');
+        agregarResultado('12j · Panel muestra aviso de insumos quitar sin receta',
+          !!panelBody12.querySelector('.asig-panel-aviso.error'));
+
+        const opciones12 = panelBody12.querySelectorAll('.asig-opcion-card');
+        agregarResultado('12j · Panel muestra opciones', opciones12.length >= 1, `${opciones12.length} opciones`);
+
+        document.querySelector('[data-action="asig-cerrar-panel"]')?.click();
+        await esperar(400);
+        agregarResultado('12j · Panel cerrado', !panel12.classList.contains('abierto'));
+      }
+
+      agregarInfo('12k. Volver a Modo Lienzo');
+
+      const btnLienzoVuelta12 = document.querySelector('#menuModoSwitch [data-modo="lienzo"]');
+      btnLienzoVuelta12?.click();
+      await esperar(500);
+
+      agregarResultado('12k · Botón Lienzo activo', btnLienzoVuelta12?.classList.contains('activo'));
+      agregarResultado('12k · Contenedor Lienzo visible',
+        document.getElementById('menuModoLienzoContainer')?.style.display === 'flex');
+      agregarResultado('12k · Contenedor Variantes oculto',
+        document.getElementById('menuModoVariantesContainer')?.style.display === 'none');
+      agregarResultado('12k · Banda de contexto oculta',
+        document.getElementById('menuModoContexto')?.style.display === 'none');
+      agregarResultado('12k · Botón contexto visible en modo Lienzo',
+        document.getElementById('menuCtxBtn')?.style.display !== 'none');
+
+      agregarInfo('12 · Limpieza del Bloque 12');
+
+      CartaEditor.limpiar();
+      await esperar(300);
+
+      let limpiezaProds12 = true;
+      for (const id of ids12.productos) {
+        try { await DBAppwrite.eliminar('productos', id); }
+        catch (e) { limpiezaProds12 = false; Logger.warn(`[Test] Producto ${id} no eliminado: ${e.message}`); }
+      }
+      agregarResultado('12 · Productos de prueba eliminados', limpiezaProds12);
+
+      let limpiezaVars12 = true;
+      for (const id of ids12.variantes) {
+        try { await DBAppwrite.eliminar('variantes', id); }
+        catch (e) { limpiezaVars12 = false; Logger.warn(`[Test] Variante ${id} no eliminada: ${e.message}`); }
+      }
+      agregarResultado('12 · Variantes de prueba eliminadas', limpiezaVars12);
+
+      let limpiezaRecs12 = true;
+      for (const id of ids12.recetas) {
+        try { await DBAppwrite.eliminar('recetas', id); }
+        catch (e) { limpiezaRecs12 = false; Logger.warn(`[Test] Receta ${id} no eliminada: ${e.message}`); }
+      }
+      agregarResultado('12 · Recetas de prueba eliminadas', limpiezaRecs12);
+
+      // ══════════════════════════════════════════════════════════
+      //  SECCIÓN FINAL — LIMPIEZA Y RESUMEN
+      // ══════════════════════════════════════════════════════════
+
+      agregarSeccion('Limpieza final');
+
+      const staffPubFinal = await DB.obtenerStaffPorEspacio('PubPrueba');
+      const staffAltaFinal = staffPubFinal.find(s => s.nombre === nombreVisibleAlta);
+      if (staffAltaFinal?.id) await DBAppwrite.eliminar('staff', staffAltaFinal.id);
+      const staffAltaEliminado = !(await DB.obtenerStaffPorEspacio('PubPrueba')).some(s => s.nombre === nombreVisibleAlta);
+      agregarResultado('Staff de alta eliminado', staffAltaEliminado);
+
+      if (placeholderStaffId) {
+        await DBAppwrite.eliminar('staff', placeholderStaffId);
+        const placeholderEliminado = !(await DB.obtenerStaffPorEspacio('PubPrueba')).some(s => s.id === placeholderStaffId);
+        agregarResultado('Placeholder de staff eliminado', placeholderEliminado);
+      }
+
+      try {
+        await DBAppwrite.eliminar('configuracion', docFalsoId);
+        agregarResultado('Doc alternativo de config eliminado', true);
+      } catch (e) {
+        agregarResultado('Doc alternativo de config eliminado', false, e.message);
+      }
+
+      try {
+        const restantes = await DBAppwrite.listar('configuracion');
+        const huerfanos = restantes.filter(d =>
+          d.clave === 'global' &&
+          d.espacioId === 'PubPrueba' &&
+          d.id !== 'PubPrueba_global'
+        );
+        for (const h of huerfanos) {
+          await DBAppwrite.eliminar('configuracion', h.id);
+        }
+        if (huerfanos.length > 0) {
+          agregarResultado('Huérfanos extra de config limpiados', true, `${huerfanos.length}`);
+        }
+      } catch (e) { }
+
+      setFiltroVendibles(false);
+      Config.limpiar();
 
       await Auth.cerrarSesion();
-      const loginMasterFinal = await Auth.iniciarSesion('master', 'master123');
-      if (!loginMasterFinal) {
-        agregarResultado('Login master final', false);
-        return;
-      }
 
-      const staffActual = await DB.obtenerStaffPorEspacio('lataberna');
-      const staffAlta = staffActual.find(s => s.nombre === nombreVisibleAlta);
-      const staffAdminActual = staffActual.find(s => s.id === staffAdmin?.id);
-      const staffGerenteActual = staffActual.find(s => s.id === staffGerente?.id);
-
-      if (staffAlta?.id) await DBAppwrite.eliminar('staff', staffAlta.id);
-      if (staffAdminActual?.id) await DBAppwrite.eliminar('staff', staffAdminActual.id);
-      if (staffGerenteActual?.id) await DBAppwrite.eliminar('staff', staffGerenteActual.id);
-
-      const staffDespues = await DB.obtenerStaffPorEspacio('lataberna');
-      agregarResultado('Staff de alta eliminado', !staffDespues.some(s => s.nombre === nombreVisibleAlta));
-      agregarResultado('Staff admin temporal eliminado', !staffDespues.some(s => s.id === staffAdmin?.id));
-      agregarResultado('Staff gerente temporal eliminado', !staffDespues.some(s => s.id === staffGerente?.id));
-
-      // ── Resumen final ─────────────────────────────────
       const total = resultados.length;
       const pasaron = resultados.filter(r => r.ok).length;
       const fallaron = total - pasaron;
-
       const resumen = document.createElement('div');
       resumen.style.marginTop = '12px';
       resumen.className = fallaron === 0 ? 'log-positivo' : 'log-error';
       resumen.innerHTML = `<strong>Resumen:</strong> ${pasaron} correctos, ${fallaron} fallidos.`;
       log.appendChild(resumen);
-
       Logger.info(`[test-D-unificado] Finalizado. ${pasaron}/${total} correctos.`);
     }
 
-    window.addEventListener('load', () => run().catch(e => {
-      log.innerHTML += `<div class="log-error">Error: ${e.message}</div>`;
-      console.error(e);
-    }));
+    // ════════════════════════════════════════════════════════════
+    //  SECCIÓN ARRANQUE
+    // ════════════════════════════════════════════════════════════
+
+    const _arrancarTest = () => {
+      console.log('[Test D] Arrancando test...');
+      run().catch(e => {
+        log.innerHTML += `<div class="log-error">Error: ${e.message}</div>`;
+        console.error('[Test D] Error en run():', e);
+      });
+    };
+
+    if (document.readyState === 'loading') {
+      console.log('[Test D] DOM cargando, esperando load...');
+      window.addEventListener('load', _arrancarTest);
+    } else {
+      console.log('[Test D] DOM ya listo, arrancando directo');
+      setTimeout(_arrancarTest, 100);
+    }
   </script>
 </body>
 </html>

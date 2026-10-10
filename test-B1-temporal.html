@@ -1,513 +1,109 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="es-CL">
 <head>
   <meta charset="UTF-8">
-  <title>Test B1 – Gran Test Unificado (v11 No Destructivo)</title>
+  <title>Test B1 Temporal — CommandBus wrapper</title>
   <style>
-    body { font-family: monospace; background: #1a1a24; color: #f1f5f9; padding: 20px; }
-    h1 { color: #f59e0b; }
-    .suite { margin-bottom: 20px; border-bottom: 1px solid #2e2e42; padding-bottom: 12px; }
-    .test { margin: 4px 0; padding: 4px 8px; border-radius: 4px; }
-    .pass { background: rgba(34,197,94,.2); }
-    .fail { background: rgba(239,68,68,.2); }
-    .log { background: rgba(99,102,241,.2); }
-    .summary { margin-top: 20px; font-weight: bold; }
-    .info { color: #94a3b8; font-size: 12px; margin: 2px 0; }
+    body { background:#0f0f14; color:#f1f5f9; font-family: monospace; padding: 20px; line-height: 1.5; }
+    h1 { color:#f59e0b; }
+    .t { margin: 4px 0; padding: 6px 10px; border-radius: 6px; font-size: 13px; }
+    .p { background: rgba(16,185,129,.15); border-left: 4px solid #10b981; }
+    .f { background: rgba(239,68,68,.15); border-left: 4px solid #ef4444; }
+    .i { background: rgba(59,130,246,.15); border-left: 4px solid #3b82f6; }
+    .s { margin-top: 24px; padding: 14px; background: #1f2937; border-radius: 6px; font-weight: bold; font-size: 14px; }
+    pre { background:#1f2937; padding:10px; border-radius:6px; font-size:11px; overflow-x:auto; white-space:pre-wrap; }
   </style>
 </head>
 <body>
-  <h1>🧪 Test B1 – Gran Test Unificado (v11 No Destructivo)</h1>
-  <p class="info">Zonas → Mapa → Bandeja persistente → Fusión/Deshacer → Agregar mesa → Vinculación → Pedido → Comanda → Precarga → Cuenta.</p>
+  <h1>🧪 Test B1 Temporal — CommandBus wrapper v1.0.0</h1>
+  <p style="font-size:13px;color:#94a3b8;">
+    Verifica si <code>CommandBus.ejecutar</code> inspecciona
+    <code>data.exito</code> del handler. Indep de la versión del archivo.
+    Si los 4 asserts pasan, el wrapper está corregido (E.x14 aplicado).
+  </p>
   <div id="results"></div>
 
-  <script src="/js/appwrite.min.js"></script>
-
   <script type="module">
-    const { Logger }         = await import('/js/lib/logger.js');
-    const { EventBus }       = await import('/js/lib/eventBus.js');
-    const { Store }          = await import('/js/lib/store.js');
-    const { CommandBus }     = await import('/js/lib/command-bus.js');
-    const { DBAppwrite }     = await import('/js/db-appwrite.js');
-    const { DB }             = await import('/js/db.js');
-    const { Auth, inicializarAuth } = await import('/js/auth.js');
-    const { Mesas }          = await import('/js/ui/mesas.js');
-    const { Comanda }        = await import('/js/ui/comanda.js');
-    const { Cuenta }         = await import('/js/ui/cuenta.js');
-    const { PrecargaControl }= await import('/js/modulos/interno/precarga-control.js');
-    const { MesaDetalles }   = await import('/js/ui/mesa-detalles.js');
-    const { agregarMesa }    = await import('/js/ui/mesas/acciones-mesa.js');
-    const { PedidoManager }  = await import('/js/managers/pedido-manager.js');
-    const { PedidoRepositoryLocal } = await import('/js/repositorios/pedido-repository.js');
-    const { Deps }           = await import('/js/lib/deps.js');
-
-    await import('/js/comandos/agregar-mesa.js');
-    await import('/js/comandos/crear-pedido-mesa.js');
-    await import('/js/comandos/liberar-mesa.js');
-    await import('/js/comandos/enviar-comanda.js');
-    await import('/js/comandos/completar-subcomanda.js');
+    const { CommandBus } = await import('/js/lib/command-bus.js');
+    const { Logger }     = await import('/js/lib/logger.js');
 
     Logger.setLevel('ERROR');
+
     const resultsEl = document.getElementById('results');
     let passed = 0, failed = 0;
-    const log = msg => { resultsEl.innerHTML += `<div class="test log">🔍 ${msg}</div>`; };
-    const pass = msg => { passed++; resultsEl.innerHTML += `<div class="test pass">✔ ${msg}</div>`; };
-    const fail = msg => { failed++; resultsEl.innerHTML += `<div class="test fail">✘ ${msg}</div>`; };
-    const esperar = ms => new Promise(r => setTimeout(r, ms));
 
-    const obtenerTarjeta = num => [...document.querySelectorAll('.mesa-card')].find(c => c.textContent.includes(String(num)));
-    const obtenerNumerosDOM = () => [...document.querySelectorAll('.mesa-card .mesa-numero')].map(el => el.textContent.trim());
+    const assert = (c, m) => {
+      if (c) { passed++; resultsEl.innerHTML += `<div class="t p">✔ ${m}</div>`; }
+      else { failed++; resultsEl.innerHTML += `<div class="t f">✘ ${m}</div>`; }
+    };
+    const info = m => resultsEl.innerHTML += `<div class="t i">ℹ️ ${m}</div>`;
 
-    async function esperarHasta(condicion, descripcion, timeout = 5000) {
-      const inicio = Date.now();
-      while (Date.now() - inicio < timeout) {
-        if (await condicion()) return true;
-        await esperar(200);
-      }
-      log(`Timeout esperando: ${descripcion}`);
-      return false;
+    // ═══════════════════════════════════════════════════
+    // Caso 1: handler devuelve { exito: false }
+    // Esperado (E.x14): wrapper propaga exito: false.
+    // ═══════════════════════════════════════════════════
+    CommandBus.registrar('test_caso1', async () => {
+      return { exito: false, error: 'Fallo simulado del handler' };
+    });
+
+    const r1 = await CommandBus.ejecutar({ type: 'test_caso1', datos: {} });
+    info(`Caso 1 — retorno del wrapper: ${JSON.stringify(r1)}`);
+    assert(r1.exito === false, 'Caso 1: handler devuelve {exito:false} → wrapper propaga exito:false');
+    assert(r1.error === 'Fallo simulado del handler' || r1.data?.error === 'Fallo simulado del handler',
+      'Caso 1: wrapper propaga el error del handler');
+
+    // ═══════════════════════════════════════════════════
+    // Caso 2: handler devuelve valor sin campo exito
+    // Esperado: wrapper devuelve exito: true (compatibilidad).
+    // ═══════════════════════════════════════════════════
+    CommandBus.registrar('test_caso2', async () => {
+      return { id: 'abc', valor: 42 };
+    });
+
+    const r2 = await CommandBus.ejecutar({ type: 'test_caso2', datos: {} });
+    info(`Caso 2 — retorno del wrapper: ${JSON.stringify(r2)}`);
+    assert(r2.exito === true, 'Caso 2: handler sin campo exito → wrapper propaga exito:true');
+    assert(r2.data?.id === 'abc', 'Caso 2: wrapper propaga data con el valor del handler');
+
+    // ═══════════════════════════════════════════════════
+    // Caso 3: handler tira excepción
+    // Esperado: wrapper captura y devuelve exito: false.
+    // ═══════════════════════════════════════════════════
+    CommandBus.registrar('test_caso3', async () => {
+      throw new Error('Excepción simulada');
+    });
+
+    const r3 = await CommandBus.ejecutar({ type: 'test_caso3', datos: {} });
+    info(`Caso 3 — retorno del wrapper: ${JSON.stringify(r3)}`);
+    assert(r3.exito === false, 'Caso 3: handler tira excepción → wrapper devuelve exito:false');
+
+    // ═══════════════════════════════════════════════════
+    // Caso 4: handler devuelve { exito: true }
+    // Esperado: wrapper devuelve exito: true.
+    // ═══════════════════════════════════════════════════
+    CommandBus.registrar('test_caso4', async () => {
+      return { exito: true, data: { ok: true } };
+    });
+
+    const r4 = await CommandBus.ejecutar({ type: 'test_caso4', datos: {} });
+    info(`Caso 4 — retorno del wrapper: ${JSON.stringify(r4)}`);
+    assert(r4.exito === true, 'Caso 4: handler devuelve {exito:true} → wrapper propaga exito:true');
+
+    // ═══ RESUMEN ═══
+    resultsEl.innerHTML += `<div class="s">${passed} pasaron, ${failed} fallaron</div>`;
+    if (failed === 0) {
+      resultsEl.innerHTML += '<div class="t p">✅ Wrapper del CommandBus corregido (E.x14 aplicado). Nota B1 cerrada.</div>';
+    } else {
+      resultsEl.innerHTML += '<div class="t f">⚠️ Wrapper del CommandBus NO corregido. Coordinar con Célula E.</div>';
     }
 
-    let prodIdA = null, prodIdB = null, recetaId = null;
-    let pedidoId = null, precargaDocId = null;
-    let mesaVinculada = null;
-    let baseInicio = 0, baseFin = 0;
-    let mesaNueva = null;
-    const idsCreados = [];
-
-    try {
-      log('Inicializando Appwrite...');
-      if (!(await DBAppwrite.iniciar()) || !DBAppwrite.habilitado) throw new Error('Appwrite no disponible');
-
-      log('Autenticando master...');
-      await inicializarAuth();
-      if (!(await Auth.iniciarSesion('master', 'master123'))) throw new Error('Auth falló');
-
-      await DB.init();
-      PedidoManager.init({ pedidoRepo: PedidoRepositoryLocal });
-      Deps.registrar('pedidoRepo', PedidoRepositoryLocal);
-
-      log('Activando Comanda y PrecargaControl...');
-      Comanda.activar();
-      PrecargaControl.activar();
-
-      // ═══ ZONA DE PRUEBA SIN DESTRUIR PRODUCCIÓN ═══
-      const mesasExistentes = await DBAppwrite.listar('mesas');
-      const maxExistente = mesasExistentes.reduce((max, m) => {
-        const n = parseInt(m.numero);
-        return !isNaN(n) ? Math.max(max, n) : max;
-      }, 0);
-
-      baseInicio = maxExistente + 1;
-      baseFin = baseInicio + 11;
-      log(`Creando mesas de prueba ${baseInicio}..${baseFin}...`);
-
-      const mesasPrueba = [];
-      for (let i = baseInicio; i <= baseFin; i++) {
-        const num = String(i);
-        const mesaCreada = await DBAppwrite.crear('mesas', num, {
-          numero: num,
-          estado: 'libre',
-          pedidoId: '',
-          comensales: 1,
-          zona: 'zona_test',
-          esVirtual: false,
-          espacioId: 'lataberna'
-        });
-        if (mesaCreada?.id) idsCreados.push({ coleccion: 'mesas', id: mesaCreada.id });
-        mesasPrueba.push(num);
-      }
-
-      const todasMesas = await DBAppwrite.listar('mesas');
-      DB.mesas = todasMesas;
-      Store.despachar({ type: 'MESAS_INICIALIZAR', payload: todasMesas });
-
-      log('Creando productos de prueba...');
-      prodIdA = (await DBAppwrite.crear('productos', 'unique()', {
-        nombre: 'Hamburguesa (test)', precio: 1500, categoria: 'platos', destino: 'cocina', activo: true, estado: 'disponible', espacioId: 'lataberna'
-      })).id;
-      prodIdB = (await DBAppwrite.crear('productos', 'unique()', {
-        nombre: 'Cerveza (test)', precio: 800, categoria: 'bebidas', destino: 'barra', activo: true, estado: 'disponible', espacioId: 'lataberna'
-      })).id;
-      recetaId = (await DBAppwrite.crear('recetas', 'unique()', {
-        productoId: prodIdA, ingredientes: '[]', instrucciones: 'Armar y cocinar', es_intermedio: false, espacioId: 'lataberna'
-      })).id;
-      idsCreados.push({ coleccion: 'productos', id: prodIdA });
-      idsCreados.push({ coleccion: 'productos', id: prodIdB });
-      idsCreados.push({ coleccion: 'recetas', id: recetaId });
-
-      Store.despachar({ type: 'PRODUCTOS_INICIALIZAR', payload: await DBAppwrite.listar('productos') });
-      Store.despachar({ type: 'RECETAS_INICIALIZAR', payload: await DBAppwrite.listar('recetas') });
-
-      // ═══ VISTA DE MESAS ═══
-      const main = document.createElement('main');
-      main.id = 'view-mesas';
-      main.className = 'view active';
-      document.body.appendChild(main);
-
-      // Llamamos a activar para que asegure la vista y active la bandeja
-      Mesas.activar();
-      EventBus.emit('vista:cambiada', 'mesas');
-      await esperar(300);
-
-      // ═══ SUITE 0: MAPA DE MESAS ═══
-      resultsEl.innerHTML += '<div class="suite"><h2>0. Mapa de Mesas</h2></div>';
-      const mesasActuales = await DBAppwrite.listar('mesas');
-      const cuentaPruebas = mesasPrueba.filter(n => mesasActuales.some(m => m.numero === n)).length;
-      if (cuentaPruebas === 12) pass('Las 12 mesas de prueba están en Appwrite');
-      else fail(`Solo ${cuentaPruebas} mesas de prueba en Appwrite`);
-
-      let card = obtenerTarjeta(baseInicio);
-      if (card) pass(`Tarjeta de mesa ${baseInicio} existe`);
-      else fail(`No se encontró tarjeta de mesa ${baseInicio}`);
-      if (!card) throw new Error('Sin tarjeta de prueba');
-
-      let microCocina = card.querySelector('.micro-cocina');
-      let microBarra = card.querySelector('.micro-barra');
-      if (microCocina) pass('Aparece micro-insignia de cocina'); else fail('No aparece micro-insignia de cocina');
-      if (microBarra) pass('Aparece micro-insignia de barra'); else fail('No aparece micro-insignia de barra');
-
-      const gris = 'rgb(156, 163, 175)';
-      if (microCocina && microCocina.style.background === gris) pass('Cocina gris inicial'); else fail('Cocina no gris');
-      if (microBarra && microBarra.style.background === gris) pass('Barra gris inicial'); else fail('Barra no gris');
-
-      DB.comandas = [{
-        id: 'com_1', mesa: String(baseInicio), destino: 'cocina',
-        items: [], estado: 'en-proceso', ts: Date.now() - 5 * 60 * 1000, mozo: 'Carlos', observaciones: ''
-      }];
-      Store.despachar({ type: 'COMANDA_AGREGADA', payload: DB.comandas[0] });
-      Mesas.render();
-      await esperar(200);
-
-      card = obtenerTarjeta(baseInicio);
-      microCocina = card?.querySelector('.micro-cocina');
-      if (microCocina && microCocina.style.background === 'rgb(245, 158, 11)') pass('Cocina amarilla (en-proceso)');
-      else fail('Cocina no cambió a amarillo');
-
-      DB.comandas[0].estado = 'lista';
-      Store.despachar({ type: 'COMANDA_ACTUALIZADA', payload: { id: 'com_1', cambios: { estado: 'lista' } } });
-      Mesas.render();
-      await esperar(200);
-      card = obtenerTarjeta(baseInicio);
-      microCocina = card?.querySelector('.micro-cocina');
-      if (microCocina && microCocina.style.background === 'rgb(34, 197, 94)') pass('Cocina verde (lista)');
-      else fail('Cocina no cambió a verde');
-
-      if (card) {
-        card.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-        await esperar(450);
-        card.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-        await esperar(200);
-        const popover = document.querySelector('#popoverContainer div');
-        if (popover) {
-          pass('Popover aparece');
-          if (popover.textContent.includes(`Mesa ${baseInicio}`)) pass('Popover muestra número de mesa');
-          else fail('Popover no muestra número de mesa');
-          if (popover.textContent.includes('lista')) pass('Popover muestra estado lista');
-          else fail('Popover no muestra estado lista');
-          popover.querySelector('button')?.click();
-        } else fail('Popover no apareció');
-      }
-
-      DB.comandas = [];
-      Store.despachar({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
-      Mesas.render();
-      await esperar(200);
-
-      // ═══ SUITE 1: BANDEJA PERSISTENTE ═══
-      resultsEl.innerHTML += '<div class="suite"><h2>1. Bandeja Persistente</h2></div>';
-
-      // Crear aviso persistente tipo llamado
-      const aviso = await DBAppwrite.crear('avisos', 'unique()', {
-        mesaId: String(baseInicio + 1),
-        tipo: 'llamado',
-        estado: 'pendiente',
-        espacioId: 'lataberna'
-      });
-      idsCreados.push({ coleccion: 'avisos', id: aviso.id });
-
-      // Crear precarga persistente
-      const precargaPersistente = await DBAppwrite.crear('pedidos', 'unique()', {
-        mesa: String(baseInicio + 2),
-        tipo: 'local',
-        origen: 'cliente',
-        estado: 'precarga',
-        comensales: 1,
-        items: '[]',
-        total: 0,
-        id_usuario: 'cliente_test_bandeja',
-        espacioId: 'lataberna'
-      });
-      idsCreados.push({ coleccion: 'pedidos', id: precargaPersistente.id });
-
-      // Abrir bandeja y verificar
-      Mesas.BandejaAtencion.abrirBandeja();
-      await esperar(1200);
-
-      const itemsBandeja = document.querySelectorAll('#bandejaLista .bandeja-item');
-      if (itemsBandeja.length === 2) pass('Bandeja muestra 2 solicitudes persistentes');
-      else fail(`Bandeja muestra ${itemsBandeja.length} solicitudes (esperado 2)`);
-
-      const textoBandeja = document.getElementById('bandejaLista')?.textContent || '';
-      if (textoBandeja.includes(`Mesa ${baseInicio + 1}`)) pass('Bandeja muestra aviso persistente');
-      else fail('Bandeja no muestra aviso persistente');
-      if (textoBandeja.includes(`Mesa ${baseInicio + 2}`)) pass('Bandeja muestra precarga persistente');
-      else fail('Bandeja no muestra precarga persistente');
-
-      Mesas.BandejaAtencion.cerrarBandeja();
-      await esperar(200);
-
-      // ═══ SUITE 2: FUSIÓN Y DESHACER FUSIÓN ═══
-      resultsEl.innerHTML += '<div class="suite"><h2>2. Fusión y Deshacer Fusión</h2></div>';
-      const nums = [baseInicio + 3, baseInicio + 4, baseInicio + 5];
-      log(`Fusionando ${nums.join('+')} como "cumpleaños"...`);
-      const virtual = await DB.fusionarMesas(nums, 'Mozo Test', 'cumpleaños');
-      if (virtual && virtual.numero === 'cumpleaños') pass('Fusión devuelve mesa virtual');
-      else fail('Fusión no devolvió mesa virtual');
-      await esperar(500);
-      Store.despachar({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
-      Mesas.render();
-      await esperar(300);
-
-      let dom = obtenerNumerosDOM();
-      if (dom.includes('cumpleaños')) pass('DOM muestra "cumpleaños"');
-      else fail('DOM no muestra "cumpleaños"');
-      if (nums.every(n => !dom.includes(String(n)))) pass('DOM no muestra originales');
-      else fail('DOM muestra originales');
-
-      MesaDetalles.abrir('cumpleaños');
-      await esperar(300);
-      const cardVirtual = document.querySelector('#modalMesaDetalles .action-card.virtual');
-      if (cardVirtual) pass('Existe botón Deshacer Fusión');
-      else fail('No existe botón Deshacer Fusión');
-      if (cardVirtual) {
-        cardVirtual.click();
-        await esperar(300);
-        const confirmarBtn = document.querySelector('.modal-confirm-overlay .confirmar-btn');
-        if (confirmarBtn) {
-          confirmarBtn.click();
-          await esperar(300);
-          pass('Confirmación deshacer fusión aceptada');
-        } else fail('No se pudo confirmar deshacer');
-
-        const eliminadaDeAppwrite = await esperarHasta(async () => {
-          const mesas = await DBAppwrite.listar('mesas');
-          return !mesas.some(m => m.numero === 'cumpleaños');
-        }, 'mesa virtual desaparece de Appwrite');
-
-        if (eliminadaDeAppwrite) pass('Virtual eliminada de Appwrite (con polling)');
-        else fail('Virtual aún en Appwrite tras polling');
-      }
-
-      const virtualLocal = DB.mesas.find(m => m.numero === 'cumpleaños');
-      if (!virtualLocal) pass('Virtual eliminada localmente');
-      else fail('Virtual aún local');
-      const originalesLocal = nums.map(n => DB.mesas.find(x => String(x.numero) === String(n))?.estado);
-      if (originalesLocal.every(e => e === 'libre')) pass('Originales restauradas localmente');
-      else fail(`Originales locales mal: ${originalesLocal.join(', ')}`);
-
-      const originalesAppwrite = await esperarHasta(async () => {
-        const mesas = await DBAppwrite.listar('mesas');
-        return nums.every(n => mesas.find(x => String(x.numero) === String(n))?.estado === 'libre');
-      }, 'originales libres en Appwrite');
-
-      if (originalesAppwrite) pass('Originales restauradas en Appwrite (con polling)');
-      else fail('Originales Appwrite no restauradas');
-
-      Store.despachar({ type: 'MESAS_INICIALIZAR', payload: DB.mesas });
-      Mesas.render();
-      await esperar(300);
-      dom = obtenerNumerosDOM();
-      if (!dom.includes('cumpleaños')) pass('DOM sin "cumpleaños"');
-      else fail('DOM aún con "cumpleaños"');
-      if (nums.every(n => dom.includes(String(n)))) pass('DOM muestra originales');
-      else fail('DOM no muestra originales');
-      const numericos = dom.filter(n => /^\d+$/.test(n)).map(Number);
-      const ascendente = numericos.every((n,i,a)=>i===0||a[i-1]<n);
-      if (ascendente) pass('Orden ascendente');
-      else fail('Orden no ascendente');
-
-      // ═══ SUITE 3: AGREGAR MESA NUEVA ═══
-      resultsEl.innerHTML += '<div class="suite"><h2>3. Agregar Mesa Nueva</h2></div>';
-      const resultadoAgregar = await agregarMesa();
-      if (resultadoAgregar && resultadoAgregar.exito) {
-        pass('agregarMesa: comando exitoso y mesa persistida');
-      } else {
-        fail(`agregarMesa: ${resultadoAgregar?.error || 'sin exito'}`);
-      }
-      await esperar(1000);
-      Mesas.render();
-      await esperar(300);
-
-      const maxDespues = Math.max(...DB.mesas.map(m => parseInt(m.numero) || 0));
-      mesaNueva = String(maxDespues);
-      const mesaNuevaDB = DB.mesas.find(m => String(m.numero) === mesaNueva);
-      if (mesaNuevaDB) pass(`DB: mesa ${mesaNueva} creada`);
-      else fail(`DB: mesa ${mesaNueva} no existe`);
-      const mesaNuevaStore = Store.obtenerEstado().mesas.find(m => String(m.numero) === mesaNueva);
-      if (mesaNuevaStore) pass(`Store: mesa ${mesaNueva} presente`);
-      else fail(`Store: mesa ${mesaNueva} no existe`);
-      const mesaNuevaAppwrite = (await DBAppwrite.listar('mesas')).find(m => m.numero === mesaNueva);
-      if (mesaNuevaAppwrite) pass(`Appwrite: mesa ${mesaNueva} creada`);
-      else fail(`Appwrite: mesa ${mesaNueva} no existe`);
-      dom = obtenerNumerosDOM();
-      if (dom.includes(mesaNueva)) pass(`DOM: muestra mesa ${mesaNueva}`);
-      else fail(`DOM: no muestra mesa ${mesaNueva}`);
-
-      // ═══ SUITE 4: VINCULACIÓN ═══
-      resultsEl.innerHTML += '<div class="suite"><h2>4. Vinculación de cliente</h2></div>';
-      EventBus.emit('cliente:mesa_ingresada', { mesa: baseInicio });
-      await esperar(200);
-      MesaDetalles.abrir(baseInicio);
-      await esperar(300);
-      const seccionEspera = document.getElementById('seccionEspera');
-      if (seccionEspera && seccionEspera.style.display === 'flex') pass('Sección de espera visible');
-      else fail('Sección de espera NO visible');
-      const btnAceptar = document.querySelector(`#modalMesaDetalles .btn-atender[data-num-mesa="${baseInicio}"]`);
-      if (btnAceptar) {
-        pass('Botón Aceptar presente');
-        btnAceptar.click();
-        mesaVinculada = await new Promise(async (resolve) => {
-          const timeout = Date.now() + 3000;
-          while (Date.now() < timeout) {
-            const mesas = await DBAppwrite.listar('mesas');
-            const mesa = mesas.find(m => m.numero === String(baseInicio));
-            if (mesa && mesa.pedidoId) { resolve(mesa); return; }
-            await esperar(100);
-          }
-          resolve(null);
-        });
-        if (mesaVinculada && mesaVinculada.estado === 'ocupada' && mesaVinculada.pedidoId) {
-          pass('Mesa vinculada con pedidoId');
-          pedidoId = mesaVinculada.pedidoId;
-        } else {
-          fail('Mesa vinculada sin pedidoId');
-          throw new Error('Sin pedidoId');
-        }
-      } else {
-        fail('Botón Aceptar NO encontrado');
-      }
-
-      const pedidoRemoto = await DBAppwrite.baseDeDatos.getRow({
-        databaseId: DBAppwrite.idBaseDeDatos,
-        tableId: DBAppwrite.COLECCIONES['pedidos'],
-        rowId: pedidoId
-      });
-      if (pedidoRemoto) {
-        const pedidoLocal = {
-          id: pedidoRemoto.$id,
-          mesa: pedidoRemoto.mesa,
-          mozo: pedidoRemoto.mozo,
-          comensales: pedidoRemoto.comensales,
-          items: typeof pedidoRemoto.items === 'string' ? JSON.parse(pedidoRemoto.items) : (pedidoRemoto.items || []),
-          total: pedidoRemoto.total || 0,
-          estado: pedidoRemoto.estado,
-          tipo: pedidoRemoto.tipo,
-          origen: pedidoRemoto.origen,
-          transacciones: [],
-          observaciones: pedidoRemoto.observaciones || '',
-          creadoEn: pedidoRemoto.$createdAt || pedidoRemoto.creadoEn
-        };
-        DB.pedidos = [pedidoLocal];
-        Store.despachar({ type: 'PEDIDOS_INICIALIZAR', payload: DB.pedidos });
-      }
-
-      // ═══ SUITE 5: TOMAR PEDIDO ═══
-      resultsEl.innerHTML += '<div class="suite"><h2>5. Tomar Pedido</h2></div>';
-      Comanda.establecerMesaActiva(mesaVinculada);
-      const prod1 = { id: prodIdA, nombre: 'Hamburguesa (test)', precio: 1500, categoria: 'platos', destino: 'cocina' };
-      const prod2 = { id: prodIdB, nombre: 'Cerveza (test)', precio: 800, categoria: 'bebidas', destino: 'barra' };
-      EventBus.emit('producto:seleccionado', prod1);
-      await esperar(100);
-      EventBus.emit('producto:seleccionado', prod1);
-      await esperar(100);
-      EventBus.emit('producto:seleccionado', prod2);
-      await esperar(200);
-      const pedidoLocal = DB.pedidos.find(p => p.id === pedidoId);
-      const items = pedidoLocal?.items || [];
-      if (items.length === 2) pass('Hay 2 ítems distintos');
-      else fail(`Ítems distintos: ${items.length}`);
-      const totalQty = items.reduce((s,i)=>s+(i.qty||1),0);
-      if (totalQty === 3) pass('Cantidad total = 3');
-      else fail(`Cantidad total: ${totalQty}`);
-
-      // ═══ SUITE 6: ENVIAR COMANDA ═══
-      resultsEl.innerHTML += '<div class="suite"><h2>6. Enviar Comanda</h2></div>';
-      const pendientes = items.map(i => ({ ...i, enviado: false }));
-      const resEnvio = await CommandBus.ejecutar({
-        type: 'enviarComanda',
-        datos: { mesa: mesaVinculada, mozo: 'Test', comensales: 2, observaciones: '', itemsPendientes: pendientes }
-      });
-      if (resEnvio.exito) pass('Envío exitoso');
-      else fail('Fallo envío');
-      if (DB.comandas.length >= 1) pass('Se creó al menos 1 comanda');
-      else fail('No se crearon comandas');
-
-      // ═══ SUITE 7: PRECARGA ═══
-      resultsEl.innerHTML += '<div class="suite"><h2>7. Precarga</h2></div>';
-      const precargaItems = [
-        { prodId: prodIdA, nombre: 'Hamburguesa (test)', precio: 1500, categoria: 'platos', destino: 'cocina', qty: 1, obs: 'sin cebolla' }
-      ];
-      const precargaDoc = await DBAppwrite.crear('pedidos', 'unique()', {
-        mesa: String(baseInicio), tipo: 'local', origen: 'cliente', estado: 'precarga', comensales: 1,
-        items: JSON.stringify(precargaItems), total: 1500, id_usuario: 'cliente_test', espacioId: 'lataberna'
-      });
-      precargaDocId = precargaDoc.id;
-      idsCreados.push({ coleccion: 'pedidos', id: precargaDoc.id });
-      EventBus.emit('cliente:precarga_enviada', {
-        id: precargaDocId, mesa: baseInicio,
-        items: precargaItems,
-        clienteId: 'cliente_test', observaciones: '', timestamp: Date.now()
-      });
-      await esperar(300);
-      const badgeEl = document.querySelector('.precarga-badge');
-      if (badgeEl) pass('Aparece insignia de precarga');
-      else fail('No apareció insignia de precarga');
-      EventBus.emit('precarga:items_listos', { mesa: String(baseInicio), items: precargaItems, precargaId: precargaDocId });
-      await esperar(200);
-      await DBAppwrite.actualizar('pedidos', pedidoId, {
-        items: JSON.stringify(precargaItems),
-        estado: 'abierta',
-        total: precargaItems.reduce((s,i)=>s+(i.precio||0)*(i.qty||1),0)
-      });
-      await esperar(500);
-      const pedidoFinal = await DBAppwrite.baseDeDatos.getRow({
-        databaseId: DBAppwrite.idBaseDeDatos,
-        tableId: DBAppwrite.COLECCIONES['pedidos'],
-        rowId: pedidoId
-      });
-      const itemsFinal = JSON.parse(pedidoFinal.items || '[]');
-      const totalFinal = itemsFinal.reduce((s,i)=>s+(i.qty||1),0);
-      if (totalFinal === 1) pass('Total tras precarga = 1');
-      else fail(`Total tras precarga: ${totalFinal}`);
-
-      // ═══ SUITE 8: CUENTA ═══
-      resultsEl.innerHTML += '<div class="suite"><h2>8. Revisar Cuenta</h2></div>';
-      try {
-        Cuenta.pedirCuenta();
-        pass('pedirCuenta ejecutado sin errores');
-      } catch (e) {
-        fail('Error en pedirCuenta');
-      }
-
-      // ═══ RESULTADOS ═══
-      resultsEl.innerHTML += `<div class="summary">${passed} pasaron, ${failed} fallaron</div>`;
-      if (!failed) resultsEl.innerHTML += '<div class="test pass">✔ Todos los tests pasaron.</div>';
-      else resultsEl.innerHTML += '<div class="test fail">✘ Algunos tests fallaron.</div>';
-
-    } catch (e) {
-      fail('ERROR: ' + e.message);
-      console.error(e);
-    } finally {
-      // ═══ LIMPIEZA SOLO DE ELEMENTOS DE PRUEBA ═══
-      for (const item of idsCreados) {
-        try { await DBAppwrite.eliminar(item.coleccion, item.id); } catch {}
-      }
-      if (pedidoId) await DBAppwrite.eliminar('pedidos', pedidoId).catch(() => {});
-      if (precargaDocId) await DBAppwrite.eliminar('pedidos', precargaDocId).catch(() => {});
-      document.querySelectorAll('.modal-overlay').forEach(o => o.remove());
-      document.getElementById('view-mesas')?.remove();
-      log('🏁 Test finalizado. Se eliminaron solo elementos de prueba.');
-    }
+    // Log para inspección
+    resultsEl.innerHTML += `<pre>Diagnóstico completo:\n` +
+      `Caso 1 → ${JSON.stringify(r1)}\n` +
+      `Caso 2 → ${JSON.stringify(r2)}\n` +
+      `Caso 3 → ${JSON.stringify(r3)}\n` +
+      `Caso 4 → ${JSON.stringify(r4)}\n` +
+      `</pre>`;
   </script>
 </body>
 </html>

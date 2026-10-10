@@ -1,9 +1,20 @@
 /* ================================================================
    LaTaberna - PubPOS — MÓDULO JS (ES6)
    Archivo: js/bootstrap.js
-   Versión: 1.0.18
+   Versión: 1.0.23
    Propósito: Secuencia de arranque: Auth, DB, Store, dependencias.
               Integración con Auth v2.1.3 y modelo de insumos.
+              v1.0.23: A.76: se despacha CARTAS_INICIALIZAR al
+                       Store tras DB.init() para cerrar la
+                       coherencia de slices (variantes, movimientos
+                       y cartas despachados al arranque).
+              v1.0.22: A.74: se despacha MOVIMIENTOS_INICIALIZAR
+                       al Store tras DB.init().
+              v1.0.21: A.46: se despacha VARIANTES_INICIALIZAR al
+                       Store tras cargar DB.
+              v1.0.20: eliminado alias transitorio
+                       INGREDIENTES_INICIALIZAR. Se mantiene el
+                       registro de Auth en Deps para DBAppwrite.
    ================================================================ */
 
 import { Logger } from './lib/logger.js';
@@ -28,6 +39,14 @@ const Bootstrap = (() => {
   async function arrancar() {
     Logger.setLevel('DEBUG');
     Logger.info('[Bootstrap] Iniciando aplicación...');
+
+    // 0. Registrar dependencias base antes de que otros módulos las usen.
+    try {
+      Deps.registrar('auth', Auth);
+      Logger.info('[Bootstrap] Auth registrado en el contenedor de dependencias.');
+    } catch (e) {
+      Logger.warn('[Bootstrap] No se pudo registrar Auth en Deps:', e);
+    }
 
     // 1. Inicializar autenticación
     try {
@@ -62,12 +81,13 @@ const Bootstrap = (() => {
     Store.despachar({ type: 'PEDIDOS_INICIALIZAR',      payload: DB.pedidos || [] });
     Store.despachar({ type: 'PRODUCTOS_INICIALIZAR',    payload: DB.productos || [] });
     Store.despachar({ type: 'INSUMOS_INICIALIZAR',      payload: DB.insumos || [] });
-    // Alias temporal para vistas que aún despachan el tipo anterior
-    Store.despachar({ type: 'INGREDIENTES_INICIALIZAR', payload: DB.insumos || [] });
-    Store.despachar({ type: 'RECETAS_INICIALIZAR',       payload: DB.recetas || [] });
-    Store.despachar({ type: 'MOZOS_INICIALIZAR',         payload: DB.mozos || [] });
-    Store.despachar({ type: 'CONFIG_INICIALIZAR',        payload: DB.config || {} });
+    Store.despachar({ type: 'RECETAS_INICIALIZAR',      payload: DB.recetas || [] });
+    Store.despachar({ type: 'MOZOS_INICIALIZAR',        payload: DB.mozos || [] });
+    Store.despachar({ type: 'CONFIG_INICIALIZAR',       payload: DB.config || {} });
     Store.despachar({ type: 'PEDIDOSDELIVERY_INICIALIZAR', payload: DB.pedidosDelivery || [] });
+    Store.despachar({ type: 'VARIANTES_INICIALIZAR',    payload: DB.variantes || [] });
+    Store.despachar({ type: 'MOVIMIENTOS_INICIALIZAR',  payload: DB.movimientos || [] });
+    Store.despachar({ type: 'CARTAS_INICIALIZAR',       payload: DB.cartas || [] });
     Logger.info('[Bootstrap] Store poblado con datos iniciales.');
 
     // 4. Configurar repositorios y servicios

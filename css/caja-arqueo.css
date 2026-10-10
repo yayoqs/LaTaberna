@@ -1,0 +1,242 @@
+/* ================================================================
+   LaTaberna - PubPOS — CSS MODULAR
+   Archivo: css/caja-arqueo.css
+   Versión: 1.0.0
+   Propósito: Modal de arqueo de caja. Todos los estilos están
+              encapsulados bajo #modalArqueo.
+   ================================================================ */
+
+/* ═══════════════════════════════════════════════════════════════
+   SECCIÓN 1 — CONTENEDOR DEL MODAL
+   ═══════════════════════════════════════════════════════════════ */
+
+#modalArqueo .arqueo-modal {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  width: 100%;
+  max-width: 760px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0,0,0,.5);
+  overflow: hidden;
+}
+
+#modalArqueo .modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+#modalArqueo .modal-header h3 {
+  font-size: 16.5px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+#modalArqueo .modal-header .icon-accent { color: var(--color-accent); }
+#modalArqueo .modal-header .mh-sub {
+  font-size: 11.5px;
+  color: var(--color-text-muted);
+  font-weight: 500;
+  margin-top: 2px;
+}
+#modalArqueo .modal-close {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 15px;
+  cursor: pointer;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#modalArqueo .modal-close:hover {
+  color: var(--color-text);
+  background: var(--color-hover);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SECCIÓN 2 — CUERPO Y RESUMEN
+   ═══════════════════════════════════════════════════════════════ */
+
+#modalArqueo .arqueo-body {
+  padding: 20px 22px;
+  overflow-y: auto;
+}
+
+#modalArqueo .arq-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+#modalArqueo .arq-sum-card {
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+#modalArqueo .arq-sum-card .lbl {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+#modalArqueo .arq-sum-card .val {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SECCIÓN 3 — TABLA DE DENOMINACIONES
+   ═══════════════════════════════════════════════════════════════ */
+
+#modalArqueo .denom-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 18px;
+}
+#modalArqueo .denom-table th {
+  text-align: left;
+  font-size: 10.5px;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--color-border);
+  font-weight: 700;
+}
+#modalArqueo .denom-table td {
+  padding: 7px 6px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+#modalArqueo .denom-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 13px;
+}
+#modalArqueo .bill-swatch {
+  width: 26px;
+  height: 16px;
+  border-radius: 3px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+}
+#modalArqueo .denom-qty {
+  width: 64px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text);
+  padding: 6px 8px;
+  font-size: 13px;
+  text-align: center;
+  min-height: 34px;
+  outline: none;
+}
+#modalArqueo .denom-qty:focus { border-color: var(--color-accent); }
+#modalArqueo .denom-sub {
+  font-weight: 700;
+  text-align: right;
+  color: var(--color-text-sec);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SECCIÓN 4 — DIFERENCIA
+   ═══════════════════════════════════════════════════════════════ */
+
+#modalArqueo .arqueo-diff {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 18px;
+  border-radius: var(--radius);
+  background: rgba(46,204,113,.1);
+  border: 1px solid rgba(46,204,113,.25);
+  margin-bottom: 16px;
+}
+#modalArqueo .arqueo-diff .d-label {
+  font-size: 12px;
+  color: var(--color-text-sec);
+}
+#modalArqueo .arqueo-diff .d-value {
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--color-success);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SECCIÓN 5 — FORMULARIO Y PIE
+   ═══════════════════════════════════════════════════════════════ */
+
+#modalArqueo .form-group label {
+  display: block;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--color-text-muted);
+  margin-bottom: 6px;
+  font-weight: 700;
+}
+#modalArqueo .form-group input {
+  width: 100%;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  padding: 11px 13px;
+  font-size: 14px;
+  outline: none;
+  transition: var(--t);
+  min-height: 42px;
+}
+#modalArqueo .form-group input:focus { border-color: var(--color-accent); }
+
+#modalArqueo .modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 22px;
+  border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SECCIÓN 6 — RESPONSIVE
+   ═══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 900px) {
+  #modalArqueo .arq-summary { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 600px) {
+  #modalArqueo .arqueo-modal {
+    max-height: 100vh;
+    border-radius: 0;
+  }
+  #modalArqueo .arq-summary { grid-template-columns: 1fr; }
+  #modalArqueo .modal-footer {
+    flex-direction: column-reverse;
+    padding: 14px;
+  }
+  #modalArqueo .modal-footer .btn-primary,
+  #modalArqueo .modal-footer .btn-secondary {
+    width: 100%;
+    justify-content: center;
+  }
+}

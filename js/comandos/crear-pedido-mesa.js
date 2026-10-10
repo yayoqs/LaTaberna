@@ -1,9 +1,9 @@
 /* ================================================================
    LaTaberna - PubPOS — COMANDO JS (ES6)
    Archivo: js/comandos/crear-pedido-mesa.js
-   Versión: 1.0.4
+   Versión: 1.0.5
    Propósito: Comando para crear un pedido asociado a una mesa.
-              v1.0.4: asigna tipo=salon, origen=staff, pedidoId en comandas.
+              v1.0.5: A.9: tipo 'salon' → 'local' (enum correcto).
    ================================================================ */
 
 import { CommandBus } from '../lib/command-bus.js';
@@ -21,7 +21,7 @@ export function crearComandoPedidoMesa(datos) {
       numeroMesa: datos.numeroMesa,
       mozo: datos.mozo || 'Sin mozo',
       comensales: datos.comensales || 1,
-      tipo: 'salon',
+      tipo: 'local',
       origen: 'staff'
     }
   };

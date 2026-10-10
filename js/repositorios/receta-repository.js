@@ -1,9 +1,31 @@
 /* ================================================================
    LaTaberna - PubPOS — REPOSITORIO JS (ES6)
    Archivo: js/repositorios/receta-repository.js
-   Versión: 1.1.1
+   Versión: 1.2.1
    Propósito: Repositorio de recetas y productos (Appwrite + localStorage).
-              v1.1.1: eliminado campo 'tipo' de productos (ya no existe en el esquema).
+   v1.2.1: A.52 — guardarProducto persiste todos los campos del
+           producto base. Antes solo enviaba nombre, activo, estado,
+           destino y variantes_ids. Los campos categoria, precio,
+           descripcion, imagen y alergenos se perdían silenciosamente.
+           Además el campo `estado` estaba hardcodeado a 'disponible',
+           lo que reactivaba productos agotados al editarlos.
+           Cambios:
+             · docParaAppwrite extiende con categoria (default
+               'General', coherente con DBCore._normalizarProducto),
+               precio (Number, default 0), descripcion (default ''),
+               imagen (default '').
+             · estado respeta producto.estado con fallback
+               'disponible'. Coherente con el enum del schema.
+             · alergenos serializado con el mismo patrón que
+               variantes_ids: array → JSON.stringify, string → se
+               conserva, ausente → '[]'.
+           Verificación: test-D-temporal.html (16/26 antes del fix,
+           26/26 después; absorber al Bloque 12 del unificado).
+   v1.2.0: guardarProducto propaga variantes_ids a Appwrite
+           con serialización JSON. Prerequisito del Paquete 3
+           (asignación de variantes a productos).
+   v1.1.1: eliminado campo 'tipo' de productos (ya no existe
+           en el esquema).
    ================================================================ */
 
 import { Logger } from '../lib/logger.js';
@@ -117,11 +139,43 @@ export function crearRecetaRepo() {
 
       if (DBAppwrite && DBAppwrite.habilitado) {
         try {
+          // v1.2.1: variantes_ids se serializa como JSON string para
+          // coincidir con el tipo varchar de la columna. Se acepta
+          // array o string ya serializado.
+          const variantesIdsSerializado = Array.isArray(producto.variantes_ids)
+            ? JSON.stringify(producto.variantes_ids)
+            : (typeof producto.variantes_ids === 'string'
+                ? producto.variantes_ids
+                : '[]');
+
+          // v1.2.1: alergenos sigue el mismo patrón. Campo del
+          // producto base (distinto de las alergias del cliente que
+          // viven en el perfil y viajan al item como
+          // alergias_manuales). Ver COLECCIONES.md v4.7.1 y
+          // ARQUITECTURA-VARIANTES.md §8.2.
+          const alergenosSerializado = Array.isArray(producto.alergenos)
+            ? JSON.stringify(producto.alergenos)
+            : (typeof producto.alergenos === 'string'
+                ? producto.alergenos
+                : '[]');
+
+          // v1.2.1 (A.52): persiste todos los campos del producto
+          // base. Antes solo viajaban nombre, activo, estado,
+          // destino y variantes_ids: categoria, precio,
+          // descripcion, imagen y alergenos se perdían.
+          // Además, `estado` estaba hardcodeado a 'disponible', lo
+          // que reactivaba productos agotados al editarlos.
           const docParaAppwrite = {
             nombre: producto.nombre,
+            precio: Number(producto.precio) || 0,
+            categoria: producto.categoria || 'General',
+            descripcion: producto.descripcion || '',
             activo: producto.activo !== false,
-            estado: 'disponible',
-            destino: producto.destino || 'cocina'
+            imagen: producto.imagen || '',
+            estado: producto.estado || 'disponible',
+            destino: producto.destino || 'cocina',
+            variantes_ids: variantesIdsSerializado,
+            alergenos: alergenosSerializado
           };
 
           if (producto.id) {

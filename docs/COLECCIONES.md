@@ -1,295 +1,103 @@
-# 📦 COLECCIONES.md — Estructura de la Base de Datos "EkyzD"
+# COLECCIONES.md — Estructura de la Base de Datos "EkyzD"
 
-**Versión:** 3.4.2
-**Fecha:** 25 de agosto de 2026
+**Versión:** 4.9.0
+**Fecha:** 8 de octubre de 2026
 **Base de datos:** `EkyzD` (ID: `6a0275cb0022ebf7d30d`)
-**Propósito:** Especificación canónica de colecciones, columnas, configuración, permisos y jerarquía de roles para Appwrite Cloud.
+**Propósito:** Especificación canónica de tablas, columnas e índices.
+
+> La configuración de permisos, teams y roles se documenta en `EstadoAppwrite.md`.
 
 ---
 
-## 🏷️ Nomenclatura
+## Cambios en v4.9.0 respecto a v4.8.0
 
-- `laTaberna_*`: Colecciones de negocio de La Taberna (tienen `espacioId`).
-- `global_*`: Colecciones compartidas entre todas las apps del ecosistema (no tienen `espacioId`).
+- A.74: se agrega la colección `laTaberna_Movimientos` con 11
+  columnas y 4 índices. Log append-only de ajustes y consumos
+  de stock. Permisos de fila update/delete solo admin.
+
+## Cambios en v4.8.0 respecto a v4.7.1
+
+- A.72: se agrega la columna `revisadoPor` (varchar 100,
+  opcional) a `laTaberna_Pedidos`.
+
+## Cambios en v4.7.1 respecto a v4.7.0
+
+- A.44: rename `laTaberna_Menus` → `laTaberna_Cartas`.
+- A.47: se elimina la fila huérfana de `laTaberna_Avisos`.
+
+## Cambios en v4.7.0 respecto a v4.6.0
+
+- A.43: se agrega la columna `alergenos` (varchar 500, opcional)
+  a `laTaberna_Productos`.
+
+## Cambios en v4.6.0 respecto a v4.5.3
+
+- A.39: se agrega la colección `laTaberna_Variantes`.
+- A.39: se agrega la columna `variantes_ids` a
+  `laTaberna_Productos`.
+
+## Cambios en v4.5.3 respecto a v4.5.2
+
+- A.16/A.17: `laTaberna_Insumos` incorpora el modelo de insumo
+  vendible: columnas `vendible`, `precio_venta` y `destino`.
+- A.16/A.18: se elimina `insumoId` de `laTaberna_Productos`.
+
+---
+
+## Nomenclatura
+
+- `laTaberna_*`: tablas de negocio de La Taberna.
+- `global_*`: tablas compartidas del ecosistema.
 
 ---
 
-## 🔐 Jerarquía y asignación de roles
+## Nota sobre Appwrite Console IV
 
-| Rol | Nivel | Puede asignar |
-|-----|-------|---------------|
-| `master` | Plataforma | `admin` |
-| `admin` | Tenant | `gerente`, `chef`, `cocinaAyudante`, `barman`, `barraAyudante`, `mesero`, `caja`, `repartidor`, `artista` |
-| `gerente` | Staff | `chef`, `cocinaAyudante`, `barman`, `barraAyudante`, `mesero`, `caja`, `repartidor`, `artista` |
-| `chef` | Staff | No asigna roles |
-| `cocinaAyudante` | Staff | No asigna roles |
-| `barman` | Staff | No asigna roles |
-| `barraAyudante` | Staff | No asigna roles |
-| `mesero` | Staff | No asigna roles |
-| `caja` | Staff | No asigna roles |
-| `repartidor` | Staff | No asigna roles |
-| `artista` | Staff | No asigna roles |
-| `cliente` | Usuario | No asigna roles |
+La consola nueva usa términos unificados, pero la CLI conserva nombres clásicos.
 
-Los usuarios pueden tener múltiples roles staff simultáneamente. El campo `rolPrincipal` define la vista inicial.
+En la consola:
+
+- Tablas = Tables
+- Filas = Rows
+- Columnas = Columns
+
+En la CLI:
+
+- Tablas = collections
+- Filas = documents
+- Columnas = attributes
+
+No modificar la terminología de los IDs.
+
+---
+
+## Nota sobre roles del ecosistema
+
+El ecosistema Elisekai utiliza `jugador` como rol base global.
+En LaTaberna, un jugador sin Team actúa como cliente.
+No existe el rol `cliente` como etiqueta separada.
 
 ---
 
-## 🔐 Matriz de permisos por colección
-
-### Leyenda
-
-- **CRUD**: CREATE, READ, UPDATE, DELETE
-- **R/U**: READ, UPDATE
-- **C/R/U**: CREATE, READ, UPDATE
-- **—**: Sin permiso
-
----
+## Tablas de negocio (`laTaberna_*`)
 
 ### 1. `laTaberna_Productos`
 
-| Label | Permisos |
-|-------|----------|
-| `master` | CRUD |
-| `admin` | CRUD |
-| `gerente` | CRUD |
-| `chef` | READ |
-| `cocinaAyudante` | — |
-| `barman` | READ |
-| `barraAyudante` | — |
-| `mesero` | READ |
-| `caja` | READ |
-| `repartidor` | READ |
-| `artista` | — |
-| `cliente` | READ |
-
----
-
-### 2. `laTaberna_Pedidos`
-
-| Label | Permisos |
-|-------|----------|
-| `master` | CRUD |
-| `admin` | CRUD |
-| `gerente` | R/U |
-| `chef` | READ |
-| `cocinaAyudante` | — |
-| `barman` | READ |
-| `barraAyudante` | — |
-| `mesero` | C/R/U |
-| `caja` | READ |
-| `repartidor` | R/U |
-| `artista` | — |
-| `cliente` | READ (propios) |
-
----
-
-### 3. `laTaberna_Mesas`
-
-| Label | Permisos |
-|-------|----------|
-| `master` | CRUD |
-| `admin` | CRUD |
-| `gerente` | R/U |
-| `chef` | — |
-| `cocinaAyudante` | — |
-| `barman` | — |
-| `barraAyudante` | — |
-| `mesero` | R/U |
-| `caja` | READ |
-| `repartidor` | — |
-| `artista` | — |
-| `cliente` | READ* |
-
-> **Nota:** El permiso `READ` para `cliente` en `laTaberna_Mesas` permite consultas puntuales de estado de su mesa. No habilita la vista de mapa de mesas en la UI; dicha vista se controla con `verMesas: false` en `roles.js`.
-
----
-
-### 4. `laTaberna_Comandas`
-
-| Label | Permisos |
-|-------|----------|
-| `master` | CRUD |
-| `admin` | CRUD |
-| `gerente` | R/U |
-| `chef` | R/U |
-| `cocinaAyudante` | R/U |
-| `barman` | R/U |
-| `barraAyudante` | R/U |
-| `mesero` | C/R |
-| `caja` | — |
-| `repartidor` | READ |
-| `artista` | — |
-| `cliente` | — |
-
----
-
-### 5. `laTaberna_Insumos`
-
-| Label | Permisos |
-|-------|----------|
-| `master` | CRUD |
-| `admin` | CRUD |
-| `gerente` | CRUD |
-| `chef` | READ |
-| `cocinaAyudante` | — |
-| `barman` | READ |
-| `barraAyudante` | — |
-| `mesero` | — |
-| `caja` | — |
-| `repartidor` | — |
-| `artista` | — |
-| `cliente` | — |
-
----
-
-### 6. `laTaberna_Recetas`
-
-| Label | Permisos |
-|-------|----------|
-| `master` | CRUD |
-| `admin` | CRUD |
-| `gerente` | R/U |
-| `chef` | CRUD |
-| `cocinaAyudante` | READ |
-| `barman` | CRUD (barra) |
-| `barraAyudante` | READ |
-| `mesero` | — |
-| `caja` | — |
-| `repartidor` | — |
-| `artista` | — |
-| `cliente` | — |
-
----
-
-### 7. `laTaberna_Staff`
-
-| Label | Permisos |
-|-------|----------|
-| `master` | CRUD |
-| `admin` | CRUD |
-| `gerente` | C/R |
-| `chef` | READ |
-| `cocinaAyudante` | READ |
-| `barman` | READ |
-| `barraAyudante` | READ |
-| `mesero` | READ |
-| `caja` | READ |
-| `repartidor` | READ |
-| `artista` | READ |
-| `cliente` | READ |
-
----
-
-### 8. `laTaberna_Configuracion`
-
-| Label | Permisos |
-|-------|----------|
-| `master` | CRUD |
-| `admin` | CRUD |
-| `gerente` | READ |
-| Resto de roles | — |
-
----
-
-### 9. `laTaberna_Eventos_en_vivo`
-
-| Label | Permisos |
-|-------|----------|
-| `master` | CRUD |
-| `admin` | CRUD |
-| `gerente` | C/R/U |
-| `artista` | R/U |
-| `cliente` | READ |
-| Resto de roles | — |
-
----
-
-### 10. `laTaberna_Menus`
-
-| Label | Permisos |
-|-------|----------|
-| `master` | CRUD |
-| `admin` | CRUD |
-| `gerente` | C/R/U |
-| `mesero` | READ |
-| `cliente` | READ |
-| Resto de roles | — |
-
----
-
-### 11. `laTaberna_Proveedores`
-
-| Label | Permisos |
-|-------|----------|
-| `master` | CRUD |
-| `admin` | CRUD |
-| `gerente` | CRUD |
-| Resto de roles | — |
-
----
-
-### 12. `laTaberna_Entradas`
-
-| Label | Permisos |
-|-------|----------|
-| `master` | CRUD |
-| `admin` | CRUD |
-| `gerente` | CRUD |
-| `chef` | READ |
-| `barman` | READ |
-| Resto de roles | — |
-
----
-
-### 13. `laTaberna_Comensales`
-
-| Label | Permisos |
-|-------|----------|
-| `master` | CRUD |
-| `admin` | CRUD |
-| `gerente` | C/R/U |
-| `mesero` | C/R/U |
-| `caja` | READ |
-| Resto de roles | — |
-
----
-
-### 14. `laTaberna_Avisos`
-
-| Label | Permisos |
-|-------|----------|
-| `master` | CRUD |
-| `admin` | CRUD |
-| `gerente` | CRUD |
-| `mesero` | C/R/U |
-| `cliente` | C/R |
-| Resto de roles | READ |
-
----
-
-## 📋 Colecciones de negocio (`laTaberna_*`)
-
----
-
-## 1. `laTaberna_Productos`
-
-**Name:** laTaberna_Productos
-**Table ID:** laTaberna_Productos
-
-| Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
-|---------|------|:----------:|-------------------|---------|
+| Columna | Tipo | Obligatorio | Detalles | Default |
+|---------|------|:----------:|----------|---------|
 | `nombre` | varchar | Sí | 255 | — |
 | `precio` | float | No | — | `0` |
-| `categoria` | varchar | No | 100 | — |
+| `categoria` | varchar | No | 255 | — |
 | `destino` | enum | No | `cocina`, `barra`, `ambos` | `cocina` |
 | `descripcion` | varchar | No | 500 | — |
 | `activo` | boolean | Sí | — | `true` |
-| `imagen` | varchar | No | 500 | — |
+| `imagen` | varchar | No | 1000 | — |
 | `estado` | enum | Sí | `disponible`, `agotado` | `disponible` |
+| `variantes_ids` | varchar | No | 2000 — JSON array | `[]` |
+| `alergenos` | varchar | No | 500 — JSON array | `[]` |
 | `espacioId` | varchar | No | 100 | — |
 
-**Índices:**
+Índices:
 
 | Nombre | Tipo | Columna(s) |
 |--------|------|-----------|
@@ -297,36 +105,41 @@ Los usuarios pueden tener múltiples roles staff simultáneamente. El campo `rol
 | `index_activo` | Key | `activo` |
 | `index_destino` | Key | `destino` |
 
+> `variantes_ids` almacena un JSON array de strings con los IDs
+> de variantes asignadas al producto. El orden del array define el
+> orden de aparición en la UI. Ver `ARQUITECTURA-VARIANTES.md`.
+>
+> `alergenos` almacena un JSON array de strings con los alérgenos
+> propios del producto base, sin depender de variantes. Los valores
+> válidos están definidos en el enum cerrado
+> `js/dominio/alergenos.js` (ver `ARQUITECTURA-VARIANTES.md §8.2`).
+
 ---
 
-## 2. `laTaberna_Pedidos`
+### 2. `laTaberna_Pedidos`
 
-**Name:** laTaberna_Pedidos
-**Table ID:** laTaberna_Pedidos
-
-Colección unificada para todos los tipos de pedido: local, reparto, retiro y precargas de clientes.
-
-| Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
-|---------|------|:----------:|-------------------|---------|
+| Columna | Tipo | Obligatorio | Detalles | Default |
+|---------|------|:----------:|----------|---------|
 | `mesa` | varchar | No | 100 | — |
-| `tipo` | enum | Sí | `local`, `reparto`, `retiro` | `local` |
+| `tipo` | enum | Sí | `local`, `retiro`, `reparto` | `local` |
 | `origen` | enum | Sí | `staff`, `cliente` | `staff` |
 | `estado` | enum | Sí | `abierta`, `en_proceso`, `cerrada`, `precarga` | `abierta` |
 | `mozo` | varchar | No | 100 | — |
 | `comensales` | integer | Sí | — | `1` |
-| `items` | varchar | No | 16383 | `[]` |
+| `items` | varchar | No | 7000 | `[]` |
 | `total` | float | Sí | — | `0` |
 | `observaciones` | varchar | No | 500 | — |
-| `transacciones` | varchar | No | 16383 | `[]` |
+| `transacciones` | varchar | No | 5000 | `[]` |
 | `descuento` | float | No | — | `0` |
 | `direccion` | varchar | No | 500 | — |
 | `telefono` | varchar | No | 50 | — |
 | `repartidor` | varchar | No | 100 | — |
-| `id_usuario` | varchar | No | 255 | — |
+| `id_usuario` | varchar | No | 50 | — |
 | `nombre_comensal` | varchar | No | 255 | — |
+| `revisadoPor` | varchar | No | 100 | — |
 | `espacioId` | varchar | No | 100 | — |
 
-**Índices:**
+Índices:
 
 | Nombre | Tipo | Columna(s) |
 |--------|------|-----------|
@@ -334,27 +147,33 @@ Colección unificada para todos los tipos de pedido: local, reparto, retiro y pr
 | `index_estado` | Key | `estado` |
 | `index_tipo` | Key | `tipo` |
 
+> Los items del pedido pueden incluir:
+>   · `tipo`: `'producto'` o `'insumo'`.
+>   · `opciones`: array de selecciones de variantes (ver
+>     `ARQUITECTURA-VARIANTES.md §5`).
+>   · `alergias_manuales`: array de alergias informadas por el
+>     cliente, distinto del campo `alergenos` de las opciones.
+>
+> `revisadoPor` se completa cuando el mesero revisa una
+> precarga. Es trazabilidad persistida del flujo cliente →
+> mesero.
+
 ---
 
-## 3. `laTaberna_Mesas`
+### 3. `laTaberna_Mesas`
 
-**Name:** laTaberna_Mesas
-**Table ID:** laTaberna_Mesas
-
-Colección simplificada que gestiona exclusivamente la disponibilidad física de las mesas.
-
-| Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
-|---------|------|:----------:|-------------------|---------|
+| Columna | Tipo | Obligatorio | Detalles | Default |
+|---------|------|:----------:|----------|---------|
 | `numero` | varchar | Sí | 100 | — |
 | `estado` | enum | Sí | `libre`, `ocupada`, `esperando`, `cuenta`, `fusionada`, `pagada` | `libre` |
-| `pedidoId` | varchar | No | 100 | — |
+| `pedidoId` | varchar | No | 255 | — |
 | `comensales` | integer | Sí | — | `1` |
 | `zona` | varchar | No | 100 | `salon` |
 | `esVirtual` | boolean | Sí | — | `false` |
-| `mesasFusionadas` | varchar | No | 500 | — |
-| `espacioId` | varchar | No | 100 | — |
+| `mesasFusionadas` | varchar | No | 255 | — |
+| `espacioId` | varchar | No | 255 | — |
 
-**Índices:**
+Índices:
 
 | Nombre | Tipo | Columna(s) |
 |--------|------|-----------|
@@ -363,26 +182,23 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 
 ---
 
-## 4. `laTaberna_Comandas`
+### 4. `laTaberna_Comandas`
 
-**Name:** laTaberna_Comandas
-**Table ID:** laTaberna_Comandas
-
-| Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
-|---------|------|:----------:|-------------------|---------|
-| `mesa` | varchar | Sí | 100 | — |
+| Columna | Tipo | Obligatorio | Detalles | Default |
+|---------|------|:----------:|----------|---------|
+| `mesa` | varchar | Sí | 255 | — |
 | `pedidoId` | varchar | No | 100 | — |
 | `destino` | enum | Sí | `cocina`, `barra`, `ambos` | `cocina` |
-| `items` | varchar | Sí | 16383 | — |
+| `items` | varchar | Sí | 5000 | — |
 | `observaciones` | varchar | No | 500 | — |
 | `estado` | enum | Sí | `nueva`, `en-proceso`, `lista`, `completada` | `nueva` |
-| `subcomandas` | varchar | No | 16383 | `{}` |
+| `subcomandas` | varchar | No | 5000 | `{}` |
 | `ts` | integer | No | — | — |
-| `deliveryId` | varchar | No | 100 | — |
-| `mozo` | varchar | No | 100 | — |
-| `espacioId` | varchar | No | 100 | — |
+| `deliveryId` | varchar | No | 255 | — |
+| `mozo` | varchar | No | 255 | — |
+| `espacioId` | varchar | No | 255 | — |
 
-**Índices:**
+Índices:
 
 | Nombre | Tipo | Columna(s) |
 |--------|------|-----------|
@@ -392,52 +208,51 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 
 ---
 
-## 5. `laTaberna_Insumos`
+### 5. `laTaberna_Insumos`
 
-**Name:** laTaberna_Insumos
-**Table ID:** laTaberna_Insumos
-
-| Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
-|---------|------|:----------:|-------------------|---------|
+| Columna | Tipo | Obligatorio | Detalles | Default |
+|---------|------|:----------:|----------|---------|
 | `nombre` | varchar | Sí | 255 | — |
-| `unidad` | varchar | No | 50 | `u` |
+| `unidad` | varchar | No | 50 | — |
 | `categoria` | varchar | No | 100 | — |
 | `ubicacion` | varchar | No | 255 | — |
 | `stock` | float | No | — | `0` |
 | `stock_minimo` | float | No | — | `0` |
-| `tipo` | enum | Sí | `cocina`, `operativo`, `menaje`, `aseo` | `cocina` |
+| `tipo` | enum | Sí | `aseo`, `cocina`, `operativo`, `menaje` | `cocina` |
 | `costo_manual` | float | No | — | `null` |
+| `vendible` | boolean | No | — | `false` |
+| `precio_venta` | integer | No | — | `0` |
+| `destino` | enum | No | `cocina`, `barra`, `ambos` | `cocina` |
 | `espacioId` | varchar | No | 100 | — |
 
-**Índices:**
+Índices:
 
 | Nombre | Tipo | Columna(s) |
 |--------|------|-----------|
 | `index_tipo` | Key | `tipo` |
 | `index_categoria` | Key | `categoria` |
 
+> **Insumo vendible.** Si `vendible: true`, el insumo puede
+> ofrecerse directamente al cliente (bebida en lata, pan casero,
+> etc.) sin necesidad de una receta.
+
 ---
 
-## 6. `laTaberna_Recetas`
+### 6. `laTaberna_Recetas`
 
-**Name:** laTaberna_Recetas
-**Table ID:** laTaberna_Recetas
-
-> **Nota:** La colección no almacena el nombre del producto. El nombre se obtiene mediante la relación `productoId` → `laTaberna_Productos.$id`. Para obtener una receta con el nombre del producto resuelto, usar el método `DBInventario.obtenerRecetaConProducto(recetaId)`.
-
-| Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
-|---------|------|:----------:|-------------------|---------|
+| Columna | Tipo | Obligatorio | Detalles | Default |
+|---------|------|:----------:|----------|---------|
 | `productoId` | varchar | Sí | 255 | — |
-| `ingredientes` | varchar | No | 16383 | `[]` |
-| `instrucciones` | varchar | No | 2000 | — |
+| `ingredientes` | varchar | No | 7000 | `[]` |
+| `instrucciones` | varchar | No | 7000 | — |
 | `es_intermedio` | boolean | No | — | `false` |
 | `nivel` | varchar | No | 100 | — |
 | `categoria` | varchar | No | 100 | — |
-| `destino` | varchar | No | 50 | — |
+| `destino` | varchar | No | 100 | — |
 | `unidadStock` | varchar | No | 50 | — |
 | `espacioId` | varchar | No | 100 | — |
 
-**Índices:**
+Índices:
 
 | Nombre | Tipo | Columna(s) |
 |--------|------|-----------|
@@ -446,111 +261,109 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 
 ---
 
-## 7. `laTaberna_Staff`
+### 7. `laTaberna_Staff`
 
-**Name:** laTaberna_Staff
-**Table ID:** laTaberna_Staff
-**Propósito:** Personal del restaurante con múltiples roles por espacio.
-
-| Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
-|---------|------|:----------:|-------------------|---------|
+| Columna | Tipo | Obligatorio | Detalles | Default |
+|---------|------|:----------:|----------|---------|
 | `nombre` | varchar | Sí | 100 | — |
-| `usuarioId` | varchar | No | 100 | — |
-| `roles` | varchar | Sí | 16383 | `[]` |
+| `usuarioId` | varchar | Sí | 100 | — |
+| `roles` | varchar | Sí | 500 | `[]` |
 | `rolPrincipal` | varchar | Sí | 50 | `mesero` |
 | `estado` | enum | Sí | `activo`, `inactivo`, `vacaciones` | `activo` |
 | `fechaIngreso` | datetime | No | — | — |
 | `telefono` | varchar | No | 50 | — |
-| `email` | varchar | No | 255 | — |
+| `email` | varchar | No | 50 | — |
 | `notas` | varchar | No | 2000 | — |
-| `tokenVinculacion` | varchar | No | 100 | — |
+| `tokenVinculacion` | varchar | No | 255 | — |
 | `espacioId` | varchar | No | 100 | — |
 
-**Índices:**
+Índices:
 
 | Nombre | Tipo | Columna(s) |
 |--------|------|-----------|
-| `index_usuarioId_espacioId_unico` | Unique | `usuarioId`, `espacioId` |
 | `index_estado` | Key | `estado` |
 | `index_espacioId` | Key | `espacioId` |
+| `index_usuarioId_espacioId_unico` | Unique | `usuarioId`, `espacioId` |
 
 ---
 
-## 8. `laTaberna_Configuracion`
+### 8. `laTaberna_Configuracion`
 
-**Name:** laTaberna_Configuracion
-**Table ID:** laTaberna_Configuracion
-**Propósito:** Configuración por local (nombre, dirección, zonas, etc.).
-
-| Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
-|---------|------|:----------:|-------------------|---------|
+| Columna | Tipo | Obligatorio | Detalles | Default |
+|---------|------|:----------:|----------|---------|
 | `clave` | varchar | Sí | 100 | — |
-| `valor` | varchar | Sí | 16383 | — |
-| `espacioId` | varchar | No | 100 | — |
+| `valor` | varchar | Sí | 1000 | — |
+| `espacioId` | varchar | Sí | 100 | — |
+
+> Row Security activado. Permisos de tabla solo `master`. Acceso
+> por equipo mediante permisos de fila.
+>
+> El `$id` de la fila sigue el patrón `{espacioId}_global`.
+>
+> Claves de la sección **Catálogo**:
+>   · `kds_colapso_variantes` (integer, default 3).
+
+Sin índices adicionales.
 
 ---
 
-## 9. `laTaberna_Eventos_en_vivo`
+### 9. `laTaberna_Eventos_en_vivo`
 
-**Name:** laTaberna_Eventos_en_vivo
-**Table ID:** laTaberna_Eventos_en_vivo
-
-| Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
-|---------|------|:----------:|-------------------|---------|
+| Columna | Tipo | Obligatorio | Detalles | Default |
+|---------|------|:----------:|----------|---------|
 | `tipo` | enum | Sí | `bingo`, `karaoke`, `votacion` | — |
 | `estado` | enum | Sí | `configuracion`, `activo`, `pausado`, `finalizado` | `configuracion` |
-| `datos` | varchar | No | 16383 | — |
+| `datos` | varchar | No | 2000 | — |
 | `creadoPor` | varchar | No | 100 | — |
 | `espacioId` | varchar | No | 100 | — |
 
+Sin índices adicionales.
+
 ---
 
-## 10. `laTaberna_Menus`
+### 10. `laTaberna_Cartas`
 
-**Name:** laTaberna_Menus
-**Table ID:** laTaberna_Menus
-
-| Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
-|---------|------|:----------:|-------------------|---------|
-| `nombre` | varchar | Sí | 255 | — |
+| Columna | Tipo | Obligatorio | Detalles | Default |
+|---------|------|:----------:|----------|---------|
+| `nombre` | varchar | Sí | 150 | — |
 | `estado` | enum | Sí | `borrador`, `publicado` | `borrador` |
-| `productos` | varchar | No | 16383 | `[]` |
+| `productos` | varchar | No | 10000 | `[]` |
 | `creadoPor` | varchar | No | 255 | — |
 | `fondo` | varchar | No | 50 | `#1a1a2e` |
 | `tipografia` | varchar | No | 100 | `'Inter', sans-serif` |
 | `grilla` | boolean | No | — | `false` |
 | `espacioId` | varchar | No | 100 | — |
 
+> Colección renombrada desde `laTaberna_Menus` en A.44
+> (2026-09-16).
+
+Sin índices adicionales.
+
 ---
 
-## 11. `laTaberna_Proveedores`
+### 11. `laTaberna_Proveedores`
 
-**Name:** laTaberna_Proveedores
-**Table ID:** laTaberna_Proveedores
-
-| Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
-|---------|------|:----------:|-------------------|---------|
+| Columna | Tipo | Obligatorio | Detalles | Default |
+|---------|------|:----------:|----------|---------|
 | `nombre` | varchar | Sí | 255 | — |
 | `tipo` | enum | Sí | `distribuidor`, `supermercado`, `feria`, `huerta`, `donacion`, `otro` | `otro` |
 | `contacto` | varchar | No | 255 | — |
 | `telefono` | varchar | No | 50 | — |
-| `email` | varchar | No | 255 | — |
+| `email` | varchar | No | 100 | — |
 | `direccion` | varchar | No | 500 | — |
-| `rubro` | varchar | No | 100 | — |
+| `rubro` | varchar | No | 255 | — |
 | `notas` | varchar | No | 2000 | — |
 | `activo` | boolean | Sí | — | `true` |
 | `espacioId` | varchar | No | 100 | — |
 
+Sin índices adicionales.
+
 ---
 
-## 12. `laTaberna_Entradas`
+### 12. `laTaberna_Entradas`
 
-**Name:** laTaberna_Entradas
-**Table ID:** laTaberna_Entradas
-**Propósito:** Registro de cada recepción de mercadería.
-
-| Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
-|---------|------|:----------:|-------------------|---------|
+| Columna | Tipo | Obligatorio | Detalles | Default |
+|---------|------|:----------:|----------|---------|
 | `insumoId` | varchar | Sí | 255 | — |
 | `proveedorId` | varchar | Sí | 255 | — |
 | `formato` | varchar | No | 100 | — |
@@ -561,7 +374,7 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 | `fecha` | datetime | No | — | — |
 | `espacioId` | varchar | No | 100 | — |
 
-**Índices:**
+Índices:
 
 | Nombre | Tipo | Columna(s) |
 |--------|------|-----------|
@@ -571,14 +384,10 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 
 ---
 
-## 13. `laTaberna_Comensales`
+### 13. `laTaberna_Comensales`
 
-**Name:** laTaberna_Comensales
-**Table ID:** laTaberna_Comensales
-**Propósito:** Registro de personas en una mesa, con o sin cuenta del ecosistema.
-
-| Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
-|---------|------|:----------:|-------------------|---------|
+| Columna | Tipo | Obligatorio | Detalles | Default |
+|---------|------|:----------:|----------|---------|
 | `mesaId` | varchar | Sí | 100 | — |
 | `usuarioId` | varchar | No | 100 | `null` |
 | `nombre` | varchar | Sí | 100 | — |
@@ -587,7 +396,7 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 | `unidoEn` | datetime | No | — | — |
 | `espacioId` | varchar | No | 100 | — |
 
-**Índices:**
+Índices:
 
 | Nombre | Tipo | Columna(s) |
 |--------|------|-----------|
@@ -596,24 +405,20 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 
 ---
 
-## 14. `laTaberna_Avisos`
+### 14. `laTaberna_Avisos`
 
-**Name:** laTaberna_Avisos
-**Table ID:** laTaberna_Avisos
-**Propósito:** Solicitudes transitorias generadas por clientes (vinculación, llamado). Las precargas no se almacenan aquí.
-
-| Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
-|---------|------|:----------:|-------------------|---------|
+| Columna | Tipo | Obligatorio | Detalles | Default |
+|---------|------|:----------:|----------|---------|
 | `tipo` | enum | Sí | `vinculacion`, `llamado`, `precarga` | — |
 | `mesaId` | varchar | Sí | 100 | — |
-| `usuarioId` | varchar | No | 100 | — |
+| `usuarioId` | varchar | No | 150 | — |
 | `estado` | enum | Sí | `pendiente`, `atendido`, `descartado` | `pendiente` |
 | `creadoEn` | datetime | No | — | — |
 | `atendidoPor` | varchar | No | 100 | — |
 | `atendidoEn` | datetime | No | — | — |
-| `espacioId` | varchar | Sí | 100 | — |
+| `espacioId` | varchar | No | 100 | — |
 
-**Índices:**
+Índices:
 
 | Nombre | Tipo | Columna(s) |
 |--------|------|-----------|
@@ -624,32 +429,102 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 
 ---
 
-## 🌐 Colecciones globales (`global_*`)
+### 15. `laTaberna_Variantes`
+
+| Columna | Tipo | Obligatorio | Detalles | Default |
+|---------|------|:----------:|----------|---------|
+| `nombre` | varchar | Sí | 150 | — |
+| `descripcion` | varchar | No | 500 | — |
+| `tipo` | enum | Sí | `unica`, `multiple` | `unica` |
+| `requerido` | boolean | Sí | — | `false` |
+| `min_seleccion` | integer | Sí | — | `0` |
+| `max_seleccion` | integer | Sí | — | `1` |
+| `opciones` | varchar | Sí | 10000 — JSON array | `[]` |
+| `espacioId` | varchar | No | 100 | — |
+| `activo` | boolean | Sí | — | `true` |
+| `orden` | integer | No | — | `0` |
+
+Índices:
+
+| Nombre | Tipo | Columna(s) |
+|--------|------|-----------|
+| `index_espacioId` | Key | `espacioId` |
+| `index_activo` | Key | `activo` |
+
+> Row Security activado. Permisos de tabla solo `label:master`.
 
 ---
 
-## 15. `global_Perfiles`
+### 16. `laTaberna_Movimientos`
 
-**Name:** global_Perfiles
-**Table ID:** global_Perfiles
-**Propósito:** Perfil de usuario del ecosistema (avatar, nivel, XP).
+| Columna | Tipo | Obligatorio | Detalles | Default |
+|---------|------|:----------:|----------|---------|
+| `insumoId` | varchar | Sí | 100 | — |
+| `insumoNombre` | varchar | Sí | 255 | — |
+| `tipo` | enum | Sí | `entrada`, `salida`, `ajuste` | `ajuste` |
+| `cantidad` | float | Sí | signo delata dirección | — |
+| `unidad` | varchar | No | 50 | — |
+| `motivo` | varchar | No | 255 | — |
+| `referencia` | varchar | No | 100 | — |
+| `usuario` | varchar | No | 100 | — |
+| `usuarioId` | varchar | No | 100 | — |
+| `fecha` | datetime | Sí | — | — |
+| `espacioId` | varchar | Sí | 100 | — |
 
-| Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
-|---------|------|:----------:|-------------------|---------|
+Índices:
+
+| Nombre | Tipo | Columna(s) |
+|--------|------|-----------|
+| `index_espacioId` | Key | `espacioId` |
+| `index_fecha` | Key | `fecha` |
+| `index_insumoId` | Key | `insumoId` |
+| `index_tipo` | Key | `tipo` |
+
+> **Log append-only** de ajustes y consumos de stock. No se
+> actualiza ni se elimina en operación normal. Solo `admin`
+> puede hacer update/delete si surge un caso extraordinario.
+>
+> **Campos denormalizados:** `insumoNombre` y `unidad` se graban
+> al momento del movimiento. Si el insumo se renombra después,
+> el movimiento conserva el histórico.
+>
+> **`referencia`:** ata el movimiento a su causa.
+>   · Consumo por comanda: `pedidoId`.
+>   · Consumo por insumo vendible: `pedidoId`.
+>   · Entrada por compra: `entradaId`.
+>   · Ajuste manual: vacío.
+>
+> **Retención en el Store:** últimos 30 días. El histórico
+> completo vive en Appwrite.
+>
+> **Migración de `localStorage`:** no aplicada. Los movimientos
+> previos a esta colección no se migraron.
+>
+> **Row Security:** activado. Permisos de fila update/delete
+> solo `admin`.
+
+---
+
+## Tablas globales (`global_*`)
+
+### 17. `global_Perfiles`
+
+| Columna | Tipo | Obligatorio | Detalles | Default |
+|---------|------|:----------:|----------|---------|
 | `usuarioId` | varchar | Sí | 100 | — |
 | `nombreUsuario` | varchar | Sí | 100 | — |
 | `nombre` | varchar | Sí | 255 | — |
 | `avatar` | varchar | No | 500 | — |
 | `nivel` | integer | Sí | — | `1` |
-| `xp` | integer | Sí | — | `0` |
-| `insignias` | varchar | No | 16383 | `[]` |
+| `xp` | float | Sí | — | `0` |
+| `insignias` | varchar | No | 2000 | `[]` |
 | `racha` | integer | Sí | — | `0` |
-| `titulos` | varchar | No | 16383 | `[]` |
+| `titulos` | varchar | No | 2000 | `[]` |
 | `fechaRegistro` | datetime | No | — | — |
-| `bio` | varchar | No | 500 | — |
+| `bio` | varchar | No | 2000 | — |
 | `ultimaActividad` | datetime | No | — | — |
 
-**Índices:**
+Índices:
 
 | Nombre | Tipo | Columna(s) |
 |--------|------|-----------|
@@ -658,14 +533,10 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 
 ---
 
-## 16. `global_Puntos`
+### 18. `global_Puntos`
 
-**Name:** global_Puntos
-**Table ID:** global_Puntos
-**Propósito:** Historial de puntos de fidelización del ecosistema.
-
-| Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
-|---------|------|:----------:|-------------------|---------|
+| Columna | Tipo | Obligatorio | Detalles | Default |
+|---------|------|:----------:|----------|---------|
 | `usuarioId` | varchar | Sí | 100 | — |
 | `cantidad` | integer | Sí | — | `0` |
 | `motivo` | varchar | No | 255 | — |
@@ -674,7 +545,7 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 | `espacioId` | varchar | No | 100 | — |
 | `fecha` | datetime | No | — | — |
 
-**Índices:**
+Índices:
 
 | Nombre | Tipo | Columna(s) |
 |--------|------|-----------|
@@ -683,14 +554,10 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 
 ---
 
-## 17. `global_Eventos`
+### 19. `global_Eventos`
 
-**Name:** global_Eventos
-**Table ID:** global_Eventos
-**Propósito:** Eventos globales visibles desde cualquier app del ecosistema.
-
-| Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
-|---------|------|:----------:|-------------------|---------|
+| Columna | Tipo | Obligatorio | Detalles | Default |
+|---------|------|:----------:|----------|---------|
 | `titulo` | varchar | Sí | 255 | — |
 | `descripcion` | varchar | No | 500 | — |
 | `fecha` | datetime | No | — | — |
@@ -700,7 +567,7 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 | `app` | varchar | No | 50 | — |
 | `espacioId` | varchar | No | 100 | — |
 
-**Índices:**
+Índices:
 
 | Nombre | Tipo | Columna(s) |
 |--------|------|-----------|
@@ -709,39 +576,96 @@ Colección simplificada que gestiona exclusivamente la disponibilidad física de
 
 ---
 
-## 18. `global_Espacios`
+### 20. `global_Espacios`
 
-**Name:** global_Espacios
-**Table ID:** global_Espacios
-**Propósito:** Registro de locales y hogares del ecosistema.
-
-| Columna | Tipo | Obligatorio | Tamaño / Detalles | Default |
-|---------|------|:----------:|-------------------|---------|
+| Columna | Tipo | Obligatorio | Detalles | Default |
+|---------|------|:----------:|----------|---------|
 | `nombre` | varchar | Sí | 255 | — |
-| `tipo` | enum | Sí | `bar`, `hogar`, `tienda`, `veterinaria`, `hotel`, `otro` | `bar` |
+| `tipo` | enum | No | `bar`, `hogar`, `tienda`, `veterinaria`, `hotel`, `otro`, `pub`, `restaurant`, `eventos`, `taller`, `vitrina` | `otro` |
 | `databaseId` | varchar | No | 100 | — |
 | `adminAsignado` | varchar | No | 100 | — |
 | `direccion` | varchar | No | 500 | — |
 | `ciudad` | varchar | No | 100 | — |
 | `pais` | varchar | No | 100 | — |
 | `activo` | boolean | Sí | — | `true` |
+| `app` | varchar | Sí | 50 | — |
 
-**Índices:**
+> El `$id` de la fila es el `espacioId`.
+> No existe columna `espacioId`.
+
+Índices:
 
 | Nombre | Tipo | Columna(s) |
 |--------|------|-----------|
 | `index_tipo` | Key | `tipo` |
 | `index_activo` | Key | `activo` |
+| `index_app` | Key | `app` |
 
 ---
 
-## ⚡ Funciones serverless
+### 21. `global_Limites`
+
+| Columna | Tipo | Obligatorio | Detalles | Default |
+|---------|------|:----------:|----------|---------|
+| `clave` | varchar | Sí | 255 | — |
+| `marcaTiempo` | datetime | Sí | — | — |
+| `contador` | integer | No | — | `0` |
+
+Índices:
+
+| Nombre | Tipo | Columna(s) |
+|--------|------|-----------|
+| `index_clave` | Key | `clave` |
+| `index_marcaTiempo` | Key | `marcaTiempo` |
+
+> Uso exclusivo de las funciones serverless para rate limiting.
+
+---
+
+## Funciones serverless
 
 | Nombre | URL | Descripción |
 |--------|-----|-------------|
-| `registrar-usuario` | `https://6a81573b000d2f0660d5.tor.appwrite.run` | Registro seguro de cuentas del ecosistema. Crea usuario en Appwrite Auth, perfil global y asigna label cliente. |
-| `asignar-rol` | `https://6a6b3c8a003b634646cc.tor.appwrite.run` | Sincroniza labels de roles múltiples en Appwrite Auth según `usuarioId`, `espacioId` y `roles`. También canjea token de vinculación Staff. |
+| `registrar-usuario` | `https://6a81573b000d2f0660d5.tor.appwrite.run` | Crea cuenta, perfil global y espacio MiRefugio. |
+| `asignar-rol` | `https://6a6b3c8a003b634646cc.tor.appwrite.run` | Sincroniza labels y membresías de Teams. Soporta creación segura de filas de negocio. |
 
 ---
 
-*Documento mantenido por la Célula A (Core). Cualquier modificación debe solicitarse formalmente.*
+## Notas al pie
+
+### Insumo vendible
+
+El modelo de **insumo vendible** reemplaza el campo `insumoId` de
+productos. Un insumo puede ser ingrediente de receta, producto
+vendible directo, o ambos.
+
+### Sistema de variantes
+
+El **sistema de variantes** permite que un producto padre ofrezca
+opciones seleccionables (sabor, tamaño, extras) sin duplicar
+productos. Se documenta en `ARQUITECTURA-VARIANTES.md`.
+
+### Alérgenos
+
+El enum cerrado de alérgenos vive en `js/dominio/alergenos.js`.
+
+### Rename laTaberna_Menus → laTaberna_Cartas
+
+La colección se renombró el 2026-09-16. La clave `cartas`
+reemplaza a `menus` en `COLECCIONES`.
+
+### revisadoPor
+
+La columna `revisadoPor` de `laTaberna_Pedidos` se agregó en
+A.72 (2026-10-08).
+
+### Movimientos de inventario
+
+La colección `laTaberna_Movimientos` se agregó en A.74
+(2026-10-08). Es un log append-only de ajustes y consumos de
+stock. Los movimientos previos a esta colección no se migraron
+desde `localStorage`.
+
+---
+
+*Documento mantenido por la Célula A (Core) del ecosistema Elisekai.*
